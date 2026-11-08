@@ -3,6 +3,39 @@ codecov:
     # Three suite flags plus the unflagged combined report for complete branch data.
     after_n_builds: 4
 
+coverage:
+  precision: 1
+  round: down
+  status:
+    project:
+      default:
+        # The headline number is shown, never a gate: most of the counted lines are engine,
+        # rendering, GUI and editor code that unit tests cannot reach.
+        informational: true
+    patch:
+      # New code under components/ is the code that unit tests can reach. Informational for now. This one 80% target
+      # is a stand-in (with the 5% threshold it passes down to 75%): before it becomes a gate, split it by tier and
+      # set the threshold to 0, as docs/openfallout/coverage-targets.md describes.
+      default:
+        paths:
+          - components/
+        target: 80%
+        threshold: 5%
+        informational: true
+        if_not_found: success
+      # Engine glue needs a running game, so it is reported and never gated.
+      engine:
+        paths:
+          - apps/
+        informational: true
+
+ignore:
+  # Fallout 4 archive readers; Fallout 3, New Vegas and Tale of Two Wastelands do not use them.
+  - "components/bsa/ba2*"
+  # Morrowind-only importers.
+  - "apps/essimporter/"
+  - "apps/mwiniimporter/"
+
 flag_management:
   default_rules:
     # All three suites run on each code change; do not hide missing uploads.
@@ -13,15 +46,77 @@ flag_management:
     - name: editor
 
 component_management:
+  default_rules:
+    statuses:
+      # No drop of more than 1 point, informational for every component. Do not remove the line below to gate one:
+      # that gates all of them. Give the component its own statuses entry with its number from
+      # docs/openfallout/coverage-targets.md and no informational line.
+      - type: project
+        target: auto
+        threshold: 1%
+        informational: true
   individual_components:
+    - component_id: rules
+      name: Fallout rules
+      paths:
+        - components/falloutscript/**
+        - components/falloutmenu/**
+    - component_id: loaders
+      name: Formats and loaders
+      paths:
+        - components/esm/**
+        - components/esm3/**
+        - components/esm4/**
+        - components/esmloader/**
+        - components/esmterrain/**
+        - components/nif/**
+        - components/nifbullet/**
+        - components/bsa/**
+        - components/bgsm/**
+        - components/vfs/**
+        - components/files/**
+        - components/fallback/**
+        - components/toutf8/**
+        - components/serialization/**
+        - components/l10n/**
+        - components/config/**
+        - components/settings/**
+        - components/sqlite3/**
+        - components/compiler/**
+        - components/interpreter/**
+        - components/lua/**
+        - components/detournavigator/**
+        - components/misc/**
+    - component_id: render_helpers
+      name: Rendering, GUI and audio helpers
+      paths:
+        - components/sceneutil/**
+        - components/nifosg/**
+        - components/resource/**
+        - components/shader/**
+        - components/fx/**
+        - components/terrain/**
+        - components/stereo/**
+        - components/widgets/**
+        - components/myguiplatform/**
+        - components/sdlutil/**
+        - components/lua_ui/**
+        - components/fontloader/**
+        - components/debug/**
+        - components/contentselector/**
+        - components/crashcatcher/**
+        - components/loadinglistener/**
+        - components/platform/**
+        - components/process/**
+        - components/std140/**
+        - components/testing/**
+        - components/translation/**
+        - components/bullethelpers/**
+        - components/navmeshtool/**
     - component_id: engine
       name: OpenFallout engine
       paths:
         - apps/openfallout/**
-    - component_id: shared_libraries
-      name: Shared libraries
-      paths:
-        - components/**
     - component_id: editor
       name: Construction Set editor
       paths:
@@ -37,8 +132,6 @@ component_management:
         - apps/bsatool/**
         - apps/bulletobjecttool/**
         - apps/esmtool/**
-        - apps/essimporter/**
-        - apps/mwiniimporter/**
         - apps/navmeshtool/**
         - apps/niftest/**
 

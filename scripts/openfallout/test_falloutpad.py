@@ -8,9 +8,14 @@ import unittest
 from pathlib import Path
 
 try:
-    from lupa import LuaRuntime
+    # The game runs its scripts on LuaJIT. The default runtime of lupa is the newest Lua, which refuses some code that
+    # LuaJIT accepts, such as an assignment to the variable of a for loop.
+    from lupa.luajit21 import LuaRuntime
 except ImportError:  # pragma: no cover
-    LuaRuntime = None
+    try:
+        from lupa import LuaRuntime
+    except ImportError:
+        LuaRuntime = None
 
 SCRIPTS = Path(__file__).resolve().parents[2] / "files" / "data" / "scripts" / "omw"
 
@@ -146,7 +151,8 @@ class ScriptsTest(unittest.TestCase):
     def test_the_keys_of_a_screen_and_the_buttons_go_through_one_function(self):
         for screen in SCREENS:
             text = (SCRIPTS / ("fallout%s.lua" % screen)).read_text(encoding="utf-8")
-            self.assertIn("press(key.code)", text, screen)
+            # Some screens also hand the symbol of the key on: press(key.code, key.symbol)
+            self.assertRegex(text, r"press\(key\.code[,)]", screen)
 
 
 if __name__ == "__main__":

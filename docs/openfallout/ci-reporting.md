@@ -26,6 +26,14 @@ two suites may exercise opposite sides of a branch, while each separate XML
 report only describes partial coverage. The combined upload does not affect
 the individual flags.
 
+gcovr runs with `--exclude-throw-branches`. The compiler adds a hidden exit for exceptions
+to every call that may throw, and gcov reports it as a branch. Almost no test takes these exits,
+and Codecov counts a line with an untaken branch as partial, which is not covered. gcovr drops
+them whether or not a test took them, so the reports no longer count the exception exits of any
+call; the lines of a `catch` block still count as lines. This changes the percentages only, not
+which tests run. gcovr applies the flag while it reads the gcov data, so it belongs on the
+per-suite run; the merge of the saved traces cannot add it later.
+
 GoogleTest XML is normalized to JUnit, preserving test names, durations,
 failure details, and skipped/disabled tests. Source paths inside the checkout
 become repository-relative paths. Raw GoogleTest reports are retained alongside
@@ -39,28 +47,52 @@ repository upload secret.
 
 `codecov.yml` lists the three flags, disables carryforward, and waits for all
 four coverage uploads before producing the coverage notification and PR comment.
-There are no new per-flag coverage thresholds. Test Analytics needs successive
+There are no per-flag coverage thresholds. Every status it defines is informational,
+so Codecov shows the numbers and cannot turn a PR red: the project total, a patch
+status for new code under `components/` (target 80%, which the 5% threshold lets
+pass down to 75%), a patch status for `apps/` and a project status for each component. It also ignores the Fallout 4 archive
+readers (`components/bsa/ba2*`) and the two Morrowind-only importers. The targets
+behind this, and how to turn the statuses into gates, are in
+[Test coverage targets](coverage-targets.md). Test Analytics needs successive
 uploads to establish timing, failure-rate, and flakiness history.
 
 ## Source components
 
 The Components view groups production source files independently of the test
 suite flags. The component IDs in `codecov.yml` are stable so coverage history
-can continue across display-name changes.
+can continue across display-name changes. `shared_libraries` was split into
+`rules`, `loaders` and `render_helpers`, so the history of that one ID ends at
+the split.
 
 | Component | Source paths |
 | --- | --- |
-| OpenFallout engine | `apps/openfallout/` |
-| Shared libraries | `components/` |
-| Construction Set editor | `apps/opencs/` |
-| Launcher and installation wizard | `apps/launcher/`, `apps/wizard/` |
-| Data and navigation tools | BSA, Bullet, ESM, ESS, INI, navigation, and NIF tools under `apps/` |
+| Fallout rules (`rules`) | `components/falloutscript/`, `components/falloutmenu/` |
+| Formats and loaders (`loaders`) | ESM, NIF, BSA, VFS, file, navigation, script and other data code under `components/` |
+| Rendering, GUI and audio helpers (`render_helpers`) | scene graph, shaders, terrain, widgets, SDL and other helpers under `components/` |
+| OpenFallout engine (`engine`) | `apps/openfallout/` |
+| Construction Set editor (`editor`) | `apps/opencs/` |
+| Launcher and installation wizard (`desktop_ui`) | `apps/launcher/`, `apps/wizard/` |
+| Data and navigation tools (`tools`) | BSA, Bullet, ESM, navigation and NIF tools under `apps/` |
 
-These five groups cover the production files in the coverage report without
-overlapping one another. They are included in PR comments and do not add new
-coverage thresholds. To see this configuration in the default-branch view,
-merge the PR and allow its `master` coverage run to finish. Codecov may offer
-**Enable Component Analytics** to backfill historical component trends.
+These groups cover the production files in the coverage report without
+overlapping one another, except for the ignored files named above. They are
+included in PR comments. To see a change to this configuration in the
+default-branch view, merge the PR and allow its `master` coverage run to
+finish. Codecov may offer **Enable Component Analytics** to backfill
+historical component trends.
+
+## Python tests of the helper scripts
+
+The `Changes` job of `push.yml` runs the unit tests under `scripts/openfallout/`
+on every pull request and every push to `master`, including the documentation-only
+ones that skip the platform builds. They read the Lua scripts and the coverage tracker, so
+they check that those still agree. The job installs a `luajit` executable and
+`lupa` (pinned in the workflow, so Dependabot does not update it); without
+them the Lua tests skip. To run them locally:
+
+```sh
+python3 -m unittest discover -s scripts/openfallout -p 'test_*.py'
+```
 
 With an instrumented GCC build in `build/` and gcovr 8.3 on `PATH`, the same
 reporting commands can be run locally:
