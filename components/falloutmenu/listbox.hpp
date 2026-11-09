@@ -18,7 +18,9 @@ namespace FalloutMenu
     class ListBox
     {
     public:
-        ListBox(OpenMenu& open, int listTile, std::string templateName);
+        /// `fitRows` is for a list that the code of the games makes as high as its first rows (the topics of a
+        /// conversation: the first three) and scrolls in the steps that the rest of the rows need: 0 for the others
+        ListBox(OpenMenu& open, int listTile, std::string templateName, int fitRows = 0);
 
         /// Make the rows again: each is a tile of the template with these traits set (`string`, `_line_alpha`, ...); a
         /// trait named `Tile.trait` is set on the tile of that name inside the row, and `_template` (a text) names
@@ -48,6 +50,7 @@ namespace FalloutMenu
         OpenMenu& mOpen;
         int mList;
         std::string mTemplate;
+        int mFitRows = 0;
         std::vector<int> mItems;
         int mSelected = -1;
         /// What the file gives for the height of one scroll step, before the code changes it

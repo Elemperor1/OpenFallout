@@ -1,11 +1,11 @@
--- The death of the player in Fallout 3 and New Vegas: a few seconds after the player has died (the settings of the
--- files say how many) the game stands still and asks whether to load a save or to quit. What dead is, is the engine's
--- (core.pipboy.playerDead).
+-- The death of the player in Fallout 3 and New Vegas, as the games' code does it (Mac round 4A H2, FalloutNV.exe 0x93E840):
+-- a few seconds after the player has died (fPlayerDeathReloadTime, 5 in the executables) the game closes what is open and,
+-- when there is a save, asks in a message box what it says (sMiscPlayerDeadMessage) with two buttons, Reload
+-- (sMiscPlayerDeadLoadOption: the most recent save is loaded) and Main Menu (sMiscPlayerDeadMenuOption); with no save it
+-- goes straight to the main menu. The box has no timer and no key of its own. What dead is, is the engine's
+-- (core.pipboy.playerDead); the box is the message box of the game's own file (falloutmessage.lua).
 local core = require('openfallout.core')
-local ui = require('openfallout.ui')
-local util = require('openfallout.util')
 local I = require('openfallout.interfaces')
-local widgetModule = require('scripts.omw.falloutwidgets')
 
 local pipboy = core.pipboy
 
@@ -13,62 +13,45 @@ if not pipboy.available() then
     return {}
 end
 
-local v2 = util.vector2
-local colors = widgetModule
-local textSize = widgetModule.textSize
-
-local element = nil
-local modeOpen = false
--- Real seconds since the player was seen dead
+-- Real seconds since the player was seen dead, and whether the box has been asked for since
 local deadFor = 0
 local shown = false
 
-local widgets
-
-local function update()
-    if element then element:update() end
-end
-
-local function destroyElement()
-    if element then
-        element:destroy()
-        element = nil
-    end
+-- What the game's settings say (the stand-in words of the port when the install has none)
+local function word(name, fallback)
+    local ok, text = pcall(pipboy.text, name)
+    if ok and type(text) == 'string' and text ~= '' then return text end
+    return fallback
 end
 
 local function show()
     shown = true
-    if not modeOpen then
-        modeOpen = true
-        I.UI.addMode('Interface', { windows = {} })
+    if not pipboy.hasRecentSave() then
+        pipboy.openMainMenu()
+        return
     end
-    destroyElement()
-    widgets = widgetModule.new(update)
-    local width = math.max(360, math.floor(ui.screenSize().x * 0.3))
-    local rows = {
-        { props = { size = v2(width, 0) } },
-        { props = { size = widgetModule.gap } },
-        widgets.label('YOU ARE DEAD', colors.badColor, textSize + 8),
-        { props = { size = widgetModule.gap } },
-        widgets.clickable('Load the last save', function() pipboy.askReload() end, { color = colors.titleColor }),
-        { props = { size = widgetModule.gap } },
-        widgets.clickable('Quit', function() core.quit() end, { color = colors.titleColor }),
-    }
-    element = ui.create(widgets.panel(rows))
+    local asked = I.FalloutMessage ~= nil and I.FalloutMessage.ask(
+        word('sMiscPlayerDeadMessage', 'Reloading the most recent save game'),
+        { word('sMiscPlayerDeadLoadOption', 'Reload'), word('sMiscPlayerDeadMenuOption', 'Main Menu') },
+        function(index)
+            if index == 1 then
+                pipboy.reloadRecent()
+            elseif index == 2 then
+                pipboy.openMainMenu()
+            elseif index == nil then
+                -- (the box could not be shown after all, when the game's message file is not usable)
+                pipboy.askReload()
+            end
+        end)
+    -- (an install without the game's message file: the engine's own question about loading the last save)
+    if not asked then pipboy.askReload() end
 end
 
 return {
     engineHandlers = {
         onFrame = function()
             if not pipboy.playerDead() then
-                if shown then
-                    destroyElement()
-                    shown = false
-                    if modeOpen then
-                        modeOpen = false
-                        I.UI.removeMode('Interface')
-                    end
-                end
+                shown = false
                 deadFor = 0
                 return
             end
@@ -76,16 +59,6 @@ return {
             deadFor = deadFor + core.getRealFrameDuration()
             if not shown and deadFor >= (pipboy.setting('fPlayerDeathReloadTime') or 5) then
                 show()
-            end
-        end,
-    },
-    eventHandlers = {
-        -- A screen that was left (Escape) while the player is dead comes back on the next frame
-        UiModeChanged = function(data)
-            if modeOpen and data.oldMode == 'Interface' and data.newMode ~= 'Interface' and data.newMode ~= 'MainMenu' then
-                modeOpen = false
-                destroyElement()
-                shown = false
             end
         end,
     },

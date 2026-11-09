@@ -32,6 +32,9 @@ namespace FalloutScript::SettingText
         // compared with the executables' texts one by one (round 12AC): 37 are equal byte for byte, and the others
         // are the words that fit the length and the capitals the executables give them (the audio volumes are one
         // word each, the switch words and two of the colours are in capitals).
+        // The four notes of the quick save and the quick load (sQuickSaving, sQuickLoading and the refusals
+        // sCantQuickSave, sCantQuickLoad) are the port's own words, so that a game with neither a plugin text nor an
+        // executable to read says something on the HUD line.
         // The words of the text under the crosshair (the verbs sTargetType*, sSearch, sPickpocket, sSteal, sPick,
         // sDisarmMine, the lock's sLocked, sHUDUseKey, sTo, the names of the lock classes and the two whole lines
         // sBroken and sInaccessible) are string settings of the executables with no plugin record behind them; the
@@ -51,6 +54,8 @@ namespace FalloutScript::SettingText
             Entry{ "sCWheelTitle", "Companion Wheel" },
             Entry{ "sCameraPitch", "Invert Y" },
             Entry{ "sCancel", "Cancel" },
+            Entry{ "sCantQuickLoad", "Quick loading is not possible now." },
+            Entry{ "sCantQuickSave", "Quick saving is not possible now." },
             Entry{ "sCauterize", "Cauterize" },
             Entry{ "sChallengeToggle", "Challenges" },
             Entry{ "sCloseButton", "Close" },
@@ -175,6 +180,8 @@ namespace FalloutScript::SettingText
             Entry{ "sPressStart", "Press Start" },
             Entry{ "sPrevious", "Previous" },
             Entry{ "sQuestsTabText", "Quests" },
+            Entry{ "sQuickLoading", "Quick loading..." },
+            Entry{ "sQuickSaving", "Quick saving..." },
             Entry{ "sQuicksaveAbbrev", "Quick" },
             Entry{ "sQuit", "Quit" },
             Entry{ "sRadioVolume", "Radio" },

@@ -644,7 +644,10 @@ namespace OFDialogue
         }
 
         const OFWorld::ESMStore& store = *OFBase::Environment::get().getESMStore();
-        const ESM::Dialogue* dial = store.get<ESM::Dialogue>().find(topic);
+        // (a game that has no such topic, the "hit" of the dying words in Fallout, says nothing)
+        const ESM::Dialogue* dial = store.get<ESM::Dialogue>().search(topic);
+        if (dial == nullptr)
+            return false;
 
         const OFMechanics::CreatureStats& creatureStats = actor.getClass().getCreatureStats(actor);
         Filter filter(actor, 0, creatureStats.hasTalkedToPlayer());

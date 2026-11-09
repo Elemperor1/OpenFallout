@@ -83,6 +83,10 @@ namespace OFLua
             return rows;
         };
 
+        // A note in the line of messages of the display, as a script's message to the player is printed (the games'
+        // screens tell the player there, not in a window of the engine's own)
+        api["message"] = [](std::string_view text) { scripts().hudMessages().push(std::string(text)); };
+
         // The lines that characters said to the player since this was last called, oldest first, for the subtitles: the
         // text, how long it stays, how far the speaker is, whether a script forced it and whose line it is (0 the
         // player's own, 2 another character's)

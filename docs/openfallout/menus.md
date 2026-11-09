@@ -665,7 +665,7 @@ sets their `_alpha`, and the file shows a tile when that is more than 0), so the
   decides which save Continue loads, by the last write time of the file (the newest first), as the port does by the time
   the save was made. The save's picture and its version line are not here.
 - The engine's side: `menu.mainMenuOpen`, `menu.claimMainMenu(drawn, escape)`, `menu.resume`, `menu.canSave`,
-  `menu.openSettings`, `menu.settingsOpen`, `menu.inputTaken` (`openfallout.menu`). While the console, a
+  `menu.openSettings`, `menu.settingsOpen`, `menu.inputTaken`, `menu.mainMenuPictures` (`openfallout.menu`). While the console, a
   message box or a dialog of the engine's own windows (the one that tells that a save failed, which is modal and has the
   buttons of the pad first) has the input, the script leaves the keys and the buttons of the pad alone: the keys typed in
   the console reach the menu's scripts as well, and so does the key that closes it, so the engine takes who had the key or
@@ -697,10 +697,15 @@ Load opens the list of saves (five rows in the title mode, as the file says itse
 which asks. A pad's Start button does nothing here.
 
 The picture behind the list is the game's first picture of the main menu, `Interface\Main\main_background.dds` (`sMainMenuBackground`,
-1024 by 512), stretched over the whole screen like the slides of the loading menu. Not here: the row of the downloadable content
-(a list of plug-ins), the rotating pictures of the main menu (the game takes them from its loading menu, a new one every ten
-seconds, up to 20), the music of the title (`sTitleMusic`, `special\maintitle.mp3`, volume 0.6), and the version line
-(`1.4.0.525`), which the file hides on a PC. The engine's own buttons come back by themselves when the script does not claim
+1024 by 512), stretched over the whole screen like the slides of the loading menu. The picture turns as the game's does (Mac
+round 12BN part G3: the load screens that carry the main-menu flag 0x400, 33 in New Vegas; a new one every ten seconds,
+fading in over the one before in 2.222 seconds; at most 20, each file once): `menu.mainMenuPictures()` gives the pictures
+(the engine picks them as the loading menu does for a game that starts from the main menu, at random), and the script
+shows the backdrop first and then those, one after the other, round again. The music of the title (`sTitleMusic`,
+`Music\Special\MainTitle.mp3`) begins three seconds after the screen comes (when the install has the file) and stops when a
+game is begun. Not here: the row of the downloadable content (a list of plug-ins), the volume of the title's music (the
+game's 0.6; the music volume of the settings is what applies), and the version line (`1.4.0.525`), which the file hides on
+a PC. The engine's own buttons come back by themselves when the script does not claim
 the menu in a second (the file is not there, or the script failed). Seen only in the offline harness, not in the running game.
 
 ### The settings screens
@@ -1536,6 +1541,97 @@ found the same way.
   gives red, green and blue. The port's `colorOf` still uses the tile's red, green and blue when no system colour is named.
 - A hotrect that only copies its child's `x` and `y` does not move that child a second time (the Pip-Boy tabs would end up
   off the screen otherwise). This is the rule that matches the design; it has not been seen in the running game yet.
+
+## Seen in the running game (Mac round 12BO, New Vegas, 2026-11-09)
+
+- Title screen: without saves the list is New, Settings, Credits, Quit (New lit); with saves Continue, New, Load, Settings,
+  Credits, Quit (Continue lit). At 1920 by 1080 the logo is at x 47 to 467, y 482 to 609, the rows end at x 1863 and are
+  54 px apart, the lit row's box is 415 px wide and about 51 high; the 2:1 picture is stretched over the whole window (no bars,
+  at 4:3 it is squeezed). Row text is amber (the brightest pixel 255, 182, 66). New and Continue ask, Load shows five rows, Escape
+  goes back one step, Credits scrolls (it did not end by itself in 178 s) and Escape or a click ends it. The first pictures
+  and the music of the title were added after this run.
+- Amber (255, 182, 66 at the peaks): the HUD numbers, message line, compass, the pause menu, the Pip-Boy headings and rows and
+  the loading wheel and bars. Still green before this round: the Pip-Boy's page strip (the plain widgets of
+  `falloutwidgets.lua`: now amber in New Vegas), the progress box of the engine's loading screen (now hidden while the game's
+  loading menu is drawn) and the box of the player's death (now the game's own message box with Reload and Main Menu). The
+  left bars of the loading screen end at x 797, 735, 797 and the right ones at 1122, 1184, 1122: exact mirrors about the
+  wheel's centre (959.5) within a pixel.
+- Breath: the meter's ring is centred 49.9% across and 11.3% down, 57 px wide, 16 ticks, "O2" in the middle, amber; it comes
+  about half a second after the head goes under (fade shorter than 0.25 s), the ticks go out one every 0.625 s clockwise from the one
+  right of the top (10 s in all), then the damage is 0.2 x int(health) a second (the loss falls by a factor of 0.819 a second),
+  and at less than a point of health the player dies; coming up fills the breath at once and the meter fades out in about
+  0.4 s. A message box hides it and the clock stops while it is open.
+- Body tone: the body follows the face's tone slider for all four sexes and races (the neck's brightness 45, 101, 120, 135, 170
+  for the man at -35, -10, 0, 10, 35); the head and body agree to within 30 in brightness; only at +35 does the head turn
+  cyan-grey (R below G) while the body stays yellow, which the face's own shader maths gives (not changed).
+- V.A.T.S.: ten bracket boxes with a percent each, the picked part named, the creature's name and meter at the bottom, HP and AP
+  meters, the queue rows right-aligned above the AP block, Space queues, E accepts, Escape and RMB return; with the hands every part
+  shows 95% (the blow is sure within reach and the cap is 95). The hints read "Accept  E)" and "Return  RMB)": the closing
+  bracket is the file's own, there is no opening one. The pad (shoulders, Y, X) works. The brackets of a target at the right
+  of the view draw over the hints.
+- Every one of the 38 implemented screens opens from its file with no error and no missing texture (the scroll picture of
+  `book_menu.xml` and its button picture are not in the install: a scroll has none); the files open with no script data show
+  their placeholders only.
+- HUD, quest and hot key texts (round 12BO part H): the region line fades in over about 1.7 s, holds 2 s and fades out over
+  1.3 s, left aligned at 3% across and 80% down, none for an interior; the quest heading and name appear 0.2 to 1.2 s after the
+  stage is set and are gone about 9.5 s after it, the objective lines follow (a menu hides them and stops their clock);
+  a bark's subtitles are two centred lines at 70% down for about the seconds of the line; a tap of a number key does nothing, a
+  hold of about 0.6 s shows the wheel (slot 1 of `assignHotKey` is the box labelled 2, the ammunition swap, which is why the
+  first item sits in the top-middle box: the call counts from 0); the reticle is two chevrons and only a drawn ranged weapon
+  has it; the HUD is gone with the Pip-Boy, the pause menu, V.A.T.S. (the bars stay) and a conversation.
+- The texts of the data name the controls with `&name;` and `&-name;` (Mac round 12BP part A; no `##(`, `#{` or `&amp;` form
+  is in the data or the executables): `&sUActnUse;` is the words `sPCControlsTextPrefix` (the games put them before the key), a
+  space and the key, `&-sUActnUse;` is the bare key text, empty when the control has none, and a control with no key reads
+  `sPCControlsTextNone`; the executables know 28 controls, a mouse button comes before a key, and a name that is not a
+  control is read as a game setting. The engine put the localisation token of its own settings screen for a mouse button
+  (`#{sMouse} 1`) into the text, which the interface showed as `##(sMouse)`; it is now the setting of the games
+  (`sMouseLeftButton`, "Mouse1" in the executable).
+- The topic list of a conversation (Mac round 12BP part B, `dialog_menu.xml` and FalloutNV.exe 0x7638B0 and 0x71AD30): the list
+  is as high as its first three rows (a row is its wrapped text and 20 of room), never lower than the file's 110, and the
+  rows beyond are reached by steps of `(total - height) / (n - 1)` with `n = max(ceil(count x (total - height) / total) + 1, 2)`:
+  whole rows when all rows are as high, else fractions, and the rows clip at the top and the bottom of the list between
+  steps; at the last step the last row ends where the list does. `ListBox` has this as `fitRows` (the dialogue asks for 3).
+
+## Seen in the running game (Mac round 12BP part C, New Vegas and Fallout 3, 2026-11-09)
+
+- Title: the picture changes every 9.95 s with a linear cross-fade of 2.2 s; the music (`maintitle.mp3`) starts 3.0 s after the
+  title appears and is closed when a game starts. The texts of the controls read as the games' (`To fire your weapon, push
+  Mouse1.`, bare `Tab`, `WASD`, `CapsLock`), with no `&` or `#` left. A note stays on the HUD line for characters / 15 seconds,
+  at least 2.
+- The loading screen of a door in New Vegas (3.3 s): the picture, the tip, the wheel and the bars are amber (252, 183, 70), no
+  green progress box at any frame; a cell that is already loaded shows no loading screen. Fallout 3 draws no wheel and no
+  picture (its loading menu has no slides): the scene goes black for about 3 s with the engine's progress box at the bottom.
+- The topic list of a conversation with six topics (two of them two lines high) is 259 px high, rows 61 px (one line) and 99 px
+  (two lines) apart, three steps of 61, 60 and 60 px, a wheel event or an arrow click is one step, the last row ends at the list
+  bottom: the rule of the previous section as built.
+- The death of the player: the engine asked at once (the box without words of its own) and not after fPlayerDeathReloadTime,
+  which kept the game's box from showing; the engine's question is now left to a game without the Fallout scripts. A top row of
+  pages (STAT, ITEMS, DATA) in the Pip-Boy kept the green frame of the engine's box template (it is a flat amber frame in New
+  Vegas now). A note that the HUD queues while the Pip-Boy is open is drawn under the Pip-Boy's panel (only its left 230 px
+  show), over the loot menu it is on top.
+- The loot menu: the file's hints read "Take All  A)" and "Exit  E)" and bind `_PCButton_A` and `_PCButton_E`; the screen
+  answered R for Take All and nothing for E, which is now the file's (A takes everything, E leaves; Escape leaves too). Taking
+  loot prints no note. A V.A.T.S. attack prints no line of its own. The note of a message with no buttons stays as many seconds
+  as the message's TNAM says (the length of its text gives the time when it has none): the Mac
+  measured 2.2 s for the tutorial note on the fire button (the data has 8 and 10 s for some messages).
+- Quick save, quick load and the HUD line against menus (Mac round 12BQ part A, FalloutNV.exe): F5 (control 0x19, function
+  0x8509A0) queues one note on the HUD message line (`ShowHUDMessage` 0x7052F0 -> `HUDMainMenu::QueueMessage` 0x775380) with the
+  words of `sQuickSaving`, the neutral Vault Boy face, 2.0 s (a constant, not a setting) and no sound, then saves as "quicksave";
+  F9 (0x8509F0) does the same with `sQuickLoading`; when it cannot, `sCantQuickSave` or `sCantQuickLoad` with the sad face, 2.0 s;
+  a failed write says `sSaveFailed`. The autosave (0x850A40) and a save that worked say nothing (`sAutoSaving` and
+  `sSaveSuccessful` have no code that reads them). The HUD main menu has depth -50 and the Pip-Boy pages, the container, the
+  conversation and the message menus 0 or more (the loading menu -6), so the HUD line is drawn under them. The port prints
+  the notes of the quick save and quick load on the HUD line.
+- The death of the player is told to the Lua screen by the state of the actors of Fallout and by a flag of the state manager
+  that the engine sets when the death animation is over (a fall or the breath is the engine's, not a script's).
+- The engine ends the game (state Ended) in the frame the player's health is below one. The script of the pause menu draws the
+  title screen's list (Continue, New, Load, Settings, Quit) in that state too, as in no game: the Mac round 12BQ saw the
+  engine's own pixel-font menu (four rows, no Return or Save) after the death box's Main Menu, because the script drew only
+  while a game ran or none did. Pressing Escape after the death shows the same title list.
+- Fallout 3's loading menu (Fallout3.exe, `loading_menu.xml`): the picture (`loading_world_image`, LSCR ICON), a moving slide, the
+  pinwheel (`loading01.nif`), the plate number, the current objective, three statistic rows and the level meter; the screens
+  come from the 150 LSCR records (limits `iMaxScreens`, `iMaxScreens_MainMenu`, `iNumLocationSpecificScreens`; 32 name
+  locations) and there is no LSCT. The port does not draw it in Fallout 3 yet (black and the engine's progress box).
 
 ## What is not known yet
 

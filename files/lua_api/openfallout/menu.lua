@@ -92,6 +92,13 @@
 -- @param #boolean escape optional
 
 ---
+-- The pictures the title screen turns through behind its list: the load screens of the data that carry the main menu's
+-- flag, picked as the game's loading menu picks them for a game that starts from the main menu (every picture once, in a
+-- random order, at most 20), as the paths of the picture files in the data (under "textures")
+-- @function [parent=#menu] mainMenuPictures
+-- @return #list<#string>
+
+---
 -- Close the menu and go on with the game (nothing when no game is running)
 -- @function [parent=#menu] resume
 

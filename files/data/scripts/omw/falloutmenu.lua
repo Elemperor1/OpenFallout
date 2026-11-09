@@ -282,9 +282,10 @@ end
 -- Make a list of the menu: `listTile` is the list (a tile of `list_box.xml`) and `template` the tile that each row is.
 -- Returns an object with `rows(tables of traits)`, `update(row, traits)`, `select(row)`, `selected()`, `count()` and
 -- `onClick(function(row, tile))`;
--- the rows are from 1.
-function Shown:list(listTile, template)
-    local number = self.menu:addList(listTile, template)
+-- the rows are from 1. `fitRows` makes the list as high as that many of its first rows (the topics of a conversation:
+-- three), scrolled in the steps the other rows need.
+function Shown:list(listTile, template, fitRows)
+    local number = self.menu:addList(listTile, template, fitRows)
     if not number then return nil end
     local shown = self
     local list = {}

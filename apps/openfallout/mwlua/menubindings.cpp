@@ -248,11 +248,12 @@ namespace OFLua
             return rows;
         };
 
-        // Lists (`list_box.xml`): make one of a tile and a template for its rows (the number of the list, from 1), give
-        // it rows (tables of traits to set on each: `string` and the like), pick a row, and find which row a tile is
+        // Lists (`list_box.xml`): make one of a tile and a template for its rows (the number of the list, from 1; the
+        // third argument is how many of its first rows the list is as high as), give it rows (tables of traits to set
+        // on each: `string` and the like), pick a row, and find which row a tile is
         menuT["addList"] = [](sol::this_state state, LuaMenu& self, std::string_view listTile,
-                               std::string_view templateName) -> sol::object {
-            const int number = self.mMenu->addList(listTile, templateName);
+                               std::string_view templateName, sol::optional<int> fitRows) -> sol::object {
+            const int number = self.mMenu->addList(listTile, templateName, std::max(0, fitRows.value_or(0)));
             if (number < 0)
                 return sol::nil;
             return sol::make_object<int>(state, number + 1);

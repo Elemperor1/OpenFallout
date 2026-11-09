@@ -70,6 +70,7 @@ void OFState::StateManager::cleanup(bool force)
         mCharacterManager.setCurrentCharacter(nullptr);
         mTimePlayed = 0;
         mLastSavegame.clear();
+        mPlayerDied = false;
 
         mState = State_NoGame;
         OFBase::Environment::get().getLuaManager()->noGame();
@@ -158,6 +159,23 @@ void OFState::StateManager::askLoadRecent()
             mAskLoadRecent = true;
         }
     }
+}
+
+bool OFState::StateManager::hasRecentSave()
+{
+    return !mLastSavegame.empty() && getCurrentCharacter() != nullptr;
+}
+
+void OFState::StateManager::loadRecent()
+{
+    Character* character = getCurrentCharacter();
+    if (character == nullptr || mLastSavegame.empty())
+    {
+        OFBase::Environment::get().getWindowManager()->pushGuiMode(OFGui::GM_MainMenu);
+        return;
+    }
+    // (requestLoad: a load in the middle of a frame can crash)
+    requestLoad(character, mLastSavegame);
 }
 
 OFState::StateManager::State OFState::StateManager::getState() const
@@ -397,10 +415,15 @@ void OFState::StateManager::quickSave(std::string name)
             && OFBase::Environment::get().getWorld()->getGlobalInt(OFWorld::Globals::sCharGenState) == -1 // char gen
             && OFBase::Environment::get().getWindowManager()->isSavingAllowed()))
     {
-        // You can not save your game right now
-        OFBase::Environment::get().getWindowManager()->messageBox("#{OFEngine:SaveGameDenied}");
+        // You can not save your game right now (the games say it on the line of the HUD, in their words)
+        if (OFBase::Environment::get().getFalloutScripts() != nullptr)
+            OFBase::Environment::get().getFalloutScripts()->quickNote(true, true);
+        else
+            OFBase::Environment::get().getWindowManager()->messageBox("#{OFEngine:SaveGameDenied}");
         return;
     }
+    if (OFBase::Environment::get().getFalloutScripts() != nullptr)
+        OFBase::Environment::get().getFalloutScripts()->quickNote(true, false);
 
     Character* currentCharacter = getCurrentCharacter(); // Get current character
     QuickSaveManager saveFinder(name, Settings::saves().mMaxQuicksaves);
@@ -742,13 +765,18 @@ void OFState::StateManager::printSavegameFormatError(
 
 void OFState::StateManager::quickLoad()
 {
-    if (Character* currentCharacter = getCurrentCharacter())
+    Character* currentCharacter = getCurrentCharacter();
+    if (currentCharacter == nullptr || currentCharacter->begin() == currentCharacter->end())
     {
-        if (currentCharacter->begin() == currentCharacter->end())
-            return;
-        // use requestLoad, otherwise we can crash by loading during the wrong part of the frame
-        requestLoad(currentCharacter, currentCharacter->begin()->mPath);
+        // (the games tell it on the HUD line while a game runs)
+        if (mState == State_Running && OFBase::Environment::get().getFalloutScripts() != nullptr)
+            OFBase::Environment::get().getFalloutScripts()->quickNote(false, true);
+        return;
     }
+    // The note is said when the load is done: a load clears the notes of the HUD (see update)
+    mQuickLoadNote = true;
+    // use requestLoad, otherwise we can crash by loading during the wrong part of the frame
+    requestLoad(currentCharacter, currentCharacter->begin()->mPath);
 }
 
 void OFState::StateManager::deleteGame(const OFState::Character* character, const OFState::Slot* slot)
@@ -822,6 +850,10 @@ void OFState::StateManager::update(float duration)
             character = getCurrentCharacter();
         loadGame(character, mLoadRequest->second);
         mLoadRequest = std::nullopt;
+        // (the load that the quick load key asked for says its note now, after the load cleared the notes)
+        if (mQuickLoadNote && mState == State_Running && OFBase::Environment::get().getFalloutScripts() != nullptr)
+            OFBase::Environment::get().getFalloutScripts()->quickNote(false, false);
+        mQuickLoadNote = false;
     }
 }
 

@@ -7,7 +7,10 @@
 #include <string>
 #include <string_view>
 
+#include <components/esm/records.hpp>
+#include <components/falloutscript/loadscreens.hpp>
 #include <components/lua/util.hpp>
+#include <components/misc/rng.hpp>
 #include <components/misc/strings/lower.hpp>
 #include <components/settings/values.hpp>
 
@@ -16,6 +19,7 @@
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
 #include "../mwstate/character.hpp"
+#include "../mwworld/esmstore.hpp"
 #include "../mwworld/globals.hpp"
 
 #include "context.hpp"
@@ -250,6 +254,30 @@ namespace OFLua
                 if (SDL_IsGameController(index) == SDL_TRUE)
                     return true;
             return false;
+        };
+        // The pictures the title screen turns through behind its list: the load screens of the data that carry the
+        // main menu's flag (0x400), picked as the game's loading menu picks them when a game starts from the main menu
+        // (every picture once, in a random order, at most 20), as the paths of the picture files (without "textures")
+        api["mainMenuPictures"] = [](sol::this_state thisState) {
+            namespace LS = FalloutScript::LoadScreens;
+            constexpr std::uint32_t mainMenuFlag = 0x400;
+            constexpr std::size_t most = 20;
+            std::vector<LS::Picture> pool;
+            for (const ESM4::LoadScreen& record : OFBase::Environment::get().getESMStore()->get<ESM4::LoadScreen>())
+            {
+                if (record.mIcon.empty())
+                    continue;
+                LS::Picture picture;
+                picture.mIcon = record.mIcon;
+                picture.mMainMenu = (record.mFlags & mainMenuFlag) != 0;
+                pool.push_back(std::move(picture));
+            }
+            const std::vector<std::size_t> chosen = LS::choosePictures(
+                pool, true, most, [](int low, int high) { return low + Misc::Rng::rollDice(high - low + 1); });
+            sol::table result(thisState, sol::create);
+            for (const std::size_t index : chosen)
+                result.add(pool[index].mIcon);
+            return result;
         };
         // The settings are written to the user's file (when the screens of the settings are left)
         api["saveOptions"] = []() { OFBase::Environment::get().getWindowManager()->saveSettings(); };

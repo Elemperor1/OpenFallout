@@ -156,8 +156,9 @@ namespace FalloutMenu
         const std::vector<int>& scrollbars() const { return mScrollbars; }
 
         /// Make a list of a tile that the file gives `list_box.xml` and a template for its rows; the number of the
-        /// list, -1 if the menu has no such tile or template
-        int addList(std::string_view listTile, std::string_view templateName);
+        /// list, -1 if the menu has no such tile or template. `fitRows` is how many of its first rows the list is as
+        /// high as (0: the file says how high it is).
+        int addList(std::string_view listTile, std::string_view templateName, int fitRows = 0);
         ListBox* list(int number);
         /// The list and the row of it that a tile is (or is in), if it is
         std::optional<std::pair<int, int>> rowOf(const Tile& tile);

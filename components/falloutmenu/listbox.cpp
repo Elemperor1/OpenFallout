@@ -8,10 +8,11 @@
 
 namespace FalloutMenu
 {
-    ListBox::ListBox(OpenMenu& open, int listTile, std::string templateName)
+    ListBox::ListBox(OpenMenu& open, int listTile, std::string templateName, int fitRows)
         : mOpen(open)
         , mList(listTile)
         , mTemplate(std::move(templateName))
+        , mFitRows(fitRows)
     {
         Menu& menu = mOpen.menu();
         if (Tile* tile = list())
@@ -128,7 +129,18 @@ namespace FalloutMenu
         const float bottom = top + menu.number(*target, "height");
         const float visible = std::max(1.f, menu.number(*bar, "_number_of_visible_items"));
         float scroll = menu.number(*bar, "_current_value");
-        if (top < scroll * delta)
+        if (mFitRows > 0)
+        {
+            // The steps are not whole rows: the row has to be inside the height of the list
+            constexpr float slack = 0.001f;
+            const float listHeight = menu.number(*tile, "height");
+            if (top < scroll * delta - slack)
+                scroll = std::floor(top / delta + slack);
+            else if (bottom > scroll * delta + listHeight + slack)
+                scroll = std::ceil((bottom - listHeight) / delta - slack);
+            scroll = std::min(scroll, std::max(0.f, menu.number(*bar, "_number_of_items") - visible));
+        }
+        else if (top < scroll * delta)
             scroll = std::floor(top / delta);
         else if (bottom > (scroll + visible) * delta)
             scroll = std::ceil(bottom / delta) - visible;
@@ -184,18 +196,50 @@ namespace FalloutMenu
             y += height;
         }
         const float total = y;
-        if (fixedRows > 0)
+        if (mFitRows > 0)
         {
-            menu.set(*tile, "_scroll_delta", delta);
-            menu.set(*tile, "height", fixedRows * delta);
+            // The list is as high as its first rows (the file says the least it is: `_MinListHeight`), and the steps
+            // that scroll it are as many as the rest of the rows need, each the same part of what is over; the last
+            // step puts the end of the last row at the end of the list (FalloutNV.exe 0x7638B0 and 0x71AD30)
+            float fit = 0;
+            for (int row = 0; row < std::min(rowCount(), mFitRows); ++row)
+                if (const Tile* target = item(row))
+                    fit += menu.number(*target, "height");
+            const float least
+                = menu.defines(*tile, "_minlistheight") ? menu.number(*tile, "_minlistheight") : mFileHeight;
+            const float listHeight = std::max(fit, least);
+            menu.set(*tile, "height", listHeight);
+            const float over = total - listHeight;
+            float steps = 1.f;
+            if (over > 0.f && total > 0.f)
+            {
+                steps = std::max(std::ceil(static_cast<float>(rowCount()) * over / total) + 1.f, 2.f);
+                menu.set(*tile, "_scroll_delta", over / (steps - 1.f));
+            }
+            else
+                menu.set(*tile, "_scroll_delta", mFileDelta);
+            if (bar != nullptr)
+            {
+                menu.set(*bar, "_number_of_items", steps);
+                menu.set(*bar, "_number_of_visible_items", 1.f);
+            }
+            menu.set(*tile, "_num_filtered", static_cast<float>(rowCount()));
         }
-        const float listHeight = menu.number(*tile, "height");
-        if (bar != nullptr)
+        else
         {
-            menu.set(*bar, "_number_of_items", std::max(1.f, std::ceil(total / delta)));
-            menu.set(*bar, "_number_of_visible_items", std::max(1.f, std::floor(listHeight / delta)));
+            if (fixedRows > 0)
+            {
+                menu.set(*tile, "_scroll_delta", delta);
+                menu.set(*tile, "height", fixedRows * delta);
+            }
+            const float listHeight = menu.number(*tile, "height");
+            if (bar != nullptr)
+            {
+                menu.set(*bar, "_number_of_items", std::max(1.f, std::ceil(total / delta)));
+                menu.set(*bar, "_number_of_visible_items", std::max(1.f, std::floor(listHeight / delta)));
+            }
+            menu.set(*tile, "_num_filtered", static_cast<float>(rowCount()));
         }
-        menu.set(*tile, "_num_filtered", static_cast<float>(rowCount()));
 
         // The highlight box stands on the picked row, wherever the scrolling has put it
         if (Tile* picked = item(mSelected))

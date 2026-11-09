@@ -17,6 +17,17 @@ local menuModule = require('scripts.omw.falloutmenu')
 local quantity = require('scripts.omw.falloutquantity')
 local cards = require('scripts.omw.falloutitemcards')
 
+-- A note to the player goes to the line of messages of the display, as the games print it, while the display is the
+-- game's own file (the engine's own message window is the fallback)
+local function tellPlayer(text)
+    local hud = I.FalloutHud
+    if hud and hud.note then
+        hud.note(text)
+    else
+        ui.showMessage(text)
+    end
+end
+
 local pipboy = core.pipboy
 
 if not pipboy.available() then
@@ -309,7 +320,7 @@ end
 local function moveItem(from, item, count)
     local to = otherSide(from)
     if from.player and item.equipped then
-        ui.showMessage('Unequip it first.')
+        tellPlayer('Unequip it first.')
         return
     end
     pipboy.transfer(from.holder(), to.holder(), item.id, count)
@@ -442,7 +453,7 @@ local function updateCards()
 end
 
 -- The keys while the menu of the file is there: Left and Right go to the other list, the arrows and pages pick a
--- thing, Enter moves it and R takes everything
+-- thing, Enter moves it, A takes everything and E leaves (the keys the file names: _PCButton_A and _PCButton_E)
 local function pressMenu(code, symbol)
     if quantity.isOpen() then
         quantity.press(code, symbol)
@@ -475,13 +486,15 @@ local function pressMenu(code, symbol)
         if picked > 0 then
             activateRow(side, picked)
         end
-    elseif code == input.KEY.R then
+    elseif code == input.KEY.A then
         takeAll()
+    elseif code == input.KEY.E then
+        leave()
     end
 end
 
 -- What a key (or a button of the pad that stands for one) does while the screen is there: the arrows and pages pick a
--- thing, Enter takes it and R takes everything
+-- thing, Enter takes it, A takes everything and E leaves
 local function press(code, symbol)
     -- (a menu opened over the screen takes the keys and the buttons)
     if not isOpen() or I.UI.getMode() ~= 'Interface' or messageOpen() then
@@ -501,14 +514,16 @@ local function press(code, symbol)
         moveSelected(-listLines)
     elseif code == input.KEY.Enter then
         takeSelected()
-    elseif code == input.KEY.R then
+    elseif code == input.KEY.A then
         takeAll()
+    elseif code == input.KEY.E then
+        leave()
     end
 end
 
--- On the pad Y takes the thing and X takes everything
+-- On the pad Y takes the thing and X takes everything (the pad's X is the file's Take All, key A)
 local onPad = pad.handler('loot', function() return isOpen() and I.UI.getMode() == 'Interface' and not messageOpen() end, press,
-    { [input.CONTROLLER_BUTTON.X] = input.KEY.R })
+    { [input.CONTROLLER_BUTTON.X] = input.KEY.A })
 
 local function sync()
     local loot = pipboy.loot()

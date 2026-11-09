@@ -1680,7 +1680,8 @@
 
 ---
 -- Lists, as the games' code makes them from `list_box.xml`. `addList` makes one from the tile of the list and the name of
--- the template of its rows (a number counted from 1, nil if the menu has no such tile or template); `setRows` makes the
+-- the template of its rows (a number counted from 1, nil if the menu has no such tile or template; a third number makes
+-- the list as high as that many of its first rows, as the games' code does for the topics of a conversation); `setRows` makes the
 -- rows again from a list of tables, each the traits to set on one row (`string`, `_line_alpha`, ...), and works out
 -- their heights, the scrolling and the highlight; `selectRow` (counted from 1, 0 for none; `reveal` scrolls to it),
 -- `selectedRow`, `rowCount`; `rowOf` gives the list and the row that a tile is (or is in).
@@ -1719,6 +1720,12 @@
 -- The messages that were printed since this was last called, oldest first.
 -- @function [parent=#Hud] takeMessages
 -- @return #list<#HudMessage>
+
+---
+-- Prints a note in the line of messages of the display (the place a script's message to the player is printed), not in a
+-- window of the engine's own.
+-- @function [parent=#Hud] message
+-- @param #string text
 
 ---
 -- The lines that characters said to the player outside of a conversation since this was last called, oldest first, for the
@@ -3244,6 +3251,19 @@
 ---
 -- The game asks whether to load the most recent save, as it does when the player has died.
 -- @function [parent=#Pipboy] askReload
+
+---
+-- Whether there is a save that `reloadRecent` would load (the game's own box for the death has no buttons without one).
+-- @function [parent=#Pipboy] hasRecentSave
+-- @return #boolean
+
+---
+-- Loads the most recent save of the current character at once; the main menu opens when there is none.
+-- @function [parent=#Pipboy] reloadRecent
+
+---
+-- Opens the menu that Escape opens (the games' "Main Menu" button of the box for the death).
+-- @function [parent=#Pipboy] openMainMenu
 
 ---
 -- @{#Vats}: V.A.T.S., the targeting of Fallout 3 and New Vegas that stops the game for attacks at parts of the body. The

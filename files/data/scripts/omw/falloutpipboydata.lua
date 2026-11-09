@@ -16,10 +16,22 @@
 --   page.update()          -- each frame while the page is shown
 --   page.hide()
 local core = require('openfallout.core')
+local I = require('openfallout.interfaces')
 local input = require('openfallout.input')
 local ui = require('openfallout.ui')
 
 local menuModule = require('scripts.omw.falloutmenu')
+
+-- A note to the player goes to the line of messages of the display, as the games print it, while the display is the
+-- game's own file (the engine's own message window is the fallback)
+local function tellPlayer(text)
+    local hud = I.FalloutHud
+    if hud and hud.note then
+        hud.note(text)
+    else
+        ui.showMessage(text)
+    end
+end
 
 local pipboy = core.pipboy
 
@@ -354,7 +366,7 @@ local function travelTo(index)
     local marker = markers[index]
     if not marker then return end
     if not marker.travel then
-        ui.showMessage(marker.name ~= '' and marker.name or 'Unknown')
+        tellPlayer(marker.name ~= '' and marker.name or 'Unknown')
         return
     end
     local api = interact()
@@ -362,7 +374,7 @@ local function travelTo(index)
     if why == '' then
         if options.close then options.close() end
     else
-        ui.showMessage(why)
+        tellPlayer(why)
     end
 end
 

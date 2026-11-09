@@ -1274,12 +1274,19 @@ namespace OFScript
         return mEnableParents;
     }
 
-    void FalloutScripts::tellPlayer(const std::string& text, int kind)
+    void FalloutScripts::quickNote(bool save, bool denied)
+    {
+        const char* name
+            = denied ? (save ? "sCantQuickSave" : "sCantQuickLoad") : (save ? "sQuickSaving" : "sQuickLoading");
+        tellPlayer(gameSettingText(name), denied ? 2 : 0, 2.f);
+    }
+
+    void FalloutScripts::tellPlayer(const std::string& text, int kind, float seconds)
     {
         // Not in the dialogue window: the window of Fallout's conversations is a script's, and the one that takes these
         // notes during a conversation of Morrowind is hidden
         // The head-up display prints it in the corner (the display of Fallout takes what is said from the line)
-        mHudMessages.push(text, {}, 0, kind);
+        mHudMessages.push(text, {}, seconds, kind);
     }
 
     bool FalloutScripts::leftLoadedCells(FalloutScript::FormId reference)
@@ -1356,6 +1363,11 @@ namespace OFScript
 
     std::optional<std::string> FalloutScripts::messageToken(std::string_view name)
     {
+        // `&-name;` is the form of the games that asks for the bare text: the key of a control without the words that
+        // `&name;` puts before it (FalloutNV.exe 0x7070C0)
+        const bool bare = name.starts_with('-');
+        if (bare)
+            name.remove_prefix(1);
         if (name == "PCName")
             return mChargen.name();
         // The sex and race are those of the player now: the ones picked in the making of the character or, before that,
@@ -1371,46 +1383,21 @@ namespace OFScript
             return race != nullptr ? race->mFullName : std::string();
         }
 
-        // The keys of the controls: the key that is bound to the action, as the settings screen lists it. The games
-        // have no key for blocking in the controls of OpenFallout, so its token is the name of the action.
-        static const std::pair<std::string_view, int> actions[] = {
-            { "sUActnForward", OFInput::A_MoveForward },
-            { "sUActnBack", OFInput::A_MoveBackward },
-            { "sUActnSldleft", OFInput::A_MoveLeft },
-            { "sUActnSldright", OFInput::A_MoveRight },
-            { "sUActnJump", OFInput::A_Jump },
-            { "sUActnRun", OFInput::A_Run },
-            { "sUActnToggleRun", OFInput::A_AlwaysRun },
-            { "sUActnCrouch", OFInput::A_Sneak },
-            { "sUActnUse", OFInput::A_Use },
-            { "sUActnGrab", OFInput::A_Activate },
-            { "sUActnMenumode", OFInput::A_Inventory },
-        };
-        for (const auto& [token, action] : actions)
-            if (name == token)
-            {
-                OFBase::InputManager* input = OFBase::Environment::get().getInputManager();
-                if (input == nullptr)
-                    return std::nullopt;
-                return input->joystickLastUsed() ? input->getActionControllerBindingName(action)
-                                                 : input->getActionKeyBindingName(action);
-            }
-        // V.A.T.S. is opened by the V key (falloutvats.lua)
-        if (name == "sUActnVats")
-            return "V";
-        if (name == "sUActnBlock")
-            return "Block";
-
         // The names of keys and buttons: the setting of the files when it has one, else the name the games set
-        if (name.starts_with("sKB") || name.starts_with("sMouse") || name.starts_with("sDevice")
-            || name.starts_with("sXB"))
-        {
-            std::string text = gameSettingText(name);
+        const auto deviceName = [this](std::string_view setting) -> std::optional<std::string> {
+            std::string text = gameSettingText(setting);
             if (!text.empty() && text.front() != '\\')
                 return text;
             static const std::pair<std::string_view, std::string_view> buttons[] = {
                 { "sMouseLeftButton", "Mouse1" },
                 { "sMouseRightButton", "Mouse2" },
+                { "sMouseMiddleButton", "Wheel" },
+                { "sMouseButton3", "Button 3" },
+                { "sMouseButton4", "Button 4" },
+                { "sMouseButton5", "Button 5" },
+                { "sMouseButton6", "Button 6" },
+                { "sMouseButton7", "Button 7" },
+                { "sMouseButton8", "Button 8" },
                 { "sDeviceMouse", "Mouse" },
                 { "sXBABtn", "A" },
                 { "sXBBBtn", "B" },
@@ -1429,12 +1416,105 @@ namespace OFScript
                 { "sXBDPadRight", "D-Pad Right" },
             };
             for (const auto& [token, button] : buttons)
-                if (name == token)
+                if (setting == token)
                     return std::string(button);
             // sKBSpace, sKBE: the key is named after the rest of the id
-            if (name.starts_with("sKB") && name.size() > 3)
-                return std::string(name.substr(3));
+            if (setting.starts_with("sKB") && setting.size() > 3)
+                return std::string(setting.substr(3));
+            return std::nullopt;
+        };
+
+        // The keys of the controls: the key that is bound to the action, as the settings screen lists it, in the words
+        // of the games (the executables take a mouse button before a key, which the settings of OpenFallout do not
+        // order). The games have no key for blocking in the controls of OpenFallout, so its token is the name of the
+        // action.
+        struct Control
+        {
+            std::string_view mName;
+            int mAction;
+        };
+        static const Control actions[] = {
+            { "sUActnForward", OFInput::A_MoveForward },
+            { "sUActnBack", OFInput::A_MoveBackward },
+            { "sUActnSldleft", OFInput::A_MoveLeft },
+            { "sUActnSldright", OFInput::A_MoveRight },
+            { "sUActnJump", OFInput::A_Jump },
+            { "sUActnRun", OFInput::A_Run },
+            { "sUActnToggleRun", OFInput::A_AlwaysRun },
+            { "sUActnCrouch", OFInput::A_Sneak },
+            { "sUActnUse", OFInput::A_Use },
+            { "sUActnGrab", OFInput::A_Activate },
+            { "sUActnActivate", OFInput::A_Activate },
+            { "sUActnMenumode", OFInput::A_Inventory },
+            { "sUActnRdyitem", OFInput::A_ToggleWeapon },
+            { "sUActnTogglepov", OFInput::A_TogglePOV },
+            { "sUActnAutomove", OFInput::A_AutoMove },
+            { "sUActnRestmenu", OFInput::A_Rest },
+            { "sUActnQuickload", OFInput::A_QuickLoad },
+            { "sUActnQuicksave", OFInput::A_QuickSave },
+        };
+        OFBase::InputManager* input = OFBase::Environment::get().getInputManager();
+        // The key (or the pad's button) that is bound to an action, as the settings screen lists it
+        const auto bindingText = [&](int action, bool pad) {
+            std::string binding
+                = pad ? input->getActionControllerBindingName(action) : input->getActionKeyBindingName(action);
+            // The settings screen localises its names: here a mouse button is named by the setting of the games, a
+            // control with no key has no text, and the escaped `#` of the tags is the key itself
+            if (binding.starts_with("#{sMouse} "))
+            {
+                const unsigned button = static_cast<unsigned>(std::max(0, std::atoi(binding.c_str() + 10)));
+                const std::string_view setting = FalloutScript::mouseButtonSetting(button);
+                binding = setting.empty() ? std::string() : deviceName(setting).value_or(std::string());
+            }
+            else if (binding.starts_with("#{"))
+                binding.clear();
+            else
+                for (std::size_t at = binding.find("##"); at != std::string::npos; at = binding.find("##", at + 1))
+                    binding.erase(at, 1);
+            return binding;
+        };
+        std::optional<std::string> key;
+        for (const auto& [token, action] : actions)
+            if (Misc::StringUtils::ciEqual(name, token))
+            {
+                if (input == nullptr)
+                    return std::nullopt;
+                key = bindingText(action, input->joystickLastUsed());
+                break;
+            }
+        // The hot keys are the keys of the eight quick key actions (the number keys unless the player moved them: the
+        // hot key wheel and falloutvats.lua read the actions), the second of them is the swap of the ammunition, and
+        // V.A.T.S. is opened by the V key
+        if (!key)
+        {
+            const auto hotKey = [&](int number) {
+                std::string text = input != nullptr ? bindingText(OFInput::A_QuickKey1 + number - 1, false) : "";
+                return text.empty() ? std::to_string(number) : text;
+            };
+            if (Misc::StringUtils::ciEqual(name, "sUActnVats"))
+                key = "V";
+            else if (Misc::StringUtils::ciEqual(name, "sUActnBlock"))
+                key = "Block";
+            else if (Misc::StringUtils::ciEqual(name, "sUActnAMmoSwap"))
+                key = hotKey(2);
+            else if (name.size() == 13 && Misc::StringUtils::ciEqual(name.substr(0, 12), "sUActnHotKey")
+                && name[12] >= '1' && name[12] <= '8')
+                key = hotKey(name[12] - '0');
         }
+        if (key)
+        {
+            // The words that the games set before the key (`sPCControlsTextPrefix`; for a button of a trigger
+            // `sPCControlsTriggerPrefix`) and for a control that has none
+            const bool trigger = Misc::StringUtils::lowerCase(*key).find("trigger") != std::string::npos;
+            return FalloutScript::controlText(
+                gameSettingText(trigger ? "sPCControlsTriggerPrefix" : "sPCControlsTextPrefix"), *key,
+                gameSettingText("sPCControlsTextNone"), bare);
+        }
+
+        // The names of keys and buttons: the setting of the files when it has one, else the name the games set
+        if (name.starts_with("sKB") || name.starts_with("sMouse") || name.starts_with("sDevice")
+            || name.starts_with("sXB"))
+            return deviceName(name);
         return std::nullopt;
     }
 
@@ -1478,7 +1558,9 @@ namespace OFScript
         // nothing to pick: it has the button that closes it
         if (box.mButtons.empty() && !isBox)
         {
-            tellPlayer(escapeTags(text));
+            // (the notification stays as long as the message says, its TNAM in seconds: a tutorial's stays longer
+            // than the time that the length of its words gives)
+            tellPlayer(escapeTags(text), 0, std::min(static_cast<float>(record->mDisplayTime), 30.f));
             return;
         }
         Log(Debug::Info) << "Message buttons: " << box.mButtons.size();

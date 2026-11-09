@@ -13,9 +13,11 @@
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/statemanager.hpp"
+#include "../mwbase/windowmanager.hpp"
 #include "../mwscript/falloutscripts.hpp"
 
 #include "context.hpp"
+#include "luamanagerimp.hpp"
 
 namespace OFLua
 {
@@ -774,9 +776,30 @@ namespace OFLua
         api["refundSkillPoints"] = [](int skill, int points) { return scripts().refundSkillPoints(skill, points); };
         api["choosePerk"] = [](std::string_view perk) { return scripts().choosePerk(parseId(perk)); };
 
-        // Whether the player is dead, and the game asks to load a save when the screen of its death is over
-        api["playerDead"] = []() { return scripts().actors().isDead(scripts().playerReference()); };
-        api["askReload"] = []() { OFBase::Environment::get().getStateManager()->askLoadRecent(); };
+        // Whether the player is dead (by what the scripts did to it or by what the engine did: a fall, the breath), and
+        // the game asks to load a save when the screen of its death is over
+        api["playerDead"] = []() {
+            return scripts().actors().isDead(scripts().playerReference())
+                || OFBase::Environment::get().getStateManager()->playerDied();
+        };
+        // (a script runs while the world is drawn: a window is opened in the update of the main thread, like the
+        // modes of the interface package)
+        api["askReload"] = [manager = context.mLuaManager]() {
+            manager->addAction(
+                [] { OFBase::Environment::get().getStateManager()->askLoadRecent(); }, "Pipboy.askReload");
+        };
+        // The game's own box for the death has these: whether there is a save to reload, loading the most recent one,
+        // and the main menu (which opens the menu that Escape does)
+        api["hasRecentSave"] = []() { return OFBase::Environment::get().getStateManager()->hasRecentSave(); };
+        api["reloadRecent"] = [manager = context.mLuaManager]() {
+            // (with no save to load it opens the main menu, which is not done while the world is drawn)
+            manager->addAction(
+                [] { OFBase::Environment::get().getStateManager()->loadRecent(); }, "Pipboy.reloadRecent");
+        };
+        api["openMainMenu"] = [manager = context.mLuaManager]() {
+            manager->addAction([] { OFBase::Environment::get().getWindowManager()->pushGuiMode(OFGui::GM_MainMenu); },
+                "Pipboy.openMainMenu");
+        };
         return LuaUtil::makeReadOnly(api);
     }
 }

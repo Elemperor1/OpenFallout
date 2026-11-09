@@ -1790,6 +1790,8 @@ namespace OFMechanics
 
     void Actors::resurrect(const OFWorld::Ptr& ptr) const
     {
+        if (ptr == getPlayer())
+            OFBase::Environment::get().getStateManager()->setPlayerDied(false);
         const auto iter = mIndex.find(ptr.mRef);
         if (iter != mIndex.end())
         {
@@ -1847,8 +1849,12 @@ namespace OFMechanics
 
                 if (isPlayer)
                 {
-                    // player's death animation is over
-                    OFBase::Environment::get().getStateManager()->askLoadRecent();
+                    // player's death animation is over. A game of Fallout asks as its own code does, a few seconds
+                    // later and in its own message box (falloutdeath.lua, which is told by this flag or by the state
+                    // of the actors of Fallout); the engine's question comes first there and has no words of the game
+                    OFBase::Environment::get().getStateManager()->setPlayerDied(true);
+                    if (OFBase::Environment::get().getFalloutScripts() == nullptr)
+                        OFBase::Environment::get().getStateManager()->askLoadRecent();
                 }
                 else
                 {
