@@ -187,7 +187,12 @@ namespace DetourNavigator
             std::vector<std::string> lines;
             std::istringstream stream(content);
             for (std::string line; std::getline(stream, line);)
+            {
+                // the file is written in text mode, which ends the lines with CR LF on Windows
+                if (!line.empty() && line.back() == '\r')
+                    line.pop_back();
                 lines.push_back(line);
+            }
             // four vertices and two faces
             ASSERT_EQ(lines.size(), 6u);
             for (std::size_t i = 0; i < 4; ++i)
