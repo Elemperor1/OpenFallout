@@ -16,6 +16,7 @@
 --   page.update()          -- each frame while the page is shown
 --   page.hide()
 local core = require('openfallout.core')
+local I = require('openfallout.interfaces')
 local input = require('openfallout.input')
 local ui = require('openfallout.ui')
 
@@ -26,11 +27,12 @@ local quantity = require('scripts.omw.falloutquantity')
 local repair = require('scripts.omw.falloutpipboyrepair')
 local mods = require('scripts.omw.falloutpipboymods')
 
--- A note to the player goes to the line of messages of the display, as the games print it (the engine's own message
--- window is the fallback)
+-- A note to the player goes to the line of messages of the display, as the games print it, while the display is the
+-- game's own file (the engine's own message window is the fallback)
 local function tellPlayer(text)
-    if core.hud and core.hud.message then
-        core.hud.message(text)
+    local hud = I.FalloutHud
+    if hud and hud.note then
+        hud.note(text)
     else
         ui.showMessage(text)
     end

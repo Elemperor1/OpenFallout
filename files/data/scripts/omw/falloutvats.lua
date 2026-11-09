@@ -38,11 +38,12 @@ local widgetModule = require('scripts.omw.falloutwidgets')
 local menuModule = require('scripts.omw.falloutmenu')
 local pad = require('scripts.omw.falloutpad')
 
--- A note to the player goes to the line of messages of the display, as the games print it (the engine's own message
--- window is the fallback)
+-- A note to the player goes to the line of messages of the display, as the games print it, while the display is the
+-- game's own file (the engine's own message window is the fallback)
 local function tellPlayer(text)
-    if core.hud and core.hud.message then
-        core.hud.message(text)
+    local hud = I.FalloutHud
+    if hud and hud.note then
+        hud.note(text)
     else
         ui.showMessage(text)
     end

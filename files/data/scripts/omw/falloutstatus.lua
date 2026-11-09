@@ -777,6 +777,15 @@ return {
         -- What the display shows now (nil while it is not up) and the compass
         state = function() return shown end,
         compass = function() return shownCompass end,
+        -- A note to the player: on the line of messages while the display is the one of the game's file (it stays over
+        -- the menus), else in the engine's own message window (the plain display of the port hides with a menu)
+        note = function(text)
+            if menuHud and core.hud and core.hud.message then
+                core.hud.message(text)
+            else
+                ui.showMessage(text)
+            end
+        end,
     },
     engineHandlers = {
         onFrame = function()
