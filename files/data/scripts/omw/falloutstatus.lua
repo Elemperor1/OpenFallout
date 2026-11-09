@@ -580,6 +580,8 @@ local function current(dt)
         sneaking = status.sneaking,
         sneak = status.sneak,
         sneakText = status.sneakText ~= '' and status.sneakText or status.sneak:upper(),
+        headUnder = status.headUnder == true,
+        breathTicks = status.breathTicks,
         crippled = status.crippled,
         reticle = status.weaponDrawn,
         -- A script that took the movement away (a scene) shows less of the display, as the executable's mode 0xC does

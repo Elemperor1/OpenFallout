@@ -30,6 +30,9 @@ namespace FalloutScript
         double mSwimBreathBase = 10; // fActorSwimBreathBase: the seconds that a character holds its breath under water
         double mSwimBreathMult = 0.5; // fActorSwimBreathMult: what each point of the stat adds to them
         double mSwimBreathDamage = 0.2; // fActorSwimBreathDamage: the share of its health that it loses for each second
+        /// The heal rate that an endurance of 6 to 10 gives (fAVDHealRateEndurance6Bonus to
+        /// fAVDHealRateEndurance10Bonus; a lower or higher endurance gives none), which the breath is worked out from
+        double mHealRateEnduranceBonus[5] = { 5, 5, 5, 10, 10 };
 
         using Lookup = std::function<std::optional<double>(std::string_view)>;
 
@@ -53,11 +56,16 @@ namespace FalloutScript
         /// The chance of a critical hit in percent
         double criticalChance(const DerivedStatSettings& settings, double luck);
 
-        /// How far under water a character has to be for the breath to run out (the executables compare the share of
-        /// the body that is under the water with it: FalloutNV.exe 0x889930, Mac round 12BI B)
+        /// The heal rate that the endurance gives (FalloutNV.exe 0x643A70, Mac round 12BM): the games make the breath
+        /// of a character last by it
+        double healRate(const DerivedStatSettings& settings, double endurance);
+
+        /// How far under water a character has to be for the breath to run out, as a share of its height: the head is
+        /// under the water when the point at that share of the height is (FalloutNV.exe 0x889930, Mac rounds 12BI B and
+        /// 12BM A)
         constexpr double swimSubmersion = 0.875;
-        /// The seconds that a character holds its breath: the base and a share of the stat (whole points of it)
-        double swimBreath(const DerivedStatSettings& settings, double stat);
+        /// The seconds that a character holds its breath: the base and a share of the heal rate (whole points of it)
+        double swimBreath(const DerivedStatSettings& settings, double healRate);
 
         /// What a frame under or over the water does to the breath
         struct SwimBreathStep
@@ -67,12 +75,11 @@ namespace FalloutScript
             /// The health that the frame took (the breath ran out)
             double mDamage = 0;
         };
-        /// The breath after a frame of `seconds`. Under water (`submersion`: the share of the body under it, from 0 to
-        /// 1) it runs down, unless the character can breathe there; out of the breath the character takes the share of
-        /// its health that the settings say for each second, and the breath stays at 0. Above the water it is full
-        /// again at once.
+        /// The breath after a frame of `seconds`. With the head under the water it runs down, unless the character can
+        /// breathe there; out of the breath the character takes the share of its health that the settings say for each
+        /// second (whole points of the health), and the breath stays at 0. Above the water it is full again at once.
         SwimBreathStep swimBreathStep(const DerivedStatSettings& settings, double remaining, double longest,
-            double submersion, bool breathesWater, double health, double seconds);
+            bool headUnder, bool breathesWater, double health, double seconds);
 
         /// The ticks of the air meter that show: 16 when the breath is full, one less for each sixteenth that is gone
         /// (the meter's sequence hides tick k at k/30 seconds and the sequence time is a sixteenth-thirtieths of the

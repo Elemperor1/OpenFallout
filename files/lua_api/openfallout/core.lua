@@ -1736,6 +1736,20 @@
 -- @param #boolean show
 
 ---
+-- Draws the air meter of the display of Fallout: a ring of 16 ticks round an "O2", the model that the display's file
+-- names (`AirTimer01.NIF`) and the menu engine does not draw. The position and size are in the units of the interface
+-- (`ui.screenSize()`).
+-- @function [parent=#Hud] setAirMeter
+-- @param #number x The origin of the model.
+-- @param #number y
+-- @param #number unit The size of a unit of the model.
+-- @param #number alpha 0 hides the meter, 1 draws it whole.
+-- @param #number ticks How many of the 16 ticks show.
+-- @param #number red 0 to 1.
+-- @param #number green
+-- @param #number blue
+
+---
 -- What the line over the compass is told since this was last called, oldest first. Each row has `name` and `cell`: `cell` is
 -- false for the name of a region the player came into (looked for when the player's cell is another one, and once after a game
 -- was begun or loaded, as the games do it; a building, a place that no region covers and a region without a name give nothing,
@@ -1788,6 +1802,9 @@
 -- @field #string sneak What the characters around make of the player: "hidden", "caution", "detected" or "danger".
 -- @field #string sneakText The word the games print for it.
 -- @field #boolean weaponDrawn
+-- @field #boolean headUnder Whether the head of the player is under the water (the air meter shows then).
+-- @field #number breath The share of the breath of the player that is left, 0 to 1.
+-- @field #number breathTicks How many of the 16 ticks of the air meter show.
 -- @field #table controlsOff The controls that DisablePlayerControls took away, true for each that is off: `movement`,
 -- `pipboy`, `fighting`, `pointOfView`, `looking`, `rollover` and `sneaking`.
 -- @field #list<#string> crippled The textures (names under Interface\Stats) of the limbs that are crippled.

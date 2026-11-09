@@ -1474,6 +1474,11 @@ namespace OFScript
             /// The names of the textures of the limbs that are crippled (under Interface\Stats)
             std::vector<std::string> mCrippled;
             bool mWeaponDrawn = false;
+            /// The breath of the player: whether its head is under the water, the share of the breath that is left and
+            /// how many of the 16 ticks of the air meter show (FalloutScript::DerivedStats::airMeterVisibleTicks)
+            bool mHeadUnder = false;
+            double mBreath = 1;
+            int mBreathTicks = 16;
             /// The controls that DisablePlayerControls took away, one bit for each in the order of
             /// FalloutScript::PlayerControl
             unsigned mControlsOff = 0;
@@ -2357,6 +2362,10 @@ namespace OFScript
         FalloutScript::Crafting mCrafting;
         FalloutScript::Limbs mLimbs;
         std::atomic<bool> mVatsOpen{ false };
+        /// The seconds of breath that the player has left (-1 until the first frame has filled it) and whether its head
+        /// is under the water
+        std::atomic<double> mBreathLeft{ -1.0 };
+        std::atomic<bool> mHeadUnder{ false };
         std::optional<FalloutScript::Vats::Rules> mVatsRules;
         FalloutScript::Chargen mChargen;
         /// The screen the attributes were last started for
@@ -2681,6 +2690,12 @@ namespace OFScript
         /// Makes the save that a script asked for, when the interface allows one
         void runSaveRequests();
         void updateRest(float frametime);
+        /// The breath of the player: it runs down while the head is under the water and a player that is out of it
+        /// loses health (FalloutNV.exe 0x889930, Mac rounds 12BI and 12BM). It is full again as soon as the head is
+        /// out.
+        void updateBreath(float frametime);
+        /// The seconds that the player holds its breath
+        double mostBreath();
         /// Whether the furniture is a bed that the actor would lie on
         bool isBedFor(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture);
         /// The map markers the player walks up to are found

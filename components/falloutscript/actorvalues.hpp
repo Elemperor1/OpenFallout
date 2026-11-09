@@ -32,6 +32,7 @@ namespace FalloutScript
         constexpr int actionPoints = 12;
         constexpr int carryWeight = 13;
         constexpr int criticalChance = 14;
+        constexpr int healRate = 15;
         constexpr int health = 16;
         constexpr int meleeDamage = 17;
         constexpr int speedMult = 21;

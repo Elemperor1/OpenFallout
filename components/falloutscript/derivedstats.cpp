@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 
 namespace FalloutScript
 {
@@ -41,6 +42,11 @@ namespace FalloutScript
         take(lookup, "fActorSwimBreathBase", settings.mSwimBreathBase);
         take(lookup, "fActorSwimBreathMult", settings.mSwimBreathMult);
         take(lookup, "fActorSwimBreathDamage", settings.mSwimBreathDamage);
+        static constexpr std::string_view healRateNames[5]
+            = { "fAVDHealRateEndurance6Bonus", "fAVDHealRateEndurance7Bonus", "fAVDHealRateEndurance8Bonus",
+                  "fAVDHealRateEndurance9Bonus", "fAVDHealRateEndurance10Bonus" };
+        for (std::size_t i = 0; i < 5; ++i)
+            take(lookup, healRateNames[i], settings.mHealRateEnduranceBonus[i]);
         return settings;
     }
 
@@ -79,17 +85,25 @@ namespace FalloutScript
         return std::clamp(settings.mCritLuckBase + luck * settings.mCritLuckMult, 0.0, 100.0);
     }
 
-    double DerivedStats::swimBreath(const DerivedStatSettings& settings, double stat)
+    double DerivedStats::healRate(const DerivedStatSettings& settings, double endurance)
     {
-        return std::max(settings.mSwimBreathBase + settings.mSwimBreathMult * std::trunc(stat), 0.0);
+        const int points = static_cast<int>(std::trunc(endurance));
+        if (points < 6 || points > 10)
+            return 0;
+        return settings.mHealRateEnduranceBonus[points - 6];
+    }
+
+    double DerivedStats::swimBreath(const DerivedStatSettings& settings, double healRate)
+    {
+        return std::max(settings.mSwimBreathBase + settings.mSwimBreathMult * std::trunc(healRate), 0.0);
     }
 
     DerivedStats::SwimBreathStep DerivedStats::swimBreathStep(const DerivedStatSettings& settings, double remaining,
-        double longest, double submersion, bool breathesWater, double health, double seconds)
+        double longest, bool headUnder, bool breathesWater, double health, double seconds)
     {
         SwimBreathStep step;
         step.mRemaining = remaining;
-        if (submersion < swimSubmersion)
+        if (!headUnder)
         {
             step.mRemaining = longest;
             return step;

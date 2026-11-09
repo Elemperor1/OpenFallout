@@ -648,6 +648,8 @@ namespace OFScript
         mActorValues.clear();
         mLimbs.clear();
         mVatsOpen = false;
+        mBreathLeft = -1.0;
+        mHeadUnder = false;
         mReferenceState.clear();
         mReputation.clear();
         mObjectState.clear();
@@ -823,6 +825,7 @@ namespace OFScript
             if (gain > 0)
                 mActorValues.restore(mPlayer, AV::actionPoints, gain);
         }
+        updateBreath(frametime);
         mHudTime += frametime;
         raiseCombatEvents(frametime);
         updateProgress(frametime);
@@ -2608,7 +2611,7 @@ namespace OFScript
         if (victim == mPlayer)
             wearArmorOfHit(victim, limb, hit.mEntering, defense.mResistance, defense.mThreshold, hit.mAfterThreshold,
                 mVatsOpen ? std::max(gameSetting("fVATSPlayerDamageMult", 1.0), 0.0) : 1.0);
-        // The blow that hurts the player flashes the screen red, as the fall and the drowning of the engine do
+        // The blow that hurts the player flashes the screen red, as the fall of the engine does
         if (victim == mPlayer && dealt > 0)
         {
             runOnMainThread([] {
@@ -3586,6 +3589,12 @@ namespace OFScript
                 return Derived::criticalChance(settings, permanent(AV::luck));
             case AV::meleeDamage:
                 return Derived::meleeDamage(settings, permanent(AV::strength));
+            case AV::healRate:
+                // Only the player's is worked out: the breath lasts by it (the executables work it out for everyone,
+                // but nothing else of the port looks at it)
+                if (actor != mPlayer)
+                    return std::nullopt;
+                return Derived::healRate(settings, permanent(AV::endurance));
             case AV::health:
                 break;
             default:

@@ -28,6 +28,7 @@
 --     of the objectives come one after the other under it (falloutmenuquests.lua keeps the times: Mac round 12AR C1).
 -- What the exe fills in that the engine does not tell yet is left out (the weapon's name and condition, the damage
 -- threshold).
+local core = require('openfallout.core')
 local ui = require('openfallout.ui')
 local vfs = require('openfallout.vfs')
 local menuModule = require('scripts.omw.falloutmenu')
@@ -52,6 +53,10 @@ local MARK_SPAN = 274
 local MARK_FRONT = 137
 local MARK_FADE = 55
 local SAFE = 15
+-- The air meter (the BreathMeter tile, the model AirTimer01.NIF that the menu engine does not draw): its tile is 80 units
+-- under the sneak meter, which is 2 safe zones from the top; its alpha takes this many seconds to come and to go
+local AIR_FADE = 0.5
+local AIR_BELOW_SNEAK = 80
 -- The line of the region name: seconds it takes to fade in and out, and from the start of the fade in until the fade out may
 -- begin, and the alpha it fades in to (the executable takes 255 times its setting fHudOpacity:Interface, 1.0 by default)
 local REGION_FADE = 2
@@ -128,6 +133,7 @@ local function build(self)
     place(t.enemy, math.floor(width / 2) - 175, hpY + 40)
     t.reticle = find('ReticleCenter')
     place(t.reticle, math.floor(width / 2) - 63 / 2 - 3, math.floor(height / 2) - 75 / 2 - 3)
+    t.breath = m:find('BreathMeter')
     t.sneak = find('SneakMeter')
     place(t.sneak, math.floor(width / 2), 2 * sy)
     t.messages = find('Messages')
@@ -778,7 +784,46 @@ function Hud:update(state, dt)
         self:showEnemy(state, dt)
         self:showLimbs(state, dt)
     end)
+    self:showAirMeter(state, full, dt)
     return true
+end
+
+-- The air meter: it comes in over half a second when the head of the player goes under the water, and goes out the same way
+-- once the head is out and the coming in is over (FalloutNV.exe 0x77E4F0, Mac round 12BM). It is not there at all while
+-- a window is open or the player is dead.
+function Hud:showAirMeter(state, full, dt)
+    local air = self.air
+    if not air then
+        air = { alpha = 0 }
+        self.air = air
+    end
+    local under = state.headUnder == true
+    if air.tween then
+        air.tween.time = air.tween.time + dt
+        local k = math.min(air.tween.time / AIR_FADE, 1)
+        air.alpha = air.tween.from + (air.tween.to - air.tween.from) * k
+        if k >= 1 then air.tween = nil end
+    end
+    if not air.tween then
+        if under and air.alpha <= 0 then
+            air.tween = { from = 0, to = 1, time = 0 }
+        elseif not under and air.alpha > 0 then
+            air.tween = { from = 1, to = 0, time = 0 }
+        end
+    end
+    local alpha = full and air.alpha or 0
+    if alpha <= 0 then
+        if air.drawn then
+            core.hud.setAirMeter(0, 0, 1, 0, 0, 1, 1, 1)
+            air.drawn = false
+        end
+        return
+    end
+    local unit = self.size.y / 960
+    local colour = self.tiles.breath and self.shown.menu:color(self.tiles.breath) or { red = 1, green = 1, blue = 1 }
+    core.hud.setAirMeter(math.floor(self.width / 2) * unit, (2 * SAFE + AIR_BELOW_SNEAK) * unit, unit, alpha,
+        state.breathTicks or 16, colour.red, colour.green, colour.blue)
+    air.drawn = true
 end
 
 -- The marks of the compass move with each turn, so they are set apart from the rest
@@ -788,6 +833,7 @@ function Hud:updateCompass(compass, full)
 end
 
 function Hud:close()
+    if self.air and self.air.drawn then core.hud.setAirMeter(0, 0, 1, 0, 0, 1, 1, 1) end
     self.shown:close()
 end
 

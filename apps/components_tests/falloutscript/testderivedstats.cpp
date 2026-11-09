@@ -21,6 +21,7 @@ namespace
     using FalloutScript::DerivedStats::airMeterVisibleTicks;
     using FalloutScript::DerivedStats::carryWeight;
     using FalloutScript::DerivedStats::criticalChance;
+    using FalloutScript::DerivedStats::healRate;
     using FalloutScript::DerivedStats::meleeDamage;
     using FalloutScript::DerivedStats::npcHealth;
     using FalloutScript::DerivedStats::playerHealth;
@@ -132,6 +133,11 @@ namespace
                     return npcHealth(DerivedStatSettings(), 50, permanent(ActorValue::endurance), mLevel);
                 case ActorValue::actionPoints:
                     return actionPoints(DerivedStatSettings(), permanent(ActorValue::agility));
+                case ActorValue::healRate:
+                    // Only the player's is worked out
+                    if (actor == player)
+                        return healRate(DerivedStatSettings(), permanent(ActorValue::endurance));
+                    return std::nullopt;
                 default:
                     return std::nullopt;
             }
@@ -166,6 +172,24 @@ namespace
         values.setBase(player, ActorValue::endurance, 10);
         records.mLevel = 3;
         EXPECT_EQ(values.current(player, ActorValue::health), 100 + 11 * 20 + 2 * 5);
+    }
+
+    TEST(FalloutScriptDerivedStatsTest, the_heal_rate_of_the_player_follows_its_endurance)
+    {
+        DerivingRecords records;
+        ActorValues values(&records);
+
+        EXPECT_TRUE(ActorValues::isDerived(ActorValue::healRate));
+        // An endurance of 5 gives none, and a perk that adds one, or a point set, gives the bonus of the new endurance
+        EXPECT_EQ(values.current(player, ActorValue::healRate), 0);
+        values.modify(player, ActorValue::endurance, 1);
+        EXPECT_EQ(values.current(player, ActorValue::healRate), 5);
+        values.setBase(player, ActorValue::endurance, 9);
+        EXPECT_EQ(values.current(player, ActorValue::healRate), 10);
+        // Another character has the value that is set for it, none otherwise
+        EXPECT_EQ(values.current(guard, ActorValue::healRate), 0);
+        values.setBase(guard, ActorValue::healRate, 3);
+        EXPECT_EQ(values.current(guard, ActorValue::healRate), 3);
     }
 
     TEST(FalloutScriptDerivedStatsTest, damage_comes_off_a_worked_out_value_and_a_set_value_replaces_it)
@@ -305,35 +329,50 @@ namespace
         EXPECT_DOUBLE_EQ(swimBreath(settingsOf({ { "fActorSwimBreathBase", -4 } }), 0), 0);
     }
 
+    TEST(FalloutScriptDerivedStatsTest, the_heal_rate_comes_from_an_endurance_of_six_to_ten)
+    {
+        const DerivedStatSettings settings = settingsOf({});
+        for (const double endurance : { 0.0, 1.0, 5.0, 5.9, 11.0 })
+            EXPECT_DOUBLE_EQ(healRate(settings, endurance), 0) << endurance;
+        EXPECT_DOUBLE_EQ(healRate(settings, 6), 5);
+        EXPECT_DOUBLE_EQ(healRate(settings, 7), 5);
+        EXPECT_DOUBLE_EQ(healRate(settings, 8.5), 5);
+        EXPECT_DOUBLE_EQ(healRate(settings, 9), 10);
+        EXPECT_DOUBLE_EQ(healRate(settings, 10), 10);
+        const DerivedStatSettings changed = settingsOf({ { "fAVDHealRateEndurance7Bonus", 7 } });
+        EXPECT_DOUBLE_EQ(healRate(changed, 7), 7);
+        EXPECT_DOUBLE_EQ(healRate(changed, 6), 5);
+    }
+
     TEST(FalloutScriptDerivedStatsTest, the_breath_runs_down_under_water_and_is_full_again_above_it)
     {
         const DerivedStatSettings settings = settingsOf({});
-        auto step = swimBreathStep(settings, 12.5, 12.5, 1.0, false, 200, 0.5);
+        auto step = swimBreathStep(settings, 12.5, 12.5, true, false, 200, 0.5);
         EXPECT_DOUBLE_EQ(step.mRemaining, 12.0);
         EXPECT_DOUBLE_EQ(step.mDamage, 0);
-        step = swimBreathStep(settings, step.mRemaining, 12.5, 0.9, false, 200, 1.0);
+        step = swimBreathStep(settings, step.mRemaining, 12.5, true, false, 200, 1.0);
         EXPECT_DOUBLE_EQ(step.mRemaining, 11.0);
         // The head out of the water fills the breath at once, however little was left, and so does a character that
         // is not in the water at all
-        step = swimBreathStep(settings, 0.3, 12.5, 0.874, false, 200, 0.016);
+        step = swimBreathStep(settings, 0.3, 12.5, false, false, 200, 0.016);
         EXPECT_DOUBLE_EQ(step.mRemaining, 12.5);
         EXPECT_DOUBLE_EQ(step.mDamage, 0);
-        step = swimBreathStep(settings, 3, 12.5, 0.0, false, 200, 0.016);
+        step = swimBreathStep(settings, 3, 12.5, false, false, 200, 0.016);
         EXPECT_DOUBLE_EQ(step.mRemaining, 12.5);
     }
 
     TEST(FalloutScriptDerivedStatsTest, a_character_that_is_out_of_breath_loses_a_fifth_of_its_health_each_second)
     {
         const DerivedStatSettings settings = settingsOf({});
-        auto step = swimBreathStep(settings, 0.01, 12.5, 1.0, false, 200.7, 0.5);
+        auto step = swimBreathStep(settings, 0.01, 12.5, true, false, 200.7, 0.5);
         EXPECT_DOUBLE_EQ(step.mRemaining, 0);
         // The health counts in whole points, and the frame that ran the breath out takes the whole frame's share
         EXPECT_DOUBLE_EQ(step.mDamage, 0.2 * 200 * 0.5);
-        step = swimBreathStep(settings, step.mRemaining, 12.5, 1.0, false, 160, 0.25);
+        step = swimBreathStep(settings, step.mRemaining, 12.5, true, false, 160, 0.25);
         EXPECT_DOUBLE_EQ(step.mRemaining, 0);
         EXPECT_DOUBLE_EQ(step.mDamage, 0.2 * 160 * 0.25);
         // A breath that lasts exactly to the end of the frame does no harm yet
-        step = swimBreathStep(settings, 0.5, 12.5, 1.0, false, 200, 0.5);
+        step = swimBreathStep(settings, 0.5, 12.5, true, false, 200, 0.5);
         EXPECT_DOUBLE_EQ(step.mRemaining, 0);
         EXPECT_DOUBLE_EQ(step.mDamage, 0);
     }
@@ -341,11 +380,11 @@ namespace
     TEST(FalloutScriptDerivedStatsTest, a_character_that_breathes_water_keeps_its_breath_under_it)
     {
         const DerivedStatSettings settings = settingsOf({});
-        const auto step = swimBreathStep(settings, 4, 12.5, 1.0, true, 200, 3.0);
+        const auto step = swimBreathStep(settings, 4, 12.5, true, true, 200, 3.0);
         EXPECT_DOUBLE_EQ(step.mRemaining, 4);
         EXPECT_DOUBLE_EQ(step.mDamage, 0);
         // It is filled above the water all the same
-        EXPECT_DOUBLE_EQ(swimBreathStep(settings, 4, 12.5, 0.0, true, 200, 0.1).mRemaining, 12.5);
+        EXPECT_DOUBLE_EQ(swimBreathStep(settings, 4, 12.5, false, true, 200, 0.1).mRemaining, 12.5);
     }
 
     TEST(FalloutScriptDerivedStatsTest, the_air_meter_loses_a_tick_for_each_sixteenth_of_the_breath)
