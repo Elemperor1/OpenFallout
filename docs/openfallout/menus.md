@@ -1397,11 +1397,10 @@ slot has the record's picture over its tile; `core.casino.caravan.cards()` and `
 caravans on the board have the words of the card (rank and suit letter) because the strips of the game are partly covered 3D cards.
 Each match adds one to the Pip-Boy statistic "Caravan games won" (0x25) or
 "lost" (0x26) and to the player's own totals (caps won, caps lost, matches won, matches lost, the biggest pot won), which the result
-screen shows and the save keeps (`CaravanRecord`, the section `caravanrecord`). Seen only in the offline harness with a made-up
-engine (`caravan.lua`), not in the running game. Not made: the 3D table, deck strips and hands (the scenes catalogued in 12AS
+screen shows and the save keeps (`CaravanRecord`, the section `caravanrecord`). Seen in the offline harness with a made-up
+engine (`caravan.lua`) and in the running game in Mac round 12BU. Not made: the 3D table, deck strips and hands (the scenes catalogued in 12AS
 E2: `Meshes\Terminals\NV_Caravan\NV_Caravan-Table.NIF`, `-Deck.NIF` and `-Available.NIF`, the sequences `Card1..4_In/_Out`,
-`Deck-Card1..5_Out`, `Deck8-Card1..8_Out`), the card backs (`TX01`) and the pictures on the board strips, the sounds, the text the executable writes into the title of the
-opponent's ante on the stake (the file copies the string of its tile), and the Escape and the pad's B on the match, which leave
+`Deck-Card1..5_Out`, `Deck8-Card1..8_Out`), the card backs (`TX01`) and the pictures on the board strips, the sounds, and the Escape and the pad's B on the match, which leave
 at once and forfeit without the question (the engine has no way yet for a screen of a script to keep them; the executable's B
 puts a picked card back, else asks sQuitCaravanText, and its Escape opens the pause menu), and the pad's B a second after the result is up (the engine's B leaves at once).
 
@@ -1650,11 +1649,28 @@ M12 folder; the tracker rows carry one line each.
   conversation, the death box and Reload, lockpicking, the terminal and its game of hacking.
 - Failed: `book_menu`, which only the console opens (as in the executable): it draws a stray "0" because three textures it names
   (`interface/misc/scroll_background.dds`, `scroll_roll.dds`, `interface/shared/button/short_on.dds`) are not in the game's
-  archives. The five Caravan screens were not reached: the one opener is the script command in the INFO results of nine characters
-  and no route to it was found in two rounds; `core.casino.caravan.open` starts a match from a script of Lua for such a check.
-- Seen on the way: the 3D camera of the blackjack screen looked down a corridor of the casino, not at the table; the Pip-Boy's
-  "Repair" button stays dim on the row of a worn copy whose donor is a better copy, although `pipboy.canRepair` is true for it
-  (the repair screen itself opens and repairs from the other row); Fallout 3 shows a small frame rate text at the top left.
+  archives. The five Caravan screens were not reached in 12BT (the one opener is the script command in the INFO results of nine
+  characters and no route to it was found); they were run in Mac round 12BU through `core.casino.caravan.open` (below).
+- Seen on the way: the 3D camera of the blackjack screen looked down a corridor of the casino, not at the table; Fallout 3
+  shows a small frame rate text at the top left. The Pip-Boy's "Repair" button that stayed dim on the row of a worn copy is
+  the engine's rule, not a fault (Mac round 12BU): the button follows `pipboy.canRepair` in every state, and an equipped copy is
+  no donor, so with two copies the row of the one that is not equipped is dim while the other is equipped; a click on a weapon
+  row equips it.
+
+## Seen in the running game (Mac round 12BU, head 0c16b17d05, 2026-11-09: the five Caravan screens, New Vegas)
+
+A match opened by `core.casino.caravan.open(opponent, deck, kind, fraction)` (the opponent's object `id` or "FormId:0x...",
+the id of its `CDCK` deck, the kind, the share of its money it stakes, 0 to 1), with 600 caps and 54 Caravan cards in the pack:
+all five screens passed (`mac-12bu-results.md` of the M12 folder). The stake showed the funds, the opponent's ante and Auto Match,
+Raise (the amount box) and Accept; Accept made the pot, the smaller of the two bets, and moved no caps; the deck screen took
+Randomize and Play from 30 cards; the match put a card down and the opponent answered; Cancel asked Yes/No and Yes forfeited;
+the result showed the totals and the loss was paid (caps 600 to 595, the pot). Found and fixed on the way: the Caravan money
+looked for the caps as form 0xF, but the master's place is in the high byte (0x0100000F in the Mac's load order), so the stake
+showed no funds and no ante (Pip-Boy, barter and repair already used `masterForm`); and the opponent's row of the stake showed
+a label of the port's own over its value, where the executable writes the opponent's name there (`0x73D020`) and widens the
+info rect by 150 (the value of a name of more than 17 bytes moves 15 for each byte more; not seen with such a name). Not tried:
+a win paid out (no short route to a win; a forfeit is a loss), and the opponent's caps were not read from the probe. The
+container of the Caravan cards (a card box) lists nothing and its Take All does nothing: the `CCRD` rows are not listed there.
 
 ## What is not known yet
 
