@@ -13,6 +13,7 @@
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/statemanager.hpp"
+#include "../mwbase/windowmanager.hpp"
 #include "../mwscript/falloutscripts.hpp"
 
 #include "context.hpp"
@@ -777,6 +778,11 @@ namespace OFLua
         // Whether the player is dead, and the game asks to load a save when the screen of its death is over
         api["playerDead"] = []() { return scripts().actors().isDead(scripts().playerReference()); };
         api["askReload"] = []() { OFBase::Environment::get().getStateManager()->askLoadRecent(); };
+        // The game's own box for the death has these: whether there is a save to reload, loading the most recent one,
+        // and the main menu (which opens the menu that Escape does)
+        api["hasRecentSave"] = []() { return OFBase::Environment::get().getStateManager()->hasRecentSave(); };
+        api["reloadRecent"] = []() { OFBase::Environment::get().getStateManager()->loadRecent(); };
+        api["openMainMenu"] = []() { OFBase::Environment::get().getWindowManager()->pushGuiMode(OFGui::GM_MainMenu); };
         return LuaUtil::makeReadOnly(api);
     }
 }

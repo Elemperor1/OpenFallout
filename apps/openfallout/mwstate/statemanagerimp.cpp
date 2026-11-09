@@ -160,6 +160,23 @@ void OFState::StateManager::askLoadRecent()
     }
 }
 
+bool OFState::StateManager::hasRecentSave()
+{
+    return !mLastSavegame.empty() && getCurrentCharacter() != nullptr;
+}
+
+void OFState::StateManager::loadRecent()
+{
+    Character* character = getCurrentCharacter();
+    if (character == nullptr || mLastSavegame.empty())
+    {
+        OFBase::Environment::get().getWindowManager()->pushGuiMode(OFGui::GM_MainMenu);
+        return;
+    }
+    // (requestLoad: a load in the middle of a frame can crash)
+    requestLoad(character, mLastSavegame);
+}
+
 OFState::StateManager::State OFState::StateManager::getState() const
 {
     return mState;

@@ -46,6 +46,8 @@ namespace OFState
         bool hasQuitRequest() const override;
 
         void askLoadRecent() override;
+        void loadRecent() override;
+        bool hasRecentSave() override;
 
         void requestNewGame(bool bypass) override { mNewGameRequest = NewGameRequest{ .mBypass = bypass }; }
 

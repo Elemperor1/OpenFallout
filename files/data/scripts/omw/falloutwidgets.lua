@@ -3,6 +3,7 @@
 -- when they are clicked, and a panel to put them in. Each screen makes its own set with `widgets.new(update)`, where
 -- `update` redraws the element of the screen after a line has changed its colour.
 local async = require('openfallout.async')
+local core = require('openfallout.core')
 local ui = require('openfallout.ui')
 local util = require('openfallout.util')
 local I = require('openfallout.interfaces')
@@ -11,13 +12,43 @@ local v2 = util.vector2
 
 local module = {}
 
-module.normalColor = util.color.rgb(0.45, 1, 0.55)
-module.focusColor = util.color.rgb(1, 1, 1)
-module.titleColor = util.color.rgb(1, 0.85, 0.4)
-module.pickedColor = util.color.rgb(1, 0.85, 0.4)
-module.hintColor = util.color.rgb(0.6, 0.7, 0.6)
-module.dimColor = util.color.rgb(0.3, 0.45, 0.35)
-module.badColor = util.color.rgb(1, 0.45, 0.4)
+-- The colours: the green of Fallout 3 and the amber of New Vegas (the system colour of its menus, 255 182 66), as the
+-- games' own screens have them. Which game it is the engine says (the stats of the player); until it has said, the
+-- green is given and not kept
+local palettes = {
+    green = {
+        normalColor = util.color.rgb(0.45, 1, 0.55),
+        focusColor = util.color.rgb(1, 1, 1),
+        titleColor = util.color.rgb(1, 0.85, 0.4),
+        pickedColor = util.color.rgb(1, 0.85, 0.4),
+        hintColor = util.color.rgb(0.6, 0.7, 0.6),
+        dimColor = util.color.rgb(0.3, 0.45, 0.35),
+        badColor = util.color.rgb(1, 0.45, 0.4),
+    },
+    amber = {
+        normalColor = util.color.rgb(1, 182 / 255, 66 / 255),
+        focusColor = util.color.rgb(1, 0.96, 0.82),
+        titleColor = util.color.rgb(1, 0.93, 0.7),
+        pickedColor = util.color.rgb(1, 0.93, 0.7),
+        hintColor = util.color.rgb(0.72, 0.52, 0.22),
+        dimColor = util.color.rgb(0.4, 0.29, 0.12),
+        badColor = util.color.rgb(1, 0.42, 0.3),
+    },
+}
+local palette = nil
+setmetatable(module, {
+    __index = function(_, key)
+        if not palette then
+            local ok, stats = pcall(function() return core.pipboy.stats() end)
+            if ok and type(stats) == 'table' then
+                palette = stats.newVegas and palettes.amber or palettes.green
+            else
+                return palettes.green[key]
+            end
+        end
+        return palette[key]
+    end,
+})
 
 module.textSize = ui._getDefaultFontSize() + 4
 module.gap = v2(0, 6)

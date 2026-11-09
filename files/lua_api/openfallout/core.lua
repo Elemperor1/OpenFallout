@@ -3246,6 +3246,19 @@
 -- @function [parent=#Pipboy] askReload
 
 ---
+-- Whether there is a save that `reloadRecent` would load (the game's own box for the death has no buttons without one).
+-- @function [parent=#Pipboy] hasRecentSave
+-- @return #boolean
+
+---
+-- Loads the most recent save of the current character at once; the main menu opens when there is none.
+-- @function [parent=#Pipboy] reloadRecent
+
+---
+-- Opens the menu that Escape opens (the games' "Main Menu" button of the box for the death).
+-- @function [parent=#Pipboy] openMainMenu
+
+---
 -- @{#Vats}: V.A.T.S., the targeting of Fallout 3 and New Vegas that stops the game for attacks at parts of the body. The
 -- player spends action points on each attack, which hits by a chance that the weapon, the skill, the distance and the
 -- part decide. Not available in load scripts.
