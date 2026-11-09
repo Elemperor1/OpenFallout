@@ -286,11 +286,13 @@ file(GLOB UNITTEST_SRC_FILES
     bsa/testcompressedbsafile.cpp
 
     nif/node.hpp
+    nif/geometry.hpp
     nif/niftestfile.hpp
     nif/testanimsurvey.cpp
     nif/testbspline.cpp
     nif/testextradata.cpp
     nif/testcontroller.cpp
+    nif/testdata.cpp
     nif/testnode.cpp
     nif/testphysics.cpp
 )
