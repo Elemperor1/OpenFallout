@@ -354,7 +354,11 @@ namespace ESM
 
         TEST(Esm3ReaderTest, identifierWhoseStringDoesNotFitItsSubrecordFails)
         {
-            const std::string bytes("\x01\x40\x00\x00\x00abc", 8);
+            // the literal is split so that the hex escape does not swallow the letters that follow it
+            const std::string bytes(
+                "\x01\x40\x00\x00\x00"
+                "abc",
+                8);
             EXPECT_THAT(
                 failureOfIdentifier(bytes, bytes.size()), HasSubstr("RefId string does not fit subrecord size"));
         }
