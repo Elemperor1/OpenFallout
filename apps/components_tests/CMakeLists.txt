@@ -267,6 +267,7 @@ file(GLOB UNITTEST_SRC_FILES
     nifosg/testkeyframes.cpp
     nifosg/testnifloader.cpp
 
+    esmterrain/teststorage.cpp
     esmterrain/testgridsampling.cpp
     esmterrain/testtexturepath.cpp
 
@@ -288,6 +289,7 @@ file(GLOB UNITTEST_SRC_FILES
     sceneutil/loddebug.cpp
     sceneutil/userdata.cpp
 
+    bgsm/testfile.cpp
     bsa/testbsafile.cpp
     bsa/testcompressedbsafile.cpp
 
