@@ -3167,7 +3167,7 @@ namespace OFScript
         return stance;
     }
 
-    void FalloutScripts::prepareFight(const OFWorld::Ptr& actor)
+    void FalloutScripts::prepareFight(const OFWorld::Ptr& actor, bool say)
     {
         const FalloutScript::FormId self = scriptReferenceOf(actor);
         // Only a character carries weapons around; a creature fights with what it has
@@ -3233,6 +3233,11 @@ namespace OFScript
         else if (held.mWeapon != 0)
             mEquipment.unequip(self, held.mWeapon);
         mEquipment.setWeaponDrawn(self, true);
+        // What a character goes into a fight with, said once for each fight (round 10M: the pistol raider of Fallout 3
+        // stood at its target and never shot, and no line said what it held)
+        if (say)
+            Log(Debug::Info) << FalloutScript::hex(self) << " readies for a fight: " << candidates.size()
+                             << " weapon(s) among " << items.size() << " kind(s) of item; " << attackDiagnosis(actor);
     }
 
     FalloutScripts::HeldWeapon FalloutScripts::heldWeapon(const OFWorld::Ptr& actor)

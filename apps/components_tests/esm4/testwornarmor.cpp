@@ -3,6 +3,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <map>
 #include <set>
@@ -766,6 +767,71 @@ namespace
         EXPECT_EQ(worn.mCovered, head | hair);
         EXPECT_EQ(worn.mWithoutModel, 1u);
         EXPECT_EQ(worn.mWithoutSlots, 2u);
+    }
+
+    // The pistol raider of Fallout 3 (round 10M, the real records): the placed base takes everything from a levelled
+    // list of levelled lists of characters, whose pick takes its inventory from a template that lists levelled lists of
+    // items: one of three pistols with their ammunition, and a backup that is most often none
+    TEST(ESM4WornArmorTest, aRaiderOfFallout3CarriesOnePistolAndItsRounds)
+    {
+        constexpr std::uint32_t pistol10mm = 0x434F, pistolChinese = 0x4325, pistol32 = 0x80A, ammo10mm = 0x4241,
+                                ammo32 = 0x207F7, knife = 0x4334;
+        TestSource source;
+        // the weapons, each as three entries of the same level, and the ammunition as lists that give a round or none
+        source.addList(0x2F708, { { 1, pistol10mm }, { 1, pistol10mm }, { 1, pistol10mm } }, 0x02);
+        source.addList(0x2F70E, { { 1, pistolChinese }, { 1, pistolChinese }, { 1, pistolChinese } }, 0x03);
+        source.addList(0x2F70A, { { 1, pistol32 }, { 1, pistol32 }, { 1, pistol32 } }, 0x02);
+        source.addList(0x2935E, { { 1, ammo10mm } }, 0x02, 25);
+        source.addList(0x2935F, { { 1, ammo32 } }, 0x02, 25);
+        // a use-all list: the weapon list, one round, and nine chances at a round
+        const auto withAmmo = [&source](std::uint32_t list, std::uint32_t weapons, std::uint32_t ammo,
+                                  std::uint32_t chances, std::uint32_t chanceCount) {
+            source.addList(list, { { 1, weapons }, { 1, ammo }, { 1, chances } }, 0x04);
+            source.mLevelledItems.at(id(list)).mLvlObject[2].count = static_cast<std::int16_t>(chanceCount);
+        };
+        withAmmo(0x2F6E9, 0x2F708, ammo10mm, 0x2935E, 9);
+        withAmmo(0x2F6EE, 0x2F70E, ammo10mm, 0x2935E, 9);
+        withAmmo(0x2F6EB, 0x2F70A, ammo32, 0x2935F, 5);
+        source.addList(0xA84DB, { { 1, 0x2F6EB }, { 1, 0x2F6EE }, { 1, 0x2F6E9 } }, 0x03);
+        source.addList(0x2F6F3, { { 1, knife } }, 0x02);
+        source.addList(0xC5C23, { { 1, 0x2F6F3 } }, 0x00, 75);
+        // the template of the character that the list picks, which has the lists, and the character
+        source.addNpc(0x2F6D2, { 0xA84DB, 0xC5C23 });
+        source.addNpc(0x2F6D3, { 0xA84DB, 0xC5C23 }, 0x03AE, 0x2F6D2);
+        ESM4::LevelledNpc variant{};
+        variant.mId = id(0x2961F);
+        variant.mLvlActorFlags = 0x02;
+        variant.mLvlObject.push_back({ 1, 0, 0x2F6D3, 1, 0 });
+        source.mLevelledNpcs[id(0x2961F)] = variant;
+        ESM4::LevelledNpc encounter{};
+        encounter.mId = id(0x29627);
+        encounter.mLvlActorFlags = 0x01;
+        encounter.mLvlObject.push_back({ 1, 0, 0x2961F, 1, 0 });
+        source.mLevelledNpcs[id(0x29627)] = encounter;
+        const ESM4::Npc& raider = source.addNpc(0x2F6E2, {}, 0x01DF, 0x29627);
+
+        std::map<std::uint32_t, std::uint32_t> mostRounds;
+        for (std::uint32_t seed = 1; seed <= 64; ++seed)
+        {
+            const ESM4::CharacterArmor given = ESM4::characterArmor(source, raider, 2, seed);
+            std::map<std::uint32_t, std::uint32_t> items;
+            for (const ESM4::ListedItem& item : given.mOtherFromLists)
+                items[item.mItem.mIndex] += item.mCount;
+            // exactly one of the three pistols (a pistol is never given twice), and the rounds that go with it
+            const int pistols
+                = (items.count(pistol10mm) != 0) + (items.count(pistolChinese) != 0) + (items.count(pistol32) != 0);
+            ASSERT_EQ(pistols, 1) << "seed " << seed;
+            const std::uint32_t pistol = items.count(pistol10mm) != 0 ? pistol10mm
+                : items.count(pistolChinese) != 0                     ? pistolChinese
+                                                                      : pistol32;
+            EXPECT_EQ(items.at(pistol), 1u) << "seed " << seed;
+            const std::uint32_t ammo = pistol == pistol32 ? ammo32 : ammo10mm;
+            ASSERT_NE(items.count(ammo), 0u) << "seed " << seed;
+            EXPECT_GE(items.at(ammo), 1u) << "seed " << seed;
+            mostRounds[ammo] = std::max(mostRounds[ammo], items.at(ammo));
+        }
+        // across the seeds the chances at a round are taken: more than the one round that is always there
+        EXPECT_GT(mostRounds[ammo10mm], 3u);
     }
 
     TEST(ESM4WornArmorTest, readsWhetherARecordTakesAThingFromItsTemplate)

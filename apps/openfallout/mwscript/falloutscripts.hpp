@@ -1433,8 +1433,9 @@ namespace OFScript
         /// that is loaded), and the fight is stopped then.
         FightStance fightStance(const OFWorld::Ptr& actor);
         /// A character that is about to fight takes the weapon that does the most damage of those it can use (a
-        /// character with no weapon and no melee weapon in its inventory fights with its hands), and draws it
-        void prepareFight(const OFWorld::Ptr& actor);
+        /// character with no weapon and no melee weapon in its inventory fights with its hands), and draws it; with
+        /// `say` the log tells what it took and what it has
+        void prepareFight(const OFWorld::Ptr& actor, bool say = false);
         /// Whether the character, which is at peace, goes for the player when it sees it: from its aggression and how
         /// its factions stand to the player. `radius` is the radius its AI data names, within which it sees the player
         /// whatever the stealth equation says, 0 when it has none.

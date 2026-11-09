@@ -1639,7 +1639,7 @@ namespace OFMechanics
             {
                 mind.mFighting = true;
                 stopWalking(mind);
-                scripts.prepareFight(mind.mPtr);
+                scripts.prepareFight(mind.mPtr, true);
                 showWeapon(frame, mind, scripts);
             }
 
