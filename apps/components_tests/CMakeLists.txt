@@ -11,13 +11,18 @@ file(GLOB UNITTEST_SRC_FILES
     lua/testasync.cpp
     lua/testconfiguration.cpp
     lua/testinputactions.cpp
+    lua/testinputregistry.cpp
     lua/testl10n.cpp
     lua/testlua.cpp
     lua/testscriptscontainer.cpp
+    lua/testscriptscontainermore.cpp
     lua/testserialization.cpp
     lua/teststorage.cpp
+    lua/teststoragesections.cpp
     lua/testuicontent.cpp
+    lua/testutf8.cpp
     lua/testutilpackage.cpp
+    lua/testutilpackagemore.cpp
     lua/testyaml.cpp
 
     misc/compression.cpp
@@ -25,6 +30,7 @@ file(GLOB UNITTEST_SRC_FILES
     misc/testendianness.cpp
     misc/testmathutil.cpp
     misc/testresourcehelpers.cpp
+    misc/testresourcepaths.cpp
     misc/teststringops.cpp
 
     nifloader/testbulletnifloader.cpp
@@ -34,12 +40,14 @@ file(GLOB UNITTEST_SRC_FILES
     detournavigator/settingsutils.cpp
     detournavigator/recastmeshbuilder.cpp
     detournavigator/gettilespositions.cpp
+    detournavigator/makesettings.cpp
     detournavigator/recastmeshobject.cpp
     detournavigator/navmeshtilescache.cpp
     detournavigator/tilecachedrecastmeshmanager.cpp
     detournavigator/navmeshdb.cpp
     detournavigator/serialization.cpp
     detournavigator/asyncnavmeshupdater.cpp
+    detournavigator/testdebug.cpp
 
     serialization/binaryreader.cpp
     serialization/binarywriter.cpp
@@ -48,6 +56,7 @@ file(GLOB UNITTEST_SRC_FILES
 
     settings/parser.cpp
     settings/shadermanager.cpp
+    settings/testmanager.cpp
     settings/testvalues.cpp
 
     shader/parsedefines.cpp
@@ -64,7 +73,9 @@ file(GLOB UNITTEST_SRC_FILES
     esmloader/esmdata.cpp
     esmloader/record.cpp
 
+    fallback/testfallback.cpp
     files/conversiontests.cpp
+    files/testconfigurationmanager.cpp
     files/testgameini.cpp
     files/testfalloutinstall.cpp
     files/hash.cpp
@@ -74,7 +85,10 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/includes.cpp
     esm4/testactorvalueinfo.cpp
     esm4/testaddonnode.cpp
+    esm4/testammo.cpp
     esm4/testammoeffect.cpp
+    esm4/testarmoraddon.cpp
+    esm4/testbook.cpp
     esm4/testcamerapath.cpp
     esm4/testcamerashot.cpp
     esm4/testcaravancard.cpp
@@ -103,6 +117,10 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testfacegen.cpp
     esm4/testfaction.cpp
     esm4/testformidlist.cpp
+    esm4/testactorrecords.cpp
+    esm4/testitemrecords.cpp
+    esm4/testland.cpp
+    esm4/testplacedrecords.cpp
     esm4/testlinkedreference.cpp
     esm4/testlock.cpp
     esm4/testhungerstage.cpp
@@ -118,9 +136,11 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testloadscreentype.cpp
     esm4/testmagiceffect.cpp
     esm4/testmapmarker.cpp
+    esm4/testmediaset.cpp
     esm4/testmenuicon.cpp
     esm4/testmessage.cpp
     esm4/testmodeldata.cpp
+    esm4/testnavigation.cpp
     esm4/testnavmesh.cpp
     esm4/testnote.cpp
     esm4/testnpc.cpp
@@ -136,6 +156,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testradiationstage.cpp
     esm4/testragdoll.cpp
     esm4/testrace.cpp
+    esm4/testreader.cpp
     esm4/testreadergame.cpp
     esm4/testrecipe.cpp
     esm4/testrecipecategory.cpp
@@ -148,6 +169,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testscriptargs.cpp
     esm4/testscriptcode.cpp
     esm4/testscriptcodecensus.cpp
+    esm4/testscriptcodecensusmore.cpp
     esm4/testsleepdeprivationstage.cpp
     esm4/testspell.cpp
     esm4/testsurvey.cpp
@@ -241,7 +263,19 @@ file(GLOB UNITTEST_SRC_FILES
     fx/technique.cpp
 
     esm3/readerscache.cpp
+    esm3/saveloadharness.hpp
     esm3/testsaveload.cpp
+    esm3/testsavegamerecords.cpp
+    esm3/testsaveobjects.cpp
+    esm3/testcontentrecords.cpp
+    esm3/testcreaturenpc.cpp
+    esm3/testcells.cpp
+    esm3/testdialogue.cpp
+    esm3/testmagicfactionscriptplayer.cpp
+    esm3/testmorrowindrecords.cpp
+    esm3/testsavegamegaps.cpp
+    esm3/testreaderandland.cpp
+    esm3/testmappings.cpp
     esm3/testesmwriter.cpp
     esm3/testinfoorder.cpp
     esm3/testcstringids.cpp
@@ -251,6 +285,7 @@ file(GLOB UNITTEST_SRC_FILES
     nifosg/testkeyframes.cpp
     nifosg/testnifloader.cpp
 
+    esmterrain/teststorage.cpp
     esmterrain/testgridsampling.cpp
     esmterrain/testtexturepath.cpp
 
@@ -272,13 +307,24 @@ file(GLOB UNITTEST_SRC_FILES
     sceneutil/loddebug.cpp
     sceneutil/userdata.cpp
 
+    bgsm/testfile.cpp
     bsa/testbsafile.cpp
     bsa/testcompressedbsafile.cpp
+    bsa/testcompressedbsafilearchive.cpp
 
     nif/node.hpp
+    nif/geometry.hpp
+    nif/niftestfile.hpp
     nif/testanimsurvey.cpp
     nif/testbspline.cpp
+    nif/testextradata.cpp
+    nif/testhavok.cpp
+    nif/testcontroller.cpp
+    nif/testdata.cpp
+    nif/testnode.cpp
     nif/testphysics.cpp
+    nif/testparticle.cpp
+    nif/testproperty.cpp
 )
 
 source_group(apps\\components-tests FILES ${UNITTEST_SRC_FILES})
