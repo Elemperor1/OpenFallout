@@ -518,6 +518,27 @@ ARENA_TARGET_ID = 0x953
 ARENA_TARGET_REF_ID = 0x954
 BODY_PARTS_ID = 0x1D  # the number of the DefaultBodyPartData of the games, which every character that is not the player has
 ARENA_TARGET_PLACE = (300.0, 300.0, 0.0)
+# The shooting range of the arena, along a line in the south: a shooter that carries the pistol and, once the test sets
+# its "go" global, is told by its script to use it (UseWeapon, three attacks that always hit and do no damage, holding fire)
+# against the target; a blocker that stands between them and goes away when the test sets "release"; the target, whose
+# script counts the blows and keeps the health it has at the third
+RANGE_SHOOTER_ID = 0xF80
+RANGE_SHOOTER_REF_ID = 0xF81
+RANGE_BLOCKER_ID = 0xF82
+RANGE_BLOCKER_REF_ID = 0xF83
+RANGE_TARGET_ID = 0xF84
+RANGE_TARGET_REF_ID = 0xF85
+RANGE_PLACE_REF_ID = 0xF86  # where the shooter stands: the place of its order
+RANGE_SHOOTER_SCRIPT_ID = 0xF87
+RANGE_BLOCKER_SCRIPT_ID = 0xF88
+RANGE_TARGET_SCRIPT_ID = 0xF89
+RANGE_GLOBALS = {name: (0xF8A + index, "OFTestRange" + name.title()) for index, name in enumerate(
+    ("go", "release", "ordered", "hits", "health"))}
+RANGE_SHOOTER_PLACE = (-1000.0, -1500.0, 0.0)
+RANGE_BLOCKER_PLACE = (-600.0, -1500.0, 0.0)
+RANGE_TARGET_PLACE = (-200.0, -1500.0, 0.0)
+RANGE_ATTACKS = 3
+RANGE_TARGET_HEALTH = 10.0  # a level 1 character with one endurance and 5 health, as the dummy is
 # What the Pip-Boy lists besides the rifle and its rounds: a key (it is on the keyring) and ammunition the rifle does not
 # take (it is dimmed and can not be put on)
 ARENA_KEY_ID = 0x955
@@ -639,7 +660,7 @@ LOD_LAND_ID = 0x987
 MAP_FIND_REF_ID = 0x9A3 # a map marker in the open world, hidden until the player walks up to it
 MAP_FIND_PLACE = (200.0, 300.0)
 MAP_FIND_NAME = "Test Find"
-LAST_ID = 0xF70 # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0xF8E # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -2496,6 +2517,7 @@ def plugin():
                                     for form_id, name in ACTOR_VALUE_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l") for form_id, name in REGION_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"f") for form_id, name in ARENA_GLOBALS.values()),
+                                  *(global_variable(form_id, name, b"f") for form_id, name in RANGE_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"f") for form_id, name in SAVED_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"f") for form_id, name in AUTOPLAY_GLOBALS.values()),
                                   *(global_variable(form_id, name, b"l" if key in ("now", "hop") else b"f")
@@ -2658,7 +2680,43 @@ def arena_scripts():
     started = raider.form(ARENA_GLOBALS["started"][0])
     raider.add(sf.statement(sf.SCRIPT_NAME), sf.block(sf.ON_START_COMBAT, count(started)))
     return [record(b"SCPT", ARENA_DUMMY_SCRIPT_ID, [zstr(b"EDID", "OFTestArenaDummyScript"), *sf.sub_records(dummy)]),
-            record(b"SCPT", ARENA_RAIDER_SCRIPT_ID, [zstr(b"EDID", "OFTestArenaRaiderScript"), *sf.sub_records(raider)])]
+            record(b"SCPT", ARENA_RAIDER_SCRIPT_ID, [zstr(b"EDID", "OFTestArenaRaiderScript"), *sf.sub_records(raider)]),
+            *range_scripts()]
+
+
+def range_scripts():
+    """The scripts of the shooting range (SCPT records of type 0). The shooter, every frame, tells itself once to use the pistol
+    from where it stands on the target, for RANGE_ATTACKS attacks that always hit and do no damage, with the other
+    flags that the game's scripts give (crouch to reload, hold fire), when the test has set "go". The blocker disables itself
+    when the test sets "release". The target counts the blows, and keeps its health at the last of the attacks."""
+    sf = fallout_script
+    shooter = sf.Script(0)
+    go, ordered = (shooter.form(RANGE_GLOBALS[name][0]) for name in ("go", "ordered"))
+    pistol, place, target = (shooter.form(form_id) for form_id in (ARENA_PISTOL_ID, RANGE_PLACE_REF_ID, RANGE_TARGET_REF_ID))
+    shooter.add(sf.statement(sf.SCRIPT_NAME), sf.block(sf.GAME_MODE, b"".join([
+        sf.branch(sf.IF, sf.global_target(go) + sf.number("1") + sf.operator("==")),
+        sf.branch(sf.IF, sf.global_target(ordered) + sf.number("0") + sf.operator("==")),
+        sf.set_to(sf.global_target(ordered), sf.number("1")),
+        sf.call(sf.USE_WEAPON, sf.form_argument(pistol), sf.form_argument(place), sf.form_argument(target),
+                sf.int_argument(RANGE_ATTACKS), sf.int_argument(1), sf.int_argument(1), sf.int_argument(1),
+                sf.int_argument(1)),
+        sf.statement(sf.END_IF), sf.statement(sf.END_IF)])))
+    blocker = sf.Script(0)
+    release, self_ref = blocker.form(RANGE_GLOBALS["release"][0]), blocker.form(RANGE_BLOCKER_REF_ID)
+    blocker.add(sf.statement(sf.SCRIPT_NAME), sf.block(sf.GAME_MODE, b"".join([
+        sf.branch(sf.IF, sf.global_target(release) + sf.number("1") + sf.operator("==")),
+        sf.call_on(self_ref, sf.DISABLE), sf.statement(sf.END_IF)])))
+    victim = sf.Script(0)
+    hits, health = (victim.form(RANGE_GLOBALS[name][0]) for name in ("hits", "health"))
+    self_ref = victim.form(RANGE_TARGET_REF_ID)
+    victim.add(sf.statement(sf.SCRIPT_NAME), sf.block(sf.ON_HIT, b"".join([
+        sf.set_to(sf.global_target(hits), sf.global_target(hits) + sf.number("1") + sf.operator("+")),
+        sf.branch(sf.IF, sf.global_target(hits) + sf.number(str(RANGE_ATTACKS)) + sf.operator("==")),
+        sf.set_to(sf.global_target(health), sf.call_token(sf.GET_ACTOR_VALUE, sf.u16(AV_HEALTH), reference=self_ref)),
+        sf.statement(sf.END_IF)])))
+    return [record(b"SCPT", RANGE_SHOOTER_SCRIPT_ID, [zstr(b"EDID", "OFTestRangeShooterScript"), *sf.sub_records(shooter)]),
+            record(b"SCPT", RANGE_BLOCKER_SCRIPT_ID, [zstr(b"EDID", "OFTestRangeBlockerScript"), *sf.sub_records(blocker)]),
+            record(b"SCPT", RANGE_TARGET_SCRIPT_ID, [zstr(b"EDID", "OFTestRangeTargetScript"), *sf.sub_records(victim)])]
 
 
 def saved_quest():
@@ -2757,7 +2815,14 @@ def arena_people():
     bystander = person(ARENA_BYSTANDER_ID, "OFTestArenaBystander", dressed=False, ai=(0, 4))
     target = person(ARENA_TARGET_ID, "OFTestArenaTarget", dressed=False, health=ARENA_DUMMY_HEALTH,
                     attributes=(5, 5, 1, 5, 5, 5, 5), level=1, ai=(0, 2))
-    return [dummy, raider, bystander, target]
+    # The shooting range: the shooter carries the pistol and its rounds and never starts a fight; the blocker and the target
+    # are like the dummy, a character that is hit goes for whoever hit it
+    shooter = person(RANGE_SHOOTER_ID, "OFTestRangeShooter", dressed=False, script=RANGE_SHOOTER_SCRIPT_ID,
+                     items=[(ARENA_PISTOL_ID, 1), (ARENA_AMMO_ID, ARENA_RAIDER_AMMO)], ai=(0, 4))
+    blocker = person(RANGE_BLOCKER_ID, "OFTestRangeBlocker", dressed=False, script=RANGE_BLOCKER_SCRIPT_ID, ai=(0, 4))
+    victim = person(RANGE_TARGET_ID, "OFTestRangeTarget", dressed=False, script=RANGE_TARGET_SCRIPT_ID,
+                    health=ARENA_DUMMY_HEALTH, attributes=(5, 5, 1, 5, 5, 5, 5), level=1, ai=(0, 4))
+    return [dummy, raider, bystander, target, shooter, blocker, victim]
 
 
 def arena_bobby_pin():
@@ -2847,6 +2912,10 @@ def arena_cell():
         achr(ARENA_RAIDER_REF_ID, ARENA_RAIDER_PLACE, base=ARENA_RAIDER_ID),
         achr(ARENA_BYSTANDER_REF_ID, ARENA_BYSTANDER_PLACE, base=ARENA_BYSTANDER_ID),
         achr(ARENA_TARGET_REF_ID, ARENA_TARGET_PLACE, base=ARENA_TARGET_ID),
+        achr(RANGE_SHOOTER_REF_ID, RANGE_SHOOTER_PLACE, base=RANGE_SHOOTER_ID),
+        achr(RANGE_BLOCKER_REF_ID, RANGE_BLOCKER_PLACE, base=RANGE_BLOCKER_ID),
+        achr(RANGE_TARGET_REF_ID, RANGE_TARGET_PLACE, base=RANGE_TARGET_ID),
+        refr(RANGE_PLACE_REF_ID, TARGET_MARKER_ID, RANGE_SHOOTER_PLACE),
         refr(AUTOPLAY_TARGET_REF_ID, AUTOPLAY_TARGET_ID, AUTOPLAY_TARGET_PLACE), *arena_lock_refs()])
     children = group(struct.pack("<I", ARENA_CELL_ID), 6, [refs])
     sub_block = group(struct.pack("<i", ARENA_CELL_ID // 10 % 10), 3, [cell, children])

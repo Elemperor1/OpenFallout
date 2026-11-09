@@ -1584,13 +1584,50 @@ namespace OFMechanics
                             break;
                     }
                 }
+                // Far from the player it does nothing, and keeps the order (fAIUseWeaponDistance: 5000 in the
+                // executable, 15000 in both master files; FalloutNV.exe 0x8f7776)
+                if (distanceAcross(mind.position(), frame.mPlayer)
+                    > scripts.gameSetting("fAIUseWeaponDistance").value_or(5000.0))
+                    return true;
                 const osg::Vec3f aim = order.mTarget.getRefData().getPosition().asVec3();
                 faceToward(
                     frame, mind, std::atan2(aim.x() - mind.position().x(), aim.y() - mind.position().y()), duration);
+                // With HoldFire it does not shoot while another character stands in the way, nearer than the target
+                // and within 30 degrees of the line to it (FalloutNV.exe 0x8f8966; what the list of the executable
+                // holds is not known, the characters of the cell stand for it)
+                if (order.mOrder.mHoldFire && mind.mPtr.getCell() != nullptr)
+                {
+                    // Characters that have no mind stand in the way as well: they are all the characters of the cell
+                    std::vector<FalloutScript::FightAI::FloorPoint> others;
+                    mind.mPtr.getCell()->forEach([&](const OFWorld::Ptr& other) {
+                        if ((other.getType() == ESM4::Npc::sRecordId || other.getType() == ESM4::Creature::sRecordId)
+                            && other != mind.mPtr && other != order.mTarget && other.getRefData().isEnabled()
+                            && !scripts.isDead(other))
+                        {
+                            const osg::Vec3f at = other.getRefData().getPosition().asVec3();
+                            others.push_back({ at.x(), at.y() });
+                        }
+                        return true;
+                    });
+                    if (FalloutScript::FightAI::lineOfFireBlocked(
+                            { mind.position().x(), mind.position().y() }, { aim.x(), aim.y() }, others))
+                    {
+                        if ((mind.mHeld += duration) >= holdFireReportAfter)
+                        {
+                            mind.mHeld = 0.f;
+                            Log(Debug::Info) << mind.mPtr.getCellRef().getRefId()
+                                             << " holds fire: another character is in the way of its shot";
+                        }
+                        return true;
+                    }
+                }
                 if (scripts.scriptedShot(mind.mPtr, order.mTarget).mFired)
+                {
+                    mind.mHeld = 0.f;
                     if (auto* animation
                         = dynamic_cast<OFRender::FalloutActorAnimation*>(frame.mWorld.getAnimation(mind.mPtr)))
                         animation->attack();
+                }
                 return true;
             }
             if (mind.mOrdered)

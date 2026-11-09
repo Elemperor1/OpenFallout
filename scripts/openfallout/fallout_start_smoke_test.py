@@ -2264,6 +2264,50 @@ for _key, _tag in (("armed", "ARMED"), ("weapon_out", "OUT"), ("ammo", "AMMO"), 
                    ("raider_ammo", "RAIDER_AMMO"), ("hits", "HITS"), ("deaths", "DEATHS"), ("started", "STARTED")):
     ARENA_SCRIPT = ARENA_SCRIPT.replace("@" + _tag + "@", plugin.ARENA_GLOBALS[_key][1])
 
+# The shooting range of the arena: the shooter is told by its script to use the pistol on the target (UseWeapon, three attacks that
+# always hit and do no damage, holding fire) while the blocker stands in the way: it must not shoot; the blocker goes away
+# and it must make its three attacks, the target hears of each blow (its script counts them) and keeps its health
+RANGE_SCRIPT = """\
+local world = require('openfallout.world')
+local core = require('openfallout.core')
+
+local elapsed, step = 0, 0
+local function find(id)
+    local ok, object = pcall(world.getObjectByFormId, core.getFormId('OFTest.esm', id))
+    return ok and object:isValid() and object or nil
+end
+local function report(tag)
+    local g = world.globals
+    local shooter, target = find(@SHOOTER@), find(@TARGET@)
+    print('OFTEST', 'range', tag, string.format('ordered=%.0f hits=%.0f health=%.1f targetDistance=%s',
+        g.@ORDERED@, g.@HITS@, g.@HEALTH@,
+        shooter and target and string.format('%.0f', (shooter.position - target.position):length()) or 'none'))
+end
+local steps = {
+    { 1.0, function() world.globals.@GO@ = 1 end },
+    { 8.0, function() report('blocked') end },
+    { 8.5, function() world.globals.@RELEASE@ = 1 end },
+    { 16.0, function() report('released') end },
+    { 17.0, core.quit },
+}
+return {
+    engineHandlers = {
+        onUpdate = function(dt)
+            elapsed = elapsed + dt
+            local next = steps[step + 1]
+            if next and elapsed >= next[1] then
+                step = step + 1
+                next[2]()
+            end
+        end,
+    },
+}
+"""
+for _name, _value in (("@SHOOTER@", str(plugin.RANGE_SHOOTER_REF_ID)), ("@TARGET@", str(plugin.RANGE_TARGET_REF_ID)),
+                      *((f"@{key.upper()}@", plugin.RANGE_GLOBALS[key][1])
+                        for key in ("go", "release", "ordered", "hits", "health"))):
+    RANGE_SCRIPT = RANGE_SCRIPT.replace(_name, _value)
+
 # The player script of the arena: shoots at the object it is told to, once the weapon is ready again, as the player script of
 # the engine does, and logs each shot
 ARENA_PLAYER_SCRIPT = """\
@@ -4001,6 +4045,47 @@ def check_saves(first, second, third=None):
     return problems
 
 
+def check_range(text):
+    """The problems with the shooting range: the shooter is told to use the pistol (UseWeapon) and, with the blocker in the
+    line of fire, makes no attack and says that it holds fire; when the blocker has gone it makes its three attacks and is
+    done after them, the target hears of each blow (they are hits though they do no damage) and keeps the health it had."""
+    problems = []
+    for line in text.splitlines():
+        if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run|Frame error", line, re.I):
+            problems.append(line)
+    pattern = r"OFTEST\trange\t(\w+)\tordered=(-?[\d.]+) hits=(-?[\d.]+) health=(-?[\d.]+) targetDistance=(\w+)$"
+    reports = {}
+    for line in text.splitlines():
+        match = re.search(pattern, line)
+        if match:
+            reports[match.group(1)] = {"ordered": float(match.group(2)), "hits": float(match.group(3)),
+                                       "health": float(match.group(4)),
+                                       "distance": None if match.group(5) == "none" else float(match.group(5))}
+    for tag in ("blocked", "released"):
+        if tag not in reports:
+            problems.append(f"no 'range {tag}' line in the log")
+    if problems:
+        return problems
+    blocked, released = reports["blocked"], reports["released"]
+    attacks = plugin.RANGE_ATTACKS
+    if blocked["ordered"] != 1:
+        problems.append("the shooter was not told to use the weapon")
+    if blocked["hits"] != 0:
+        problems.append(f"the shooter hit the target {blocked['hits']:.0f} time(s) with a character in the line of fire")
+    if not re.search(r"holds fire: another character is in the way of its shot", text):
+        problems.append("the shooter did not say that it holds fire")
+    if released["hits"] < attacks:
+        problems.append(f"the target was hit {released['hits']:.0f} time(s) after the blocker went, not {attacks}")
+    if released["health"] != plugin.RANGE_TARGET_HEALTH:
+        problems.append(f"the target had {released['health']:.1f} health after its third blow, not "
+                        f"{plugin.RANGE_TARGET_HEALTH:.1f}: the attacks that do no damage hurt it")
+    if not re.search(rf"UseWeapon: \S+ shoots {attacks} time\(s\)", text):
+        problems.append("no 'UseWeapon ... shoots' line in the log")
+    if not re.search(rf"UseWeapon: \S+ is done \(all its attacks are made\) after {attacks} attack\(s\)", text):
+        problems.append(f"the order did not end after its {attacks} attacks")
+    return problems
+
+
 def check_arena(text):
     """The problems with the arena: the stages of the quest are set; the rifle is in the hands of the player with its rounds;
     the dummy takes the blows the player shoots at it (its OnHit block counts each, a round is used for each shot) and
@@ -5154,7 +5239,7 @@ def main():
     parser.add_argument("--display-lists", action="store_true",
                         help="run with `force vertex buffer objects = false`, the display lists of OpenGL: the engine "
                              "must not say it draws from vertex buffer objects")
-    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena", "autoplay", "saves", "savesprobe", "mods", "activation", "archives"],
+    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena", "range", "autoplay", "saves", "savesprobe", "mods", "activation", "archives"],
                         help="run only this start (or the conversation, the making of the character or the new game), "
                              "not all")
     args = parser.parse_args()
@@ -5192,6 +5277,8 @@ def main():
     (data / "scripts" / "arenaplayer.lua").write_text(ARENA_PLAYER_SCRIPT, encoding="ascii")
     (data / "arenatest.omwscripts").write_text(
         "PLAYER: scripts/arenaplayer.lua\nGLOBAL: scripts/arenatest.lua\n", encoding="ascii")
+    (data / "scripts" / "rangetest.lua").write_text(RANGE_SCRIPT, encoding="ascii")
+    (data / "rangetest.omwscripts").write_text("GLOBAL: scripts/rangetest.lua\n", encoding="ascii")
     (data / "scripts" / "savesworld.lua").write_text(SAVES_WORLD_SCRIPT, encoding="ascii")
     (data / "scripts" / "savesmenu.lua").write_text(SAVES_MENU_SCRIPT, encoding="ascii")
     (data / "scripts" / "saveslocal.lua").write_text(SAVES_LOCAL_SCRIPT, encoding="ascii")
@@ -5336,6 +5423,26 @@ def main():
             print(line.split("]", 1)[-1].strip())
         for problem in found:
             print("PROBLEM (arena):", problem)
+        problems += found
+    if args.only in (None, "range"):
+        home = work / "range" / "home"
+        home.mkdir(parents=True)
+        runtime = work / "range" / "runtime"
+        runtime.mkdir(mode=0o700)
+        print("== range: --start", plugin.ARENA_CELL_NAME)
+        status, _ = run_engine(program, build / "resources", data, home, runtime, max(args.seconds, 40),
+                               plugin.ARENA_CELL_NAME, [], "rangetest.omwscripts")
+        log = home / ".config" / "openfallout" / "openfallout.log"
+        text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+        print(f"log: {log}")
+        found = []
+        if status != 0:
+            found.append(f"the engine exited with status {status}")
+        found += check_range(text)
+        for line in (line for line in text.splitlines() if "OFTEST" in line or "UseWeapon" in line or "holds fire" in line):
+            print(line.split("]", 1)[-1].strip())
+        for problem in found:
+            print("PROBLEM (range):", problem)
         problems += found
     if args.only in (None, "autoplay"):
         # The gates of autoplay have a table of their own (a data folder of their own, since the table is a script of it)

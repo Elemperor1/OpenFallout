@@ -90,6 +90,23 @@ namespace FalloutScript::FightAI
     /// skill over a hundred, between 0.3 and 0.95 (a guess: the games work it out from the spread of the weapon and
     /// the distance, and the skill)
     double hitChance(double skill);
+
+    /// A place on the floor, for the line of fire
+    struct FloorPoint
+    {
+        double mX = 0;
+        double mY = 0;
+    };
+
+    /// The angle within which a character in the line of fire holds a shooter back (round 10N: 0.5236 radians, 30
+    /// degrees, at 0x1088258 of FalloutNV.exe)
+    constexpr double lineOfFireAngle = 0.5236;
+
+    /// Whether a shot of UseWeapon with HoldFire has to wait because another character stands in the line of fire: one
+    /// that is nearer to the shooter than the target and within `lineOfFireAngle` of the line from the shooter to the
+    /// target (FalloutNV.exe 0x8f8966 to 0x8f8ad2). The characters that count (not the target, not the dead) are for
+    /// the caller to choose.
+    bool lineOfFireBlocked(FloorPoint shooter, FloorPoint target, const std::vector<FloorPoint>& others);
 }
 
 #endif

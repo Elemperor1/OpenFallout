@@ -89,11 +89,11 @@ return {
         -- The script of the classroom trigger needs the player sitting at a desk (stage 50 comes when the player sits while in the
         -- trigger, unless Mr. Brotch's dialogue went by way of 45, the skipped test), and at 55 the seven classmates sitting too,
         -- which their packages of the type Find bring about (Mac round 10M: all seven sit within 12 s of stage 40, on seven
-        -- of the eight places of the classroom, and desk 0x02B793 is the one that is left). So the player sits at it, as the
-        -- player does in the game, and walks into the trigger; stages 50, 55 and 60 then come by themselves. The seat is taken
-        -- once (`tries = 1`: activating a piece of furniture a second time gets the player up from it)
+        -- of the eight places of the classroom, and desk 0x02B793 is the one that is left; round 10N: all eight places are
+        -- inside the box of the trigger). So the player sits at it, as the player does in the game, and stages 50, 55 and 60 come by
+        -- themselves. The seat is taken once (`tries = 1`: activating a piece of furniture a second time gets the player up
+        -- from it)
         { quest = 'CG03', stage = 42, file = 'Fallout3.esm', ref = 0x02B793, how = 'activate', settle = 2, gap = 0, tries = 1 },
-        { quest = 'CG03', stage = 42, file = 'Fallout3.esm', ref = 0x02B799, how = 'walk', settle = 2, gap = 2, tries = 1 },
         { quest = 'CG03', stage = 45, file = 'Fallout3.esm', ref = 0x02B799, how = 'walk' },
         { quest = 'CG03', stage = 55, file = 'Fallout3.esm', ref = 0x02B799, how = 'walk' },
         -- The stand-in for the case that the engine does not bring 60 about by itself (the Mac rounds 10I, 10K and 10L used it

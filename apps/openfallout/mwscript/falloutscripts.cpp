@@ -2611,7 +2611,7 @@ namespace OFScript
     }
 
     FalloutScripts::StrikeResult FalloutScripts::strike(FalloutScript::FormId attacker, FalloutScript::FormId victim,
-        FalloutScript::FormId weapon, int limb, double roll, int condition, int mods)
+        FalloutScript::FormId weapon, int limb, double roll, int condition, int mods, bool noDamage)
     {
         namespace AV = FalloutScript::ActorValue;
         StrikeResult result;
@@ -2678,6 +2678,16 @@ namespace OFScript
         if (limb >= 0 && !blow.mMelee)
             if (const double multiplier = mLimbs.damageMultiplier(victim, limb); multiplier > 0)
                 dealt *= multiplier;
+        // A shot of UseWeapon that does no damage has its damage number zeroed in the executable, and the rest of the
+        // hit runs (round 10N: FalloutNV.exe 0x89a706 zeroes the float of the hit and goes on): the victim is hit, its
+        // blocks hear of it, and it fights back, but its health, its limbs and the armor it wears keep what they have
+        if (noDamage)
+        {
+            dealt = 0;
+            hit.mDamage = 0;
+            hit.mEntering = 0;
+            hit.mAfterThreshold = 0;
+        }
 
         // The blows come one after the other from here, and no death or revival comes between the checks and the blow:
         // a blow that comes late for a death changes nothing
@@ -2982,9 +2992,9 @@ namespace OFScript
             wearWeaponOfShot(attacker, stats);
         if (victim == mPlayer || isCharacterOrCreature(target))
         {
-            // A shot that is told to do no damage hits and takes nothing
-            if (!noDamage)
-                result.mStrike = strike(attacker, victim, stats.mWeapon, limb, -1.0, conditionBefore, modsBefore);
+            // A shot that is told to do no damage still hits: it takes nothing from the victim (strike zeroes the
+            // damage)
+            result.mStrike = strike(attacker, victim, stats.mWeapon, limb, -1.0, conditionBefore, modsBefore, noDamage);
             return result;
         }
         // An object has no health, but its script hears of the blow. It is not attacked in the sense of GetAttacked,

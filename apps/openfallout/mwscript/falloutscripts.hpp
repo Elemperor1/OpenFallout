@@ -1321,10 +1321,13 @@ namespace OFScript
         /// fights back if it was at peace. The OnHit, OnHitWith and OnDeath blocks of the victim run in the next
         /// frame. `limb` is the part of the body that was hit, -1 when not known; `roll` (0 to 100) decides whether the
         /// blow is critical, a negative one is drawn at random. The copy that strikes is the one in the hands of the
-        /// attacker unless `condition` (tenths of a percent, 0 or more) and `mods` name it: a weapon that breaks with the
-        /// blow is out of the hands by then. Any thread.
+        /// attacker unless `condition` (tenths of a percent, 0 or more) and `mods` name it: a weapon that breaks with
+        /// the blow is out of the hands by then. With `noDamage` (a shot of UseWeapon with DoNoDamage) the blow is a
+        /// hit that does no damage: the blocks of the victim run and it fights back, and nothing is taken from it. Any
+        /// thread.
         StrikeResult strike(FalloutScript::FormId attacker, FalloutScript::FormId victim,
-            FalloutScript::FormId weapon = 0, int limb = -1, double roll = -1, int condition = -1, int mods = 0);
+            FalloutScript::FormId weapon = 0, int limb = -1, double roll = -1, int condition = -1, int mods = 0,
+            bool noDamage = false);
 
         /// What the weapon that a character holds allows
         struct WeaponStats
