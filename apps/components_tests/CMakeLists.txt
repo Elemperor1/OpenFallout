@@ -111,6 +111,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testfacegen.cpp
     esm4/testfaction.cpp
     esm4/testformidlist.cpp
+    esm4/testitemrecords.cpp
     esm4/testland.cpp
     esm4/testlinkedreference.cpp
     esm4/testlock.cpp
