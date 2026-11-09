@@ -5,6 +5,7 @@
 #include <components/nif/nifstream.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <sstream>
@@ -49,6 +50,9 @@ namespace NifTest
         Bytes& f32(float value) { return put(value); }
         Bytes& boolean(bool value) { return put<std::uint8_t>(value ? 1 : 0); }
 
+        /// A flag as the oldest files write it, in four bytes.
+        Bytes& boolean32(bool value) { return u32(value ? 1 : 0); }
+
         /// A reference to a record by its index in the file; -1 is none.
         Bytes& ref(std::int32_t index) { return i32(index); }
 
@@ -77,6 +81,51 @@ namespace NifTest
         {
             identity3();
             return vec3(x, y, z).f32(scale);
+        }
+
+        /// A 16-bit count and then 16-bit values.
+        Bytes& shorts(const std::vector<std::uint16_t>& values)
+        {
+            u16(static_cast<std::uint16_t>(values.size()));
+            for (const std::uint16_t value : values)
+                u16(value);
+            return *this;
+        }
+
+        /// Keys of a value with one float: the count, the linear interpolation type and the time and value of each.
+        Bytes& floatKeys(const std::vector<std::pair<float, float>>& keys)
+        {
+            u32(static_cast<std::uint32_t>(keys.size()));
+            if (keys.empty())
+                return *this;
+            u32(1); // linear
+            for (const auto& [time, value] : keys)
+                f32(time).f32(value);
+            return *this;
+        }
+
+        /// The same for a vector of three floats.
+        Bytes& vec3Keys(const std::vector<std::pair<float, std::array<float, 3>>>& keys)
+        {
+            u32(static_cast<std::uint32_t>(keys.size()));
+            if (keys.empty())
+                return *this;
+            u32(1);
+            for (const auto& [time, value] : keys)
+                f32(time).vec3(value[0], value[1], value[2]);
+            return *this;
+        }
+
+        /// The same for a rotation, as w, x, y, z.
+        Bytes& quatKeys(const std::vector<std::pair<float, std::array<float, 4>>>& keys)
+        {
+            u32(static_cast<std::uint32_t>(keys.size()));
+            if (keys.empty())
+                return *this;
+            u32(1);
+            for (const auto& [time, value] : keys)
+                f32(time).quat(value[0], value[1], value[2], value[3]);
+            return *this;
         }
 
         Bytes& zeros(std::size_t count)
@@ -142,6 +191,73 @@ namespace NifTest
         {
             string(bytes, text);
             return std::move(bytes);
+        }
+
+        /// What the start of every object with a name and a place has: the name, the extra data, the controller, the
+        /// flags, the transform, the properties and the collision.
+        struct Place
+        {
+            std::string mName;
+            std::vector<std::int32_t> mExtra;
+            std::int32_t mController = -1;
+            std::uint32_t mFlags = 0;
+            float mX = 0, mY = 0, mZ = 0;
+            float mScale = 1;
+            std::vector<std::int32_t> mProperties;
+            std::int32_t mCollision = -1;
+        };
+
+        /// A flag in the width the version of the file writes it: four bytes before 4.1.0.0, one after.
+        Bytes& flag(Bytes& bytes, bool value) const
+        {
+            if (mProfile.mVersion < Nif::NIFStream::generateVersion(4, 1, 0, 0))
+                return bytes.boolean32(value);
+            return bytes.boolean(value);
+        }
+
+        /// The start of an NiObjectNET: the name, the extra data, the controller.
+        Bytes& named(Bytes& bytes, std::string_view name, const std::vector<std::int32_t>& extra = {},
+            std::int32_t controller = -1)
+        {
+            using Nif::NIFStream;
+            string(bytes, name);
+            if (mProfile.mVersion < NIFStream::generateVersion(10, 0, 1, 0))
+                bytes.ref(extra.empty() ? -1 : extra.front());
+            else
+                bytes.refs(extra);
+            return bytes.ref(controller);
+        }
+
+        /// The start of an NiAVObject.
+        Bytes& place(Bytes& bytes, const Place& at)
+        {
+            using Nif::NIFStream;
+            named(bytes, at.mName, at.mExtra, at.mController);
+            if (mProfile.mBethVersion <= 26)
+                bytes.u16(static_cast<std::uint16_t>(at.mFlags));
+            else
+                bytes.u32(at.mFlags);
+            bytes.vec3(at.mX, at.mY, at.mZ).identity3().f32(at.mScale);
+            if (mProfile.mVersion <= NIFStream::generateVersion(4, 2, 2, 0))
+                bytes.vec3(0, 0, 0); // velocity
+            if (mProfile.mBethVersion <= 34)
+                bytes.refs(at.mProperties);
+            if (mProfile.mVersion <= NIFStream::generateVersion(4, 2, 2, 0))
+                flag(bytes, false); // no bounding volume
+            if (mProfile.mVersion >= NIFStream::generateVersion(10, 0, 1, 0))
+                bytes.ref(at.mCollision);
+            return bytes;
+        }
+
+        /// The body of an NiNode: the start and the children.
+        Bytes node(const Place& at, const std::vector<std::int32_t>& children = {})
+        {
+            Bytes bytes;
+            place(bytes, at);
+            bytes.refs(children);
+            if (mProfile.mBethVersion < 130)
+                bytes.refs({}); // effects
+            return bytes;
         }
 
         /// Add a record and return its index.
