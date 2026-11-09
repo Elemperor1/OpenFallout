@@ -59,6 +59,8 @@ local COLOR = {
 
 local shown = nil
 local shownSerial = nil
+-- Whether the opponent's row of the stake screen has been laid out for the menu that is open (once for each menu)
+local betLaidOut = false
 local modeOpen = false
 local drawn = nil
 local lastWidth = nil
@@ -109,6 +111,7 @@ local function destroyMenu()
         shown:close()
     end
     shown, drawn, lastWidth = nil, nil, nil
+    betLaidOut = false
     deckTiles, gameTiles = nil, nil
     activeList, cursor, firstShown = 'all', { deck = 1, all = 1 }, { deck = 1, all = 1 }
     pickedHand, discarding, lastMove, resultAge = nil, false, nil, nil
@@ -287,9 +290,24 @@ local function setButton(name, text, visible)
     shown:set(tile, 'visible', visible and 1 or 0)
 end
 
+-- FalloutNV.exe 0x73D020: the string of the opponent's row is the opponent's name and its value the ante; the info rect is 150
+-- wider, and the file's layout has room for 17 letters of the name, so for each letter more the value moves 15 to the right
+-- (the order of the two and a name of more than 17 letters were not seen in the running game)
+local function layBet(name)
+    if betLaidOut then return end
+    betLaidOut = true
+    local rect = shown:find('CBM_InfoRect')
+    local width = rect and tonumber(shown:get(rect, 'width'))
+    if width then shown:set(rect, 'width', width + 150) end
+    local value = shown:find('CBM_NPCBetValue')
+    local x = value and tonumber(shown:get(value, 'x'))
+    if x and #name > 17 then shown:set(value, 'x', x + (#name - 17) * 15) end
+end
+
 local function drawBet(screen)
     shown:batch(function()
-        setDisplay('CBM_NPCBetDisplay', 'Opponent\'s Current Ante: ', screen.ante)
+        layBet(screen.opponent or '')
+        setDisplay('CBM_NPCBetDisplay', screen.opponent or '', screen.ante)
         setDisplay('CBM_PlayerBetDisplay', nil, screen.bet)
         setDisplay('CBM_TotalFundsDisplay', nil, screen.funds)
         setButton('CBM_AutoMatchButton', nil, screen.canMatch)

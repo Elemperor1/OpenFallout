@@ -2240,6 +2240,18 @@
 -- @return #table Nil when no match is open.
 
 ---
+-- Starts a match as the script command ShowCaravanMenu does. The opponent is a character (the `id` of its object, or its
+-- serialized id "FormId:0x..."), the deck is the id of its CDCK record (the same texts), the kind is 0 (or 1 for the four of
+-- the tournament), the fraction is the share of its money
+-- that the opponent stakes (0 to 1). The match begins with the stake.
+-- @function [parent=#Caravan] open
+-- @param #string opponent
+-- @param #string deck
+-- @param #number kind
+-- @param #number fraction
+-- @return #boolean False when the fraction is not from 0 to 1, when the deck is not a deck of the files or when the player owns fewer than 30 cards.
+
+---
 -- The stake: take what the opponent asks (or all the player has), raise by an amount (up to `mostRaise`), accept (the
 -- pot is the smaller of the two bets and the deck stage begins).
 -- @function [parent=#Caravan] match

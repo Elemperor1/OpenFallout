@@ -1633,6 +1633,29 @@ found the same way.
   come from the 150 LSCR records (limits `iMaxScreens`, `iMaxScreens_MainMenu`, `iNumLocationSpecificScreens`; 32 name
   locations) and there is no LSCT. The port does not draw it in Fallout 3 yet (black and the engine's progress box).
 
+## Seen in the running game (Mac round 12BT, head 7c69e668b2, 2026-11-09: 18 runs, New Vegas 17 and Fallout 3 1)
+
+The last sweep of M12: each screen opened in the running game, one real action each, 0 Lua error lines from the game's own scripts
+in any run, frame time 16.7 ms on average, no crash. Numbers and notes are in `mac-12bt-results-a.md`, `-b.md` and `-c.md` of the
+M12 folder; the tracker rows carry one line each.
+
+- New Vegas, passed: the skill tags and the traits of character making, the name box, the Vigor Tester (only through the whole
+  chain of the quest: stage 60 with objective 30 shown), level up (skill points, then the perk page), barter (38 caps moved),
+  lockpicking (the pick turns, breaks after 1.6 s at a wrong angle, opens in 0.98 s at the right one), the terminal and the game
+  of hacking, the DATA page and its quest list, a campfire's recipes, a Yes/No box (mouse, Down and Enter; letters do nothing),
+  the companion wheel (eight slices), credits (about 79 px a second), the help manual and settings, the slot machine, blackjack
+  and roulette, the loading screen of a door (amber tip and wheel, no HUD under it), the HUD, V.A.T.S., the flat amber frame of
+  the Pip-Boy's pages, the face screen, the item mod screen, the repair services of a vendor and the repair screen.
+- Fallout 3, passed: the title list and the pause list (green), the Pip-Boy's three pages, the container and its quantity box, a
+  conversation, the death box and Reload, lockpicking, the terminal and its game of hacking.
+- Failed: `book_menu`, which only the console opens (as in the executable): it draws a stray "0" because three textures it names
+  (`interface/misc/scroll_background.dds`, `scroll_roll.dds`, `interface/shared/button/short_on.dds`) are not in the game's
+  archives. The five Caravan screens were not reached: the one opener is the script command in the INFO results of nine characters
+  and no route to it was found in two rounds; `core.casino.caravan.open` starts a match from a script of Lua for such a check.
+- Seen on the way: the 3D camera of the blackjack screen looked down a corridor of the casino, not at the table; the Pip-Boy's
+  "Repair" button stays dim on the row of a worn copy whose donor is a better copy, although `pipboy.canRepair` is true for it
+  (the repair screen itself opens and repairs from the other row); Fallout 3 shows a small frame rate text at the top left.
+
 ## What is not known yet
 
 - How the games place the Pip-Boy background (1024 by 768 design units) on the screen of the device; the box is centred and

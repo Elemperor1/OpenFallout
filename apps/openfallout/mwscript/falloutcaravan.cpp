@@ -23,7 +23,8 @@ namespace OFScript
         using FalloutScript::Casino::CaravanPayment;
         using FalloutScript::Casino::CaravanStake;
 
-        /// The form of the caps (the games keep them as form 0xF)
+        /// The form of the caps in the first master (the games keep them as form 0xF; the place of the master among the
+        /// content files is the high byte, see masterForm)
         constexpr FalloutScript::FormId capsNumber = 0x0000000F;
         /// The least number of cards a deck has: the menu does not open for a player with fewer cards, and the deck
         /// is not accepted with fewer (FalloutNV.exe 0x741060 and the menu's Play)
@@ -84,13 +85,13 @@ namespace OFScript
     }
 
     // FalloutNV.exe 0x73D650: the money of a side is its caps and the worth of the caravan money in its pack
-    static Money moneyOf(
-        FalloutScript::ActorState& actors, const OFWorld::ESMStore& store, FalloutScript::FormId holder)
+    static Money moneyOf(FalloutScript::ActorState& actors, const OFWorld::ESMStore& store,
+        FalloutScript::FormId holder, FalloutScript::FormId caps)
     {
         Money money;
         if (holder == 0)
             return money;
-        money.mCaps = actors.itemCount(holder, capsNumber);
+        money.mCaps = actors.itemCount(holder, caps);
         std::vector<std::pair<FalloutScript::FormId, int>> items;
         if (!actors.items(holder, items))
             return money;
@@ -145,8 +146,8 @@ namespace OFScript
             return false;
         }
         const int barter = static_cast<int>(mActorValues.current(mPlayer, AV::barter));
-        session.mStake.emplace(
-            moneyOf(mActors, mStore, mPlayer).total(), moneyOf(mActors, mStore, opponent).total(), fraction, barter);
+        session.mStake.emplace(moneyOf(mActors, mStore, mPlayer, masterForm(capsNumber)).total(),
+            moneyOf(mActors, mStore, opponent, masterForm(capsNumber)).total(), fraction, barter);
         const std::lock_guard lock(mCaravanMutex);
         session.mSerial = ++mCaravanSerial;
         mCaravan = std::move(session);
@@ -434,7 +435,7 @@ namespace OFScript
         // The side that lost pays the pot: its caravan money first, item by item, and the rest in caps (0x74CC70)
         const FalloutScript::FormId payer = session.mWon ? session.mOpponent : mPlayer;
         const FalloutScript::FormId receiver = session.mWon ? mPlayer : session.mOpponent;
-        const Money money = moneyOf(mActors, mStore, payer);
+        const Money money = moneyOf(mActors, mStore, payer, masterForm(capsNumber));
         const CaravanPayment payment = FalloutScript::Casino::settleCaravan(pot, money.mItems, money.mCaps);
         for (const auto& [form, count] : payment.mItems)
         {
@@ -444,9 +445,9 @@ namespace OFScript
                 mActors.addItem(receiver, form, count);
         }
         if (payer != 0 && payment.mPayerCaps > 0)
-            mActors.removeItem(payer, capsNumber, payment.mPayerCaps);
+            mActors.removeItem(payer, masterForm(capsNumber), payment.mPayerCaps);
         if (receiver != 0 && payment.mReceiverCaps > 0)
-            mActors.addItem(receiver, capsNumber, payment.mReceiverCaps);
+            mActors.addItem(receiver, masterForm(capsNumber), payment.mReceiverCaps);
     }
 
     void FalloutScripts::closeCaravan()
