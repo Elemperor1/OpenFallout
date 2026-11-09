@@ -269,6 +269,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm3/testcells.cpp
     esm3/testdialogue.cpp
     esm3/testmagicfactionscriptplayer.cpp
+    esm3/testmorrowindrecords.cpp
     esm3/testreaderandland.cpp
     esm3/testmappings.cpp
     esm3/testesmwriter.cpp
