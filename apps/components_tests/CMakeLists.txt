@@ -290,6 +290,7 @@ file(GLOB UNITTEST_SRC_FILES
     nif/testanimsurvey.cpp
     nif/testbspline.cpp
     nif/testextradata.cpp
+    nif/testcontroller.cpp
     nif/testnode.cpp
     nif/testphysics.cpp
 )

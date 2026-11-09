@@ -337,6 +337,10 @@ namespace NifTest
             {
                 if (!mProfile.hasTypeList())
                     out.sized(type);
+                // from 10.0.0.0 to 10.1.x each record has a separator, except for those of Havok
+                if (mProfile.mVersion >= Nif::NIFStream::generateVersion(10, 0, 0, 0)
+                    && mProfile.mVersion < Nif::NIFStream::generateVersion(10, 2, 0, 0) && !type.starts_with("bhk"))
+                    out.u32(0);
                 out.raw(body);
             }
 
