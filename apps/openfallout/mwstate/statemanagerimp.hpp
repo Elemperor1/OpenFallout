@@ -27,6 +27,8 @@ namespace OFState
         std::atomic<bool> mPlayerDied{ false };
         std::optional<NewGameRequest> mNewGameRequest;
         std::optional<std::pair<const Character*, std::filesystem::path>> mLoadRequest;
+        // The load that was asked for by the quick load key says its note when it is done (a load clears the notes)
+        bool mQuickLoadNote = false;
         State mState;
         CharacterManager mCharacterManager;
         double mTimePlayed;

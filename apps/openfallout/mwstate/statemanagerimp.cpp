@@ -773,8 +773,8 @@ void OFState::StateManager::quickLoad()
             OFBase::Environment::get().getFalloutScripts()->quickNote(false, true);
         return;
     }
-    if (OFBase::Environment::get().getFalloutScripts() != nullptr)
-        OFBase::Environment::get().getFalloutScripts()->quickNote(false, false);
+    // The note is said when the load is done: a load clears the notes of the HUD (see update)
+    mQuickLoadNote = true;
     // use requestLoad, otherwise we can crash by loading during the wrong part of the frame
     requestLoad(currentCharacter, currentCharacter->begin()->mPath);
 }
@@ -850,6 +850,10 @@ void OFState::StateManager::update(float duration)
             character = getCurrentCharacter();
         loadGame(character, mLoadRequest->second);
         mLoadRequest = std::nullopt;
+        // (the load that the quick load key asked for says its note now, after the load cleared the notes)
+        if (mQuickLoadNote && mState == State_Running && OFBase::Environment::get().getFalloutScripts() != nullptr)
+            OFBase::Environment::get().getFalloutScripts()->quickNote(false, false);
+        mQuickLoadNote = false;
     }
 }
 
