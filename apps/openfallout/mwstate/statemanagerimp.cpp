@@ -70,6 +70,7 @@ void OFState::StateManager::cleanup(bool force)
         mCharacterManager.setCurrentCharacter(nullptr);
         mTimePlayed = 0;
         mLastSavegame.clear();
+        mPlayerDied = false;
 
         mState = State_NoGame;
         OFBase::Environment::get().getLuaManager()->noGame();
@@ -414,10 +415,14 @@ void OFState::StateManager::quickSave(std::string name)
             && OFBase::Environment::get().getWorld()->getGlobalInt(OFWorld::Globals::sCharGenState) == -1 // char gen
             && OFBase::Environment::get().getWindowManager()->isSavingAllowed()))
     {
-        // You can not save your game right now
-        OFBase::Environment::get().getWindowManager()->messageBox("#{OFEngine:SaveGameDenied}");
+        // You can not save your game right now (the games say it on the line of the HUD, in their words)
+        if (OFBase::Environment::get().getFalloutScripts() != nullptr)
+            OFBase::Environment::get().getFalloutScripts()->quickNote(true, true);
+        else
+            OFBase::Environment::get().getWindowManager()->messageBox("#{OFEngine:SaveGameDenied}");
         return;
     }
+    OFBase::Environment::get().getFalloutScripts()->quickNote(true, false);
 
     Character* currentCharacter = getCurrentCharacter(); // Get current character
     QuickSaveManager saveFinder(name, Settings::saves().mMaxQuicksaves);
@@ -759,13 +764,17 @@ void OFState::StateManager::printSavegameFormatError(
 
 void OFState::StateManager::quickLoad()
 {
-    if (Character* currentCharacter = getCurrentCharacter())
+    Character* currentCharacter = getCurrentCharacter();
+    if (currentCharacter == nullptr || currentCharacter->begin() == currentCharacter->end())
     {
-        if (currentCharacter->begin() == currentCharacter->end())
-            return;
-        // use requestLoad, otherwise we can crash by loading during the wrong part of the frame
-        requestLoad(currentCharacter, currentCharacter->begin()->mPath);
+        // (the games tell it on the HUD line while a game runs)
+        if (mState == State_Running)
+            OFBase::Environment::get().getFalloutScripts()->quickNote(false, true);
+        return;
     }
+    OFBase::Environment::get().getFalloutScripts()->quickNote(false, false);
+    // use requestLoad, otherwise we can crash by loading during the wrong part of the frame
+    requestLoad(currentCharacter, currentCharacter->begin()->mPath);
 }
 
 void OFState::StateManager::deleteGame(const OFState::Character* character, const OFState::Slot* slot)

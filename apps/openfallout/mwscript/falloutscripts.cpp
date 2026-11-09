@@ -1274,6 +1274,13 @@ namespace OFScript
         return mEnableParents;
     }
 
+    void FalloutScripts::quickNote(bool save, bool denied)
+    {
+        const char* name
+            = denied ? (save ? "sCantQuickSave" : "sCantQuickLoad") : (save ? "sQuickSaving" : "sQuickLoading");
+        tellPlayer(gameSettingText(name), denied ? 2 : 0, 2.f);
+    }
+
     void FalloutScripts::tellPlayer(const std::string& text, int kind, float seconds)
     {
         // Not in the dialogue window: the window of Fallout's conversations is a script's, and the one that takes these

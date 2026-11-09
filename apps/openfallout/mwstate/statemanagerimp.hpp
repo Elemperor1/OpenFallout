@@ -7,6 +7,8 @@
 
 #include "../mwbase/statemanager.hpp"
 
+#include <atomic>
+
 #include "charactermanager.hpp"
 
 namespace OFState
@@ -21,6 +23,8 @@ namespace OFState
 
         bool mQuitRequest;
         bool mAskLoadRecent;
+        // (read by the scripts of Lua, which run on a thread of their own)
+        std::atomic<bool> mPlayerDied{ false };
         std::optional<NewGameRequest> mNewGameRequest;
         std::optional<std::pair<const Character*, std::filesystem::path>> mLoadRequest;
         State mState;
@@ -48,6 +52,8 @@ namespace OFState
         void askLoadRecent() override;
         void loadRecent() override;
         bool hasRecentSave() override;
+        void setPlayerDied(bool died) override { mPlayerDied = died; }
+        bool playerDied() const override { return mPlayerDied; }
 
         void requestNewGame(bool bypass) override { mNewGameRequest = NewGameRequest{ .mBypass = bypass }; }
 

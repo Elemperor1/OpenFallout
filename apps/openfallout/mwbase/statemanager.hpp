@@ -48,6 +48,10 @@ namespace OFBase
         virtual void loadRecent() = 0;
         /// Whether there is a save that loadRecent would load
         virtual bool hasRecentSave() = 0;
+        /// Says that the death animation of the player is over (true) or that the player lives again (false): a game of
+        /// Fallout asks what to do a few seconds later and in its own box (falloutdeath.lua), which reads this
+        virtual void setPlayerDied(bool died) = 0;
+        virtual bool playerDied() const = 0;
 
         virtual void requestNewGame(bool bypass) = 0;
         virtual void requestLoad(const OFState::Character* character, const std::filesystem::path& filepath) = 0;

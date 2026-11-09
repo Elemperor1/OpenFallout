@@ -775,8 +775,12 @@ namespace OFLua
         api["refundSkillPoints"] = [](int skill, int points) { return scripts().refundSkillPoints(skill, points); };
         api["choosePerk"] = [](std::string_view perk) { return scripts().choosePerk(parseId(perk)); };
 
-        // Whether the player is dead, and the game asks to load a save when the screen of its death is over
-        api["playerDead"] = []() { return scripts().actors().isDead(scripts().playerReference()); };
+        // Whether the player is dead (by what the scripts did to it or by what the engine did: a fall, the breath), and
+        // the game asks to load a save when the screen of its death is over
+        api["playerDead"] = []() {
+            return scripts().actors().isDead(scripts().playerReference())
+                || OFBase::Environment::get().getStateManager()->playerDied();
+        };
         api["askReload"] = []() { OFBase::Environment::get().getStateManager()->askLoadRecent(); };
         // The game's own box for the death has these: whether there is a save to reload, loading the most recent one,
         // and the main menu (which opens the menu that Escape does)

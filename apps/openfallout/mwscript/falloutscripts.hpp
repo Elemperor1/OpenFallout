@@ -1986,6 +1986,11 @@ namespace OFScript
         /// when there is no such sound record or it has no file
         bool playInterfaceSound(std::string_view name);
 
+        /// The note that the games print on the HUD line when the player quick saves or quick loads (the words of
+        /// sQuickSaving and sQuickLoading, 2 seconds, the neutral face) and when that cannot be done (sCantQuickSave
+        /// and sCantQuickLoad, the sad face), Mac round 12BQ A1. A save made by the autosave has none.
+        void quickNote(bool save, bool denied);
+
     private:
         /// The voice file of the line that the speaker says, empty when the data has none
         std::string voiceFile(FalloutScript::FormId speaker, const FalloutScript::DialogueLine& line);

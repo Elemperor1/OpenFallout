@@ -1614,6 +1614,20 @@ found the same way.
   loot prints no note. A V.A.T.S. attack prints no line of its own. The note of a message with no buttons stays as many seconds
   as the message's TNAM says (the length of its text gives the time when it has none): the Mac
   measured 2.2 s for the tutorial note on the fire button (the data has 8 and 10 s for some messages).
+- Quick save, quick load and the HUD line against menus (Mac round 12BQ part A, FalloutNV.exe): F5 (control 0x19, function
+  0x8509A0) queues one note on the HUD message line (`ShowHUDMessage` 0x7052F0 -> `HUDMainMenu::QueueMessage` 0x775380) with the
+  words of `sQuickSaving`, the neutral Vault Boy face, 2.0 s (a constant, not a setting) and no sound, then saves as "quicksave";
+  F9 (0x8509F0) does the same with `sQuickLoading`; when it cannot, `sCantQuickSave` or `sCantQuickLoad` with the sad face, 2.0 s;
+  a failed write says `sSaveFailed`. The autosave (0x850A40) and a save that worked say nothing (`sAutoSaving` and
+  `sSaveSuccessful` have no code that reads them). The HUD main menu has depth -50 and the Pip-Boy pages, the container, the
+  conversation and the message menus 0 or more (the loading menu -6), so the HUD line is drawn under them. The port prints
+  the notes of the quick save and quick load on the HUD line.
+- The death of the player is told to the Lua screen by the state of the actors of Fallout and by a flag of the state manager
+  that the engine sets when the death animation is over (a fall or the breath is the engine's, not a script's).
+- Fallout 3's loading menu (Fallout3.exe, `loading_menu.xml`): the picture (`loading_world_image`, LSCR ICON), a moving slide, the
+  pinwheel (`loading01.nif`), the plate number, the current objective, three statistic rows and the level meter; the screens
+  come from the 150 LSCR records (limits `iMaxScreens`, `iMaxScreens_MainMenu`, `iNumLocationSpecificScreens`; 32 name
+  locations) and there is no LSCT. The port does not draw it in Fallout 3 yet (black and the engine's progress box).
 
 ## What is not known yet
 
