@@ -1,7 +1,10 @@
 #include "casinobindings.hpp"
 
 #include <stdexcept>
+#include <string>
+#include <string_view>
 
+#include <components/esm/refid.hpp>
 #include <components/lua/luastate.hpp>
 #include <components/lua/util.hpp>
 
@@ -20,6 +23,18 @@ namespace OFLua
             if (host == nullptr)
                 throw std::runtime_error("core.casino is only available with the content of Fallout 3 and New Vegas");
             return *host;
+        }
+
+        /// A form id from Lua, the text that a reference or a record has as its id
+        FalloutScript::FormId parseId(std::string_view text)
+        {
+            if (text.empty())
+                return 0;
+            const ESM::RefId id = ESM::RefId::deserializeText(text);
+            const ESM::FormId* form = id.getIf<ESM::FormId>();
+            if (form == nullptr)
+                throw std::runtime_error("\"" + std::string(text) + "\" is not a form id");
+            return form->toUint32();
         }
 
         const char* gameName(OFScript::FalloutScripts::CasinoGame game)
@@ -339,6 +354,12 @@ namespace OFLua
             row["gamesLost"] = screen->mTotals.mGamesLost;
             row["biggestAnte"] = screen->mTotals.mBiggestAnte;
             return row;
+        };
+        // Starts a match as the script command ShowCaravanMenu does: the character the opponent is, the CDCK record of
+        // its deck, the kind of opponent (0, or 1 for the four of the tournament) and the share of its money that it
+        // stakes. False when the deck is not a deck of the files or the player owns fewer than 30 cards.
+        caravan["open"] = [](std::string_view opponent, std::string_view deck, int kind, double fraction) {
+            return scripts().openCaravan(parseId(opponent), parseId(deck), kind, static_cast<float>(fraction));
         };
         caravan["match"] = []() { return scripts().caravanMatch(); };
         caravan["raise"] = [](int amount) { return scripts().caravanRaise(amount); };
