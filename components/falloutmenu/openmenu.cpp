@@ -123,6 +123,13 @@ namespace FalloutMenu
 
     std::optional<std::array<float, 3>> Resources::systemColor(int id) const
     {
+        if (!mColorsSettled && mData.mNewVegas)
+            if (const std::optional<bool> newVegas = mData.mNewVegas())
+            {
+                mColorsSettled = true;
+                if (*newVegas)
+                    setNewVegasColors();
+            }
         const auto found = mColors.find(id);
         if (found == mColors.end())
             return std::nullopt;
@@ -132,6 +139,19 @@ namespace FalloutMenu
     void Resources::setSystemColor(int id, std::array<float, 3> color)
     {
         mColors[id] = color;
+    }
+
+    void Resources::useNewVegasColors()
+    {
+        mColorsSettled = true;
+        setNewVegasColors();
+    }
+
+    void Resources::setNewVegasColors() const
+    {
+        // HUDMain 1, Pipboy 4, MainMenu 5 and System 6 (HUDAlt 2 and Terminal 3 are not read)
+        for (const int id : { 1, 4, 5, 6 })
+            mColors[id] = { 255, 182, 66 };
     }
 
     std::unique_ptr<OpenMenu> OpenMenu::open(std::shared_ptr<Resources> resources, const std::string& file,

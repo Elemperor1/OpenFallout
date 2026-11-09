@@ -29,6 +29,9 @@ namespace FalloutMenu
         std::function<std::optional<std::string>(const std::string& path, std::size_t count)> mReadStart;
         /// The text of a game setting (`&-sHowMany;`)
         std::function<std::optional<std::string>(std::string_view name)> mSetting;
+        /// Whether the running game is New Vegas, once that is known (menus can open before the game's scripts exist,
+        /// and the colours wait for the answer)
+        std::function<std::optional<bool>()> mNewVegas;
     };
 
     /// The size of a DDS picture, from the first bytes of its file
@@ -53,16 +56,24 @@ namespace FalloutMenu
         /// The colour of a system colour (1 to 6), red, green and blue from 0 to 255
         std::optional<std::array<float, 3>> systemColor(int id) const;
         void setSystemColor(int id, std::array<float, 3> color);
+        /// The system colours of New Vegas: its executable makes the colours of the head-up display, the Pip-Boy, the
+        /// main menu and the system amber (255, 182, 66); the others, and all of Fallout 3's, are the INI's (Mac round
+        /// 12BN, FalloutNV.exe 0x718C90 and Fallout3.exe 0x6291B2)
+        void useNewVegasColors();
 
         /// The textures that menus asked for and the data does not have
         const std::set<std::string>& missingTextures() const { return mMissing; }
 
     private:
+        void setNewVegasColors() const;
+
         Data mData;
         FontSet mFonts;
         Atlas mAtlas;
         std::unordered_map<std::string, std::optional<TextSize>> mSizes;
-        std::map<int, std::array<float, 3>> mColors;
+        /// (the amber of New Vegas is put in when the data first says the game is New Vegas)
+        mutable std::map<int, std::array<float, 3>> mColors;
+        mutable bool mColorsSettled = false;
         std::set<std::string> mMissing;
     };
 

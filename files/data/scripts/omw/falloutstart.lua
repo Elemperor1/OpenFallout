@@ -11,8 +11,13 @@
 -- at once, as in the game, and written to the user's file when the screens are left. The list of the submenus ends with a
 -- row of the port's own that opens the engine's window of settings, which has what the game's screens do not (the size
 -- and the mode of the window, the shaders, the mods). Help opens the manual (falloutmanual.lua, on the game's own
--- tutorial_menu.xml) when the data has one; the item that goes to the title screen is not here (the title screen is the
--- engine's too, because no content, and so no words of the game, is loaded there).
+-- tutorial_menu.xml) when the data has one; the item that goes to the title screen is not here.
+--
+-- The same file is the TITLE screen (the game's code makes the menu in the title mode when no game is loaded: a list of
+-- Continue, New, Load, Settings, Credits and Quit over the picture of the main menu, with the game's logo): this script
+-- draws it when no game is running, from the same tiles, with the words of the executable (the title list's words are
+-- compiled into it, and the data of the port has been loaded by then). Not here: the row of the downloadable content, the
+-- rotating pictures behind the list (the picture of the main menu stands still), the music of the title.
 --
 -- The script says every frame that it draws the menu (claimMainMenu), so that a script that fails gives it back to the
 -- engine, and keeps Escape and the B button for itself in a screen of the menu below the list (they go back one step);
@@ -21,17 +26,21 @@ local core = require('openfallout.core')
 local input = require('openfallout.input')
 local ui = require('openfallout.ui')
 local util = require('openfallout.util')
+local vfs = require('openfallout.vfs')
 local engine = require('openfallout.menu')
 local storage = require('openfallout.storage')
 local menuModule = require('scripts.omw.falloutmenu')
 local settingsItems = require('scripts.omw.falloutsettingsitems')
 local manual = require('scripts.omw.falloutmanual')
+local credits = require('scripts.omw.falloutcredits')
 
 local FILE = 'options/start_menu.xml'
 -- The engine's own menu is in a layer of the window manager that the layer of the windows is below, so the menu is drawn
 -- in the layer above it (the one the engine's settings window is in). The console's layer is above that one, so the
 -- console is still seen over the menu (the layer of the message boxes is above the console's)
 local LAYER = 'Settings'
+-- The picture behind the title list: the first picture of the main menu (sMainMenuBackground, main_background)
+local BACKDROP = 'textures/interface/main/main_background.dds'
 local MAX_SAVES = 1000
 -- The row of the port that opens the engine's own window of settings (the game has no such row)
 local ENGINE_WINDOW = 'Engine'
@@ -41,8 +50,8 @@ local CONFIRM_ROWS = 3
 local shown = nil
 local backdrop = nil
 local lists = {}
--- What is on show: 'list' (the main menu), 'save', 'load', 'confirm', 'settings' (the submenus) or 'options' (the items of
--- one submenu)
+-- What is on show: 'list' (the main menu), 'save', 'load', 'confirm', 'settings' (the submenus), 'options' (the items of
+-- one submenu), 'help' (the manual) or 'credits'
 local screen = 'list'
 -- The screen the question was asked from, and what it asks
 local confirmFrom = 'list'
@@ -62,6 +71,8 @@ local pending = nil
 -- The script cannot draw the menu (the file is not there): the engine's own menu is used and nothing is claimed
 local failed = false
 local claiming = false
+-- The real time of the last frame of the credits
+local creditsAt = nil
 -- The save that the panel shows, so the panel is made again only when it changes
 local panelFor = nil
 
@@ -88,9 +99,15 @@ local function saveOptions()
     end
 end
 
+-- No game is running: the menu is the title screen, not the pause menu
+local function title()
+    return engine.getState() == engine.STATE.NoGame
+end
+
 local function closeShown()
     pending = nil
     manual.close()
+    credits.close()
     saveOptions()
     if shown then
         shown:close()
@@ -149,13 +166,13 @@ local function rowOf(save)
     return prefix, location
 end
 
--- The time played as days, hours and minutes (the game keeps the text in the save's header)
+-- The time played as hours, minutes and seconds, "%03i.%02i.%02i" (the game writes the text into the save's header when
+-- it saves: hours are the milliseconds over 3600000, minutes and seconds the rest; Mac round 12BN B2)
 local function playTime(seconds)
     seconds = math.floor(seconds or 0)
-    local days = math.floor(seconds / 86400)
-    local hours = math.floor((seconds % 86400) / 3600)
+    local hours = math.floor(seconds / 3600)
     local minutes = math.floor((seconds % 3600) / 60)
-    return string.format('%03d.%02d.%02d', days, hours, minutes)
+    return string.format('%03d.%02d.%02d', hours, minutes, seconds % 60)
 end
 
 local function hidePanel()
@@ -189,25 +206,11 @@ local function showScreen(name)
     if name ~= 'save' and name ~= 'load' then hidePanel() end
 end
 
-local showList, showSaves, ask, showSettings, showOptions, showManual
+local showList, showSaves, ask, showSettings, showOptions, showManual, showCredits
 
--- The main list, with the items that the state of the game allows
-showList = function()
-    items = {}
-    items[#items + 1] = { label = word('sContinue'), action = function() engine.resume() end }
-    if engine.canSave() then
-        items[#items + 1] = { label = word('sSave'), action = function() showSaves('save') end }
-    end
-    if #collectSaves(true) > 0 then
-        items[#items + 1] = { label = word('sLoad'), action = function() showSaves('load') end }
-    end
-    items[#items + 1] = { label = word('sSettings'), action = function() showSettings() end }
-    -- Help is there when the data has a manual (the game greys it when its tutorial menu does not exist)
-    local hasManual, pages = pcall(core.pipboy.helpManual, false)
-    if hasManual and type(pages) == 'table' and #pages > 0 then
-        items[#items + 1] = { label = word('sHelp'), action = function() showManual() end }
-    end
-    items[#items + 1] = {
+-- The row that quits, which asks first
+local function quitItem()
+    return {
         label = word('sQuit'),
         action = function()
             ask(word('sConfirmQuit'), 'list', {
@@ -216,6 +219,68 @@ showList = function()
             })
         end,
     }
+end
+
+-- A question that asks to be sure of what a row of the title list does: Yes carries it out, No goes back to the list
+local function sure(question, yes)
+    return function()
+        ask(question, 'list', {
+            { label = word('sYes'), action = yes },
+            { label = word('sNo'), action = function() showList() end },
+        })
+    end
+end
+
+-- Whether the data has the credits (the row is there only when it does, as the game's credits need their file)
+local creditsFile = nil
+
+-- The list of the title screen (the mask 1 of the game's items, in its order): Continue and Load only when there is a save
+-- (the game scans its folder of saves for them), Continue asks first and loads the newest save, New asks and starts a game
+local function titleItems()
+    local saves = collectSaves(true)
+    local list = {}
+    if #saves > 0 then
+        list[#list + 1] = {
+            label = word('sContinue'),
+            action = sure(word('sConfirmContinue'), function() engine.loadGame(saves[1].dir, saves[1].file) end),
+        }
+    end
+    list[#list + 1] = { label = word('sNew'), action = sure(word('sConfirmNew'), function() engine.newGame() end) }
+    if #saves > 0 then
+        list[#list + 1] = { label = word('sLoad'), action = function() showSaves('load') end }
+    end
+    list[#list + 1] = { label = word('sSettings'), action = function() showSettings() end }
+    if creditsFile then
+        list[#list + 1] = { label = word('sCrew'), action = function() showCredits() end }
+    end
+    list[#list + 1] = quitItem()
+    return list
+end
+
+-- The list of the pause menu: Continue (the same as Escape: there is no item for resuming), Save when the game can be
+-- saved, Load when there is a save, Settings, Help when the data has a manual, Quit
+local function pauseItems()
+    local list = {}
+    list[#list + 1] = { label = word('sContinue'), action = function() engine.resume() end }
+    if engine.canSave() then
+        list[#list + 1] = { label = word('sSave'), action = function() showSaves('save') end }
+    end
+    if #collectSaves(true) > 0 then
+        list[#list + 1] = { label = word('sLoad'), action = function() showSaves('load') end }
+    end
+    list[#list + 1] = { label = word('sSettings'), action = function() showSettings() end }
+    -- Help is there when the data has a manual (the game greys it when its tutorial menu does not exist)
+    local hasManual, pages = pcall(core.pipboy.helpManual, false)
+    if hasManual and type(pages) == 'table' and #pages > 0 then
+        list[#list + 1] = { label = word('sHelp'), action = function() showManual() end }
+    end
+    list[#list + 1] = quitItem()
+    return list
+end
+
+-- The main list, with the items that the state of the game allows
+showList = function()
+    items = title() and titleItems() or pauseItems()
     local rows = {}
     for index, item in ipairs(items) do rows[index] = { string = item.label, user0 = 0 } end
     shown:batch(function()
@@ -343,6 +408,11 @@ showManual = function()
     if opened then screen = 'help' end
 end
 
+-- Credits: the credits of the game over the title screen; the end of them (or Escape, or a click) brings the list back
+showCredits = function()
+    if credits.show({ layer = LAYER, onDone = function() screen = 'list' end }) then screen = 'credits' end
+end
+
 -- The items of a submenu, as toggles and meters in the container of the options; `keepRow` is the row to light
 showOptions = function(group, keepRow)
     optionGroup = group
@@ -431,6 +501,9 @@ local function back()
         showList()
     elseif screen == 'help' then
         manual.leave()
+    elseif screen == 'credits' then
+        credits.close()
+        screen = 'list'
     end
 end
 
@@ -522,20 +595,33 @@ local function updatePanel()
     end)
 end
 
+-- Whether the data has the picture of the main menu (a texture of the games' archives)
+local function hasBackdrop()
+    local ok, present = pcall(vfs.fileExists, BACKDROP)
+    return ok and present
+end
+
 local function open()
     -- The paused game shows through the menu, darkened a little: the game draws the pause menu over a picture of its own.
-    -- It is made first, so that the element of the menu is above it
+    -- The title screen has the picture of the main menu instead (the game draws it from its loading menu, over the whole
+    -- screen). It is made first, so that the element of the menu is above it
+    local atTitle = title()
+    local picture = atTitle and hasBackdrop()
     local dark = ui.create {
         layer = LAYER,
         type = ui.TYPE.Image,
         props = {
             relativeSize = util.vector2(1, 1),
-            resource = ui.texture { path = 'white' },
-            color = util.color.rgb(0, 0, 0),
-            alpha = 0.45,
+            resource = ui.texture { path = picture and BACKDROP or 'white' },
+            color = picture and util.color.rgb(1, 1, 1) or util.color.rgb(0, 0, 0),
+            alpha = (atTitle and 1) or 0.45,
             ignorePointerEvents = true,
         },
     }
+    if atTitle then
+        local ok, text = pcall(credits.load)
+        creditsFile = ok and text ~= nil
+    end
     -- With a pad connected the file is the one of the 360 controller (`&xbox;`): the glyphs of the buttons are on the
     -- tiles that they press, and the Delete button of a list of saves is there (the file shows it only to a pad)
     local opened = menuModule.open(FILE, { layer = LAYER, pad = engine.controllerConnected() })
@@ -570,6 +656,9 @@ local function open()
         -- which are not drawn yet, so it is left out: the file's own "additional visibility check" is what says it
         shown:set('main_defaults_button', 'user0', 0)
     end)
+    -- The logo of the game is the title screen's (the file keeps it at no alpha; the code of the game fades it in, and in the
+    -- pause menu leaves it out: the file's picture of the pause screen shows only when the logo does not)
+    if atTitle then shown:set('main_title', 'alpha', 255) end
     showList()
     return true
 end
@@ -592,6 +681,11 @@ local function onKey(key)
     -- The manual has its own keys
     if screen == 'help' then
         manual.press(code, key.symbol)
+        return
+    end
+    -- the credits end with Escape (the game ends them with a click or the cancel button as well)
+    if screen == 'credits' then
+        credits.press(code)
         return
     end
     local list = screen == 'list' and lists.main or screen == 'confirm' and lists.confirm
@@ -631,6 +725,10 @@ end
 local function onPad(button)
     if not shown or inputTaken() then return end
     local PAD = input.CONTROLLER_BUTTON
+    if screen == 'credits' then
+        if button == PAD.B or button == PAD.A then credits.press(input.KEY.Escape) end
+        return
+    end
     if screen == 'help' then
         -- the pages turn with the sides of the pad, B leaves (the game puts them on the triggers and B)
         if button == PAD.DPadLeft then
@@ -666,16 +764,23 @@ local function onPad(button)
     elseif button == PAD.B then
         if screen ~= 'list' then back() end
     elseif button == PAD.Start then
-        pending = function() engine.resume() end
+        -- (the pause menu is left with it; the title screen has nothing to go back to)
+        if not title() then
+            pending = function()
+                if not title() then engine.resume() end
+            end
+        end
     end
 end
 
 return {
     engineHandlers = {
-        onFrame = function()
+        onFrame = function(dt)
             -- The engine's own window for the settings is the menu while it is open
             local function drawnNow()
-                return engine.getState() == engine.STATE.Running and not failed and not engine.settingsOpen()
+                local state = engine.getState()
+                return (state == engine.STATE.Running or state == engine.STATE.NoGame) and not failed
+                    and not engine.settingsOpen()
             end
             if pending then
                 -- carried out in this frame while the menu is still the one that picked it, given up when it is not
@@ -704,10 +809,23 @@ return {
                 shown:checkSize()
                 updatePanel()
                 manual.update()
+                -- (the credits scroll by real time: the world is paused with no game and in the pause menu, and then the frame's
+                -- time is zero)
+                if credits.isOpen() then
+                    local now = core.getRealTime()
+                    credits.update(creditsAt and math.min(math.max(now - creditsAt, 0), 0.25) or 0)
+                    creditsAt = now
+                else
+                    creditsAt = nil
+                end
             end
         end,
         onKeyPress = onKey,
         onControllerButtonPress = onPad,
+        -- a click ends the credits, as the game's code ends them on the left button
+        onMouseButtonPress = function(button)
+            if screen == 'credits' and button == 1 then credits.press(input.KEY.Escape) end
+        end,
         onStateChanged = function()
             closeShown()
             release()

@@ -26,6 +26,13 @@ namespace
             EXPECT_FALSE(SettingText::standIn(name).empty()) << name;
     }
 
+    TEST(FalloutSettingText, the_title_screen_has_the_words_of_its_rows_and_its_two_questions)
+    {
+        // Continue and New ask before they act, Credits is a row of the title list only (Mac rounds 12AI A2 and 12BN C)
+        for (const char* name : { "sNew", "sCrew", "sConfirmContinue", "sConfirmNew" })
+            EXPECT_FALSE(SettingText::standIn(name).empty()) << name;
+    }
+
     TEST(FalloutSettingText, the_settings_screens_have_the_words_of_their_labels_and_values)
     {
         // The four submenus, the items of each, and the words a toggle goes through (the names are the ones rounds 12W

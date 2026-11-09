@@ -36,14 +36,23 @@ namespace OFGui
             bytes.resize(static_cast<std::size_t>(stream->gcount()));
             return bytes;
         };
+        // (menus can open while the game is still loading, before its scripts are registered)
         data.mSetting = [](std::string_view name) -> std::optional<std::string> {
-            OFScript::FalloutScripts* host = OFBase::Environment::get().getFalloutScripts();
-            if (host == nullptr)
+            const OFBase::Environment& environment = OFBase::Environment::get();
+            if (!environment.hasFalloutScripts())
                 return std::nullopt;
+            OFScript::FalloutScripts* host = environment.getFalloutScripts();
             std::string text = host->gameSettingText(name);
             if (text.empty())
                 return std::nullopt;
             return text;
+        };
+        // New Vegas draws its menus in amber, as its executable makes the system colours (Fallout 3's are green)
+        data.mNewVegas = []() -> std::optional<bool> {
+            const OFBase::Environment& environment = OFBase::Environment::get();
+            if (!environment.hasFalloutScripts())
+                return std::nullopt;
+            return environment.getFalloutScripts()->isNewVegas();
         };
         return std::make_shared<FalloutMenu::Resources>(std::move(data));
     }

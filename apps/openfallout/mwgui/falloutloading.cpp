@@ -359,7 +359,7 @@ namespace OFGui
 
     void FalloutLoading::turn(Turning& piece, const char* file, float left, float top, float width, float height,
         float pivotX, float pivotY, float degrees, float alpha, double unitsX, double unitsY,
-        const std::array<float, 4>& part)
+        const std::array<float, 4>& part, bool mirrored)
     {
         if (piece.mBox == nullptr)
         {
@@ -388,6 +388,16 @@ namespace OFGui
                         piece.mBox->setImageTexture(path);
                         piece.mBox->setImageTile(MyGUI::IntSize(partWidth, partHeight));
                         piece.mBox->setImageCoord(MyGUI::IntCoord(partLeft, partTop, partWidth, partHeight));
+                        // (the image box takes no rectangle that runs from right to left, so the mirror is the rotating
+                        // skin's own texture coordinates, set after the box's)
+                        if (mirrored)
+                            if (MyGUI::RotatingSkin* skin
+                                = piece.mBox->getSubWidgetMain()->castType<MyGUI::RotatingSkin>(false))
+                                skin->_setUVSet(
+                                    MyGUI::FloatRect(static_cast<float>(partLeft + partWidth) / piece.mWidth,
+                                        static_cast<float>(partTop) / piece.mHeight,
+                                        static_cast<float>(partLeft) / piece.mWidth,
+                                        static_cast<float>(partTop + partHeight) / piece.mHeight));
                         break;
                     }
             }
@@ -408,6 +418,11 @@ namespace OFGui
             skin->setAngle(degrees * 3.14159265f / 180.f);
         }
         piece.mBox->setAlpha(alpha);
+        // The wheel is a tile of the loading menu, which has the system colour of the main menu, and the pieces of the
+        // wheel do not name another (Mac round 12BN A2): amber in New Vegas, pale green in Fallout 3
+        if (const std::optional<std::array<float, 3>> tint
+            = mResources != nullptr ? mResources->systemColor(5) : std::nullopt)
+            piece.mBox->setColour(MyGUI::Colour((*tint)[0] / 255.f, (*tint)[1] / 255.f, (*tint)[2] / 255.f));
         piece.mBox->setVisible(alpha > 0.f);
     }
 
@@ -433,12 +448,14 @@ namespace OFGui
         // A piece is a rectangle round the middle of its node, turned about its middle; the model's origin is the tile's x
         // and y and a unit of the model is s units of the menu. Everything here is in units of the menu.
         const auto place = [&](Turning& piece, const char* file, float centerX, float centerY, float halfWidth,
-                               float halfHeight, float degrees) {
+                               float halfHeight, float degrees, bool mirrored = false) {
             turn(piece, file, wheel.mX + (centerX - halfWidth) * s, wheel.mY + (centerY - halfHeight) * s,
-                2 * halfWidth * s, 2 * halfHeight * s, halfWidth * s, halfHeight * s, degrees, alpha, unitsX, unitsY);
+                2 * halfWidth * s, 2 * halfHeight * s, halfWidth * s, halfHeight * s, degrees, alpha, unitsX, unitsY,
+                { 0.f, 0.f, 1.f, 1.f }, mirrored);
         };
-        // Back to front: the bars on both sides (the left ones are the same picture turned half round), the wheel, the ball
-        place(mWheel[0], "load_roulette_bars.dds", barsLeftX, barsY, barsHalfWidth, barsHalfHeight, 180.f);
+        // Back to front: the bars on both sides (the left ones are the right ones mirrored from left to right, as the
+        // model has them: Mac round 12BN A3), the wheel, the ball
+        place(mWheel[0], "load_roulette_bars.dds", barsLeftX, barsY, barsHalfWidth, barsHalfHeight, 0.f, true);
         place(mWheel[1], "load_roulette_bars.dds", barsRightX, barsY, barsHalfWidth, barsHalfHeight, 0.f);
         place(mWheel[2], "load_roulette_wheel.dds", wheelCenterX, wheelCenterY, wheelHalfWidth, wheelHalfHeight,
             wheelDegrees * turned);

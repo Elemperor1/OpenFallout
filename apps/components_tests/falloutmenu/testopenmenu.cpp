@@ -133,6 +133,53 @@ namespace
         EXPECT_FALSE(f.mResources->systemColor(7));
     }
 
+    TEST(FalloutOpenMenuTest, new_vegas_makes_the_colours_of_its_display_pip_boy_and_menus_amber)
+    {
+        Fixture f;
+        f.open("<menu name=\"M\"/>");
+        // Fallout 3's are the INI's: green for the display, the Pip-Boy and the system, pale green for the main menu
+        EXPECT_FLOAT_EQ((*f.mResources->systemColor(1))[0], 26.f);
+        EXPECT_FLOAT_EQ((*f.mResources->systemColor(5))[0], 199.f);
+        f.mResources->useNewVegasColors();
+        for (const int id : { 1, 4, 5, 6 })
+        {
+            const std::optional<std::array<float, 3>> color = f.mResources->systemColor(id);
+            ASSERT_TRUE(color);
+            EXPECT_FLOAT_EQ((*color)[0], 255.f);
+            EXPECT_FLOAT_EQ((*color)[1], 182.f);
+            EXPECT_FLOAT_EQ((*color)[2], 66.f);
+        }
+        // the alternate display colour and the terminal's are not changed
+        EXPECT_FLOAT_EQ((*f.mResources->systemColor(2))[1], 67.f);
+        EXPECT_FLOAT_EQ((*f.mResources->systemColor(3))[0], 33.f);
+    }
+
+    TEST(FalloutOpenMenuTest, the_colours_wait_until_the_data_says_which_game_runs)
+    {
+        Fixture f;
+        f.open("<menu name=\"M\"/>");
+        std::optional<bool> newVegas;
+        Data data = f.mResources->data();
+        data.mNewVegas = [&newVegas]() { return newVegas; };
+        const Resources resources(data);
+        // (menus can open while the game still loads: the colours are the INI's until the answer is there)
+        EXPECT_FLOAT_EQ((*resources.systemColor(5))[0], 199.f);
+        newVegas = true;
+        EXPECT_FLOAT_EQ((*resources.systemColor(5))[0], 255.f);
+        EXPECT_FLOAT_EQ((*resources.systemColor(5))[1], 182.f);
+        EXPECT_FLOAT_EQ((*resources.systemColor(1))[2], 66.f);
+        // the answer is taken once
+        newVegas = false;
+        EXPECT_FLOAT_EQ((*resources.systemColor(5))[0], 255.f);
+
+        std::optional<bool> fallout3 = false;
+        Data other = f.mResources->data();
+        other.mNewVegas = [&fallout3]() { return fallout3; };
+        const Resources green(other);
+        EXPECT_FLOAT_EQ((*green.systemColor(5))[0], 199.f);
+        EXPECT_FLOAT_EQ((*green.systemColor(1))[0], 26.f);
+    }
+
     TEST(FalloutOpenMenuTest, a_picture_goes_where_the_menu_puts_it_scaled_to_the_window)
     {
         Fixture f;
