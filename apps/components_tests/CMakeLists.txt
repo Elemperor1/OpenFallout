@@ -296,6 +296,7 @@ file(GLOB UNITTEST_SRC_FILES
     bgsm/testfile.cpp
     bsa/testbsafile.cpp
     bsa/testcompressedbsafile.cpp
+    bsa/testcompressedbsafilearchive.cpp
 
     nif/node.hpp
     nif/geometry.hpp
