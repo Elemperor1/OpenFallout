@@ -39,8 +39,7 @@ namespace
         file.add("NiShadeProperty", property(file).u16(1));
         file.add("NiSpecularProperty", property(file).u16(1));
         file.add("NiWireframeProperty", property(file).u16(0));
-        file.add("NiStencilProperty",
-            property(file).u8(1).u32(7).u32(5).u32(0xFF).u32(0).u32(2).u32(3).u32(1));
+        file.add("NiStencilProperty", property(file).u8(1).u32(7).u32(5).u32(0xFF).u32(0).u32(2).u32(3).u32(1));
         file.add("NiVertexColorProperty", property(file).u16(1).u32(2).u32(1));
         file.add("NiZBufferProperty", property(file).u16(3).u32(7));
 
@@ -90,9 +89,8 @@ namespace
         // and the vertex colour keep what they need in their flags.
         Builder file(fallout3);
         file.add("NiMaterialProperty", property(file).vec3(0, 0, 1).vec3(1, 1, 0).f32(30).f32(0.5f).f32(2));
-        file.add("NiStencilProperty", property(file).u16(0x1 | (2 << 1) | (1 << 4) | (3 << 7) | (2 << 10) | (5 << 12))
-                                          .u32(7)
-                                          .u32(0xFF));
+        file.add("NiStencilProperty",
+            property(file).u16(0x1 | (2 << 1) | (1 << 4) | (3 << 7) | (2 << 10) | (5 << 12)).u32(7).u32(0xFF));
         file.add("NiVertexColorProperty", property(file).u16((2 << 4) | (1 << 3)));
         file.add("NiZBufferProperty", property(file).u16(0x1 | (3 << 2)));
         file.add("NiShadeProperty", property(file).u16(2));
@@ -161,7 +159,8 @@ namespace
     {
         Builder file(oblivion);
         // 0: a source texture of a file
-        file.add("NiSourceTexture", property(file).u8(1).sized("a.dds").ref(-1).u32(0).u32(0).u32(0).u8(1).boolean(true));
+        file.add(
+            "NiSourceTexture", property(file).u8(1).sized("a.dds").ref(-1).u32(0).u32(0).u32(0).u8(1).boolean(true));
         Bytes bytes = property(file);
         bytes.u32(1); // modulate
         bytes.u32(7);
@@ -205,7 +204,8 @@ namespace
     TEST(NifPropertyTest, readsTheTexturesOfAShapeOfFallout3WithTheirFlagsAndTheirParallax)
     {
         Builder file(fallout3);
-        file.add("NiSourceTexture", property(file).u8(1).u32(0xFFFFFFFF).ref(-1).u32(0).u32(0).u32(0).u8(1).boolean(true).boolean(false));
+        file.add("NiSourceTexture",
+            property(file).u8(1).u32(0xFFFFFFFF).ref(-1).u32(0).u32(0).u32(0).u8(1).boolean(true).boolean(false));
         Bytes bytes = property(file);
         bytes.u16(5); // the flags of the property
         bytes.u32(8);
@@ -268,8 +268,7 @@ namespace
     {
         Builder file(fallout3);
         file.add("BSShaderTextureSet", Bytes().u32(3).sized("a_d.dds").sized("a_n.dds").sized("a_g.dds"));
-        file.add("BSShaderPPLightingProperty",
-            shader(file, "PP").u32(3).ref(0).f32(0.25f).i32(7).f32(6).f32(0.5f));
+        file.add("BSShaderPPLightingProperty", shader(file, "PP").u32(3).ref(0).f32(0.25f).i32(7).f32(6).f32(0.5f));
         file.add("BSShaderNoLightingProperty", shader(file).u32(1).sized("glow.dds").vec4(1, 2, 3, 4));
         file.add("SkyShaderProperty", shader(file).u32(2).sized("sky.dds").u32(3));
         file.add("TallGrassShaderProperty", shader(file).sized("grass.dds"));
@@ -313,7 +312,8 @@ namespace
         {
             Builder file(Profile{ 0x14020007, 11, bethVersion });
             file.add("BSShaderTextureSet", Bytes().u32(0));
-            file.add("BSShaderPPLightingProperty", shader(file).u32(3).ref(0).raw(bethVersion >= 15 ? std::string(8, '\0') : ""));
+            file.add("BSShaderPPLightingProperty",
+                shader(file).u32(3).ref(0).raw(bethVersion >= 15 ? std::string(8, '\0') : ""));
             file.add("BSShaderNoLightingProperty", shader(file).u32(1).sized("glow.dds"));
 
             const Parsed parsed(file.build());
@@ -370,8 +370,8 @@ namespace
         EXPECT_EQ(parsed.as<Nif::BSLightingShaderProperty>(3)->mHairTintColor, osg::Vec3f(1, 0.5f, 0.25f));
         EXPECT_EQ(parsed.as<Nif::BSLightingShaderProperty>(4)->mSkinTintColor, osg::Vec3f(0.5f, 0.5f, 0.5f));
         EXPECT_EQ(parsed.as<Nif::BSLightingShaderProperty>(5)->mParallax.mMaxPasses, 8.f);
-        EXPECT_EQ(parsed.as<Nif::BSLightingShaderProperty>(6)->mMultiLayerParallax.mInnerLayerTextureScale,
-            osg::Vec2f(3, 4));
+        EXPECT_EQ(
+            parsed.as<Nif::BSLightingShaderProperty>(6)->mMultiLayerParallax.mInnerLayerTextureScale, osg::Vec2f(3, 4));
         EXPECT_EQ(parsed.as<Nif::BSLightingShaderProperty>(7)->mSparkle, osg::Vec4f(1, 2, 3, 4));
         EXPECT_EQ(parsed.as<Nif::BSLightingShaderProperty>(8)->mRightEyeReflectionCenter, osg::Vec3f(4, 5, 6));
         const auto* fire = parsed.as<Nif::BSEffectShaderProperty>(9);
@@ -446,8 +446,26 @@ namespace
         // a texture of the file that has pixels inside it
         file.add("NiSourceTexture", property(file).u8(0).u8(1).ref(1).u32(0).u32(1).u32(2).u8(1));
         file.add("NiPixelData",
-            Bytes().u32(1).u32(0xFF).u32(0xFF00).u32(0xFF0000).u32(0xFF000000).u32(32).u32(0).u32(0).ref(-1).u32(1).u32(4)
-                .u32(1).u32(1).u32(0).u32(4).u8(1).u8(2).u8(3).u8(4));
+            Bytes()
+                .u32(1)
+                .u32(0xFF)
+                .u32(0xFF00)
+                .u32(0xFF0000)
+                .u32(0xFF000000)
+                .u32(32)
+                .u32(0)
+                .u32(0)
+                .ref(-1)
+                .u32(1)
+                .u32(4)
+                .u32(1)
+                .u32(1)
+                .u32(0)
+                .u32(4)
+                .u8(1)
+                .u8(2)
+                .u8(3)
+                .u8(4));
 
         const Parsed parsed(file.build());
 

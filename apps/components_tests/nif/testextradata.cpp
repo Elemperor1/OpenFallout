@@ -41,7 +41,8 @@ namespace Nif
             std::int32_t distant = file.add("BSDistantObjectExtraData", extra(file, "Distant").u32(5));
             std::int32_t large = file.add("BSDistantObjectLargeRefExtraData", extra(file, "Large").boolean(true));
             std::int32_t eyes = file.add("BSEyeCenterExtraData", extra(file, "Eyes").u32(2).f32(3).f32(4));
-            std::int32_t positions = file.add("BSPositionData", extra(file, "Positions").u32(2).u16(0x3C00).u16(0x4000));
+            std::int32_t positions
+                = file.add("BSPositionData", extra(file, "Positions").u32(2).u16(0x3C00).u16(0x4000));
 
             const Parsed parsed(file.build());
 
@@ -120,7 +121,8 @@ namespace Nif
             const auto* inventory = parsed.as<BSInvMarker>(2);
             ASSERT_NE(inventory, nullptr);
             EXPECT_EQ(inventory->mScale, 1.25f);
-            EXPECT_NEAR(inventory->mRotation.x(), osg::Quat(1.0, osg::X_AXIS, 0.0, osg::Y_AXIS, 0.5, osg::Z_AXIS).x(), 1e-6);
+            EXPECT_NEAR(
+                inventory->mRotation.x(), osg::Quat(1.0, osg::X_AXIS, 0.0, osg::Y_AXIS, 0.5, osg::Z_AXIS).x(), 1e-6);
         }
 
         TEST(NifExtraDataTest, readsTheMarkersOfFurnitureAsSkyrimWritesThem)

@@ -167,7 +167,8 @@ namespace
         const ESM4::Race race = loadVersionedRecord<ESM4::Race>("RACE", 1.34f, 15,
             subRecord("DNAM", defaults) + subRecord("CNAM", std::string(1, '\x07')) + valueSubRecord<float>("PNAM", 5.f)
                 + valueSubRecord<float>("UNAM", 3.f) + subRecord("ATTR", bytePattern(2, 1))
-                + formList("HNAM", { 0x00000831, 0x00000832, 0x00000833 }) + formList("ENAM", { 0x00000841, 0x00000842 }));
+                + formList("HNAM", { 0x00000831, 0x00000832, 0x00000833 })
+                + formList("ENAM", { 0x00000841, 0x00000842 }));
 
         EXPECT_EQ(race.mDefaultHair[0].toUint32(), 0x821u);
         EXPECT_EQ(race.mDefaultHair[1].toUint32(), 0x822u);
@@ -191,9 +192,10 @@ namespace
 
     TEST(ESM4RaceTest, readsTheMeshesAndTexturesOfTheHeadAndBodyOfTheMaleAndTheFemaleOfFallout)
     {
-        const std::string head = subRecord("NAM0", "") + subRecord("MNAM", "") + indexedPart(0, "head_m.nif", "head_m.dds")
-            + indexedPart(1, "mouth_m.nif", "") + subRecord("MODB", bytePattern(4, 0)) + subRecord("FNAM", "")
-            + indexedPart(0, "head_f.nif", "head_f.dds") + indexedPart(7, "eye_f.nif", "eye_f.dds");
+        const std::string head = subRecord("NAM0", "") + subRecord("MNAM", "")
+            + indexedPart(0, "head_m.nif", "head_m.dds") + indexedPart(1, "mouth_m.nif", "")
+            + subRecord("MODB", bytePattern(4, 0)) + subRecord("FNAM", "") + indexedPart(0, "head_f.nif", "head_f.dds")
+            + indexedPart(7, "eye_f.nif", "eye_f.dds");
         const std::string body = subRecord("NAM1", "") + subRecord("MNAM", "")
             + indexedPart(0, "upper_m.nif", "upper_m.dds") + indexedPart(3, "feet_m.nif", "feet_m.dds")
             + subRecord("FNAM", "") + indexedPart(2, "hands_f.nif", "hands_f.dds");
@@ -219,8 +221,9 @@ namespace
     TEST(ESM4RaceTest, readsTheSamePartsOfARaceOfNewVegas)
     {
         const ESM4::Race race = loadVersionedRecord<ESM4::Race>("RACE", 1.34f, 15,
-            raceData(0, 1.f) + subRecord("NAM0", "") + subRecord("MNAM", "") + indexedPart(0, "head_m.nif", "head_m.dds")
-                + subRecord("NAM1", "") + subRecord("FNAM", "") + indexedPart(1, "lower_f.nif", "lower_f.dds"));
+            raceData(0, 1.f) + subRecord("NAM0", "") + subRecord("MNAM", "")
+                + indexedPart(0, "head_m.nif", "head_m.dds") + subRecord("NAM1", "") + subRecord("FNAM", "")
+                + indexedPart(1, "lower_f.nif", "lower_f.dds"));
 
         ASSERT_EQ(race.mHeadParts.size(), 8u);
         EXPECT_EQ(race.mHeadParts[0].mesh, "head_m.nif");
@@ -230,8 +233,8 @@ namespace
 
     TEST(ESM4RaceTest, skipsAMeshThatNoIndexCameBefore)
     {
-        const ESM4::Race race = loadVersionedRecord<ESM4::Race>(
-            "RACE", 0.94f, 15, raceData(0, 1.f) + subRecord("NAM0", "") + zString("MODL", "orphan.nif") + zString("ICON", "orphan.dds"));
+        const ESM4::Race race = loadVersionedRecord<ESM4::Race>("RACE", 0.94f, 15,
+            raceData(0, 1.f) + subRecord("NAM0", "") + zString("MODL", "orphan.nif") + zString("ICON", "orphan.dds"));
 
         ASSERT_EQ(race.mHeadParts.size(), 8u);
         EXPECT_TRUE(race.mHeadParts[0].mesh.empty());
@@ -240,21 +243,21 @@ namespace
 
     TEST(ESM4RaceTest, doesNotTakeAPartThatIsNotOneOfTheEightHeadPartsOfFallout)
     {
-        EXPECT_THAT(raceLoadFailure(0.94f, 15,
-                        raceData(0, 1.f) + subRecord("NAM0", "") + subRecord("MNAM", "")
-                            + indexedPart(8, "head.nif", "")),
+        EXPECT_THAT(
+            raceLoadFailure(0.94f, 15,
+                raceData(0, 1.f) + subRecord("NAM0", "") + subRecord("MNAM", "") + indexedPart(8, "head.nif", "")),
             HasSubstr("head parts index is out of range: 8 >= 8"));
-        EXPECT_THAT(raceLoadFailure(0.94f, 15,
-                        raceData(0, 1.f) + subRecord("NAM0", "") + subRecord("FNAM", "")
-                            + indexedPart(9, "head.nif", "")),
+        EXPECT_THAT(
+            raceLoadFailure(0.94f, 15,
+                raceData(0, 1.f) + subRecord("NAM0", "") + subRecord("FNAM", "") + indexedPart(9, "head.nif", "")),
             HasSubstr("head parts female index is out of range: 9 >= 8"));
-        EXPECT_THAT(raceLoadFailure(0.94f, 15,
-                        raceData(0, 1.f) + subRecord("NAM1", "") + subRecord("MNAM", "")
-                            + indexedPart(4, "body.nif", "")),
+        EXPECT_THAT(
+            raceLoadFailure(0.94f, 15,
+                raceData(0, 1.f) + subRecord("NAM1", "") + subRecord("MNAM", "") + indexedPart(4, "body.nif", "")),
             HasSubstr("body parts male index is out of range: 4 >= 4"));
         EXPECT_THAT(raceLoadFailure(0.94f, 15,
-                        raceData(0, 1.f) + subRecord("NAM1", "") + subRecord("FNAM", "")
-                            + valueSubRecord("INDX", 5u) + zString("ICON", "body.dds")),
+                        raceData(0, 1.f) + subRecord("NAM1", "") + subRecord("FNAM", "") + valueSubRecord("INDX", 5u)
+                            + zString("ICON", "body.dds")),
             HasSubstr("body parts female index is out of range: 5 >= 4"));
     }
 
@@ -308,8 +311,8 @@ namespace
 
         std::vector<ESM4::Race> races = loadRecords<ESM4::Race>("RACE",
             record("RACE", 1,
-                raceData(0x0C, 1.f) + subRecord("ATTR", attributes) + subRecord("VNAM", mixed)
-                    + subRecord("NAM0", "") + indexedPart(0, "head.nif", "head.dds") + indexedPart(3, "mouth.nif", "")
+                raceData(0x0C, 1.f) + subRecord("ATTR", attributes) + subRecord("VNAM", mixed) + subRecord("NAM0", "")
+                    + indexedPart(0, "head.nif", "head.dds") + indexedPart(3, "mouth.nif", "")
                     + indexedPart(8, "eye.nif", "") + subRecord("NAM1", "") + zString("MODL", "tail.nif")
                     + zString("ICON", "tail.dds") + subRecord("MNAM", "") + indexedPart(0, "body.nif", "body.dds")));
 
@@ -373,11 +376,11 @@ namespace
             + valueSubRecord<std::uint32_t>("HEAD", 0x00000872) + subRecord("NAM1", "") + subRecord("NAM3", "")
             + zString("MODL", "model.hkx") + zString("ICON", "icon.dds");
         const ESM4::Race race = loadVersionedRecord<ESM4::Race>("RACE", 0.94f, 43,
-            subRecord("DATA", data) + subRecord("MNAM", "") + zString("ANAM", "male_skeleton.nif") + subRecord("FNAM", "")
-                + zString("ANAM", "female_skeleton.nif") + valueSubRecord<std::uint32_t>("WNAM", 0x00000873)
-                + subRecord("BOD2", bodyWithType) + valueSubRecord<std::uint32_t>("KSIZ", 2)
-                + formList("KWDA", { 0x00000881, 0x00000882 }) + zString("NAME", "Body") + head
-                + subRecord("VNAM", body) + subRecord("VNAM", bytePattern(2, 1)));
+            subRecord("DATA", data) + subRecord("MNAM", "") + zString("ANAM", "male_skeleton.nif")
+                + subRecord("FNAM", "") + zString("ANAM", "female_skeleton.nif")
+                + valueSubRecord<std::uint32_t>("WNAM", 0x00000873) + subRecord("BOD2", bodyWithType)
+                + valueSubRecord<std::uint32_t>("KSIZ", 2) + formList("KWDA", { 0x00000881, 0x00000882 })
+                + zString("NAME", "Body") + head + subRecord("VNAM", body) + subRecord("VNAM", bytePattern(2, 1)));
 
         EXPECT_EQ(race.mSkillBonus.size(), 7u);
         EXPECT_EQ(race.mSkillBonus.at(static_cast<ESM4::Race::SkillIndex>(0x23)), 13);
@@ -436,17 +439,18 @@ namespace
     {
         std::string skipped;
         for (const char* type : { "MODB", "MTNM", "ATKD", "ATKE", "GNAM", "NAM4", "NAM5", "LNAM", "QNAM", "HCLF",
-                 "UNES", "TINC", "TIND", "TINI", "TINL", "TINP", "TINT", "TINV", "TIRS", "PHWT", "AHCF", "AHCM",
-                 "MPAI", "MPAV", "DFTF", "DFTM", "FLMV", "FTSF", "FTSM", "MTYP", "NAM7", "NAM8", "PHTN", "RNAM",
-                 "RNMV", "RPRF", "RPRM", "SNMV", "SPCT", "SPED", "SWMV", "WKMV", "SPMV", "ATKR", "CTDA", "CIS1",
-                 "CIS2", "MODT", "MODC", "MODS", "MODF", "YNAM", "NAM2", "MODD", "ONAM", "APPR", "ATKS", "ATKT",
-                 "ATKW", "BMMP", "BSMB", "BSMP", "BSMS", "FMRI", "FMRN", "HLTX", "MLSI", "MPGN", "MPGS", "MPPC",
-                 "MPPF", "MPPI", "MPPK", "MPPM", "MPPN", "MPPT", "MSID", "MSM0", "MSM1", "NNAM", "NTOP", "PRPS",
-                 "PTOP", "QSTI", "RBPC", "SADD", "SAKD", "SAPT", "SGNM", "SRAC", "SRAF", "STCP", "STKD", "TETI",
-                 "TTEB", "TTEC", "TTED", "TTEF", "TTET", "TTGE", "TTGP", "UNWP", "WMAP", "ZNAM" })
+                 "UNES", "TINC", "TIND", "TINI", "TINL", "TINP", "TINT", "TINV", "TIRS", "PHWT", "AHCF", "AHCM", "MPAI",
+                 "MPAV", "DFTF", "DFTM", "FLMV", "FTSF", "FTSM", "MTYP", "NAM7", "NAM8", "PHTN", "RNAM", "RNMV", "RPRF",
+                 "RPRM", "SNMV", "SPCT", "SPED", "SWMV", "WKMV", "SPMV", "ATKR", "CTDA", "CIS1", "CIS2", "MODT", "MODC",
+                 "MODS", "MODF", "YNAM", "NAM2", "MODD", "ONAM", "APPR", "ATKS", "ATKT", "ATKW", "BMMP", "BSMB", "BSMP",
+                 "BSMS", "FMRI", "FMRN", "HLTX", "MLSI", "MPGN", "MPGS", "MPPC", "MPPF", "MPPI", "MPPK", "MPPM", "MPPN",
+                 "MPPT", "MSID", "MSM0", "MSM1", "NNAM", "NTOP", "PRPS", "PTOP", "QSTI", "RBPC", "SADD", "SAKD", "SAPT",
+                 "SGNM", "SRAC", "SRAF", "STCP", "STKD", "TETI", "TTEB", "TTEC", "TTED", "TTEF", "TTET", "TTGE", "TTGP",
+                 "UNWP", "WMAP", "ZNAM" })
             skipped += subRecord(type, bytePattern(4, 1));
 
-        EXPECT_EQ(loadVersionedRecord<ESM4::Race>("RACE", 0.94f, 15, skipped + zString("EDID", "Last")).mEditorId, "Last");
+        EXPECT_EQ(
+            loadVersionedRecord<ESM4::Race>("RACE", 0.94f, 15, skipped + zString("EDID", "Last")).mEditorId, "Last");
     }
 
     TEST(ESM4RaceTest, doesNotReadASubrecordItDoesNotKnow)

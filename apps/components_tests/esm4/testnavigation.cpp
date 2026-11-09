@@ -62,8 +62,8 @@ namespace
 
     ESM4::Navigation loadNavigation(const std::string& data, std::uint32_t modIndex = 0)
     {
-        const std::vector<ESM4::Navigation> result = loadRecords<ESM4::Navigation>(
-            "NAVI", record("NAVI", 0x801, data), 0, nullptr, modIndex);
+        const std::vector<ESM4::Navigation> result
+            = loadRecords<ESM4::Navigation>("NAVI", record("NAVI", 0x801, data), 0, nullptr, modIndex);
         EXPECT_EQ(result.size(), 1u);
         return result.empty() ? ESM4::Navigation{} : result[0];
     }
@@ -222,7 +222,8 @@ namespace
     {
         const std::string data = subRecord("NVMI", bytePattern(8, 1)) + zString("EDID", "AfterTheNavMeshInfo");
 
-        const std::pair<float, int> games[] = { { 0.94f, 15 }, { 1.32f, 15 }, { 1.34f, 15 }, { 1.7f, 44 }, { 1.f, 131 } };
+        const std::pair<float, int> games[]
+            = { { 0.94f, 15 }, { 1.32f, 15 }, { 1.34f, 15 }, { 1.7f, 44 }, { 1.f, 131 } };
         for (const auto& [header, form] : games)
         {
             const ESM4::Navigation navigation

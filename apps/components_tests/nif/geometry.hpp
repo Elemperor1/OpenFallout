@@ -11,7 +11,8 @@ namespace NifTest
     /// The body of the data of a geometry: the vertices, the normals, the colours and the coordinates of the texture,
     /// as the version of the file writes them. The data flags say how many sets of coordinates and whether the
     /// tangents are there.
-    inline Bytes geometryData(Builder& file, std::uint16_t numVertices, std::uint16_t dataFlags, bool normals, bool colors)
+    inline Bytes geometryData(
+        Builder& file, std::uint16_t numVertices, std::uint16_t dataFlags, bool normals, bool colors)
     {
         const bool fallout = file.profile().mVersion >= 0x14020007;
         Bytes data;

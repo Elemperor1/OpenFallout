@@ -18,8 +18,7 @@ namespace
 
     ESM4::ArmorAddon load(const std::string& data)
     {
-        const std::vector<ESM4::ArmorAddon> result
-            = loadRecords<ESM4::ArmorAddon>("ARMA", record("ARMA", 0x801, data));
+        const std::vector<ESM4::ArmorAddon> result = loadRecords<ESM4::ArmorAddon>("ARMA", record("ARMA", 0x801, data));
         EXPECT_EQ(result.size(), 1u);
         return result.empty() ? ESM4::ArmorAddon{} : result[0];
     }
@@ -122,8 +121,8 @@ namespace
     {
         std::string skipped;
         for (const char* type : { "MO2T", "MO2S", "MO2C", "MO2F", "MO3T", "MO3S", "MO3C", "MO3F", "MOSD", "MO4T",
-                 "MO4S", "MO4C", "MO4F", "MO5T", "MO5S", "MO5C", "MO5F", "NAM2", "NAM3", "SNDD", "BMDT", "DATA",
-                 "ETYP", "FULL", "ICO2", "ICON", "MODT", "MODS", "MODD", "OBND", "BSMB", "BSMP", "BSMS", "ONAM" })
+                 "MO4S", "MO4C", "MO4F", "MO5T", "MO5S", "MO5C", "MO5F", "NAM2", "NAM3", "SNDD", "BMDT", "DATA", "ETYP",
+                 "FULL", "ICO2", "ICON", "MODT", "MODS", "MODD", "OBND", "BSMB", "BSMP", "BSMS", "ONAM" })
             skipped += subRecord(type, bytePattern(4, 1));
 
         EXPECT_EQ(load(skipped + zString("EDID", "Last")).mEditorId, "Last");

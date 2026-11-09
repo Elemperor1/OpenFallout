@@ -32,8 +32,24 @@ namespace
         file.add("NiFloatData", Bytes().u32(1).u32(quadratic).f32(0).f32(1).f32(2).f32(3));
         // the tangents of a TCB key come from its neighbours
         file.add("NiFloatData",
-            Bytes().u32(3).u32(tcb).f32(0).f32(0).f32(0).f32(0).f32(0).f32(1).f32(1).f32(0).f32(0).f32(0).f32(2).f32(
-                3).f32(0).f32(0).f32(0));
+            Bytes()
+                .u32(3)
+                .u32(tcb)
+                .f32(0)
+                .f32(0)
+                .f32(0)
+                .f32(0)
+                .f32(0)
+                .f32(1)
+                .f32(1)
+                .f32(0)
+                .f32(0)
+                .f32(0)
+                .f32(2)
+                .f32(3)
+                .f32(0)
+                .f32(0)
+                .f32(0));
         file.add("NiFloatData", Bytes().u32(0));
         file.add("NiPosData", Bytes().vec3Keys({ { 0.f, { 1, 2, 3 } } }));
         file.add("NiPosData",
@@ -170,7 +186,8 @@ namespace
         }
         {
             Builder file(morrowind);
-            file.add("NiMorphData", Bytes().u32(1).u32(1).u8(1).floatKeys({ { 0.f, 0.f }, { 1.f, 1.f } }).vec3(5, 6, 7));
+            file.add(
+                "NiMorphData", Bytes().u32(1).u32(1).u8(1).floatKeys({ { 0.f, 0.f }, { 1.f, 1.f } }).vec3(5, 6, 7));
 
             const Parsed parsed(file.build());
 
@@ -244,7 +261,8 @@ namespace
             EXPECT_EQ(data->mPixelFormat.mFlags, 3u);
             EXPECT_EQ(data->mPixelFormat.mUseSrgb, profile.mVersion >= 0x14030004);
             EXPECT_EQ(data->mPixelFormat.mChannels[1].mType, Nif::NiPixelFormat::ChannelData::Type::Green);
-            EXPECT_EQ(data->mPixelFormat.mChannels[1].mConvention, Nif::NiPixelFormat::ChannelData::Convention::Compressed);
+            EXPECT_EQ(
+                data->mPixelFormat.mChannels[1].mConvention, Nif::NiPixelFormat::ChannelData::Convention::Compressed);
             EXPECT_FALSE(data->mPixelFormat.mChannels[2].mSigned);
             EXPECT_TRUE(data->mPixelFormat.mChannels[3].mSigned);
             EXPECT_EQ(data->mNumFaces, 6u);
@@ -293,8 +311,8 @@ namespace
             file.add("NiNode", file.node({ .mName = "Root" }, { 1 }));
             file.add("NiNode", file.node({ .mName = "Bone" }));
             // the skin of Morrowind has no flag for the weights and has the partitions of its own
-            file.add("NiSkinData",
-                Bytes().transform().u32(1).ref(-1).transform().vec3(0, 0, 0).f32(1).u16(1).u16(5).f32(1));
+            file.add(
+                "NiSkinData", Bytes().transform().u32(1).ref(-1).transform().vec3(0, 0, 0).f32(1).u16(1).u16(5).f32(1));
             file.add("NiSkinInstance", Bytes().ref(2).ref(0).refs({ 1 }));
 
             const Parsed parsed(file.build());

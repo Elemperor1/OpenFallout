@@ -24,7 +24,8 @@ namespace
         Builder file(fallout3);
         // 0: the root, 1: a node with a shape, 2: the shape, 3: its data, 4: a collision node
         file.add("NiNode", file.node({ .mName = "Scene Root" }, { 1, 4 }));
-        file.add("NiNode", file.node({ .mName = "Weapon", .mFlags = 0x21, .mX = 4, .mY = 5, .mZ = 6, .mScale = 2.f }, { 2 }));
+        file.add("NiNode",
+            file.node({ .mName = "Weapon", .mFlags = 0x21, .mX = 4, .mY = 5, .mZ = 6, .mScale = 2.f }, { 2 }));
         file.add("NiTriShape", geometry(file, { .mName = "Barrel", .mX = 1 }, 3));
         file.add("NiTriShapeData", triShapeData(file, 4, 0x1001, { 0, 1, 2, 1, 2, 3 }));
         file.add("RootCollisionNode", file.node({ .mName = "Collision" }));

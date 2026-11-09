@@ -33,8 +33,7 @@ namespace
             + valueSubRecord<float>("FNAM", 3.f) + valueSubRecord<float>("GNAM", 4.f)
             + subRecord("DATA", bytePattern(4, 1));
 
-        const std::vector<ESM4::MediaSet> sets
-            = loadRecords<ESM4::MediaSet>("MSET", record("MSET", 0x801, data));
+        const std::vector<ESM4::MediaSet> sets = loadRecords<ESM4::MediaSet>("MSET", record("MSET", 0x801, data));
 
         ASSERT_EQ(sets.size(), 1u);
         const ESM4::MediaSet& set = sets[0];

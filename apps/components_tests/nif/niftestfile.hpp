@@ -71,10 +71,7 @@ namespace NifTest
         /// A rotation as the four numbers of a quaternion: w, x, y, z.
         Bytes& quat(float w, float x, float y, float z) { return f32(w).f32(x).f32(y).f32(z); }
 
-        Bytes& identity3()
-        {
-            return f32(1).f32(0).f32(0).f32(0).f32(1).f32(0).f32(0).f32(0).f32(1);
-        }
+        Bytes& identity3() { return f32(1).f32(0).f32(0).f32(0).f32(1).f32(0).f32(0).f32(0).f32(1); }
 
         /// A transform of a node: the rotation matrix, the translation and the scale.
         Bytes& transform(float x = 0, float y = 0, float z = 0, float scale = 1)
@@ -275,9 +272,8 @@ namespace NifTest
             Bytes out;
             const std::uint32_t version = mProfile.mVersion;
             using Nif::NIFStream;
-            out.raw(mProfile.mVersion >= NIFStream::generateVersion(10, 0, 0, 0)
-                    ? "Gamebryo File Format, Version "
-                    : "NetImmerse File Format, Version ");
+            out.raw(mProfile.mVersion >= NIFStream::generateVersion(10, 0, 0, 0) ? "Gamebryo File Format, Version "
+                                                                                 : "NetImmerse File Format, Version ");
             out.raw(versionText(version)).raw("\n");
             out.u32(version);
             if (version >= NIFStream::generateVersion(20, 0, 0, 4))

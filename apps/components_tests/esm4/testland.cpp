@@ -72,7 +72,8 @@ namespace
         ASSERT_EQ(height.size(), sizeof(ESM4::Land::VHGT));
 
         const std::vector<ESM4::Land> lands = loadRecords<ESM4::Land>("LAND",
-            record("LAND", 0x1234, valueSubRecord<std::uint32_t>("DATA", 7) + subRecord("VNML", bytePattern(sVerts * 3, 10))
+            record("LAND", 0x1234,
+                valueSubRecord<std::uint32_t>("DATA", 7) + subRecord("VNML", bytePattern(sVerts * 3, 10))
                     + subRecord("VHGT", height) + subRecord("VCLR", bytePattern(sVerts * 3, 20))));
 
         ASSERT_EQ(lands.size(), 1u);
@@ -107,7 +108,8 @@ namespace
     {
         const std::vector<ESM4::Land> lands = loadRecords<ESM4::Land>("LAND",
             record("LAND", 1,
-                baseTexture(0x00000101, 0) + baseTexture(0x00000102, 1) + baseTexture(0, 2) + baseTexture(0x00000104, 3)),
+                baseTexture(0x00000101, 0) + baseTexture(0x00000102, 1) + baseTexture(0, 2)
+                    + baseTexture(0x00000104, 3)),
             0, nullptr, 3);
 
         ASSERT_EQ(lands.size(), 1u);
@@ -180,8 +182,8 @@ namespace
 
     TEST(ESM4LandTest, losesTheLastAdditionalTextureThatHasNoAlphaAtTheEndOfTheRecord)
     {
-        const std::vector<ESM4::Land> lands = loadRecords<ESM4::Land>(
-            "LAND", record("LAND", 1, additionalTexture(0x00000201, 3, 0)));
+        const std::vector<ESM4::Land> lands
+            = loadRecords<ESM4::Land>("LAND", record("LAND", 1, additionalTexture(0x00000201, 3, 0)));
 
         ASSERT_EQ(lands.size(), 1u);
         EXPECT_TRUE(lands[0].mTextures[3].layers.empty());
@@ -217,8 +219,8 @@ namespace
     {
         EXPECT_THAT(loadFailure(alphaSpots({ { 1, 1.f } })), HasSubstr("VTXT without ATXT"));
         // the one VTXT belongs to the one ATXT before it
-        EXPECT_THAT(loadFailure(additionalTexture(0x00000201, 0, 0) + alphaSpots({ { 1, 1.f } })
-                        + alphaSpots({ { 2, 1.f } })),
+        EXPECT_THAT(
+            loadFailure(additionalTexture(0x00000201, 0, 0) + alphaSpots({ { 1, 1.f } }) + alphaSpots({ { 2, 1.f } })),
             HasSubstr("VTXT without ATXT"));
     }
 
@@ -247,8 +249,8 @@ namespace
 
     TEST(ESM4LandTest, skipsThePathCoverageOfFallout4AndNothingElse)
     {
-        const std::vector<ESM4::Land> lands = loadRecords<ESM4::Land>("LAND",
-            record("LAND", 1, subRecord("MPCD", bytePattern(8, 0)) + valueSubRecord<std::uint32_t>("DATA", 5)));
+        const std::vector<ESM4::Land> lands = loadRecords<ESM4::Land>(
+            "LAND", record("LAND", 1, subRecord("MPCD", bytePattern(8, 0)) + valueSubRecord<std::uint32_t>("DATA", 5)));
 
         ASSERT_EQ(lands.size(), 1u);
         EXPECT_EQ(lands[0].mLandFlags, 5u);

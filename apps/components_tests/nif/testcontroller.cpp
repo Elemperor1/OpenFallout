@@ -64,8 +64,8 @@ namespace
         file.add("NiMaterialColorController", withRef(timeController(file, -1, 0x38), -1));
         file.add("NiLightColorController", withRef(timeController(file, -1, 0x18), -1));
         file.add("NiLookAtController", withRef(timeController(file, -1, 0x48), 0));
-        file.add("NiPathController",
-            timeController(file, -1, 0x28).i32(-1).f32(0.5f).f32(0.25f).u16(2).ref(-1).ref(-1));
+        file.add(
+            "NiPathController", timeController(file, -1, 0x28).i32(-1).f32(0.5f).f32(0.25f).u16(2).ref(-1).ref(-1));
         file.add("NiUVController", timeController(file).u16(3).ref(-1));
         file.add("NiGeomMorpherController", timeController(file).ref(-1).u8(1));
         file.add("NiFlipController", timeController(file).u32(2).f32(0.1f).f32(0.2f).refs({}));
@@ -152,15 +152,14 @@ namespace
         {
             Builder file(profile);
             addRoot(file);
-            file.add("NiBoneLODController",
-                [&] {
-                    Bytes bytes = timeController(file);
-                    bytes.u32(1).u32(2).u32(2);
-                    bytes.refs({ 0 }).refs({});
-                    if (profile.mBethVersion == 0 && profile.mVersion >= 0x04020200)
-                        bytes.u32(0).refs({});
-                    return bytes;
-                }());
+            file.add("NiBoneLODController", [&] {
+                Bytes bytes = timeController(file);
+                bytes.u32(1).u32(2).u32(2);
+                bytes.refs({ 0 }).refs({});
+                if (profile.mBethVersion == 0 && profile.mVersion >= 0x04020200)
+                    bytes.u32(0).refs({});
+                return bytes;
+            }());
 
             const Parsed parsed(file.build());
 
@@ -180,21 +179,19 @@ namespace
         addRoot(file);
         // 1: a controller of the transform of its target with an interpolator after it
         file.add("NiTransformController", withRef(timeController(file, -1, 0x8, 0), 2));
-        file.add("NiTransformInterpolator",
-            Bytes().vec3(1, 2, 3).quat(1, 0, 0, 0).f32(2).ref(-1));
+        file.add("NiTransformInterpolator", Bytes().vec3(1, 2, 3).quat(1, 0, 0, 0).f32(2).ref(-1));
         file.add("NiFloatInterpolator", Bytes().f32(0.5f).ref(-1));
         file.add("NiBoolInterpolator", Bytes().boolean(true).ref(-1));
         file.add("NiPoint3Interpolator", Bytes().vec3(4, 5, 6).ref(-1));
         file.add("NiColorInterpolator", Bytes().vec4(1, 0, 0, 1).ref(-1));
         file.add("NiPathInterpolator", Bytes().u16(3).i32(1).f32(0.5f).f32(0.25f).u16(1).ref(-1).ref(-1));
-        file.add("NiLookAtInterpolator",
-            [&] {
-                Bytes bytes;
-                bytes.u16(2).ref(0);
-                file.string(bytes, "Look");
-                bytes.vec3(1, 1, 1).quat(1, 0, 0, 0).f32(1);
-                return bytes.ref(2).ref(2).ref(2);
-            }());
+        file.add("NiLookAtInterpolator", [&] {
+            Bytes bytes;
+            bytes.u16(2).ref(0);
+            file.string(bytes, "Look");
+            bytes.vec3(1, 1, 1).quat(1, 0, 0, 0).f32(1);
+            return bytes.ref(2).ref(2).ref(2);
+        }());
         // 8: a blend with two items
         file.add("NiBlendFloatInterpolator",
             Bytes()
@@ -319,8 +316,22 @@ namespace
         Builder file(Profile{ 0x0A01006A, 0, 0 });
         file.add("NiTransformInterpolator",
             Bytes().vec3(1, 2, 3).quat(1, 0, 0, 0).f32(2).boolean(true).boolean(false).boolean(true).ref(-1));
-        file.add("NiBlendTransformInterpolator", Bytes().u16(0).u16(1).boolean(false).f32(0).boolean(false).u16(0).u16(0)
-                .i32(0).i32(0).vec3(4, 5, 6).quat(1, 0, 0, 0).f32(3).boolean(true).boolean(true)
+        file.add("NiBlendTransformInterpolator",
+            Bytes()
+                .u16(0)
+                .u16(1)
+                .boolean(false)
+                .f32(0)
+                .boolean(false)
+                .u16(0)
+                .u16(0)
+                .i32(0)
+                .i32(0)
+                .vec3(4, 5, 6)
+                .quat(1, 0, 0, 0)
+                .f32(3)
+                .boolean(true)
+                .boolean(true)
                 .boolean(false));
 
         const Parsed parsed(file.build());
@@ -461,8 +472,15 @@ namespace
         sequence.u32(2).u32(4); // two blocks, the array grows by four
         // the names of a block are offsets into the string palette
         sequence.ref(1).ref(-1).u8(30).ref(5).u32(0).u32(6).u32(11).u32(0xFFFFFFFF).u32(0xFFFFFFFF);
-        sequence.ref(-1).ref(-1).u8(0).ref(5).u32(0xFFFFFFFF).u32(0xFFFFFFFF).u32(0xFFFFFFFF).u32(0xFFFFFFFF).u32(
-            0xFFFFFFFF);
+        sequence.ref(-1)
+            .ref(-1)
+            .u8(0)
+            .ref(5)
+            .u32(0xFFFFFFFF)
+            .u32(0xFFFFFFFF)
+            .u32(0xFFFFFFFF)
+            .u32(0xFFFFFFFF)
+            .u32(0xFFFFFFFF);
         sequence.f32(0.5f).ref(-1).u32(1).f32(2).f32(0).f32(3).ref(2);
         file.string(sequence, "Bip01");
         sequence.ref(5);

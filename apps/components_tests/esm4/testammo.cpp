@@ -18,8 +18,7 @@ namespace
 
     ESM4::Ammunition load(const std::string& data)
     {
-        const std::vector<ESM4::Ammunition> result
-            = loadRecords<ESM4::Ammunition>("AMMO", record("AMMO", 0x801, data));
+        const std::vector<ESM4::Ammunition> result = loadRecords<ESM4::Ammunition>("AMMO", record("AMMO", 0x801, data));
         EXPECT_EQ(result.size(), 1u);
         return result.empty() ? ESM4::Ammunition{} : result[0];
     }
@@ -131,8 +130,7 @@ namespace
 
     TEST(ESM4AmmunitionTest, skipsDataOfAnUnknownSize)
     {
-        const ESM4::Ammunition ammo
-            = load(subRecord("DATA", bytePattern(5, 1)) + zString("EDID", "AfterTheData"));
+        const ESM4::Ammunition ammo = load(subRecord("DATA", bytePattern(5, 1)) + zString("EDID", "AfterTheData"));
 
         EXPECT_EQ(ammo.mData.mValue, 0u);
         EXPECT_EQ(ammo.mEditorId, "AfterTheData");

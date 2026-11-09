@@ -198,8 +198,8 @@ namespace ESM
             EXPECT_EQ(state.mItems[1].mRef.mCount, 1);
             EXPECT_THAT(state.mEquipmentSlots, ElementsAre(Pair(0u, 3), Pair(1u, 16)));
             ASSERT_EQ(state.mPermanentMagicEffectMagnitudes.size(), 1u);
-            EXPECT_THAT(state.mPermanentMagicEffectMagnitudes.at(id("ring")),
-                ElementsAre(Pair(0.5f, 2.f), Pair(0.25f, 3.f)));
+            EXPECT_THAT(
+                state.mPermanentMagicEffectMagnitudes.at(id("ring")), ElementsAre(Pair(0.5f, 2.f), Pair(0.25f, 3.f)));
             ASSERT_TRUE(state.mSelectedEnchantItem.has_value());
             EXPECT_EQ(*state.mSelectedEnchantItem, 1u);
         }
@@ -599,7 +599,11 @@ namespace ESM
             AiSequence::AiSequence record;
             record.mLastAiPackage = 2;
             auto wander = std::make_unique<AiSequence::AiWander>();
-            wander->mData = { .mDistance = 300, .mDuration = 10, .mTimeOfDay = 6, .mIdle = { 1, 2, 3, 4, 5, 6, 7, 8 }, .mShouldRepeat = 1 };
+            wander->mData = { .mDistance = 300,
+                .mDuration = 10,
+                .mTimeOfDay = 6,
+                .mIdle = { 1, 2, 3, 4, 5, 6, 7, 8 },
+                .mShouldRepeat = 1 };
             wander->mDurationData.mRemainingDuration = 4.f;
             wander->mStoredInitialActorPosition = true;
             wander->mInitialActorPosition.mValues[0] = 1.f;
@@ -669,8 +673,10 @@ namespace ESM
             const auto& activateResult = static_cast<const AiSequence::AiActivate&>(*result.mPackages[4].mPackage);
             EXPECT_EQ(activateResult.mTargetId, id("terminal"));
             EXPECT_TRUE(activateResult.mRepeat);
-            EXPECT_EQ(static_cast<const AiSequence::AiCombat&>(*result.mPackages[5].mPackage).mTargetActor.mIndex, 0x52u);
-            EXPECT_EQ(static_cast<const AiSequence::AiPursue&>(*result.mPackages[6].mPackage).mTargetActor.mIndex, 0x53u);
+            EXPECT_EQ(
+                static_cast<const AiSequence::AiCombat&>(*result.mPackages[5].mPackage).mTargetActor.mIndex, 0x52u);
+            EXPECT_EQ(
+                static_cast<const AiSequence::AiPursue&>(*result.mPackages[6].mPackage).mTargetActor.mIndex, 0x53u);
         }
 
         TEST(Esm3AiSequenceTest, anEmptySequenceStaysEmpty)

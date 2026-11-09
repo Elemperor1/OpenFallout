@@ -2,11 +2,11 @@
 #define OPENFALLOUT_APPS_COMPONENTS_TESTS_ESM3_SAVELOADHARNESS_H
 
 #include <components/esm/fourcc.hpp>
+#include <components/esm/refid.hpp>
 #include <components/esm3/cellref.hpp>
 #include <components/esm3/esmreader.hpp>
 #include <components/esm3/esmwriter.hpp>
 #include <components/esm3/formatversion.hpp>
-#include <components/esm/refid.hpp>
 #include <components/esm3/loadland.hpp>
 
 #include <gtest/gtest.h>
@@ -165,8 +165,7 @@ namespace ESM::SaveLoadTest
 
         void generateBytes(auto iterator, std::size_t count)
         {
-            std::uniform_int_distribution<unsigned short> distribution{ 0,
-                std::numeric_limits<unsigned char>::max() };
+            std::uniform_int_distribution<unsigned short> distribution{ 0, std::numeric_limits<unsigned char>::max() };
             std::generate_n(iterator, count, [&] { return static_cast<unsigned char>(distribution(mRandom)); });
         }
 

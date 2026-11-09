@@ -106,8 +106,9 @@ namespace
     TEST(ESM4BookTest, skipsTheSubrecordsItDoesNotUse)
     {
         std::string skipped;
-        for (const char* type : { "MODT", "MODC", "MODS", "MODF", "OBND", "KSIZ", "KWDA", "CNAM", "INAM", "VMAD",
-                 "DAMC", "DEST", "DMDC", "DMDL", "DMDT", "DMDS", "DSTA", "DSTD", "DSTF", "DNAM", "FIMD", "MICO", "PTRN" })
+        for (const char* type :
+            { "MODT", "MODC", "MODS", "MODF", "OBND", "KSIZ", "KWDA", "CNAM", "INAM", "VMAD", "DAMC", "DEST", "DMDC",
+                "DMDL", "DMDT", "DMDS", "DSTA", "DSTD", "DSTF", "DNAM", "FIMD", "MICO", "PTRN" })
             skipped += subRecord(type, bytePattern(4, 1));
 
         EXPECT_EQ(load(skipped + zString("EDID", "Last")).mEditorId, "Last");

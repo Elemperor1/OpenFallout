@@ -284,7 +284,8 @@ namespace ESM
             record.mModel = path("shirt.nif");
             record.mIcon = path("shirt.dds");
             record.mData = { .mType = Clothing::Shirt, .mWeight = 1.f, .mValue = 12, .mEnchant = 100 };
-            record.mParts.mParts.push_back({ .mPart = PRT_Cuirass, .mMale = id("malechest"), .mFemale = id("femalechest") });
+            record.mParts.mParts.push_back(
+                { .mPart = PRT_Cuirass, .mMale = id("malechest"), .mFemale = id("femalechest") });
             record.mParts.mParts.push_back({ .mPart = PRT_LUpperarm, .mMale = id("maleupperarm"), .mFemale = {} });
 
             Clothing result;
@@ -315,7 +316,9 @@ namespace ESM
             record.mName = "Helm";
             record.mModel = path("helm.nif");
             record.mIcon = path("helm.dds");
-            record.mData = { .mType = Armor::Helmet, .mWeight = 5.f, .mValue = 100, .mHealth = 200, .mEnchant = 300, .mArmor = 40 };
+            record.mData = {
+                .mType = Armor::Helmet, .mWeight = 5.f, .mValue = 100, .mHealth = 200, .mEnchant = 300, .mArmor = 40
+            };
             record.mParts.mParts.push_back({ .mPart = PRT_Head, .mMale = id("malehead"), .mFemale = id("femalehead") });
 
             Armor result;
@@ -374,7 +377,9 @@ namespace ESM
             record.mId = id("b_n_argonian_f_hand");
             record.mRace = id("argonian");
             record.mModel = path("hand.nif");
-            record.mData = { .mPart = BodyPart::MP_Hand, .mVampire = 1, .mFlags = BodyPart::BPF_Female, .mType = BodyPart::MT_Armor };
+            record.mData = {
+                .mPart = BodyPart::MP_Hand, .mVampire = 1, .mFlags = BodyPart::BPF_Female, .mType = BodyPart::MT_Armor
+            };
 
             BodyPart result;
             saveAndLoadRecord(record, GetParam(), result);
@@ -413,7 +418,8 @@ namespace ESM
             Enchantment record;
             record.blank();
             record.mId = id("ench");
-            record.mData = { .mType = Enchantment::WhenStrikes, .mCost = 4, .mCharge = 120, .mFlags = Enchantment::Autocalc };
+            record.mData
+                = { .mType = Enchantment::WhenStrikes, .mCost = 4, .mCharge = 120, .mFlags = Enchantment::Autocalc };
             record.mEffects = makeEffects();
 
             Enchantment result;

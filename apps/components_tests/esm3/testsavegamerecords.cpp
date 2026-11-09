@@ -2,7 +2,6 @@
 
 #include <components/esm/attr.hpp>
 #include <components/esm3/activespells.hpp>
-#include <components/esm3/loadmgef.hpp>
 #include <components/esm3/cellid.hpp>
 #include <components/esm3/controlsstate.hpp>
 #include <components/esm3/debugprofile.hpp>
@@ -11,6 +10,7 @@
 #include <components/esm3/globalmap.hpp>
 #include <components/esm3/globalscript.hpp>
 #include <components/esm3/journalentry.hpp>
+#include <components/esm3/loadmgef.hpp>
 #include <components/esm3/projectilestate.hpp>
 #include <components/esm3/savedgame.hpp>
 #include <components/esm3/selectiongroup.hpp>
@@ -548,7 +548,8 @@ namespace ESM
             params.mDisplayName = "Stimpak";
             params.mCaster = RefNum{ .mIndex = 0x10, .mContentFile = -1 };
             params.mItem = RefNum{ .mIndex = 0x20, .mContentFile = -1 };
-            params.mFlags = static_cast<ActiveSpells::Flags>(ActiveSpells::Flag_Temporary | ActiveSpells::Flag_Stackable);
+            params.mFlags
+                = static_cast<ActiveSpells::Flags>(ActiveSpells::Flag_Temporary | ActiveSpells::Flag_Stackable);
             params.mWorsenings = 2;
             params.mNextWorsening = { .mHour = 6.f, .mDay = 7 };
             ActiveEffect effect;

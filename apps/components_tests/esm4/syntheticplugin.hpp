@@ -194,8 +194,8 @@ namespace ESM4Test
     /// to 1.34 and 15 for New Vegas, 0.94 and 43 for Skyrim LE, 1.7 and 44 for Skyrim SE, 0.95 and 131 for Fallout 4.
     /// The record has the same form version. Loader and reader errors propagate to the caller.
     template <class T>
-    T loadVersionedRecord(std::string_view type, float headerVersion, std::uint16_t formVersion,
-        std::string_view data, std::uint32_t id = 0x801)
+    T loadVersionedRecord(std::string_view type, float headerVersion, std::uint16_t formVersion, std::string_view data,
+        std::uint32_t id = 0x801)
     {
         std::string hedr;
         append<float>(hedr, headerVersion);
