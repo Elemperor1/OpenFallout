@@ -983,7 +983,7 @@ namespace OFMechanics
         return it->second->getCharacterController().isSneaking();
     }
 
-    static void updateDrowning(const OFWorld::Ptr& ptr, float duration, bool isKnockedOut, bool isPlayer)
+    static void updateDrowning(const OFWorld::Ptr& ptr, float duration, bool isKnockedOut)
     {
         const auto& actorClass = ptr.getClass();
         NpcStats& stats = actorClass.getNpcStats(ptr);
@@ -997,7 +997,7 @@ namespace OFMechanics
         if (stats.getTimeToStartDrowning() == -1.f)
             stats.setTimeToStartDrowning(fHoldBreathTime);
 
-        if (!isPlayer && stats.getTimeToStartDrowning() < fHoldBreathTime / 2)
+        if (stats.getTimeToStartDrowning() < fHoldBreathTime / 2)
         {
             AiSequence& seq = actorClass.getCreatureStats(ptr).getAiSequence();
             if (seq.getTypeId() != AiPackageTypeId::Breathe) // Only add it once
@@ -1022,9 +1022,7 @@ namespace OFMechanics
                 stats.setTimeToStartDrowning(timeLeft);
             }
 
-            const bool godmode = isPlayer && world->getGodModeState();
-
-            if (timeLeft == 0.0f && !godmode)
+            if (timeLeft == 0.0f)
             {
                 // If drowning, apply 3 points of damage per second
                 static const float fSuffocationDamage
@@ -1038,9 +1036,6 @@ namespace OFMechanics
                 auto soundDrown = ESM::RefId::stringRefId("drown");
                 if (!sndmgr->getSoundPlaying(ptr, soundDrown))
                     sndmgr->playSound3D(ptr, soundDrown, 1.0f, 1.0f);
-
-                if (isPlayer)
-                    OFBase::Environment::get().getWindowManager()->activateHitOverlay(false);
             }
         }
         else
@@ -1657,11 +1652,14 @@ namespace OFMechanics
                         stats.getAiSequence().execute(actor.getPtr(), ctrl, duration, /*outOfRange*/ true);
                     }
 
-                    if (inProcessingRange && actor.getPtr().getClass().isNpc())
+                    // The breath of the player is the games' own (FalloutScripts::updateBreath: it lasts by the heal
+                    // rate and a player that is out of it loses a fifth of its health each second), not Morrowind's
+                    // with its 20 seconds
+                    if (inProcessingRange && !isPlayer && actor.getPtr().getClass().isNpc())
                     {
                         // We can not update drowning state for actors outside of AI distance - they can not resurface
                         // to breathe
-                        updateDrowning(actor.getPtr(), duration, ctrl.isKnockedOut(), isPlayer);
+                        updateDrowning(actor.getPtr(), duration, ctrl.isKnockedOut());
                     }
                     if (mTimerUpdateEquippedLight == 0 && actor.getPtr().getClass().hasInventoryStore(actor.getPtr()))
                         updateEquippedLight(actor.getPtr(), updateEquippedLightInterval, showTorches);

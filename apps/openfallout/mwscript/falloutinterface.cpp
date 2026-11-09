@@ -10,11 +10,13 @@
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadrefr.hpp>
 #include <components/falloutscript/actorvalues.hpp>
+#include <components/falloutscript/derivedstats.hpp>
 #include <components/falloutscript/hud.hpp>
 #include <components/falloutscript/messagetext.hpp>
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/mechanicsmanager.hpp"
+#include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
@@ -79,6 +81,57 @@ namespace OFScript
         mWatchers.note(self, sightOfPlayer(watcher), hostile, mHudTime);
     }
 
+    double FalloutScripts::mostBreath()
+    {
+        namespace AV = FalloutScript::ActorValue;
+        // The breath lasts by the heal rate of the player (the endurance gives it), not by the endurance itself
+        return FalloutScript::DerivedStats::swimBreath(derivedSettings(), mActorValues.current(mPlayer, AV::healRate));
+    }
+
+    void FalloutScripts::updateBreath(float frametime)
+    {
+        namespace AV = FalloutScript::ActorValue;
+        namespace Derived = FalloutScript::DerivedStats;
+        if (mPlayer == 0 || frametime < 0)
+            return;
+        OFBase::World* world = OFBase::Environment::get().getWorld();
+        if (world == nullptr)
+            return;
+        const OFWorld::Ptr player = world->getPlayerPtr();
+        if (player.isEmpty() || !player.isInCell())
+            return;
+        // The head is under the water when the point at 0.875 of the height is
+        const bool headUnder = world->isUnderwater(player, static_cast<float>(Derived::swimSubmersion));
+        mHeadUnder = headUnder;
+        const double most = mostBreath();
+        // The first frame, a loaded game and a player that is back from the dead start with the breath full
+        double left = mBreathLeft;
+        if (left < 0 || mActors.isDead(mPlayer))
+            left = most;
+        // Nothing the port has gives a character the breath of water (the executables ask for a magic effect of it and
+        // for the actor's CanBreatheWater)
+        const double health = mActorValues.current(mPlayer, AV::health);
+        const Derived::SwimBreathStep step
+            = Derived::swimBreathStep(derivedSettings(), left, most, headUnder, false, health, frametime);
+        mBreathLeft = step.mRemaining;
+        if ((step.mDamage <= 0 && !step.mFatal) || mActors.isDead(mPlayer) || world->getGodModeState())
+            return;
+        // Out of breath the player takes a fifth of its health each second, with the sound of drowning and the flash of
+        // a blow (one that is let finish before the next begins: the damage comes every frame)
+        if (const FalloutScript::FormId drowning = soundByEditorId("NPCHumanDrowning");
+            drowning != 0 && !isSoundPlaying(drowning, mPlayer))
+            playSound(drowning, mPlayer);
+        if (OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager())
+            windows->activateHitOverlay(false);
+        // No blow comes between the damage and the death of a player that has none left of its health
+        const std::lock_guard strikeLock(mStrikeMutex);
+        const auto transitions = mActors.holdTransitions();
+        mActorValues.damage(mPlayer, AV::health, step.mDamage);
+        // (a player with less than a point of health is out as well: see SwimBreathStep::mFatal)
+        if (step.mFatal || mActorValues.current(mPlayer, AV::health) <= 0)
+            mActors.kill(mPlayer);
+    }
+
     FalloutScripts::HudStatus FalloutScripts::hudStatus()
     {
         namespace AV = FalloutScript::ActorValue;
@@ -121,6 +174,11 @@ namespace OFScript
         }
         status.mCrippled.assign(crippled.begin(), crippled.end());
         status.mWeaponDrawn = mEquipment.weaponDrawn(mPlayer);
+        const double most = mostBreath();
+        const double left = mBreathLeft;
+        status.mHeadUnder = mHeadUnder;
+        status.mBreath = left < 0 || !(most > 0) ? 1.0 : std::clamp(left / most, 0.0, 1.0);
+        status.mBreathTicks = FalloutScript::DerivedStats::airMeterVisibleTicks(left < 0 ? most : left, most);
         return status;
     }
 

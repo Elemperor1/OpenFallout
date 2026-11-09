@@ -93,6 +93,7 @@
 #include "dialogue.hpp"
 #include "enchantingdialog.hpp"
 #include "exposedwindow.hpp"
+#include "falloutairmeter.hpp"
 #include "hud.hpp"
 #include "inventorytabsoverlay.hpp"
 #include "inventorywindow.hpp"
@@ -578,6 +579,7 @@ namespace OFGui
             LuaUi::clearMenuInterface();
 
             mStatsWatcher.reset();
+            mAirMeter.reset();
 
             MyGUI::LanguageManager::getInstance().eventRequestTag.clear();
             MyGUI::PointerManager::getInstance().eventChangeMousePointer.clear();
@@ -2088,6 +2090,10 @@ namespace OFGui
         mSelectedSpell = ESM::RefId();
         mCustomMarkers.clear();
 
+        // The air meter is not part of the display that the scripts of the game that is left take down with them
+        if (mAirMeter)
+            mAirMeter->hide();
+
         mForceHidden = GW_None;
         mRestAllowed = true;
 
@@ -2375,6 +2381,26 @@ namespace OFGui
     void WindowManager::setBlindness(const int percent)
     {
         mBlindnessFader->notifyAlphaChanged(percent / 100.f);
+    }
+
+    void WindowManager::setAirMeter(
+        float x, float y, float unit, float alpha, int ticks, float red, float green, float blue)
+    {
+        // Made the first time that the player is under water
+        if (!mAirMeter)
+        {
+            if (!(alpha > 0.f))
+                return;
+            mAirMeter = std::make_unique<FalloutAirMeter>();
+        }
+        FalloutAirMeter::State state;
+        state.mX = x;
+        state.mY = y;
+        state.mUnit = unit;
+        state.mAlpha = alpha;
+        state.mTicks = ticks;
+        state.mColor = { red, green, blue };
+        mAirMeter->draw(state);
     }
 
     void WindowManager::activateHitOverlay(bool interrupt)

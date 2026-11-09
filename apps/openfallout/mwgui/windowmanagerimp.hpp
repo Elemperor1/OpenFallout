@@ -103,6 +103,7 @@ namespace OFGui
     class SettingsWindow;
     class AlchemyWindow;
     class QuickKeysMenu;
+    class FalloutAirMeter;
     class LoadingScreen;
     class LevelupDialog;
     class WaitDialog;
@@ -375,6 +376,8 @@ namespace OFGui
         void setBlindness(const int percent) override;
 
         void activateHitOverlay(bool interrupt) override;
+        void setAirMeter(
+            float x, float y, float unit, float alpha, int ticks, float red, float green, float blue) override;
         void setWerewolfOverlay(bool set) override;
 
         void toggleConsole() override;
@@ -441,6 +444,7 @@ namespace OFGui
 
         std::unique_ptr<Gui::FontLoader> mFontLoader;
         std::unique_ptr<StatsWatcher> mStatsWatcher;
+        std::unique_ptr<FalloutAirMeter> mAirMeter;
 
         bool mConsoleOnlyScripts;
 

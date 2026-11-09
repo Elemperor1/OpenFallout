@@ -516,6 +516,22 @@ namespace
         EXPECT_NEAR(items[0].mColor[3], 0.2f, 1e-4);
     }
 
+    TEST(FalloutMenuDrawTest, the_colour_of_a_tile_is_its_system_colour_scaled_by_its_brightness)
+    {
+        Fixture f;
+        Menu& menu = f.open(
+            "<menu name=\"M\"><systemcolor> 5 </systemcolor>"
+            "<nif name=\"Model\"><brightness> 51 </brightness><alpha> 255 </alpha></nif>"
+            "</menu>");
+        Tile* model = menu.find("Model");
+        ASSERT_NE(model, nullptr);
+        const std::array<float, 4> color = menu.color(*model);
+        EXPECT_NEAR(color[0], 10.f / 255.f * 0.2f, 1e-4);
+        EXPECT_NEAR(color[1], 0.2f, 1e-4);
+        EXPECT_NEAR(color[2], 100.f / 255.f * 0.2f, 1e-4);
+        EXPECT_NEAR(color[3], 1.f, 1e-4);
+    }
+
     TEST(FalloutMenuDrawTest, a_tile_that_uses_its_local_colour_is_drawn_in_its_own_red_green_and_blue)
     {
         Fixture f;

@@ -1036,8 +1036,30 @@ its older drawing for a data folder that lacks the file.
   in the game: which of the lines of one batch is at the top (the one told last is), the place of a line's box, and the
   sound of a line (one `UIQuestUpdate` for each); the reminder that repeats the objectives (`AutoDisplayObjectives`, off in
   the settings) is not made.
-- Not drawn: the armour icons, the weapon's name and condition, the needs of hardcore mode and the breath meter; the
-  weapon's rounds show the rounds carried, as the engine has no clip.
+- Not drawn: the armour icons, the weapon's name and condition and the needs of hardcore mode; the weapon's rounds show the
+  rounds carried, as the engine has no clip.
+- **The breath and the air meter** (Mac rounds 12BI B and 12BM, FalloutNV.exe driver 0x889930, meter 0x77E4F0, Fallout3.exe the
+  same rule at other addresses; `DerivedStats::swimBreath`, `FalloutScripts::updateBreath`, `falloutairmeter.cpp`). The air
+  lasts `fActorSwimBreathBase` (10) plus `fActorSwimBreathMult` (0.5) seconds for each whole point of the player's **heal
+  rate** (the actor value 15, not the endurance: it is the endurance's bonus, 0 below an endurance of 6, 5 for 6 to 8, 10 for 9
+  and 10, `fAVDHealRateEndurance6Bonus` to `10Bonus`, so 10 to 15 seconds). With the head under the water (the point at 0.875 of
+  the height is) the breath runs down one second for each second; with the head out it is full again at once. When it is gone
+  the player loses `fActorSwimBreathDamage` (0.2) times its health (whole points) for each second, with the sound
+  `NPCHumanDrowning` and the flash of a blow, and dies when the health is gone. The health counts in whole points, so the
+  damage is none below one point and the player would stay at a fraction of a point for ever; the port kills a player with
+  less than a point when the breath is out (the executable's call after the damage, 0x8A7D50, was not traced). Only the
+  player is hurt by it. The
+  executable asks for the magic effect of water breathing and for the actor's CanBreatheAir and CanBreatheWater; the port has
+  none of them yet, so the breath runs down whenever the head is under. The engine's own drowning (20 seconds, 3 points a
+  second) is off for the player. The meter is the tile `BreathMeter` of the file, the model `AirTimer01.NIF` (a ring of 16
+  tick quads and a quad with an "O2", all one texture, `air_meter.dds`, 64 by 64), which the menu engine does not draw:
+  `FalloutAirMeter` does, with a widget for each, the ticks turned 22.5 degrees apart about the ring's middle (tick 16 at the
+  top, tick 1 just right of it). The model's origin is the tile's place, in the middle of the screen and 80 units under the
+  sneak meter; a unit of the model is a unit of the display's 960 (not read: the code that projects the model into the tile's
+  64 by 64 was not found). The ticks go from the one next to the top, clockwise, one for each sixteenth of the breath
+  (`ceil(16 * share)` stay). Its alpha takes half a second to come when the head goes under and half a second to go once the
+  head is out and a coming in is over; a window, the Pip-Boy and death hide it at once. Its colour is the tile's. Not seen in
+  the running game yet.
 
 ### Books and scrolls (Mac round 12AM B4, FalloutNV.exe)
 
