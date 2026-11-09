@@ -29,11 +29,13 @@ apt_retry_settings() {
 # sources are always made from the copy taken before the first change (`.ci-orig`, which apt does not read), so a
 # second mirror is never a rewrite of the first.
 apt_use_mirror() {
-  local mirror="$1" file
+  local mirror="$1" file escaped
+  # The mirror goes into the replacement of sed, where the delimiter, & and \ mean something
+  escaped=$(printf '%s' "$mirror" | sed -e 's/[\\&#]/\\&/g')
   for file in "$APT_ETC/sources.list" "$APT_ETC"/sources.list.d/*.sources "$APT_ETC"/sources.list.d/*.list; do
     [ -f "$file" ] || continue
     [ -f "$file.ci-orig" ] || cp "$file" "$file.ci-orig"
-    sed -E "s#https?://([a-z0-9-]+\.)*archive\.ubuntu\.com/ubuntu/?#${mirror}/#g" "$file.ci-orig" >"$file"
+    sed -E "s#https?://([a-z0-9-]+\.)*archive\.ubuntu\.com/ubuntu/?#${escaped}/#g" "$file.ci-orig" >"$file"
   done
 }
 

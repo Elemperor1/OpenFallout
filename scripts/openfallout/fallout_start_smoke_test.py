@@ -1449,12 +1449,12 @@ local steps = {
     { 3.0, function() report('inside') put(100, 0) end },
     { 4.5, function() report('outside') put(0, -100) end },
     { 6.0, function() report('again') put(100, 0) end },
+    { 6.0, function() classroom('early') end },
     { 7.0, function() sits('before') local object = chair() if object then object:activateBy(world.players[1]) end end },
     { 8.0, function() sits('sat') put(300, 0) end },
     { 9.0, function() sits('away') end },
     { 12.5, function() occupied('before') takeSitterChair() end },
     { 13.5, function() occupied('after') end },
-    { 6.0, function() classroom('early') end },
     { 15.0, function() sitter('later') finders('later') classroom('later') core.quit() end },
 }
 

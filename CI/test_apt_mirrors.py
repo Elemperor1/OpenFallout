@@ -125,6 +125,18 @@ class AptMirrorsTest(unittest.TestCase):
             (self.etc / "sources.list").read_text(), "deb http://security.ubuntu.com/ubuntu/ noble main\n"
         )
 
+    def test_a_mirror_with_characters_that_sed_reads_is_written_as_it_is(self):
+        mirror = "http://mirror.example/ubuntu?a=1&b=2#c\\d"
+        env = dict(os.environ, APT_ETC=str(self.etc), APT_GET=str(self.fake), CALLS=str(self.calls), DEAD="")
+        subprocess.run(
+            ["bash", "-c", f"set -euo pipefail; source {SCRIPT}; apt_use_mirror '{mirror}'"],
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        self.assertIn(f"URIs: {mirror}/\n", self.sources.read_text())
+
 
 if __name__ == "__main__":
     unittest.main()

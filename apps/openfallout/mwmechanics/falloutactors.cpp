@@ -174,6 +174,7 @@ namespace OFMechanics
         float mWatch = 0.f; // seconds until it looks for the player again, for the sneak meter
         float mHeld = 0.f; // seconds it has stood in range of its target without firing (it says why now and then)
         bool mOrdered = false; // a script told it to shoot (UseWeapon) the last time it was looked at
+        bool mPlaceAbandoned = false; // it could not get to the place of the order: it shoots from where it stands
         bool mSeenAlive = false; // it was alive when it was looked at
         bool mFell = false; // it is dead and its body has fallen
         float mReview = 0.f; // seconds until the packages are looked at again
@@ -1550,13 +1551,14 @@ namespace OFMechanics
                 if (!mind.mOrdered)
                 {
                     mind.mOrdered = true;
+                    mind.mPlaceAbandoned = false;
                     mind.mFighting = true;
                     stopWalking(mind);
                     mind.mAtGoal = false;
                     showWeapon(frame, mind, scripts);
                 }
                 // It shoots from the place it was told to, which it goes to first
-                if (!order.mPlace.isEmpty()
+                if (!mind.mPlaceAbandoned && !order.mPlace.isEmpty()
                     && !isNear(mind.position(), order.mPlace.getRefData().getPosition().asVec3(), scriptedPlaceReach))
                 {
                     const osg::Vec3f place = order.mPlace.getRefData().getPosition().asVec3();
@@ -1572,8 +1574,10 @@ namespace OFMechanics
                         case Walk::Waiting:
                             return true;
                         default:
-                            // It is there, or it cannot get there: it shoots from where it stands
+                            // It is there, or it cannot get there: it shoots from where it stands, and does not try
+                            // the walk again for this order (a failed walk waits a second before the next try)
                             stopWalking(mind);
+                            mind.mPlaceAbandoned = true;
                             break;
                     }
                 }
