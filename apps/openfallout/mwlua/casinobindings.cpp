@@ -1,5 +1,7 @@
 #include "casinobindings.hpp"
 
+#include <charconv>
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -25,11 +27,21 @@ namespace OFLua
             return *host;
         }
 
-        /// A form id from Lua, the text that a reference or a record has as its id
+        /// A form id from Lua: the text that a reference has as its `id` ("0x" and the number in hexadecimal), or the
+        /// text that a record or a reference has as its serialized id ("FormId:0x" and the number)
         FalloutScript::FormId parseId(std::string_view text)
         {
             if (text.empty())
                 return 0;
+            if (text.starts_with("0x"))
+            {
+                std::uint32_t value = 0;
+                const char* end = text.data() + text.size();
+                const auto [stop, error] = std::from_chars(text.data() + 2, end, value, 16);
+                if (error != std::errc() || stop != end)
+                    throw std::runtime_error("\"" + std::string(text) + "\" is not a form id");
+                return value;
+            }
             const ESM::RefId id = ESM::RefId::deserializeText(text);
             const ESM::FormId* form = id.getIf<ESM::FormId>();
             if (form == nullptr)
