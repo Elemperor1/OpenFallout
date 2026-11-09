@@ -11,6 +11,7 @@ file(GLOB UNITTEST_SRC_FILES
     lua/testasync.cpp
     lua/testconfiguration.cpp
     lua/testinputactions.cpp
+    lua/testinputregistry.cpp
     lua/testl10n.cpp
     lua/testlua.cpp
     lua/testscriptscontainer.cpp
