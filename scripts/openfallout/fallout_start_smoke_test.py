@@ -1578,6 +1578,10 @@ local function describe(tag)
     local g = world.globals
     print('OFTEST', 'saves characters', tag, string.format('items=%d dead=%d luck=%d karma=%d',
         g.@G_ITEMS@, g.@G_DEAD@, g.@G_LUCK@, g.@G_KARMA@))
+    -- What the packages of the walker told its script: the Travel package is begun once and done once (the globals are
+    -- saved with the game, so a package that is begun or done again after the load counts twice)
+    print('OFTEST', 'saves packages', tag, string.format('begin=%d end=%d',
+        g.@G_TRAVEL_BEGIN@, g.@G_TRAVEL_END@))
 end
 
 -- Sets the stage that writes what the game knows into the globals, and reads them a moment after
@@ -1690,7 +1694,9 @@ SAVES_WORLD_SCRIPT = (SAVES_WORLD_SCRIPT.replace("@FROM@", str(SAVES_FROM)).repl
                       .replace("@G_ITEMS@", plugin.SAVED_GLOBALS["items"][1])
                       .replace("@G_DEAD@", plugin.SAVED_GLOBALS["dead"][1])
                       .replace("@G_LUCK@", plugin.SAVED_GLOBALS["luck"][1])
-                      .replace("@G_KARMA@", plugin.SAVED_GLOBALS["karma"][1]))
+                      .replace("@G_KARMA@", plugin.SAVED_GLOBALS["karma"][1])
+                      .replace("@G_TRAVEL_BEGIN@", plugin.PACKAGE_EVENT_GLOBALS["travel_begin"][1])
+                      .replace("@G_TRAVEL_END@", plugin.PACKAGE_EVENT_GLOBALS["travel_end"][1]))
 SAVES_LOCAL_SCRIPT = """\
 local core = require('openfallout.core')
 
@@ -3974,6 +3980,19 @@ def check_saves(first, second, third=None):
             if made.get(tag) != made_id:
                 problems.append(f"{name}: after the load ({tag}) the cube that was made should be {made_id} to Lua: "
                                 f"{made.get(tag)}")
+    # The packages: the walker began and finished its Travel package before the save, and a package that a save kept goes on
+    # from where the character is: after the load (and in the engines that were started on the save) it is not begun or done
+    # again, so its script counts the same events as before (a mind that forgot its packages begins the Travel package
+    # again, and counts 2 and 2)
+    first_packages = tagged(first, "packages", r"(begin=\d+ end=\d+)")
+    if first_packages.get("before") != "begin=1 end=1":
+        problems.append(f"before the save the walker should have begun and done its Travel package once: {first_packages}")
+    for name, text in (("the engine that saved", first), *started):
+        packages = tagged(text, "packages", r"(begin=\d+ end=\d+)")
+        for tag in ("loaded", "later"):
+            if packages.get(tag) != first_packages.get("before"):
+                problems.append(f"{name}: after the load ({tag}) the walker should not begin or end its Travel package again "
+                                f"({first_packages.get('before')}): {packages.get(tag)}")
     if "Quitting peacefully" not in first:
         problems.append("the log of the engine that saved does not end with 'Quitting peacefully'")
     for name, text in started:
