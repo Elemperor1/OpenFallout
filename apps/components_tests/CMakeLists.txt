@@ -114,6 +114,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testactorrecords.cpp
     esm4/testitemrecords.cpp
     esm4/testland.cpp
+    esm4/testplacedrecords.cpp
     esm4/testlinkedreference.cpp
     esm4/testlock.cpp
     esm4/testhungerstage.cpp
