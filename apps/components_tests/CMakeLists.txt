@@ -297,6 +297,7 @@ file(GLOB UNITTEST_SRC_FILES
     nif/testanimsurvey.cpp
     nif/testbspline.cpp
     nif/testextradata.cpp
+    nif/testhavok.cpp
     nif/testcontroller.cpp
     nif/testdata.cpp
     nif/testnode.cpp
