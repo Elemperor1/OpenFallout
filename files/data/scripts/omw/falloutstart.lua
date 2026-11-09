@@ -71,6 +71,8 @@ local pending = nil
 -- The script cannot draw the menu (the file is not there): the engine's own menu is used and nothing is claimed
 local failed = false
 local claiming = false
+-- The real time of the last frame of the credits
+local creditsAt = nil
 -- The save that the panel shows, so the panel is made again only when it changes
 local panelFor = nil
 
@@ -803,7 +805,15 @@ return {
                 shown:checkSize()
                 updatePanel()
                 manual.update()
-                if credits.isOpen() then credits.update(dt or 0) end
+                -- (the credits scroll by real time: the world is paused with no game and in the pause menu, and then the frame's
+                -- time is zero)
+                if credits.isOpen() then
+                    local now = core.getRealTime()
+                    credits.update(creditsAt and math.min(math.max(now - creditsAt, 0), 0.25) or 0)
+                    creditsAt = now
+                else
+                    creditsAt = nil
+                end
             end
         end,
         onKeyPress = onKey,
