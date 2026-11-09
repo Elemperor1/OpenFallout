@@ -51,18 +51,23 @@ namespace FalloutScript
         std::size_t next = 0;
         for (std::size_t i = 0; i < text.size();)
         {
-            if (text[i] == '&' && resolve && i + 1 < text.size() && isNameStart(text[i + 1]))
+            if (text[i] == '&' && resolve && i + 1 < text.size())
             {
-                std::size_t end = i + 2;
-                while (end < text.size() && isNameChar(text[end]))
-                    ++end;
-                if (end < text.size() && text[end] == ';')
-                    if (const std::optional<std::string> value = resolve(text.substr(i + 1, end - i - 1)))
-                    {
-                        result += *value;
-                        i = end + 1;
-                        continue;
-                    }
+                // `&-name;` is the form of the games that asks for the bare text (the resolver is given the dash)
+                const std::size_t start = text[i + 1] == '-' ? i + 2 : i + 1;
+                if (start < text.size() && isNameStart(text[start]))
+                {
+                    std::size_t end = start + 1;
+                    while (end < text.size() && isNameChar(text[end]))
+                        ++end;
+                    if (end < text.size() && text[end] == ';')
+                        if (const std::optional<std::string> value = resolve(text.substr(i + 1, end - i - 1)))
+                        {
+                            result += *value;
+                            i = end + 1;
+                            continue;
+                        }
+                }
             }
             if (text[i] != '%')
             {
@@ -119,5 +124,45 @@ namespace FalloutScript
             i = position + 1;
         }
         return result;
+    }
+
+    std::string_view mouseButtonSetting(unsigned button)
+    {
+        // The buttons of SDL: 1 is the left one, 2 the middle one, 3 the right one, then the extra buttons; the games'
+        // table has the left, the right and the middle button first and "Button 3" to "Button 8" after them
+        switch (button)
+        {
+            case 1:
+                return "sMouseLeftButton";
+            case 2:
+                return "sMouseMiddleButton";
+            case 3:
+                return "sMouseRightButton";
+            case 4:
+                return "sMouseButton3";
+            case 5:
+                return "sMouseButton4";
+            case 6:
+                return "sMouseButton5";
+            case 7:
+                return "sMouseButton6";
+            case 8:
+                return "sMouseButton7";
+            case 9:
+                return "sMouseButton8";
+            default:
+                return {};
+        }
+    }
+
+    std::string controlText(std::string_view prefix, std::string_view key, std::string_view none, bool bare)
+    {
+        // `&-name;` is the bare text of the key, empty for a control that has none
+        if (bare)
+            return std::string(key);
+        std::string text(key.empty() ? none : key);
+        if (prefix.empty())
+            return text;
+        return std::string(prefix) + " " + text;
     }
 }

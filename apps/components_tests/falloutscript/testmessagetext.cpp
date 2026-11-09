@@ -84,4 +84,44 @@ namespace
         // without a resolver nothing is replaced
         EXPECT_EQ(formatMessage("&sUActnVats;", {}), "&sUActnVats;");
     }
+
+    TEST(FalloutScriptMessageTextTest, theDashFormAsksForTheBareText)
+    {
+        // `&-name;` is given to the resolver with its dash, `&name;` without
+        std::vector<std::string> asked;
+        const FalloutScript::TokenResolver resolve = [&asked](std::string_view name) -> std::optional<std::string> {
+            asked.emplace_back(name);
+            if (name == "-sUActnJump")
+                return "Space";
+            if (name == "sUActnJump")
+                return "press Space";
+            return std::nullopt;
+        };
+        EXPECT_EQ(formatMessage("&-sUActnJump; or &sUActnJump;.", {}, resolve), "Space or press Space.");
+        EXPECT_EQ(asked, (std::vector<std::string>{ "-sUActnJump", "sUActnJump" }));
+        // a dash with no name after it, and a dash form nobody knows, stay
+        EXPECT_EQ(formatMessage("&-; &-1; &-sNope;", {}, resolve), "&-; &-1; &-sNope;");
+    }
+
+    TEST(FalloutScriptMessageTextTest, theMouseButtonsAreNamedByTheSettingsOfTheGames)
+    {
+        EXPECT_EQ(FalloutScript::mouseButtonSetting(1), "sMouseLeftButton");
+        EXPECT_EQ(FalloutScript::mouseButtonSetting(2), "sMouseMiddleButton");
+        EXPECT_EQ(FalloutScript::mouseButtonSetting(3), "sMouseRightButton");
+        EXPECT_EQ(FalloutScript::mouseButtonSetting(4), "sMouseButton3");
+        EXPECT_EQ(FalloutScript::mouseButtonSetting(9), "sMouseButton8");
+        EXPECT_TRUE(FalloutScript::mouseButtonSetting(0).empty());
+        EXPECT_TRUE(FalloutScript::mouseButtonSetting(10).empty());
+    }
+
+    TEST(FalloutScriptMessageTextTest, aControlHasTheWordsOfTheGamesBeforeItsKey)
+    {
+        // `&name;`: the words, a space, the key; a control with no key has the words of the games for that
+        EXPECT_EQ(FalloutScript::controlText("press", "Mouse1", "<none>", false), "press Mouse1");
+        EXPECT_EQ(FalloutScript::controlText("press", "", "<none>", false), "press <none>");
+        EXPECT_EQ(FalloutScript::controlText("", "E", "<none>", false), "E");
+        // `&-name;`: the key, empty when there is none
+        EXPECT_EQ(FalloutScript::controlText("press", "Mouse1", "<none>", true), "Mouse1");
+        EXPECT_EQ(FalloutScript::controlText("press", "", "<none>", true), "");
+    }
 }

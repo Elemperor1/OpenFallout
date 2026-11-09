@@ -368,7 +368,7 @@ namespace OFScript
         }
 
         // The key (or button) of the activation is named as the player has it set
-        if (const auto key = messageToken("sUActnGrab"))
+        if (const auto key = messageToken("-sUActnGrab"))
             result.mKeyText = *key;
         if (OFBase::InputManager* input = OFBase::Environment::get().getInputManager())
             result.mPad = input->joystickLastUsed();

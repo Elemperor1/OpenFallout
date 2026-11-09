@@ -1572,6 +1572,20 @@ found the same way.
 - Every one of the 38 implemented screens opens from its file with no error and no missing texture (the scroll picture of
   `book_menu.xml` and its button picture are not in the install: a scroll has none); the files open with no script data show
   their placeholders only.
+- HUD, quest and hot key texts (round 12BO part H): the region line fades in over about 1.7 s, holds 2 s and fades out over
+  1.3 s, left aligned at 3% across and 80% down, none for an interior; the quest heading and name appear 0.2 to 1.2 s after the
+  stage is set and are gone about 9.5 s after it, the objective lines follow (a menu hides them and stops their clock);
+  a bark's subtitles are two centred lines at 70% down for about the seconds of the line; a tap of a number key does nothing, a
+  hold of about 0.6 s shows the wheel (slot 1 of `assignHotKey` is the box labelled 2, the ammunition swap, which is why the
+  first item sits in the top-middle box: the call counts from 0); the reticle is two chevrons and only a drawn ranged weapon
+  has it; the HUD is gone with the Pip-Boy, the pause menu, V.A.T.S. (the bars stay) and a conversation.
+- The texts of the data name the controls with `&name;` and `&-name;` (Mac round 12BP part A; no `##(`, `#{` or `&amp;` form
+  is in the data or the executables): `&sUActnUse;` is the words `sPCControlsTextPrefix` (the games put them before the key), a
+  space and the key, `&-sUActnUse;` is the bare key text, empty when the control has none, and a control with no key reads
+  `sPCControlsTextNone`; the executables know 28 controls, a mouse button comes before a key, and a name that is not a
+  control is read as a game setting. The engine put the localisation token of its own settings screen for a mouse button
+  (`#{sMouse} 1`) into the text, which the interface showed as `##(sMouse)`; it is now the setting of the games
+  (`sMouseLeftButton`, "Mouse1" in the executable).
 
 ## What is not known yet
 
