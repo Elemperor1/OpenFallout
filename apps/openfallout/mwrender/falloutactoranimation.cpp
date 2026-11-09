@@ -490,7 +490,9 @@ namespace OFRender
         mLastPosition = position;
         mHasLastPosition = true;
 
-        setGait(chooseFalloutGait(mSpeed, mGait, mGaits));
+        // A character in a piece of furniture does not walk: its place changes by a few units when it is put on its
+        // seat, which would play the walk over the pose of its seat
+        setGait(mPoseKind != 0 ? FalloutGait::Idle : chooseFalloutGait(mSpeed, mGait, mGaits));
 
         if (mGait == FalloutGait::Walk)
             adjustSpeedMult(mWalkGroup, falloutAnimationSpeed(mSpeed, mGaits.mWalkVelocity));
@@ -713,16 +715,32 @@ namespace OFRender
     {
         if (entryKind < 0)
             entryKind = 0;
-        if (entryKind == mPoseKind)
+        const bool lost = entryKind == mPoseKind && entryKind != 0 && !mPoseGroup.empty()
+            && !getInfo(mPoseGroup, nullptr, nullptr, nullptr);
+        if (!falloutPoseToStart(entryKind, mPoseKind, !mPoseGroup.empty(), !lost))
             return;
+        if (lost && !mPoseLostReported)
+        {
+            mPoseLostReported = true;
+            Log(Debug::Info) << mPtr.getCellRef().getRefId() << " lost the pose " << mPoseGroup
+                             << " to an animation that played over it (gait " << static_cast<int>(mGait)
+                             << "); it holds it again";
+        }
         // It gets up: the idle animation plays on below, and the gait is the one it was in
         if (!mPoseGroup.empty())
         {
             disable(mPoseGroup);
             mPoseGroup.clear();
         }
+        // Not yet drawn (a game that was loaded makes its characters before their animations): the pose is asked for
+        // again in the next frame
+        if (entryKind != 0 && (mObjectRoot == nullptr || mSkeletonPath.empty() || isDown()))
+        {
+            mPoseKind = 0;
+            return;
+        }
         mPoseKind = entryKind;
-        if (entryKind == 0 || mObjectRoot == nullptr || mSkeletonPath.empty() || isDown())
+        if (entryKind == 0)
             return;
 
         const std::string folder = falloutAnimationFolder(mSkeletonPath);

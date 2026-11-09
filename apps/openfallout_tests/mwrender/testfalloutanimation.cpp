@@ -275,6 +275,34 @@ namespace
         EXPECT_FLOAT_EQ(falloutAnimationSpeed(130.f, 0.5f), 1.f);
     }
 
+    TEST(OpenFalloutRenderFalloutPoseToStart, startsAPoseThatIsNotTheOneHeld)
+    {
+        EXPECT_TRUE(falloutPoseToStart(10, 0, false, false));
+        EXPECT_TRUE(falloutPoseToStart(10, 15, true, true));
+        // It gets up
+        EXPECT_TRUE(falloutPoseToStart(0, 10, true, true));
+    }
+
+    TEST(OpenFalloutRenderFalloutPoseToStart, keepsAPoseThatStillPlays)
+    {
+        EXPECT_FALSE(falloutPoseToStart(10, 10, true, true));
+        EXPECT_FALSE(falloutPoseToStart(0, 0, false, false));
+    }
+
+    TEST(OpenFalloutRenderFalloutPoseToStart, startsAPoseAgainThatSomethingTookOff)
+    {
+        // The walking gait played at its priority after the place of a character in a seat changed, and it took the
+        // pose off the states (a game that was loaded)
+        EXPECT_TRUE(falloutPoseToStart(10, 10, true, false));
+    }
+
+    TEST(OpenFalloutRenderFalloutPoseToStart, doesNotAskAgainForAKindWithoutAPose)
+    {
+        // The kind has no pose (or no file of it): there is no group, and nothing is to be found missing
+        EXPECT_FALSE(falloutPoseToStart(19, 19, false, false));
+        EXPECT_FALSE(falloutPoseToStart(-3, 0, false, false));
+    }
+
     TEST(OpenFalloutRenderChooseFalloutPose, isTheLoopOfThePoseInTheIdleAnimationsFolder)
     {
         const std::string folder = "meshes/characters/_male/";
