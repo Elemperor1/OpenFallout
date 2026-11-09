@@ -291,7 +291,8 @@ namespace OFGui
         {
             const OFBase::StateManager::State state = OFBase::Environment::get().getStateManager()->getState();
             const bool drawnByLua = OFBase::Environment::get().getWindowManager()->isMainMenuDrawnByLua()
-                && (state == OFBase::StateManager::State_Running || state == OFBase::StateManager::State_NoGame);
+                && (state == OFBase::StateManager::State_Running || state == OFBase::StateManager::State_NoGame
+                    || state == OFBase::StateManager::State_Ended);
             mButtonBox->setVisible(!drawnByLua);
             // A button that was lit when the script took over would still answer Enter and Space: the keys are the
             // script's now

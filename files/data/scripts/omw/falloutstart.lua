@@ -113,9 +113,11 @@ local function saveOptions()
     end
 end
 
--- No game is running: the menu is the title screen, not the pause menu
+-- No game is running, or the game is over (the engine ends it when the player dies, and the death box's Main Menu opens
+-- the menu then): the menu is the title screen, not the pause menu
 local function title()
-    return engine.getState() == engine.STATE.NoGame
+    local state = engine.getState()
+    return state == engine.STATE.NoGame or state == engine.STATE.Ended
 end
 
 local function closeShown()
@@ -872,7 +874,8 @@ return {
             -- The engine's own window for the settings is the menu while it is open
             local function drawnNow()
                 local state = engine.getState()
-                return (state == engine.STATE.Running or state == engine.STATE.NoGame) and not failed
+                return (state == engine.STATE.Running or state == engine.STATE.NoGame or state == engine.STATE.Ended)
+                    and not failed
                     and not engine.settingsOpen()
             end
             if pending then

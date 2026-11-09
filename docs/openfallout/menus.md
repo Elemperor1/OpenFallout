@@ -1624,6 +1624,10 @@ found the same way.
   the notes of the quick save and quick load on the HUD line.
 - The death of the player is told to the Lua screen by the state of the actors of Fallout and by a flag of the state manager
   that the engine sets when the death animation is over (a fall or the breath is the engine's, not a script's).
+- The engine ends the game (state Ended) in the frame the player's health is below one. The script of the pause menu draws the
+  title screen's list (Continue, New, Load, Settings, Quit) in that state too, as in no game: the Mac round 12BQ saw the
+  engine's own pixel-font menu (four rows, no Return or Save) after the death box's Main Menu, because the script drew only
+  while a game ran or none did. Pressing Escape after the death shows the same title list.
 - Fallout 3's loading menu (Fallout3.exe, `loading_menu.xml`): the picture (`loading_world_image`, LSCR ICON), a moving slide, the
   pinwheel (`loading01.nif`), the plate number, the current objective, three statistic rows and the level meter; the screens
   come from the 150 LSCR records (limits `iMaxScreens`, `iMaxScreens_MainMenu`, `iNumLocationSpecificScreens`; 32 name
