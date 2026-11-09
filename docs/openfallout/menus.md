@@ -1542,6 +1542,37 @@ found the same way.
 - A hotrect that only copies its child's `x` and `y` does not move that child a second time (the Pip-Boy tabs would end up
   off the screen otherwise). This is the rule that matches the design; it has not been seen in the running game yet.
 
+## Seen in the running game (Mac round 12BO, New Vegas, 2026-11-09)
+
+- Title screen: without saves the list is New, Settings, Credits, Quit (New lit); with saves Continue, New, Load, Settings,
+  Credits, Quit (Continue lit). At 1920 by 1080 the logo is at x 47 to 467, y 482 to 609, the rows end at x 1863 and are
+  54 px apart, the lit row's box is 415 px wide and about 51 high; the 2:1 picture is stretched over the whole window (no bars,
+  at 4:3 it is squeezed). Row text is amber (the brightest pixel 255, 182, 66). New and Continue ask, Load shows five rows, Escape
+  goes back one step, Credits scrolls (it did not end by itself in 178 s) and Escape or a click ends it. The first pictures
+  and the music of the title were added after this run.
+- Amber (255, 182, 66 at the peaks): the HUD numbers, message line, compass, the pause menu, the Pip-Boy headings and rows and
+  the loading wheel and bars. Still green before this round: the Pip-Boy's page strip (the plain widgets of
+  `falloutwidgets.lua`: now amber in New Vegas), the progress box of the engine's loading screen (now hidden while the game's
+  loading menu is drawn) and the box of the player's death (now the game's own message box with Reload and Main Menu). The
+  left bars of the loading screen end at x 797, 735, 797 and the right ones at 1122, 1184, 1122: exact mirrors about the
+  wheel's centre (959.5) within a pixel.
+- Breath: the meter's ring is centred 49.9% across and 11.3% down, 57 px wide, 16 ticks, "O2" in the middle, amber; it comes
+  about half a second after the head goes under (fade shorter than 0.25 s), the ticks go out one every 0.625 s clockwise from the one
+  right of the top (10 s in all), then the damage is 0.2 x int(health) a second (the loss falls by a factor of 0.819 a second),
+  and at less than a point of health the player dies; coming up fills the breath at once and the meter fades out in about
+  0.4 s. A message box hides it and the clock stops while it is open.
+- Body tone: the body follows the face's tone slider for all four sexes and races (the neck's brightness 45, 101, 120, 135, 170
+  for the man at -35, -10, 0, 10, 35); the head and body agree to within 30 in brightness; only at +35 does the head turn
+  cyan-grey (R below G) while the body stays yellow, which the face's own shader maths gives (not changed).
+- V.A.T.S.: ten bracket boxes with a percent each, the picked part named, the creature's name and meter at the bottom, HP and AP
+  meters, the queue rows right-aligned above the AP block, Space queues, E accepts, Escape and RMB return; with the hands every part
+  shows 95% (the blow is sure within reach and the cap is 95). The hints read "Accept  E)" and "Return  RMB)": the closing
+  bracket is the file's own, there is no opening one. The pad (shoulders, Y, X) works. The brackets of a target at the right
+  of the view draw over the hints.
+- Every one of the 38 implemented screens opens from its file with no error and no missing texture (the scroll picture of
+  `book_menu.xml` and its button picture are not in the install: a scroll has none); the files open with no script data show
+  their placeholders only.
+
 ## What is not known yet
 
 - How the games place the Pip-Boy background (1024 by 768 design units) on the screen of the device; the box is centred and
