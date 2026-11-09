@@ -189,6 +189,30 @@ namespace ESM4Test
         return record("TES4", 0, subRecord("HEDR", hedr));
     }
 
+    /// Load the one record of type T, with the given form ID and subrecords, from a plugin whose TES4 record has the
+    /// header version and the form version of a game with the 24 byte record headers: 0.94 and 15 for Fallout 3, 1.32
+    /// to 1.34 and 15 for New Vegas, 0.94 and 43 for Skyrim LE, 1.7 and 44 for Skyrim SE, 0.95 and 131 for Fallout 4.
+    /// The record has the same form version. Loader and reader errors propagate to the caller.
+    template <class T>
+    T loadVersionedRecord(std::string_view type, float headerVersion, std::uint16_t formVersion,
+        std::string_view data, std::uint32_t id = 0x801)
+    {
+        std::string hedr;
+        append<float>(hedr, headerVersion);
+        append<std::int32_t>(hedr, 1);
+        append<std::uint32_t>(hedr, 0x800);
+        const std::string plugin = versionedRecord("TES4", 0, subRecord("HEDR", hedr), formVersion)
+            + versionedRecord(type, id, data, formVersion);
+
+        ESM4::Reader reader(std::make_unique<std::istringstream>(plugin), "synthetic.esp", nullptr, nullptr);
+        if (!reader.getRecordHeader())
+            throw std::runtime_error("The synthetic plugin has no record");
+        reader.getRecordData();
+        T result{};
+        result.load(reader);
+        return result;
+    }
+
     /// Load all records as T from a synthetic plugin containing one group, preserving file order. The last cutBytes
     /// bytes of the file are dropped, so the record and group headers still promise them. The engine and esmtool
     /// read plugins with an encoder, which reads strings by another path than a reader without one. The plugin has no

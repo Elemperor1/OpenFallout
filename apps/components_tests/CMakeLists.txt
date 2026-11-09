@@ -74,7 +74,10 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/includes.cpp
     esm4/testactorvalueinfo.cpp
     esm4/testaddonnode.cpp
+    esm4/testammo.cpp
     esm4/testammoeffect.cpp
+    esm4/testarmoraddon.cpp
+    esm4/testbook.cpp
     esm4/testcamerapath.cpp
     esm4/testcamerashot.cpp
     esm4/testcaravancard.cpp
@@ -103,6 +106,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testfacegen.cpp
     esm4/testfaction.cpp
     esm4/testformidlist.cpp
+    esm4/testland.cpp
     esm4/testlinkedreference.cpp
     esm4/testlock.cpp
     esm4/testhungerstage.cpp
@@ -118,9 +122,11 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testloadscreentype.cpp
     esm4/testmagiceffect.cpp
     esm4/testmapmarker.cpp
+    esm4/testmediaset.cpp
     esm4/testmenuicon.cpp
     esm4/testmessage.cpp
     esm4/testmodeldata.cpp
+    esm4/testnavigation.cpp
     esm4/testnavmesh.cpp
     esm4/testnote.cpp
     esm4/testnpc.cpp
@@ -276,8 +282,10 @@ file(GLOB UNITTEST_SRC_FILES
     bsa/testcompressedbsafile.cpp
 
     nif/node.hpp
+    nif/niftestfile.hpp
     nif/testanimsurvey.cpp
     nif/testbspline.cpp
+    nif/testextradata.cpp
     nif/testphysics.cpp
 )
 
