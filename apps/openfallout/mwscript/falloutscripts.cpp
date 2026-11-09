@@ -1274,12 +1274,12 @@ namespace OFScript
         return mEnableParents;
     }
 
-    void FalloutScripts::tellPlayer(const std::string& text, int kind)
+    void FalloutScripts::tellPlayer(const std::string& text, int kind, float seconds)
     {
         // Not in the dialogue window: the window of Fallout's conversations is a script's, and the one that takes these
         // notes during a conversation of Morrowind is hidden
         // The head-up display prints it in the corner (the display of Fallout takes what is said from the line)
-        mHudMessages.push(text, {}, 0, kind);
+        mHudMessages.push(text, {}, seconds, kind);
     }
 
     bool FalloutScripts::leftLoadedCells(FalloutScript::FormId reference)
@@ -1543,7 +1543,9 @@ namespace OFScript
         // nothing to pick: it has the button that closes it
         if (box.mButtons.empty() && !isBox)
         {
-            tellPlayer(escapeTags(text));
+            // (the notification stays as long as the message says, its TNAM in seconds: a tutorial's stays longer
+            // than the time that the length of its words gives)
+            tellPlayer(escapeTags(text), 0, std::min(static_cast<float>(record->mDisplayTime), 30.f));
             return;
         }
         Log(Debug::Info) << "Message buttons: " << box.mButtons.size();

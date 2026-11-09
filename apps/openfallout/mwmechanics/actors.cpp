@@ -1847,8 +1847,11 @@ namespace OFMechanics
 
                 if (isPlayer)
                 {
-                    // player's death animation is over
-                    OFBase::Environment::get().getStateManager()->askLoadRecent();
+                    // player's death animation is over. A game of Fallout asks as its own code does, a few seconds
+                    // later and in its own message box (falloutdeath.lua); the engine's question comes first
+                    // there and has no words of the game
+                    if (OFBase::Environment::get().getFalloutScripts() == nullptr)
+                        OFBase::Environment::get().getStateManager()->askLoadRecent();
                 }
                 else
                 {

@@ -2306,7 +2306,9 @@ namespace OFScript
         const FalloutScript::EnableParents& enableParents();
         /// (`kind` is the face a message without a picture gets: 0 neutral, 1 very happy, 2 sad; the executable's
         /// callers choose it, Mac round 12BA E)
-        void tellPlayer(const std::string& text, int kind = 0);
+        // `seconds`: the display time of the message the text is from (its TNAM), 0 for the time that the length of the
+        // text gives
+        void tellPlayer(const std::string& text, int kind = 0, float seconds = 0.f);
         /// A box with the text and no button of its own: it shows for `seconds` (0 until the player closes it)
         void showNotice(const std::string& text, double seconds);
 

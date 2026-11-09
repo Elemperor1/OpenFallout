@@ -1592,6 +1592,29 @@ found the same way.
   whole rows when all rows are as high, else fractions, and the rows clip at the top and the bottom of the list between
   steps; at the last step the last row ends where the list does. `ListBox` has this as `fitRows` (the dialogue asks for 3).
 
+## Seen in the running game (Mac round 12BP part C, New Vegas and Fallout 3, 2026-11-09)
+
+- Title: the picture changes every 9.95 s with a linear cross-fade of 2.2 s; the music (`maintitle.mp3`) starts 3.0 s after the
+  title appears and is closed when a game starts. The texts of the controls read as the games' (`To fire your weapon, push
+  Mouse1.`, bare `Tab`, `WASD`, `CapsLock`), with no `&` or `#` left. A note stays on the HUD line for characters / 15 seconds,
+  at least 2.
+- The loading screen of a door in New Vegas (3.3 s): the picture, the tip, the wheel and the bars are amber (252, 183, 70), no
+  green progress box at any frame; a cell that is already loaded shows no loading screen. Fallout 3 draws no wheel and no
+  picture (its loading menu has no slides): the scene goes black for about 3 s with the engine's progress box at the bottom.
+- The topic list of a conversation with six topics (two of them two lines high) is 259 px high, rows 61 px (one line) and 99 px
+  (two lines) apart, three steps of 61, 60 and 60 px, a wheel event or an arrow click is one step, the last row ends at the list
+  bottom: the rule of the previous section as built.
+- The death of the player: the engine asked at once (the box without words of its own) and not after fPlayerDeathReloadTime,
+  which kept the game's box from showing; the engine's question is now left to a game without the Fallout scripts. A top row of
+  pages (STAT, ITEMS, DATA) in the Pip-Boy kept the green frame of the engine's box template (it is a flat amber frame in New
+  Vegas now). A note that the HUD queues while the Pip-Boy is open is drawn under the Pip-Boy's panel (only its left 230 px
+  show), over the loot menu it is on top.
+- The loot menu: the file's hints read "Take All  A)" and "Exit  E)" and bind `_PCButton_A` and `_PCButton_E`; the screen
+  answered R for Take All and nothing for E, which is now the file's (A takes everything, E leaves; Escape leaves too). Taking
+  loot prints no note. A V.A.T.S. attack prints no line of its own. The note of a message with no buttons stays as many seconds
+  as the message's TNAM says (the length of its text gives the time when it has none): the Mac
+  measured 2.2 s for the tutorial note on the fire button (the data has 8 and 10 s for some messages).
+
 ## What is not known yet
 
 - How the games place the Pip-Boy background (1024 by 768 design units) on the screen of the device; the box is centred and

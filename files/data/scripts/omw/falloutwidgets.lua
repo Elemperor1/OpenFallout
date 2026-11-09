@@ -53,6 +53,62 @@ setmetatable(module, {
 module.textSize = ui._getDefaultFontSize() + 4
 module.gap = v2(0, 6)
 
+-- Whether the screens are the amber ones of New Vegas (the palette is known by then: the engine has said which game it is)
+local function amber()
+    local _ = module.normalColor
+    return palette == palettes.amber
+end
+
+-- The solid box of the amber screens: a black ground in plain lines of the amber of the menus (the box of the engine's
+-- template has the green frame pieces of Fallout 3, which no colour of a line turns amber). It is made like the
+-- template's `boxSolid`: the pieces of the frame around a slot, the ground under them
+local flatBoxTemplate = nil
+local function flatBox()
+    if flatBoxTemplate then return flatBoxTemplate end
+    local white = ui.texture { path = 'white' }
+    local border = 2
+    local color = palettes.amber.normalColor
+    local box = {
+        type = ui.TYPE.Container,
+        content = ui.content {
+            {
+                type = ui.TYPE.Image,
+                props = {
+                    resource = white,
+                    color = util.color.rgb(0, 0, 0),
+                    relativeSize = v2(1, 1),
+                    size = v2(border * 2, border * 2),
+                },
+            },
+        },
+    }
+    local function piece(props)
+        props.resource = white
+        props.color = color
+        box.content:add { type = ui.TYPE.Image, props = props }
+    end
+    local sides = { left = { 0, 0 }, right = { 1, 0 }, top = { 0, 0 }, bottom = { 0, 1 } }
+    for name, at in pairs(sides) do
+        local horizontal = name == 'top' or name == 'bottom'
+        local dx, dy = horizontal and 1 or 0, horizontal and 0 or 1
+        piece {
+            position = v2((dx + at[1]) * border, (dy + at[2]) * border),
+            relativePosition = v2(at[1], at[2]),
+            size = v2((1 - dx) * border, (1 - dy) * border),
+            relativeSize = v2(dx, dy),
+        }
+    end
+    for _, at in ipairs { { 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 } } do
+        piece { position = v2(at[1] * border, at[2] * border), relativePosition = v2(at[1], at[2]), size = v2(border, border) }
+    end
+    box.content:add {
+        external = { slot = true },
+        props = { position = v2(border, border), relativeSize = v2(1, 1) },
+    }
+    flatBoxTemplate = box
+    return box
+end
+
 -- The words of a text in lines that fit the width (text widgets do not wrap)
 function module.wrap(text, width)
     local limit = math.max(8, math.floor(width / (module.textSize * 0.5)))
@@ -149,7 +205,7 @@ function module.new(update)
         place = place or {}
         return {
             layer = 'Windows',
-            template = I.MWUI.templates.boxSolid,
+            template = amber() and flatBox() or I.MWUI.templates.boxSolid,
             props = {
                 relativePosition = place.position or v2(0.5, 0.5),
                 anchor = place.anchor or v2(0.5, 0.5),
