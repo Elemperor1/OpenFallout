@@ -64,7 +64,9 @@ file(GLOB UNITTEST_SRC_FILES
     esmloader/esmdata.cpp
     esmloader/record.cpp
 
+    fallback/testfallback.cpp
     files/conversiontests.cpp
+    files/testconfigurationmanager.cpp
     files/testgameini.cpp
     files/testfalloutinstall.cpp
     files/hash.cpp
