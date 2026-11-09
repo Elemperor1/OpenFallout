@@ -765,7 +765,11 @@ local function onPad(button)
         if screen ~= 'list' then back() end
     elseif button == PAD.Start then
         -- (the pause menu is left with it; the title screen has nothing to go back to)
-        if not title() then pending = function() engine.resume() end end
+        if not title() then
+            pending = function()
+                if not title() then engine.resume() end
+            end
+        end
     end
 end
 

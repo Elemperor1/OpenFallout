@@ -29,6 +29,9 @@ namespace FalloutMenu
         std::function<std::optional<std::string>(const std::string& path, std::size_t count)> mReadStart;
         /// The text of a game setting (`&-sHowMany;`)
         std::function<std::optional<std::string>(std::string_view name)> mSetting;
+        /// Whether the running game is New Vegas, once that is known (menus can open before the game's scripts exist,
+        /// and the colours wait for the answer)
+        std::function<std::optional<bool>()> mNewVegas;
     };
 
     /// The size of a DDS picture, from the first bytes of its file
@@ -62,11 +65,15 @@ namespace FalloutMenu
         const std::set<std::string>& missingTextures() const { return mMissing; }
 
     private:
+        void setNewVegasColors() const;
+
         Data mData;
         FontSet mFonts;
         Atlas mAtlas;
         std::unordered_map<std::string, std::optional<TextSize>> mSizes;
-        std::map<int, std::array<float, 3>> mColors;
+        /// (the amber of New Vegas is put in when the data first says the game is New Vegas)
+        mutable std::map<int, std::array<float, 3>> mColors;
+        mutable bool mColorsSettled = false;
         std::set<std::string> mMissing;
     };
 

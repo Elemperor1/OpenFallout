@@ -154,6 +154,32 @@ namespace
         EXPECT_FLOAT_EQ((*f.mResources->systemColor(3))[0], 33.f);
     }
 
+    TEST(FalloutOpenMenuTest, the_colours_wait_until_the_data_says_which_game_runs)
+    {
+        Fixture f;
+        f.open("<menu name=\"M\"/>");
+        std::optional<bool> newVegas;
+        Data data = f.mResources->data();
+        data.mNewVegas = [&newVegas]() { return newVegas; };
+        const Resources resources(data);
+        // (menus can open while the game still loads: the colours are the INI's until the answer is there)
+        EXPECT_FLOAT_EQ((*resources.systemColor(5))[0], 199.f);
+        newVegas = true;
+        EXPECT_FLOAT_EQ((*resources.systemColor(5))[0], 255.f);
+        EXPECT_FLOAT_EQ((*resources.systemColor(5))[1], 182.f);
+        EXPECT_FLOAT_EQ((*resources.systemColor(1))[2], 66.f);
+        // the answer is taken once
+        newVegas = false;
+        EXPECT_FLOAT_EQ((*resources.systemColor(5))[0], 255.f);
+
+        std::optional<bool> fallout3 = false;
+        Data other = f.mResources->data();
+        other.mNewVegas = [&fallout3]() { return fallout3; };
+        const Resources green(other);
+        EXPECT_FLOAT_EQ((*green.systemColor(5))[0], 199.f);
+        EXPECT_FLOAT_EQ((*green.systemColor(1))[0], 26.f);
+    }
+
     TEST(FalloutOpenMenuTest, a_picture_goes_where_the_menu_puts_it_scaled_to_the_window)
     {
         Fixture f;
