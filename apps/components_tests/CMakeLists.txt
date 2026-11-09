@@ -247,7 +247,11 @@ file(GLOB UNITTEST_SRC_FILES
     fx/technique.cpp
 
     esm3/readerscache.cpp
+    esm3/saveloadharness.hpp
     esm3/testsaveload.cpp
+    esm3/testsavegamerecords.cpp
+    esm3/testsaveobjects.cpp
+    esm3/testcontentrecords.cpp
     esm3/testesmwriter.cpp
     esm3/testinfoorder.cpp
     esm3/testcstringids.cpp
