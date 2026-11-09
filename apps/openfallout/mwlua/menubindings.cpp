@@ -175,6 +175,13 @@ namespace OFLua
                     "height", (*rect)[3] * scale));
         };
 
+        // The colour a tile is drawn in: red, green, blue and alpha, 0 to 1
+        menuT["color"] = [](sol::this_state state, LuaMenu& self, const sol::object& which) {
+            const std::array<float, 4> color = self.mMenu->menu().color(tileOf(self, which));
+            sol::state_view view(state);
+            return view.create_table_with("red", color[0], "green", color[1], "blue", color[2], "alpha", color[3]);
+        };
+
         // A tile made from a template of the menu under a tile, with a name of its own; the number of the new tile
         menuT["instantiate"] = [](sol::this_state state, LuaMenu& self, const sol::object& parent,
                                    std::string_view templateName, sol::optional<std::string_view> name) -> sol::object {

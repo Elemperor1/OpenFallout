@@ -176,6 +176,10 @@ namespace FalloutMenu
         Tile* wheelTileAt(float x, float y);
         /// The rectangle a tile takes, from its position and size and those of the tiles it is in
         std::optional<std::array<float, 4>> rectangle(Tile& tile);
+        /// The colour a tile is drawn in (red, green, blue and alpha, 0 to 1): the system colour it asks for, scaled by
+        /// its brightness. A tile of a model that the port draws by itself (the air meter of the display) takes its
+        /// colour from here.
+        std::array<float, 4> color(const Tile& tile) { return colorOf(tile); }
 
         const std::vector<std::string>& problems() const { return mProblems; }
 

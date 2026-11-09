@@ -56,6 +56,7 @@ namespace FalloutScript
             case ActorValue::actionPoints:
             case ActorValue::carryWeight:
             case ActorValue::criticalChance:
+            case ActorValue::healRate:
             case ActorValue::health:
             case ActorValue::meleeDamage:
                 return true;

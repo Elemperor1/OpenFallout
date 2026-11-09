@@ -37,7 +37,7 @@ add_openfallout_dir (mwgui
     mapwindow windowpinnablebase tooltips scrollwindow bookwindow resourceskin
     formatting inventorywindow container hud countdialog tradewindow settingswindow
     confirmationdialog alchemywindow referenceinterface spellwindow mainmenu quickkeysmenu menuscenes
-    itemselection spellbuyingwindow loadingscreen falloutloading falloutmenuresources levelupdialog waitdialog spellcreationdialog
+    itemselection spellbuyingwindow loadingscreen falloutloading falloutairmeter falloutmenuresources levelupdialog waitdialog spellcreationdialog
     enchantingdialog trainingwindow travelwindow exposedwindow cursor spellicons
     merchantrepair repair soulgemdialog companionwindow bookpage journalviewmodel journalbooks
     itemmodel containeritemmodel inventoryitemmodel sortfilteritemmodel itemview

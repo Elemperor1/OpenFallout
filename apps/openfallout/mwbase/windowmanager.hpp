@@ -361,6 +361,11 @@ namespace OFBase
         virtual void setBlindness(const int percent) = 0;
 
         virtual void activateHitOverlay(bool interrupt = true) = 0;
+        /// Draws the air meter of the display of Fallout (alpha 0 hides it): `x` and `y` are the origin of its model
+        /// and `unit` the size of a unit of the model, in the units of the interface; `ticks` of its 16 show
+        virtual void setAirMeter(
+            float x, float y, float unit, float alpha, int ticks, float red, float green, float blue)
+            = 0;
         virtual void setWerewolfOverlay(bool set) = 0;
 
         virtual void toggleConsole() = 0;

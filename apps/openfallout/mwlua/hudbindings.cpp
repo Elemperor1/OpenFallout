@@ -8,6 +8,7 @@
 #include <components/lua/util.hpp>
 
 #include "../mwbase/environment.hpp"
+#include "../mwbase/windowmanager.hpp"
 #include "../mwgui/tooltips.hpp"
 #include "../mwscript/falloutscripts.hpp"
 
@@ -155,10 +156,22 @@ namespace OFLua
         // screen) is shown: the display from the game's menu file has its own text for the object, and turns it off
         api["setWorldTooltip"] = [](bool show) { OFGui::ToolTips::setWorldTooltipShown(show); };
 
+        // Draws the air meter of the display (the model that the display's file names, which the menu engine does not
+        // draw): the position of the model's origin and the size of its unit in the units of the interface, how
+        // opaque it is (0 hides it), how many of its 16 ticks show, and its colour (0 to 1)
+        api["setAirMeter"]
+            = [](double x, double y, double unit, double alpha, int ticks, double red, double green, double blue) {
+                  if (OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager())
+                      windows->setAirMeter(static_cast<float>(x), static_cast<float>(y), static_cast<float>(unit),
+                          static_cast<float>(alpha), ticks, static_cast<float>(red), static_cast<float>(green),
+                          static_cast<float>(blue));
+              };
+
         // The radiation (rads and the most the meter shows), whether the player sneaks and what the characters around
         // make of it ("hidden", "caution", "detected" or "danger", with the word the games print for it), the
-        // textures (names under Interface\Stats) of the limbs that are crippled, whether the weapon is drawn and the
-        // controls that are off
+        // textures (names under Interface\Stats) of the limbs that are crippled, whether the weapon is drawn, whether
+        // the head of the player is under the water, the share of its breath that is left and how many of the 16 ticks
+        // of the air meter that shows, and the controls that are off
         api["status"] = [lua]() {
             const OFScript::FalloutScripts::HudStatus status = scripts().hudStatus();
             sol::table row(lua, sol::create);
@@ -168,6 +181,9 @@ namespace OFLua
             row["sneak"] = sneakName(status.mSneak);
             row["sneakText"] = status.mSneakText;
             row["weaponDrawn"] = status.mWeaponDrawn;
+            row["headUnder"] = status.mHeadUnder;
+            row["breath"] = status.mBreath;
+            row["breathTicks"] = status.mBreathTicks;
             // The controls a script took away (DisablePlayerControls): the display shows less while the player cannot
             // move (the executable's mode 0xC: only the radiation, the experience and the messages), and no text under
             // the crosshair while the rollover is off
