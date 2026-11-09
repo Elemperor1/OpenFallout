@@ -166,6 +166,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testscriptargs.cpp
     esm4/testscriptcode.cpp
     esm4/testscriptcodecensus.cpp
+    esm4/testscriptcodecensusmore.cpp
     esm4/testsleepdeprivationstage.cpp
     esm4/testspell.cpp
     esm4/testsurvey.cpp
