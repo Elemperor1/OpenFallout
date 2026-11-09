@@ -422,7 +422,8 @@ void OFState::StateManager::quickSave(std::string name)
             OFBase::Environment::get().getWindowManager()->messageBox("#{OFEngine:SaveGameDenied}");
         return;
     }
-    OFBase::Environment::get().getFalloutScripts()->quickNote(true, false);
+    if (OFBase::Environment::get().getFalloutScripts() != nullptr)
+        OFBase::Environment::get().getFalloutScripts()->quickNote(true, false);
 
     Character* currentCharacter = getCurrentCharacter(); // Get current character
     QuickSaveManager saveFinder(name, Settings::saves().mMaxQuicksaves);
@@ -768,11 +769,12 @@ void OFState::StateManager::quickLoad()
     if (currentCharacter == nullptr || currentCharacter->begin() == currentCharacter->end())
     {
         // (the games tell it on the HUD line while a game runs)
-        if (mState == State_Running)
+        if (mState == State_Running && OFBase::Environment::get().getFalloutScripts() != nullptr)
             OFBase::Environment::get().getFalloutScripts()->quickNote(false, true);
         return;
     }
-    OFBase::Environment::get().getFalloutScripts()->quickNote(false, false);
+    if (OFBase::Environment::get().getFalloutScripts() != nullptr)
+        OFBase::Environment::get().getFalloutScripts()->quickNote(false, false);
     // use requestLoad, otherwise we can crash by loading during the wrong part of the frame
     requestLoad(currentCharacter, currentCharacter->begin()->mPath);
 }

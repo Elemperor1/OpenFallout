@@ -143,6 +143,12 @@ namespace
         EXPECT_EQ(SettingText::standIn("sTargetTypeOpenDoor"), SettingText::standIn("sTargetTypeOpen"));
     }
 
+    TEST(FalloutSettingText, the_notes_of_the_quick_save_and_the_quick_load_have_words)
+    {
+        for (const char* name : { "sQuickSaving", "sQuickLoading", "sCantQuickSave", "sCantQuickLoad" })
+            EXPECT_FALSE(SettingText::standIn(name).empty()) << name;
+    }
+
     TEST(FalloutSettingText, the_names_are_not_case_sensitive)
     {
         // The menu files spell some of the names two ways (sOK and sOk, sQuit and squit)

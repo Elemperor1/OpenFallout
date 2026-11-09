@@ -17,6 +17,7 @@
 #include "../mwscript/falloutscripts.hpp"
 
 #include "context.hpp"
+#include "luamanagerimp.hpp"
 
 namespace OFLua
 {
@@ -781,12 +782,20 @@ namespace OFLua
             return scripts().actors().isDead(scripts().playerReference())
                 || OFBase::Environment::get().getStateManager()->playerDied();
         };
-        api["askReload"] = []() { OFBase::Environment::get().getStateManager()->askLoadRecent(); };
+        // (a script runs while the world is drawn: a window is opened in the update of the main thread, like the
+        // modes of the interface package)
+        api["askReload"] = [manager = context.mLuaManager]() {
+            manager->addAction(
+                [] { OFBase::Environment::get().getStateManager()->askLoadRecent(); }, "Pipboy.askReload");
+        };
         // The game's own box for the death has these: whether there is a save to reload, loading the most recent one,
         // and the main menu (which opens the menu that Escape does)
         api["hasRecentSave"] = []() { return OFBase::Environment::get().getStateManager()->hasRecentSave(); };
         api["reloadRecent"] = []() { OFBase::Environment::get().getStateManager()->loadRecent(); };
-        api["openMainMenu"] = []() { OFBase::Environment::get().getWindowManager()->pushGuiMode(OFGui::GM_MainMenu); };
+        api["openMainMenu"] = [manager = context.mLuaManager]() {
+            manager->addAction([] { OFBase::Environment::get().getWindowManager()->pushGuiMode(OFGui::GM_MainMenu); },
+                "Pipboy.openMainMenu");
+        };
         return LuaUtil::makeReadOnly(api);
     }
 }
