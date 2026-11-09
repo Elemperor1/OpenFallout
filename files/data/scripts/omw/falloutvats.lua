@@ -40,7 +40,7 @@ local pad = require('scripts.omw.falloutpad')
 
 -- A note to the player goes to the line of messages of the display, as the games print it (the engine's own message
 -- window is the fallback)
-local function notice(text)
+local function tellPlayer(text)
     if core.hud and core.hud.message then
         core.hud.message(text)
     else
@@ -677,7 +677,7 @@ local function open(offered)
     end
     targets = offered or inView()
     if #targets == 0 then
-        notice('No target in sight')
+        tellPlayer('No target in sight')
         return
     end
     picked, queue = 1, {}
@@ -779,7 +779,7 @@ function queuePicked()
     if part.chance <= 0 then
         -- the executable refuses a shot with no chance with a message and the sound of a refusal (0x7EEB50)
         sound('UIVATSEnterFail')
-        notice(word('sVATSMessageZeroChance', 'The chance to hit is zero'))
+        tellPlayer(word('sVATSMessageZeroChance', 'The chance to hit is zero'))
     elseif state.actionPoints - spent() < state.cost then
         sound('UIVATSInsufficientAP')
     else
@@ -839,9 +839,9 @@ local function step()
     end
     if result.refused then
         if result.refused == 'points' then
-            notice('Not enough action points')
+            tellPlayer('Not enough action points')
         elseif result.refused == 'ammo' then
-            notice('Out of ammunition')
+            tellPlayer('Out of ammunition')
         end
     end
     -- (the game says nothing of a blow that landed or missed: the target, the experience of a kill and the meters show it)

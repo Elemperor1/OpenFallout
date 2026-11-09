@@ -28,7 +28,7 @@ local mods = require('scripts.omw.falloutpipboymods')
 
 -- A note to the player goes to the line of messages of the display, as the games print it (the engine's own message
 -- window is the fallback)
-local function notice(text)
+local function tellPlayer(text)
     if core.hud and core.hud.message then
         core.hud.message(text)
     else
@@ -238,7 +238,7 @@ local wheelGrace = 0
 -- A refusal: the words of the game's setting and the sound the executable makes (UIVATSInsufficientAP)
 local function refuse(setting, fallback)
     local text = pipboy.text(setting)
-    notice(text ~= '' and text or fallback)
+    tellPlayer(text ~= '' and text or fallback)
     pipboy.playSoundNamed('UIVATSInsufficientAP')
 end
 

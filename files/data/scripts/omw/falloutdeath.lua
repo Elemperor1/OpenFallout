@@ -38,6 +38,9 @@ local function show()
                 pipboy.reloadRecent()
             elseif index == 2 then
                 pipboy.openMainMenu()
+            elseif index == nil then
+                -- (the box could not be shown after all, when the game's message file is not usable)
+                pipboy.askReload()
             end
         end)
     -- (an install without the game's message file: the engine's own question about loading the last save)

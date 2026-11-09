@@ -17,7 +17,7 @@ local menuModule = require('scripts.omw.falloutmenu')
 
 -- A note to the player goes to the line of messages of the display, as the games print it (the engine's own message
 -- window is the fallback)
-local function notice(text)
+local function tellPlayer(text)
     if core.hud and core.hud.message then
         core.hud.message(text)
     else
@@ -143,7 +143,7 @@ local function make(recipe)
     end
     render()
     if shown and message ~= '' then
-        notice(message)
+        tellPlayer(message)
     end
 end
 

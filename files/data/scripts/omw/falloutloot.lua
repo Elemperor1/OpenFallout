@@ -19,7 +19,7 @@ local cards = require('scripts.omw.falloutitemcards')
 
 -- A note to the player goes to the line of messages of the display, as the games print it (the engine's own message
 -- window is the fallback)
-local function notice(text)
+local function tellPlayer(text)
     if core.hud and core.hud.message then
         core.hud.message(text)
     else
@@ -319,7 +319,7 @@ end
 local function moveItem(from, item, count)
     local to = otherSide(from)
     if from.player and item.equipped then
-        notice('Unequip it first.')
+        tellPlayer('Unequip it first.')
         return
     end
     pipboy.transfer(from.holder(), to.holder(), item.id, count)

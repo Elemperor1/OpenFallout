@@ -21,7 +21,7 @@ local lockpickMenu = require('scripts.omw.falloutlockpick')
 
 -- A note to the player goes to the line of messages of the display, as the games print it (the engine's own message
 -- window is the fallback)
-local function notice(text)
+local function tellPlayer(text)
     if core.hud and core.hud.message then
         core.hud.message(text)
     else
@@ -290,7 +290,7 @@ local function startRest()
         notice = why
         if restMenu then
             -- (the menu of the game has no line for it: the words go to the messages)
-            notice(why)
+            tellPlayer(why)
             return
         end
     else
