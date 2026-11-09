@@ -1575,6 +1575,8 @@ namespace OFScript
         struct ScriptedAttack
         {
             bool mActive = false;
+            /// A number for each order that scripts gave (a second order replaces the first, with another number)
+            unsigned mSerial = 0;
             FalloutScript::UseWeaponOrder mOrder;
             OFWorld::Ptr mTarget;
             /// The reference it shoots from: empty when that is the character itself or is not around
@@ -2562,8 +2564,10 @@ namespace OFScript
         {
             FalloutScript::UseWeaponOrder mOrder;
             int mMade = 0;
+            unsigned mSerial = 0;
         };
         std::map<FalloutScript::FormId, ScriptedOrder> mScriptedAttacks;
+        unsigned mScriptedSerial = 0;
         FalloutScript::AiMemory mAi;
         /// The kinds of save that scripts asked for and that were not made yet, one bit for each
         std::atomic<unsigned> mSaveRequests{ 0 };

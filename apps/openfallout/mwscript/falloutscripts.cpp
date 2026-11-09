@@ -3376,7 +3376,7 @@ namespace OFScript
                 Log(Debug::Warning) << "UseWeapon: " << FalloutScript::hex(order.mWeapon) << " is no weapon";
                 return;
             }
-            mScriptedAttacks[actor] = ScriptedOrder{ order, 0 };
+            mScriptedAttacks[actor] = ScriptedOrder{ order, 0, ++mScriptedSerial };
             Log(Debug::Info) << "UseWeapon: " << FalloutScript::hex(actor) << " shoots " << order.mAttacks
                              << " time(s) at " << FalloutScript::hex(order.mTarget) << " from "
                              << (order.mLocation != 0 ? FalloutScript::hex(order.mLocation)
@@ -3412,6 +3412,7 @@ namespace OFScript
         if (target.isEmpty() || !target.isInCell() || !target.getRefData().isEnabled() || mActors.isDead(order.mTarget))
             return finish("its target is gone");
         result.mActive = true;
+        result.mSerial = found->second.mSerial;
         result.mOrder = order;
         result.mTarget = target;
         if (order.mLocation != 0 && order.mLocation != self)

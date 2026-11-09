@@ -175,6 +175,7 @@ namespace OFMechanics
         float mHeld = 0.f; // seconds it has stood in range of its target without firing (it says why now and then)
         bool mOrdered = false; // a script told it to shoot (UseWeapon) the last time it was looked at
         bool mPlaceAbandoned = false; // it could not get to the place of the order: it shoots from where it stands
+        unsigned mOrderSerial = 0; // which order of the script that is (a new order has another number)
         bool mSeenAlive = false; // it was alive when it was looked at
         bool mFell = false; // it is dead and its body has fallen
         float mReview = 0.f; // seconds until the packages are looked at again
@@ -1548,9 +1549,11 @@ namespace OFMechanics
             const OFScript::FalloutScripts::ScriptedAttack order = scripts.scriptedAttack(mind.mPtr);
             if (order.mActive)
             {
-                if (!mind.mOrdered)
+                // A second order replaces the first one, and gets the walk to its place from the start
+                if (!mind.mOrdered || mind.mOrderSerial != order.mSerial)
                 {
                     mind.mOrdered = true;
+                    mind.mOrderSerial = order.mSerial;
                     mind.mPlaceAbandoned = false;
                     mind.mFighting = true;
                     stopWalking(mind);
