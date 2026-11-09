@@ -535,7 +535,8 @@ namespace
 
     TEST(NifParticleTest, readsTheEmitterOfAnOlderFileWithoutAVariationOfTheRadius)
     {
-        Builder file(oblivion);
+        // a version before 10.4.0.1, where the emitter has no variation of the radius
+        Builder file(Profile{ 0x0A020000, 0, 0 });
         file.add("NiNode", file.node({ .mName = "Root" }));
         file.add("NiPSysBoxEmitter", emitter(file, "Box", -1).ref(-1).f32(1).f32(2).f32(3));
         file.addRoot(0);
@@ -545,7 +546,10 @@ namespace
         const auto* box = parsed.as<Nif::NiPSysBoxEmitter>(1);
         ASSERT_NE(box, nullptr);
         EXPECT_EQ(box->mInitialRadius, 7.f);
-        EXPECT_EQ(box->mRadiusVariation, 8.f);
+        // the file has no value for it, so it stays at zero, and the values after it are not shifted
+        EXPECT_EQ(box->mRadiusVariation, 0.f);
+        EXPECT_EQ(box->mLifespan, 9.f);
+        EXPECT_EQ(box->mLifespanVariation, 10.f);
         EXPECT_EQ(box->mWidth, 1.f);
     }
 

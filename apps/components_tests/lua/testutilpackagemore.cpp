@@ -58,7 +58,7 @@ namespace
         lua.safe_script("turned = util.box(T.rotateZ(math.pi / 2))");
         EXPECT_EQ(asString("turned.halfSize"), "(1, 1, 1)");
         EXPECT_EQ(asString("turned.center"), "(0, 0, 0)");
-        EXPECT_LT(get<float>("(turned.vertices[1] - turned.vertices[2]):length() - 2"), 1e-5f);
+        EXPECT_NEAR(get<float>("(turned.vertices[1] - turned.vertices[2]):length()"), 2.f, 1e-5f);
     }
 
     TEST_F(LuaUtilPackageMoreTest, readsAColorWrittenAsCommaSeparatedNumbers)
