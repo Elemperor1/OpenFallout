@@ -638,6 +638,39 @@ namespace
         EXPECT_EQ(menu.find("List")->children().size(), 4u);
     }
 
+    TEST(FalloutOpenMenuListTest, a_list_that_fits_its_first_rows_is_as_high_as_they_are_and_scrolls_by_what_is_left)
+    {
+        Fixture f;
+        OpenMenu& open = f.open(listMenu, 1280.f, 960.f);
+        Menu& menu = open.menu();
+        const int number = open.addList("List", "Row", 3);
+        ASSERT_GE(number, 0);
+        ListBox& list = *open.list(number);
+        Tile* bar = menu.find("lb_scrollbar");
+        // Five rows of 40: the list is as high as the first three (the file's 100 is the least), and the two that are
+        // over take two steps of a whole row each
+        list.setRows(rowsOf(5));
+        EXPECT_FLOAT_EQ(menu.number(*menu.find("List"), "height"), 120.f);
+        EXPECT_FLOAT_EQ(menu.number(*menu.find("List"), "_scroll_delta"), 40.f);
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_number_of_items"), 3.f);
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_number_of_visible_items"), 1.f);
+        // The last row is shown by the last step, and it ends where the list does
+        list.select(4, true);
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_current_value"), 2.f);
+        EXPECT_FLOAT_EQ(menu.number(*list.item(4), "y") + menu.number(*list.item(4), "height"), 120.f);
+        list.select(0, true);
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_current_value"), 0.f);
+        // Two rows are lower than the file's least height: nothing to scroll
+        list.setRows(rowsOf(2));
+        EXPECT_FLOAT_EQ(menu.number(*menu.find("List"), "height"), 100.f);
+        EXPECT_FLOAT_EQ(menu.number(*bar, "_number_of_items"), 1.f);
+        // A list that does not fit rows keeps the height and the step of its file
+        const int plain = open.addList("List", "Row");
+        ListBox& other = *open.list(plain);
+        other.setRows(rowsOf(2));
+        EXPECT_FLOAT_EQ(menu.number(*menu.find("List"), "height"), 100.f);
+    }
+
     TEST(FalloutOpenMenuListTest, a_row_can_name_another_template_than_the_list_makes_its_rows_from)
     {
         Fixture f;

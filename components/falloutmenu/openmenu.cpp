@@ -402,7 +402,7 @@ namespace FalloutMenu
         }
     }
 
-    int OpenMenu::addList(std::string_view listTile, std::string_view templateName)
+    int OpenMenu::addList(std::string_view listTile, std::string_view templateName, int fitRows)
     {
         // The list is the tile of that name that has a scrollbar in it: a menu may name a heading the same
         Tile* tile = nullptr;
@@ -422,7 +422,7 @@ namespace FalloutMenu
             tile = mMenu->find(listTile);
         if (tile == nullptr || !mMenu->hasTemplate(templateName))
             return -1;
-        mLists.push_back(std::make_unique<ListBox>(*this, tile->uid(), std::string(templateName)));
+        mLists.push_back(std::make_unique<ListBox>(*this, tile->uid(), std::string(templateName), fitRows));
         return static_cast<int>(mLists.size()) - 1;
     }
 

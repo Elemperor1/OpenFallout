@@ -416,7 +416,8 @@ local function openMenu()
     local opened = menuModule.open(MENU_FILE)
     if not opened then return false end
     shown = opened
-    topics = opened:list('DM_TopicList', 'DM_TopicTemplate')
+    -- The list is as high as the first three topics (the game's code makes it so) and scrolls in steps by what is left
+    topics = opened:list('DM_TopicList', 'DM_TopicTemplate', 3)
     if not topics then
         opened:close()
         shown = nil

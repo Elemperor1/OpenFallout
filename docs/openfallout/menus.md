@@ -1586,6 +1586,11 @@ found the same way.
   control is read as a game setting. The engine put the localisation token of its own settings screen for a mouse button
   (`#{sMouse} 1`) into the text, which the interface showed as `##(sMouse)`; it is now the setting of the games
   (`sMouseLeftButton`, "Mouse1" in the executable).
+- The topic list of a conversation (Mac round 12BP part B, `dialog_menu.xml` and FalloutNV.exe 0x7638B0 and 0x71AD30): the list
+  is as high as its first three rows (a row is its wrapped text and 20 of room), never lower than the file's 110, and the
+  rows beyond are reached by steps of `(total - height) / (n - 1)` with `n = max(ceil(count x (total - height) / total) + 1, 2)`:
+  whole rows when all rows are as high, else fractions, and the rows clip at the top and the bottom of the list between
+  steps; at the last step the last row ends where the list does. `ListBox` has this as `fitRows` (the dialogue asks for 3).
 
 ## What is not known yet
 
