@@ -47,6 +47,7 @@ file(GLOB UNITTEST_SRC_FILES
     detournavigator/navmeshdb.cpp
     detournavigator/serialization.cpp
     detournavigator/asyncnavmeshupdater.cpp
+    detournavigator/testdebug.cpp
 
     serialization/binaryreader.cpp
     serialization/binarywriter.cpp
