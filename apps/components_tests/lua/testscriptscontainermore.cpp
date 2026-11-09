@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <utility>
 #include <vector>
 
 #include <components/esm/luascripts.hpp>
@@ -488,7 +489,12 @@ CUSTOM: worker.lua
 
     TEST_F(LuaScriptsContainerMoreTest, countsInstructionsAndMemoryOfEveryScript)
     {
-        const Debug::Level level = std::exchange(Log::sMinDebugLevel, Debug::All);
+        // the level goes back even when an assertion below ends the test early
+        struct LevelGuard
+        {
+            Debug::Level mLevel = std::exchange(Log::sMinDebugLevel, Debug::All);
+            ~LevelGuard() { Log::sMinDebugLevel = mLevel; }
+        } levelGuard;
 
         LuaUtil::ScriptsContainer scripts(&mLimitedLua, "Test");
         const int workerId = getId(workerPath);
@@ -541,8 +547,6 @@ CUSTOM: worker.lua
         scripts.collectStats(stats);
         EXPECT_LE(stats[workerId].mMemoryUsage, memory);
         EXPECT_GE(stats[workerId].mMemoryUsage, 0);
-
-        Log::sMinDebugLevel = level;
     }
 
     TEST_F(LuaScriptsContainerMoreTest, stopsScriptsThatUseTooManyInstructionsOrTooMuchMemory)
