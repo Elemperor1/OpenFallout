@@ -17,6 +17,7 @@ file(GLOB UNITTEST_SRC_FILES
     lua/testserialization.cpp
     lua/teststorage.cpp
     lua/testuicontent.cpp
+    lua/testutf8.cpp
     lua/testutilpackage.cpp
     lua/testyaml.cpp
 
@@ -34,6 +35,7 @@ file(GLOB UNITTEST_SRC_FILES
     detournavigator/settingsutils.cpp
     detournavigator/recastmeshbuilder.cpp
     detournavigator/gettilespositions.cpp
+    detournavigator/makesettings.cpp
     detournavigator/recastmeshobject.cpp
     detournavigator/navmeshtilescache.cpp
     detournavigator/tilecachedrecastmeshmanager.cpp
@@ -48,6 +50,7 @@ file(GLOB UNITTEST_SRC_FILES
 
     settings/parser.cpp
     settings/shadermanager.cpp
+    settings/testmanager.cpp
     settings/testvalues.cpp
 
     shader/parsedefines.cpp
@@ -254,6 +257,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm3/testsavegamerecords.cpp
     esm3/testsaveobjects.cpp
     esm3/testcontentrecords.cpp
+    esm3/testmappings.cpp
     esm3/testesmwriter.cpp
     esm3/testinfoorder.cpp
     esm3/testcstringids.cpp
@@ -297,6 +301,7 @@ file(GLOB UNITTEST_SRC_FILES
     nif/testdata.cpp
     nif/testnode.cpp
     nif/testphysics.cpp
+    nif/testparticle.cpp
     nif/testproperty.cpp
 )
 
