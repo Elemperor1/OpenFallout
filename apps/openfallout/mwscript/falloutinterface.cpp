@@ -117,12 +117,12 @@ namespace OFScript
         if ((step.mDamage <= 0 && !step.mFatal) || mActors.isDead(mPlayer) || world->getGodModeState())
             return;
         // Out of breath the player takes a fifth of its health each second, with the sound of drowning and the flash of
-        // a blow
+        // a blow (one that is let finish before the next begins: the damage comes every frame)
         if (const FalloutScript::FormId drowning = soundByEditorId("NPCHumanDrowning");
             drowning != 0 && !isSoundPlaying(drowning, mPlayer))
             playSound(drowning, mPlayer);
         if (OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager())
-            windows->activateHitOverlay();
+            windows->activateHitOverlay(false);
         // No blow comes between the damage and the death of a player that has none left of its health
         const std::lock_guard strikeLock(mStrikeMutex);
         const auto transitions = mActors.holdTransitions();
