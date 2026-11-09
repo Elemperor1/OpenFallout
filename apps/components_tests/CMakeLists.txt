@@ -295,6 +295,7 @@ file(GLOB UNITTEST_SRC_FILES
     nif/testdata.cpp
     nif/testnode.cpp
     nif/testphysics.cpp
+    nif/testproperty.cpp
 )
 
 source_group(apps\\components-tests FILES ${UNITTEST_SRC_FILES})
