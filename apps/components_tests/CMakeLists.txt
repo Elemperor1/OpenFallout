@@ -150,6 +150,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testradiationstage.cpp
     esm4/testragdoll.cpp
     esm4/testrace.cpp
+    esm4/testreader.cpp
     esm4/testreadergame.cpp
     esm4/testrecipe.cpp
     esm4/testrecipecategory.cpp
