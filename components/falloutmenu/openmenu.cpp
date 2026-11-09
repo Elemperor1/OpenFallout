@@ -134,6 +134,13 @@ namespace FalloutMenu
         mColors[id] = color;
     }
 
+    void Resources::useNewVegasColors()
+    {
+        // HUDMain 1, Pipboy 4, MainMenu 5 and System 6 (HUDAlt 2 and Terminal 3 are not read)
+        for (const int id : { 1, 4, 5, 6 })
+            mColors[id] = { 255, 182, 66 };
+    }
+
     std::unique_ptr<OpenMenu> OpenMenu::open(std::shared_ptr<Resources> resources, const std::string& file,
         float pixelWidth, float pixelHeight, bool pad, std::string* error)
     {

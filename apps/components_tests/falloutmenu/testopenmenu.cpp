@@ -133,6 +133,27 @@ namespace
         EXPECT_FALSE(f.mResources->systemColor(7));
     }
 
+    TEST(FalloutOpenMenuTest, new_vegas_makes_the_colours_of_its_display_pip_boy_and_menus_amber)
+    {
+        Fixture f;
+        f.open("<menu name=\"M\"/>");
+        // Fallout 3's are the INI's: green for the display, the Pip-Boy and the system, pale green for the main menu
+        EXPECT_FLOAT_EQ((*f.mResources->systemColor(1))[0], 26.f);
+        EXPECT_FLOAT_EQ((*f.mResources->systemColor(5))[0], 199.f);
+        f.mResources->useNewVegasColors();
+        for (const int id : { 1, 4, 5, 6 })
+        {
+            const std::optional<std::array<float, 3>> color = f.mResources->systemColor(id);
+            ASSERT_TRUE(color);
+            EXPECT_FLOAT_EQ((*color)[0], 255.f);
+            EXPECT_FLOAT_EQ((*color)[1], 182.f);
+            EXPECT_FLOAT_EQ((*color)[2], 66.f);
+        }
+        // the alternate display colour and the terminal's are not changed
+        EXPECT_FLOAT_EQ((*f.mResources->systemColor(2))[1], 67.f);
+        EXPECT_FLOAT_EQ((*f.mResources->systemColor(3))[0], 33.f);
+    }
+
     TEST(FalloutOpenMenuTest, a_picture_goes_where_the_menu_puts_it_scaled_to_the_window)
     {
         Fixture f;

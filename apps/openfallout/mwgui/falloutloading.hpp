@@ -80,14 +80,15 @@ namespace OFGui
         /// The wheel of the loading screen, turning in the corner of the screen (`loading01.nif` of the game: the bars on
         /// both sides, the wheel and the ball over it), at `seconds` of the load and `alpha` of the whole menu
         void drawWheel(double seconds, float alpha);
-        /// Puts a picture of the wheel (the file `file`, found in the folders of the game's textures) at `left`, `top` of the
-        /// menu, `width` by `height` units, turned by `degrees` about the point `pivotX`, `pivotY` of it (all in units of
-        /// the menu; `unitsX` and `unitsY` are the pixels in one unit)
-        /// (`part` is the part of the picture that is shown, as fractions of its width and height from the left and the top:
-        /// left, top, right, bottom)
+        /// Puts a picture of the wheel (the file `file`, found in the folders of the game's textures) at `left`, `top`
+        /// of the menu, `width` by `height` units, turned by `degrees` about the point `pivotX`, `pivotY` of it (all in
+        /// units of the menu; `unitsX` and `unitsY` are the pixels in one unit)
+        /// (`part` is the part of the picture that is shown, as fractions of its width and height from the left and the
+        /// top: left, top, right, bottom; `mirrored` reads it from the right edge to the left one, as the left bars of
+        /// the wheel of New Vegas are the right ones turned over)
         void turn(Turning& piece, const char* file, float left, float top, float width, float height, float pivotX,
             float pivotY, float degrees, float alpha, double unitsX, double unitsY,
-            const std::array<float, 4>& part = { 0.f, 0.f, 1.f, 1.f });
+            const std::array<float, 4>& part = { 0.f, 0.f, 1.f, 1.f }, bool mirrored = false);
         /// The wheel of Fallout 3: one picture, the wheel with its sixteen ticks and a needle that goes round in sixteen
         /// steps (the other pieces are not drawn)
         void drawNeedleWheel(double seconds, float alpha, float x, float y, float s, double unitsX, double unitsY);

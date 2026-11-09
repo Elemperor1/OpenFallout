@@ -53,6 +53,10 @@ namespace FalloutMenu
         /// The colour of a system colour (1 to 6), red, green and blue from 0 to 255
         std::optional<std::array<float, 3>> systemColor(int id) const;
         void setSystemColor(int id, std::array<float, 3> color);
+        /// The system colours of New Vegas: its executable makes the colours of the head-up display, the Pip-Boy, the
+        /// main menu and the system amber (255, 182, 66); the others, and all of Fallout 3's, are the INI's (Mac round
+        /// 12BN, FalloutNV.exe 0x718C90 and Fallout3.exe 0x6291B2)
+        void useNewVegasColors();
 
         /// The textures that menus asked for and the data does not have
         const std::set<std::string>& missingTextures() const { return mMissing; }

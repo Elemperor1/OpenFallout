@@ -45,6 +45,11 @@ namespace OFGui
                 return std::nullopt;
             return text;
         };
-        return std::make_shared<FalloutMenu::Resources>(std::move(data));
+        auto resources = std::make_shared<FalloutMenu::Resources>(std::move(data));
+        // New Vegas draws its menus in amber, as its executable makes the system colours (Fallout 3's are green)
+        if (const OFScript::FalloutScripts* host = OFBase::Environment::get().getFalloutScripts();
+            host != nullptr && host->isNewVegas())
+            resources->useNewVegasColors();
+        return resources;
     }
 }

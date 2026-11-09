@@ -650,8 +650,7 @@ sets their `_alpha`, and the file shows a tile when that is more than 0), so the
 
 - The list: Continue (there is no Resume item: Continue and Escape do the same), Save (only when the game can be saved:
   `menu.canSave()`), Load (only when there is a save), Settings, Quit (which asks). The game has a Help item and, in the
-  pause menu, an item for the title screen that are not here, and the title screen itself is still the engine's: no content
-  is loaded there, so the words of the game (game settings) are not there either.
+  pause menu, an item for the title screen that are not here (the title screen is below).
 - The list of saves: the newest first; the row for a new save when saving (`sNewSave n/1000 sSavesRemaining`, from the
   template `lb_newsave_template`, so a row of a list can name its template: `_template`), the rows of the saves
   (`lb_saveload_template`: `#0003` and the place, or the abbreviation of the quick or the automatic save). The panel
@@ -664,9 +663,7 @@ sets their `_alpha`, and the file shows a tile when that is more than 0), so the
   save, 0x800 delete, 0x100 Continue and 0x80 new game). A Yes on delete removes the `.fos` of the save and nothing else
   (no picture file: the picture is inside the save), and there is no key that deletes. The game orders the list, and
   decides which save Continue loads, by the last write time of the file (the newest first), as the port does by the time
-  the save was made. The title screen, which is the engine's own here, has the rules the file's list does not: its Continue
-  and Load rows exist only when a save does, and Continue there asks `sConfirmContinue` first (the pause menu's Continue
-  asks nothing). The save's picture and its version line are not here.
+  the save was made. The save's picture and its version line are not here.
 - The engine's side: `menu.mainMenuOpen`, `menu.claimMainMenu(drawn, escape)`, `menu.resume`, `menu.canSave`,
   `menu.openSettings`, `menu.settingsOpen`, `menu.inputTaken` (`openfallout.menu`). While the console, a
   message box or a dialog of the engine's own windows (the one that tells that a save failed, which is modal and has the
@@ -681,11 +678,30 @@ sets their `_alpha`, and the file shows a tile when that is more than 0), so the
   fades, the user traits, and one `y` shift of a tile on a wide screen), so the port puts the container at the list's side, in
   the middle of the window's height (an estimate, as the question's own tile sits 20 units to the left of it, right-aligned).
   The panel of the lit save goes with the list of saves (it is hidden while the question is shown: the first run in the
-  game, round 12AB, drew the question over its play-time line). Not read yet, so estimated: which tile is lit first (the
-  first row), and the format of the time
-  played (days, hours and minutes as `000.05.33`). The darkening of the paused world is the port's (the game draws its own
-  picture there). The sounds are the file's: a tile's `clicksound` and `mouseoversound` (see "Sounds of the menu files"), played
+  game, round 12AB, drew the question over its play-time line). The time played is hours, minutes and seconds,
+  `"%03i.%02i.%02i"` (`000.05.33`: the game writes it into the header of the save, Mac round 12BN B2). The game sets no lit
+  row when the list opens (the file's highlight is off until the pointer or a key picks a row); the port lights the first, as
+  it always has. The darkening of the paused world is the port's (the game draws its own picture there). The sounds are the file's: a tile's `clicksound` and `mouseoversound` (see "Sounds of the menu files"), played
 by the menu module; the game's own sounds for the back step were not found. Nothing was seen in the running game.
+
+### The title screen (Mac rounds 12AI A2, 12BI and 12BN C)
+
+With no game running the same script draws the same file as the title screen (the game's `StartMenu` is made in its title mode
+then: `main_title`, the logo, is faded in, which the file keeps at no alpha, and the picture of the pause screen, which shows only
+when the logo does not, is out). The words are compiled into the executable as the defaults of the settings (no master has
+them), and the data of the port is loaded before the menu opens, so `word()` finds them as it does in the pause menu. The
+list is the title list of the game, top to bottom (mask 1 of its items): Continue and Load only when a save exists (the game
+scans its folder), Continue asks `sConfirmContinue` and loads the newest save, New asks `sConfirmNew` and starts a new game,
+Load opens the list of saves (five rows in the title mode, as the file says itself), Settings, Credits (when the data has
+`CREDITS.TXT`; `falloutcredits.lua` draws them over the title and Escape, a click or the B or A button ends them) and Quit,
+which asks. A pad's Start button does nothing here.
+
+The picture behind the list is the game's first picture of the main menu, `Interface\Main\main_background.dds` (`sMainMenuBackground`,
+1024 by 512), stretched over the whole screen like the slides of the loading menu. Not here: the row of the downloadable content
+(a list of plug-ins), the rotating pictures of the main menu (the game takes them from its loading menu, a new one every ten
+seconds, up to 20), the music of the title (`sTitleMusic`, `special\maintitle.mp3`, volume 0.6), and the version line
+(`1.4.0.525`), which the file hides on a PC. The engine's own buttons come back by themselves when the script does not claim
+the menu in a second (the file is not there, or the script failed). Seen only in the offline harness, not in the running game.
 
 ### The settings screens
 
@@ -1431,7 +1447,13 @@ clockwise at 67.5 degrees a second and the ball counter-clockwise at 135, a loop
 (`load_roulette_bars`, `load_roulette_wheel`, `load_roulette_ball`) turned by widgets, with the numbers read from the model, not
 the model itself. Not verified in the game: the folder of the textures (the code tries `Textures\Interface\Loading\`,
 `\Circular Loading\`, `\Main\` and `\Interface\`), the layering (bars at the back, the wheel, the ball on top) and the
-direction of the turn. Not done: the mode of a new game, which shows the wheel and no picture; the pictures of the other
+direction of the turn. The wheel takes the system colour of the main menu, as the loading menu names it and the pieces do not
+(Mac round 12BN A2: amber in New Vegas, pale green in Fallout 3), and the left bars are the right ones mirrored from left to
+right, which the model has baked in (not turned half round; 12BN A3). Fallout 3's loading menu has no slides, mattes or tips
+(only the world image and the wheel, whose model is the one wheel picture with a needle), and fades in the same 0.75 s. The
+slides of New Vegas cross-fade in 2.22 s (`0.00045` a millisecond, linear, compiled in) with the new picture coming in over the
+old, and the hold time between pictures is `fMainMenuBkgdUpdateInterval`, `fLoadingBkgdUpdateInterval` or
+`fLoadingInitUpdateInterval` (10, 10 and 3 seconds in the INI). Not done: the mode of a new game, which shows the wheel and no picture; the pictures of the other
 kinds of load screen (objective, level progress, stats, plate). The box of the engine (the label and the progress bar) stays at
 the bottom. Seen only in the offline harness and in tests, not in the running game.
 
@@ -1490,7 +1512,11 @@ found the same way.
 - The design space is 960 high and `960 * width / height` wide; it is drawn scaled by `height / 960`.
 - Tile types, trait names and ids, expression steps, operand sources and the `&entity;` table come from `FalloutNV.exe`.
 - The system colours are numbered HUDMain 1, HUDAlt 2, Terminal 3, Pipboy 4, MainMenu 5, System 6 (none is 0, a tile's
-  own colour is -1); their red, green and blue come from the `iSystemColor` settings in the INI.
+  own colour is -1). Fallout 3 builds them from constants: HUDMain, Pipboy and System (26, 255, 128), MainMenu (199, 255, 165).
+  New Vegas builds HUDMain, Pipboy, MainMenu and System amber (255, 182, 66) (`SystemColorManager` 0x718C90; the
+  `iSystemColor` lines of its INI are dead: no string of them is in either executable), and the game's default HUD and
+  Pip-Boy colour setting is Amber too. `Resources::useNewVegasColors` sets these; the HUD and Pip-Boy colour settings the
+  player can change (Green, Blue, Amber, White) are kept but do not recolour the screens yet.
 - A tile's position is the sum of its ancestors' positions. A text tile's `x` is the point it is justified to (left end,
   centre or right end).
 - A hot rectangle that names a file (`filename`) is a picture that takes the pointer: the picture of the world map, the

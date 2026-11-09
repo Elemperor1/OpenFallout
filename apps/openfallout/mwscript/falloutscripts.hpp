@@ -177,6 +177,9 @@ namespace OFScript
         friend struct FalloutScript::SaveAccess;
 
     public:
+        /// Whether the game that is played is New Vegas (Tale of Two Wastelands is played with its engine)
+        bool isNewVegas() const { return mGame == FalloutScript::Game::NewVegas; }
+
         FalloutScripts(const OFWorld::ESMStore& store, FalloutScript::Game game,
             FalloutScript::FormId player = FalloutScript::playerReference);
 
