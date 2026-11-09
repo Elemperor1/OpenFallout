@@ -665,7 +665,7 @@ sets their `_alpha`, and the file shows a tile when that is more than 0), so the
   decides which save Continue loads, by the last write time of the file (the newest first), as the port does by the time
   the save was made. The save's picture and its version line are not here.
 - The engine's side: `menu.mainMenuOpen`, `menu.claimMainMenu(drawn, escape)`, `menu.resume`, `menu.canSave`,
-  `menu.openSettings`, `menu.settingsOpen`, `menu.inputTaken` (`openfallout.menu`). While the console, a
+  `menu.openSettings`, `menu.settingsOpen`, `menu.inputTaken`, `menu.mainMenuPictures` (`openfallout.menu`). While the console, a
   message box or a dialog of the engine's own windows (the one that tells that a save failed, which is modal and has the
   buttons of the pad first) has the input, the script leaves the keys and the buttons of the pad alone: the keys typed in
   the console reach the menu's scripts as well, and so does the key that closes it, so the engine takes who had the key or
@@ -697,10 +697,15 @@ Load opens the list of saves (five rows in the title mode, as the file says itse
 which asks. A pad's Start button does nothing here.
 
 The picture behind the list is the game's first picture of the main menu, `Interface\Main\main_background.dds` (`sMainMenuBackground`,
-1024 by 512), stretched over the whole screen like the slides of the loading menu. Not here: the row of the downloadable content
-(a list of plug-ins), the rotating pictures of the main menu (the game takes them from its loading menu, a new one every ten
-seconds, up to 20), the music of the title (`sTitleMusic`, `special\maintitle.mp3`, volume 0.6), and the version line
-(`1.4.0.525`), which the file hides on a PC. The engine's own buttons come back by themselves when the script does not claim
+1024 by 512), stretched over the whole screen like the slides of the loading menu. The picture turns as the game's does (Mac
+round 12BN part G3: the load screens that carry the main-menu flag 0x400, 33 in New Vegas; a new one every ten seconds,
+fading in over the one before in 2.222 seconds; at most 20, each file once): `menu.mainMenuPictures()` gives the pictures
+(the engine picks them as the loading menu does for a game that starts from the main menu, at random), and the script
+shows the backdrop first and then those, one after the other, round again. The music of the title (`sTitleMusic`,
+`Music\Special\MainTitle.mp3`) begins three seconds after the screen comes (when the install has the file) and stops when a
+game is begun. Not here: the row of the downloadable content (a list of plug-ins), the volume of the title's music (the
+game's 0.6; the music volume of the settings is what applies), and the version line (`1.4.0.525`), which the file hides on
+a PC. The engine's own buttons come back by themselves when the script does not claim
 the menu in a second (the file is not there, or the script failed). Seen only in the offline harness, not in the running game.
 
 ### The settings screens

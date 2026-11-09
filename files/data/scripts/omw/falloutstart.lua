@@ -16,8 +16,10 @@
 -- The same file is the TITLE screen (the game's code makes the menu in the title mode when no game is loaded: a list of
 -- Continue, New, Load, Settings, Credits and Quit over the picture of the main menu, with the game's logo): this script
 -- draws it when no game is running, from the same tiles, with the words of the executable (the title list's words are
--- compiled into it, and the data of the port has been loaded by then). Not here: the row of the downloadable content, the
--- rotating pictures behind the list (the picture of the main menu stands still), the music of the title.
+-- compiled into it, and the data of the port has been loaded by then). The picture behind the list turns as the game's does
+-- (a new one every ten seconds, fading in over the one before, from the main menu's load screens that the engine picks:
+-- every picture once, at most 20), and the music of the title begins three seconds after the screen comes. Not here: the
+-- row of the downloadable content.
 --
 -- The script says every frame that it draws the menu (claimMainMenu), so that a script that fails gives it back to the
 -- engine, and keeps Escape and the B button for itself in a screen of the menu below the list (they go back one step);
@@ -27,6 +29,7 @@ local input = require('openfallout.input')
 local ui = require('openfallout.ui')
 local util = require('openfallout.util')
 local vfs = require('openfallout.vfs')
+local ambient = require('openfallout.ambient')
 local engine = require('openfallout.menu')
 local storage = require('openfallout.storage')
 local menuModule = require('scripts.omw.falloutmenu')
@@ -41,6 +44,11 @@ local FILE = 'options/start_menu.xml'
 local LAYER = 'Settings'
 -- The picture behind the title list: the first picture of the main menu (sMainMenuBackground, main_background)
 local BACKDROP = 'textures/interface/main/main_background.dds'
+-- The pictures turn behind the list: how long one stays before the next begins to come, and how long that takes (the
+-- executable's 10 seconds, and 1 / 0.00045 ms)
+local PICTURE_SECONDS, PICTURE_FADE = 10, 1 / 0.45
+-- The music of the title (sTitleMusic), and the seconds after the screen comes that it begins
+local TITLE_MUSIC, MUSIC_DELAY = 'music/special/maintitle.mp3', 3
 local MAX_SAVES = 1000
 -- The row of the port that opens the engine's own window of settings (the game has no such row)
 local ENGINE_WINDOW = 'Engine'
@@ -49,6 +57,12 @@ local CONFIRM_ROWS = 3
 
 local shown = nil
 local backdrop = nil
+-- The picture that fades in over the backdrop, the pictures that turn (paths, the backdrop's own first) and which of them
+-- the backdrop shows, the real time that the one on show came at, and the real time the title screen came at
+local fader = nil
+local slides, slideIndex, slideAt, titleAt, fading = {}, 1, nil, nil, nil
+-- The music of the title: nil before it begins, 'playing', or 'none' when the install has no such file
+local music = nil
 local lists = {}
 -- What is on show: 'list' (the main menu), 'save', 'load', 'confirm', 'settings' (the submenus), 'options' (the items of
 -- one submenu), 'help' (the manual) or 'credits'
@@ -117,9 +131,73 @@ local function closeShown()
         backdrop:destroy()
         backdrop = nil
     end
+    if fader then
+        fader:destroy()
+        fader = nil
+    end
+    slides, slideIndex, slideAt, titleAt, fading = {}, 1, nil, nil, nil
     lists = {}
     screen, items, saveRows, panelFor = 'list', {}, {}, nil
     optionGroup, optionItems = nil, {}
+end
+
+-- The music of the title stops when a game begins (or the title goes)
+local function stopTitleMusic()
+    if music == 'playing' then pcall(ambient.stopMusic) end
+    -- (not nil: a frame of the title that comes before the game does must not begin the music again)
+    music = 'none'
+end
+
+local function startTitleMusic()
+    local ok, present = pcall(vfs.fileExists, TITLE_MUSIC)
+    if ok and present and pcall(ambient.streamMusic, TITLE_MUSIC, { fadeOut = 1 }) then
+        music = 'playing'
+    else
+        music = 'none'
+    end
+end
+
+-- The pictures of the title screen: the backdrop, then the pictures of the main menu that the engine picks (those that
+-- the install has), each file once
+local function titlePictures()
+    local list = { BACKDROP }
+    local seen = { [BACKDROP] = true }
+    local ok, picked = pcall(engine.mainMenuPictures)
+    if not ok or type(picked) ~= 'table' then return list end
+    for _, icon in ipairs(picked) do
+        local path = ('textures/' .. tostring(icon)):gsub('\\', '/'):lower()
+        local found, present = pcall(vfs.fileExists, path)
+        if not seen[path] and found and present then
+            seen[path] = true
+            list[#list + 1] = path
+        end
+    end
+    return list
+end
+
+-- The picture behind the list turns, by real time (nothing runs with no game): the next picture fades in over the
+-- backdrop and, when it is all there, becomes the backdrop
+local function turnPictures(now)
+    if not backdrop or not fader or #slides < 2 then return end
+    slideAt = slideAt or now
+    local late = now - slideAt - PICTURE_SECONDS
+    if late < 0 then return end
+    local nextIndex = slideIndex % #slides + 1
+    if late >= PICTURE_FADE then
+        backdrop.layout.props.resource = ui.texture { path = slides[nextIndex] }
+        backdrop:update()
+        fader.layout.props.alpha = 0
+        fader:update()
+        slideIndex, fading = nextIndex, nil
+        slideAt = slideAt + PICTURE_SECONDS
+        return
+    end
+    if fading ~= nextIndex then
+        fading = nextIndex
+        fader.layout.props.resource = ui.texture { path = slides[nextIndex] }
+    end
+    fader.layout.props.alpha = late / PICTURE_FADE
+    fader:update()
 end
 
 local function release()
@@ -242,10 +320,10 @@ local function titleItems()
     if #saves > 0 then
         list[#list + 1] = {
             label = word('sContinue'),
-            action = sure(word('sConfirmContinue'), function() engine.loadGame(saves[1].dir, saves[1].file) end),
+            action = sure(word('sConfirmContinue'), function() stopTitleMusic(); engine.loadGame(saves[1].dir, saves[1].file) end),
         }
     end
-    list[#list + 1] = { label = word('sNew'), action = sure(word('sConfirmNew'), function() engine.newGame() end) }
+    list[#list + 1] = { label = word('sNew'), action = sure(word('sConfirmNew'), function() stopTitleMusic(); engine.newGame() end) }
     if #saves > 0 then
         list[#list + 1] = { label = word('sLoad'), action = function() showSaves('load') end }
     end
@@ -534,7 +612,7 @@ local function pickSave(row)
         end
     else
         ask(word('sConfirmLoad'), kind, {
-            { label = word('sYes'), action = function() engine.loadGame(entry.save.dir, entry.save.file) end },
+            { label = word('sYes'), action = function() stopTitleMusic(); engine.loadGame(entry.save.dir, entry.save.file) end },
             { label = word('sNo'), action = function() showSaves(kind, lastSaveRow) end },
         })
     end
@@ -618,6 +696,17 @@ local function open()
             ignorePointerEvents = true,
         },
     }
+    -- (the picture that fades in over it when the pictures turn is made before the menu too, so it is below it)
+    local fadeIn = picture and ui.create {
+        layer = LAYER,
+        type = ui.TYPE.Image,
+        props = {
+            relativeSize = util.vector2(1, 1),
+            resource = ui.texture { path = BACKDROP },
+            alpha = 0,
+            ignorePointerEvents = true,
+        },
+    }
     if atTitle then
         local ok, text = pcall(credits.load)
         creditsFile = ok and text ~= nil
@@ -638,10 +727,12 @@ local function open()
             print('start menu: the file ' .. FILE .. ' does not have what the menu needs; the engine\'s own menu is used')
         end
         dark:destroy()
+        if fadeIn then fadeIn:destroy() end
         failed = true
         return false
     end
-    shown, backdrop, lists = opened, dark, made
+    shown, backdrop, fader, lists = opened, dark, fadeIn or nil, made
+    slides, slideIndex, slideAt, fading = picture and titlePictures() or { BACKDROP }, 1, nil, nil
     lists.main.onClick(pickItem)
     lists.confirm.onClick(pickItem)
     lists.settings.onClick(pickItem)
@@ -809,10 +900,16 @@ return {
                 shown:checkSize()
                 updatePanel()
                 manual.update()
+                local now = core.getRealTime()
+                if title() then
+                    -- the title's own pictures and music (by real time too: nothing runs with no game)
+                    titleAt = titleAt or now
+                    if music == nil and now - titleAt >= MUSIC_DELAY then startTitleMusic() end
+                    turnPictures(now)
+                end
                 -- (the credits scroll by real time: the world is paused with no game and in the pause menu, and then the frame's
                 -- time is zero)
                 if credits.isOpen() then
-                    local now = core.getRealTime()
                     credits.update(creditsAt and math.min(math.max(now - creditsAt, 0), 0.25) or 0)
                     creditsAt = now
                 else
@@ -827,6 +924,8 @@ return {
             if screen == 'credits' and button == 1 then credits.press(input.KEY.Escape) end
         end,
         onStateChanged = function()
+            stopTitleMusic()
+            music = nil
             closeShown()
             release()
             failed = false
