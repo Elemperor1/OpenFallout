@@ -189,7 +189,9 @@ local function turnPictures(now)
         fader.layout.props.alpha = 0
         fader:update()
         slideIndex, fading = nextIndex, nil
-        slideAt = slideAt + PICTURE_SECONDS
+        -- (the next one begins ten seconds after this one did; after a long frame the schedule is not left behind, which
+        -- would make the pictures go by one after the other)
+        slideAt = math.max(slideAt + PICTURE_SECONDS, now - PICTURE_FADE)
         return
     end
     if fading ~= nextIndex then

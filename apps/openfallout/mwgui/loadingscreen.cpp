@@ -377,8 +377,9 @@ namespace OFGui
             return;
 
         // The game's own loading screen has no progress bar and no label of its own: the box of the engine is only for
-        // a load where the data has not got the game's menu (Mac round 12BO part B)
-        mLoadingBox->setVisible(!mFalloutActive);
+        // a load where the data has not got the game's menu (Mac round 12BO part B), or one with a notice that must be
+        // read
+        mLoadingBox->setVisible(!mFalloutActive || mImportantLabel);
         if (mFalloutActive)
         {
             mFalloutLoading->update(mTimer.time_m() / 1000.0);
