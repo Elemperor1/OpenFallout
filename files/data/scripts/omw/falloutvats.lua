@@ -38,6 +38,16 @@ local widgetModule = require('scripts.omw.falloutwidgets')
 local menuModule = require('scripts.omw.falloutmenu')
 local pad = require('scripts.omw.falloutpad')
 
+-- A note to the player goes to the line of messages of the display, as the games print it (the engine's own message
+-- window is the fallback)
+local function notice(text)
+    if core.hud and core.hud.message then
+        core.hud.message(text)
+    else
+        ui.showMessage(text)
+    end
+end
+
 local vats = core.vats
 
 if not vats.available() then
@@ -419,7 +429,7 @@ local function updateScreen(dt)
         put(t.apBefore, 'x', 326 - widthBefore)
         put(t.apLow, 'visible', left < state.cost and 1 or 0)
         local weapon = core.combat and core.combat.weapon and core.combat.weapon() or nil
-        local rounds = weapon and weapon.rounds or nil
+        local rounds = (weapon and (weapon.ammoUse or 0) > 0) and weapon.rounds or nil
         put(t.ammo, 'visible', rounds ~= nil and 1 or 0)
         put(t.ammo, 'string', rounds ~= nil and tostring(rounds) or '')
 
@@ -667,7 +677,7 @@ local function open(offered)
     end
     targets = offered or inView()
     if #targets == 0 then
-        ui.showMessage('No target in sight')
+        notice('No target in sight')
         return
     end
     picked, queue = 1, {}
@@ -769,7 +779,7 @@ function queuePicked()
     if part.chance <= 0 then
         -- the executable refuses a shot with no chance with a message and the sound of a refusal (0x7EEB50)
         sound('UIVATSEnterFail')
-        ui.showMessage(word('sVATSMessageZeroChance', 'The chance to hit is zero'))
+        notice(word('sVATSMessageZeroChance', 'The chance to hit is zero'))
     elseif state.actionPoints - spent() < state.cost then
         sound('UIVATSInsufficientAP')
     else
@@ -829,16 +839,12 @@ local function step()
     end
     if result.refused then
         if result.refused == 'points' then
-            ui.showMessage('Not enough action points')
+            notice('Not enough action points')
         elseif result.refused == 'ammo' then
-            ui.showMessage('Out of ammunition')
+            notice('Out of ammunition')
         end
-    elseif result.hit then
-        ui.showMessage(string.format('%s%s%s', attack.name, result.crippled and ' crippled' or ' hit',
-            result.killed and ', dead' or ''))
-    else
-        ui.showMessage(attack.name .. ' missed')
     end
+    -- (the game says nothing of a blow that landed or missed: the target, the experience of a kill and the meters show it)
 end
 
 local function isOpen()

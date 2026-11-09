@@ -15,6 +15,16 @@ local widgetModule = require('scripts.omw.falloutwidgets')
 local pad = require('scripts.omw.falloutpad')
 local menuModule = require('scripts.omw.falloutmenu')
 
+-- A note to the player goes to the line of messages of the display, as the games print it (the engine's own message
+-- window is the fallback)
+local function notice(text)
+    if core.hud and core.hud.message then
+        core.hud.message(text)
+    else
+        ui.showMessage(text)
+    end
+end
+
 local pipboy = core.pipboy
 
 if not pipboy.available() then
@@ -133,7 +143,7 @@ local function make(recipe)
     end
     render()
     if shown and message ~= '' then
-        ui.showMessage(message)
+        notice(message)
     end
 end
 

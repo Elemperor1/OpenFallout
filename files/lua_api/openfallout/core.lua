@@ -1721,6 +1721,12 @@
 -- @return #list<#HudMessage>
 
 ---
+-- Prints a note in the line of messages of the display (the place a script's message to the player is printed), not in a
+-- window of the engine's own.
+-- @function [parent=#Hud] message
+-- @param #string text
+
+---
 -- The lines that characters said to the player outside of a conversation since this was last called, oldest first, for the
 -- subtitles: each has `text` (the words), `seconds` (how long it stays from the moment it was said), `distance` (of the
 -- speaker from the player), `forced` (a script asked for the text whatever the setting says) and `kind` (0 the player's

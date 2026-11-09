@@ -19,6 +19,16 @@ local terminalMenu = require('scripts.omw.falloutterminal')
 local hackMenu = require('scripts.omw.falloutterminalhack')
 local lockpickMenu = require('scripts.omw.falloutlockpick')
 
+-- A note to the player goes to the line of messages of the display, as the games print it (the engine's own message
+-- window is the fallback)
+local function notice(text)
+    if core.hud and core.hud.message then
+        core.hud.message(text)
+    else
+        ui.showMessage(text)
+    end
+end
+
 local interact = core.interact
 local pipboy = core.pipboy
 
@@ -280,7 +290,7 @@ local function startRest()
         notice = why
         if restMenu then
             -- (the menu of the game has no line for it: the words go to the messages)
-            ui.showMessage(why)
+            notice(why)
             return
         end
     else

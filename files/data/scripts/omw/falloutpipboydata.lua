@@ -21,6 +21,16 @@ local ui = require('openfallout.ui')
 
 local menuModule = require('scripts.omw.falloutmenu')
 
+-- A note to the player goes to the line of messages of the display, as the games print it (the engine's own message
+-- window is the fallback)
+local function notice(text)
+    if core.hud and core.hud.message then
+        core.hud.message(text)
+    else
+        ui.showMessage(text)
+    end
+end
+
 local pipboy = core.pipboy
 
 local module = {}
@@ -354,7 +364,7 @@ local function travelTo(index)
     local marker = markers[index]
     if not marker then return end
     if not marker.travel then
-        ui.showMessage(marker.name ~= '' and marker.name or 'Unknown')
+        notice(marker.name ~= '' and marker.name or 'Unknown')
         return
     end
     local api = interact()
@@ -362,7 +372,7 @@ local function travelTo(index)
     if why == '' then
         if options.close then options.close() end
     else
-        ui.showMessage(why)
+        notice(why)
     end
 end
 
