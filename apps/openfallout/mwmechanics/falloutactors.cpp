@@ -103,6 +103,10 @@ namespace OFMechanics
         // A shot or a throw is shown with the weapon that made it: when it used the weapon up and the character took
         // another, the next weapon is drawn this many seconds later
         constexpr float shotShownFor = 0.8f;
+        /// Real seconds a character in range of its target may go without firing before it says why
+        constexpr float holdFireReportAfter = 5.f;
+        /// How near to the place it was told to shoot from a character has to be to shoot
+        constexpr float scriptedPlaceReach = 64.f;
 
         enum class Walk
         {
@@ -168,6 +172,8 @@ namespace OFMechanics
         FalloutScript::FormId mDrawn = 0; // the weapon whose animations it was last given in a fight
         float mShowAfter = 0.f; // seconds until the weapon it holds is drawn, after a shot that used the last one up
         float mWatch = 0.f; // seconds until it looks for the player again, for the sneak meter
+        float mHeld = 0.f; // seconds it has stood in range of its target without firing (it says why now and then)
+        bool mOrdered = false; // a script told it to shoot (UseWeapon) the last time it was looked at
         bool mSeenAlive = false; // it was alive when it was looked at
         bool mFell = false; // it is dead and its body has fallen
         float mReview = 0.f; // seconds until the packages are looked at again
@@ -330,7 +336,8 @@ namespace OFMechanics
         {
             OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
             return scripts != nullptr && ptr != OFBase::Environment::get().getWorld()->getPlayerPtr()
-                && (scripts->isAggressive(ptr) || scripts->fighting(ptr) || scripts->isDead(ptr));
+                && (scripts->isAggressive(ptr) || scripts->fighting(ptr) || scripts->isDead(ptr)
+                    || scripts->hasScriptedAttack(ptr));
         }
 
         /// Whether the place is in a cell of the game that is loaded, so that an actor that goes there stays in the
@@ -1536,6 +1543,56 @@ namespace OFMechanics
                 mind.mReview = 0.f;
             };
 
+            // A script told it to shoot (UseWeapon): that takes the place of a fight and of the packages
+            const OFScript::FalloutScripts::ScriptedAttack order = scripts.scriptedAttack(mind.mPtr);
+            if (order.mActive)
+            {
+                if (!mind.mOrdered)
+                {
+                    mind.mOrdered = true;
+                    mind.mFighting = true;
+                    stopWalking(mind);
+                    mind.mAtGoal = false;
+                    showWeapon(frame, mind, scripts);
+                }
+                // It shoots from the place it was told to, which it goes to first
+                if (!order.mPlace.isEmpty()
+                    && !isNear(mind.position(), order.mPlace.getRefData().getPosition().asVec3(), scriptedPlaceReach))
+                {
+                    const osg::Vec3f place = order.mPlace.getRefData().getPosition().asVec3();
+                    if (!mind.mWalking || distanceAcross(place, mind.mDestination) > fightRepathDistance)
+                    {
+                        mind.mWaypoints.clear();
+                        mind.mDestination = place;
+                        mind.mFleeing = false;
+                    }
+                    switch (walkTo(frame, mind, mind.mDestination, duration, scriptedPlaceReach, true))
+                    {
+                        case Walk::Moving:
+                        case Walk::Waiting:
+                            return true;
+                        default:
+                            // It is there, or it cannot get there: it shoots from where it stands
+                            stopWalking(mind);
+                            break;
+                    }
+                }
+                const osg::Vec3f aim = order.mTarget.getRefData().getPosition().asVec3();
+                faceToward(
+                    frame, mind, std::atan2(aim.x() - mind.position().x(), aim.y() - mind.position().y()), duration);
+                if (scripts.scriptedShot(mind.mPtr, order.mTarget).mFired)
+                    if (auto* animation
+                        = dynamic_cast<OFRender::FalloutActorAnimation*>(frame.mWorld.getAnimation(mind.mPtr)))
+                        animation->attack();
+                return true;
+            }
+            if (mind.mOrdered)
+            {
+                // The attacks are made, or the target is gone: the character goes back to what it was doing
+                mind.mOrdered = false;
+                over();
+            }
+
             OFScript::FalloutScripts::FightStance stance = scripts.fightStance(mind.mPtr);
             if (stance.mTarget.isEmpty())
             {
@@ -1598,8 +1655,21 @@ namespace OFMechanics
                     switch (walkTo(frame, mind, mind.mDestination, duration, arrival, true))
                     {
                         case Walk::Arrived:
+                            stopWalking(mind);
+                            break;
                         case Walk::Failed:
                             stopWalking(mind);
+                            // A character that cannot get to its target, or see it from where the path ends, stands
+                            // there with its weapon drawn: it says so now and then (the pistol raider of Fallout 3
+                            // in round 10L)
+                            if ((mind.mHeld += duration) >= holdFireReportAfter)
+                            {
+                                mind.mHeld = 0.f;
+                                Log(Debug::Info) << mind.mPtr.getCellRef().getRefId() << " finds no way to its target, "
+                                                 << static_cast<int>(away) << " units away (engage "
+                                                 << static_cast<int>(stance.mEngage) << ", "
+                                                 << (visible ? "sees" : "does not see") << " it)";
+                            }
                             break;
                         default:
                             break;
@@ -1655,8 +1725,20 @@ namespace OFMechanics
                         // The weapon may have changed without a shot (it was empty, the character took another)
                         if (mind.mShowAfter <= 0.f)
                             showWeapon(frame, mind, scripts);
+                        // A character in range that does not fire for a while says why (round 10L: the pistol raider of
+                        // Fallout 3 stood at 1,250 units for 30 s and the log had no line about it)
+                        if ((mind.mHeld += duration) >= holdFireReportAfter)
+                        {
+                            mind.mHeld = 0.f;
+                            Log(Debug::Info)
+                                << mind.mPtr.getCellRef().getRefId() << " holds fire at " << static_cast<int>(away)
+                                << " units (engage " << static_cast<int>(stance.mEngage) << ", "
+                                << (visible ? "sees" : "does not see")
+                                << " the target): " << scripts.attackDiagnosis(mind.mPtr);
+                        }
                         break;
                     }
+                    mind.mHeld = 0.f;
                     // The weapon that fired is the one that is shown with the shot, which has used it up when it was
                     // the last round or the last grenade and the character took another: that one is drawn after the
                     // shot

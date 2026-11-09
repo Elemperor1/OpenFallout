@@ -627,6 +627,7 @@ namespace OFScript
         mTriggers.clear();
         mTriggerActors.clear();
         mScriptPackages.clear();
+        mScriptedAttacks.clear();
         mAi.clear();
         // A save asked for by the game that is left must not be made in the one that is loaded or started
         mSaveRequests.store(0);
@@ -686,6 +687,8 @@ namespace OFScript
             mReactivate.reset();
             mDiscoveryTimer = 0;
             mPlayerSleeping = false;
+            mPlayerMoving = false;
+            mPlayerMoveDone = false;
             RestState rest;
             rest.mSerial = mRest.mSerial;
             rest.mEnded = mRest.mEnded;
@@ -792,6 +795,16 @@ namespace OFScript
             mObjects.updateMenu(filter);
             return;
         }
+        // A move of the player that was made since the last pass is over for the scripts when this pass has run
+        struct MoveSettled
+        {
+            FalloutScripts& mHost;
+            ~MoveSettled()
+            {
+                if (mHost.mPlayerMoveDone.exchange(false))
+                    mHost.mPlayerMoving = false;
+            }
+        } moveSettled{ *this };
         // A game can be left at any time, so what has not been implemented shows up in the log while it is played
         constexpr float missingReportInterval = 30.f;
         mMissingTimer += frametime;
@@ -2843,6 +2856,12 @@ namespace OFScript
         const double combatDistance = gameSetting("fCombatDistance", 128.0);
         WeaponStats stats;
         stats.mWeapon = attacker != 0 ? mEquipment.weapon(attacker) : 0;
+        // A character that a script told to shoot (UseWeapon) holds the weapon the script names and uses no ammunition
+        // (the orders are kept by the thread of the frame, and the player never has one)
+        const bool mayBeOrdered = attacker != 0 && attacker != mPlayer && std::this_thread::get_id() == mMainThread;
+        const auto ordered = mayBeOrdered ? mScriptedAttacks.find(attacker) : mScriptedAttacks.end();
+        if (ordered != mScriptedAttacks.end())
+            stats.mWeapon = ordered->second.mOrder.mWeapon;
         const ESM4::Weapon* record
             = stats.mWeapon != 0 ? mStore.get<ESM4::Weapon>().search(refId(stats.mWeapon)) : nullptr;
         if (record == nullptr || !record->mHasGameData)
@@ -2883,15 +2902,15 @@ namespace OFScript
             stats.mAmmo = chosen;
         else if (mStore.get<ESM4::Ammunition>().search(record->mAmmo) != nullptr)
             stats.mAmmo = record->mAmmo.toUint32();
-        if (stats.mAmmo != 0)
+        if (stats.mAmmo != 0 && ordered == mScriptedAttacks.end())
             stats.mRounds = mActors.itemCount(attacker, stats.mAmmo);
         else
             stats.mAmmoUse = 0;
         return stats;
     }
 
-    FalloutScripts::FireResult FalloutScripts::fire(
-        FalloutScript::FormId attacker, const OFWorld::Ptr& target, int limb, double chance, bool ignoreCooldown)
+    FalloutScripts::FireResult FalloutScripts::fire(FalloutScript::FormId attacker, const OFWorld::Ptr& target,
+        int limb, double chance, bool ignoreCooldown, bool noDamage)
     {
         FireResult result;
         if (attacker == 0)
@@ -2963,7 +2982,9 @@ namespace OFScript
             wearWeaponOfShot(attacker, stats);
         if (victim == mPlayer || isCharacterOrCreature(target))
         {
-            result.mStrike = strike(attacker, victim, stats.mWeapon, limb, -1.0, conditionBefore, modsBefore);
+            // A shot that is told to do no damage hits and takes nothing
+            if (!noDamage)
+                result.mStrike = strike(attacker, victim, stats.mWeapon, limb, -1.0, conditionBefore, modsBefore);
             return result;
         }
         // An object has no health, but its script hears of the blow. It is not attacked in the sense of GetAttacked,
@@ -3305,6 +3326,115 @@ namespace OFScript
             // The last grenade or mine was thrown: the character takes another weapon, or fights with its hands
             prepareFight(attacker);
         }
+        return result;
+    }
+
+    std::string FalloutScripts::attackDiagnosis(const OFWorld::Ptr& attacker)
+    {
+        const FalloutScript::FormId self = scriptReferenceOf(attacker);
+        if (self == 0)
+            return "no script reference";
+        const WeaponStats weapon = weaponStats(self);
+        std::string text;
+        if (weapon.mWeapon == 0)
+            text = "no weapon in the hands (reach " + std::to_string(static_cast<int>(weapon.mRange)) + ")";
+        else
+        {
+            const ESM4::Weapon* record = mStore.get<ESM4::Weapon>().search(refId(weapon.mWeapon));
+            text = "weapon " + (record != nullptr ? record->mEditorId : std::string("?")) + " ("
+                + (weapon.mMelee ? "melee" : "ranged") + ", range " + std::to_string(static_cast<int>(weapon.mRange))
+                + ", interval " + std::to_string(weapon.mInterval) + " s)";
+            if (weapon.mAmmoUse > 0)
+                text += ", " + std::to_string(weapon.mRounds) + " rounds of " + std::to_string(weapon.mAmmoUse)
+                    + " a shot";
+            else
+                text += ", no ammunition needed";
+        }
+        float cooldown = -1.f;
+        {
+            const std::lock_guard lock(mFireMutex);
+            if (const auto found = mFireCooldowns.find(self); found != mFireCooldowns.end())
+                cooldown = found->second;
+        }
+        if (cooldown >= 0.f)
+            text += ", ready again in " + std::to_string(cooldown) + " s";
+        else
+            text += ", ready";
+        return text;
+    }
+
+    void FalloutScripts::useWeapon(FalloutScript::FormId actor, const FalloutScript::UseWeaponOrder& order)
+    {
+        // The characters read the orders on the thread of the frame, so they are given there
+        runOnMainThread([this, actor, order] {
+            const OFWorld::Ptr ptr = findReference(actor);
+            // Only a character that is in a loaded cell can shoot, and the player's attacks are its own
+            if (ptr.isEmpty() || !ptr.isInCell() || ptr == OFBase::Environment::get().getWorld()->getPlayerPtr())
+                return;
+            if (order.mWeapon == 0 || mStore.get<ESM4::Weapon>().search(refId(order.mWeapon)) == nullptr)
+            {
+                Log(Debug::Warning) << "UseWeapon: " << FalloutScript::hex(order.mWeapon) << " is no weapon";
+                return;
+            }
+            mScriptedAttacks[actor] = ScriptedOrder{ order, 0 };
+            Log(Debug::Info) << "UseWeapon: " << FalloutScript::hex(actor) << " shoots " << order.mAttacks
+                             << " time(s) at " << FalloutScript::hex(order.mTarget) << " from "
+                             << (order.mLocation != 0 ? FalloutScript::hex(order.mLocation)
+                                                      : std::string("where it stands"));
+            // A character with no packages has no mind until it has something to do
+            evaluatePackage(actor);
+        });
+    }
+
+    bool FalloutScripts::hasScriptedAttack(const OFWorld::Ptr& actor) const
+    {
+        const FalloutScript::FormId self = referenceOf(actor);
+        return self != 0 && mScriptedAttacks.count(self) != 0;
+    }
+
+    FalloutScripts::ScriptedAttack FalloutScripts::scriptedAttack(const OFWorld::Ptr& actor)
+    {
+        ScriptedAttack result;
+        const FalloutScript::FormId self = referenceOf(actor);
+        const auto found = self != 0 ? mScriptedAttacks.find(self) : mScriptedAttacks.end();
+        if (found == mScriptedAttacks.end())
+            return result;
+        const FalloutScript::UseWeaponOrder& order = found->second.mOrder;
+        const auto finish = [&](const char* why) {
+            Log(Debug::Info) << "UseWeapon: " << FalloutScript::hex(self) << " is done (" << why << ") after "
+                             << found->second.mMade << " attack(s)";
+            mScriptedAttacks.erase(found);
+            return result;
+        };
+        if (order.mAttacks > 0 && found->second.mMade >= order.mAttacks)
+            return finish("all its attacks are made");
+        const OFWorld::Ptr target = order.mTarget != 0 ? findReference(order.mTarget) : OFWorld::Ptr();
+        if (target.isEmpty() || !target.isInCell() || !target.getRefData().isEnabled() || mActors.isDead(order.mTarget))
+            return finish("its target is gone");
+        result.mActive = true;
+        result.mOrder = order;
+        result.mTarget = target;
+        if (order.mLocation != 0 && order.mLocation != self)
+        {
+            const OFWorld::Ptr place = findReference(order.mLocation);
+            if (!place.isEmpty() && place.isInCell() && place.getRefData().isEnabled())
+                result.mPlace = place;
+        }
+        return result;
+    }
+
+    FalloutScripts::FireResult FalloutScripts::scriptedShot(const OFWorld::Ptr& actor, const OFWorld::Ptr& target)
+    {
+        const FalloutScript::FormId self = scriptReferenceOf(actor);
+        const auto found = self != 0 ? mScriptedAttacks.find(self) : mScriptedAttacks.end();
+        if (found == mScriptedAttacks.end())
+            return FireResult();
+        const FalloutScript::UseWeaponOrder& order = found->second.mOrder;
+        const double skill = describeWeapon(order.mWeapon, self).mSkill;
+        const double chance = order.mAlwaysHit ? 1.0 : FalloutScript::FightAI::hitChance(skill);
+        const FireResult result = fire(self, target, -1, chance, false, order.mNoDamage);
+        if (result.mFired)
+            ++found->second.mMade;
         return result;
     }
 
@@ -5107,6 +5237,9 @@ namespace OFScript
 
     int FalloutScripts::currentPackageType(FalloutScript::FormId actor)
     {
+        // The package of UseWeapon that a script gave the character is of the type Use Weapon (16)
+        if (std::this_thread::get_id() == mMainThread && mScriptedAttacks.count(actor) != 0)
+            return 16;
         const FalloutScript::FormId package = currentPackage(actor);
         const ESM4::AIPackage* record = package != 0 ? mStore.get<ESM4::AIPackage>().search(refId(package)) : nullptr;
         return record != nullptr ? record->mData.type : -1;

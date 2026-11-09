@@ -5,6 +5,26 @@
 
 namespace FalloutScript
 {
+    /// What UseWeapon tells a character to do: shoot `mAttacks` times at the target from the place, with the weapon.
+    /// The flags are the ones of the "Use Weapon" package that the games build for it.
+    struct UseWeaponOrder
+    {
+        FormId mWeapon = 0;
+        /// The reference the character shoots from (the character itself, or a marker); 0 for where it stands
+        FormId mLocation = 0;
+        FormId mTarget = 0;
+        /// How many attacks it makes before the package is over; 0 is for one that has no end
+        int mAttacks = 0;
+        bool mCrouchToReload = true;
+        bool mHoldFire = true;
+        /// Every attack hits
+        bool mAlwaysHit = false;
+        /// An attack that hits does no damage
+        bool mNoDamage = false;
+        /// A place to aim at instead of the target (0 for none)
+        FormId mTargetLocation = 0;
+    };
+
     /// What the commands about the AI packages of characters ask of the game world. A character is told by the form id
     /// of its reference; the host knows which of them are in loaded cells and keeps what a script tells those that are
     /// not.
@@ -24,6 +44,10 @@ namespace FalloutScript
         /// at its packages again
         virtual void resetAI(FormId actor) { evaluatePackage(actor); }
 
+        /// The character drops what it does and attacks as the order says (UseWeapon); it goes back to its packages
+        /// when the attacks are made. Not for a character the host does not know or that is not in a loaded cell.
+        virtual void useWeapon(FormId /*actor*/, const UseWeaponOrder& /*order*/) {}
+
         /// The package the character follows now (0 for none, and for a character the host does not know or can not
         /// tell about)
         virtual FormId currentPackage(FormId /*actor*/) { return 0; }
@@ -37,8 +61,8 @@ namespace FalloutScript
     int currentPackageNumber(int type);
 
     /// Gives the commands about packages to the interpreter: AddScriptPackage, RemoveScriptPackage,
-    /// EvaluatePackage, GetIsCurrentPackage, GetCurrentAIPackage, GetOffersServicesNow and ResetAI. Those that the
-    /// command table does not have are left out.
+    /// EvaluatePackage, GetIsCurrentPackage, GetCurrentAIPackage, GetOffersServicesNow, ResetAI and UseWeapon. Those
+    /// that the command table does not have are left out.
     void addPackageCommands(Interpreter& interpreter, PackageWorld& world);
 }
 

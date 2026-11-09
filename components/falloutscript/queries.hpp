@@ -67,12 +67,22 @@ namespace FalloutScript
         virtual bool gameRestarted(FormId script) = 0;
         /// True the first time a script asks after a game was started or loaded, and not again until the next one
         virtual bool gameLoaded(FormId script) = 0;
+        /// How many major crimes somebody has seen the player do, as the executables count them: for the player its own
+        /// running count, for any other character the sum of the counts that the factions it belongs to keep
+        /// (witnessed crimes against the faction, which only grow). The caller has already left out a reference that
+        /// is not there.
+        virtual int majorCrimeCount(FormId actor) = 0;
+        /// Whether the player is on its way into another space: the move that a door, a fast travel or the lock of
+        /// a door that opens makes is on (a script that puts the player somewhere does not count, nor does a walk
+        /// from one exterior cell to the next)
+        virtual bool playerMovingIntoNewSpace() = 0;
     };
 
     /// Gives the commands IsInInterior, HasLoaded3D, IsRaining, IsPCSleeping, GetInZone,
     /// IsActorTalkingThroughActivator and GetGameSetting to the interpreter, and the commands of the script extenders
     /// that Tale of Two Wastelands calls in its intro: GetParentCell, GetParentWorldspace, GetGameRestarted and
-    /// GetGameLoaded. Those that the command table does not have are left out.
+    /// GetGameLoaded, and GetMajorCrimeCount and IsPlayerMovingIntoNewSpace, which the intro of Fallout 3 calls. Those
+    /// that the command table does not have are left out.
     void addQueryCommands(Interpreter& interpreter, QueryWorld& world);
 }
 

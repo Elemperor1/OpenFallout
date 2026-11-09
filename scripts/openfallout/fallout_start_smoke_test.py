@@ -1402,6 +1402,28 @@ local function finders(tag)
             string.format('%.0f', distance))
     end
 end
+-- The classroom: each of the seven classmates has a Find package for furniture near the marker; its script sets its global to
+-- GetSitting (3 when it sits). The furniture each is nearest to and how far
+local function classroom(tag)
+    local function find(id)
+        local ok, object = pcall(world.getObjectByFormId, core.getFormId('OFTest.esm', id))
+        return ok and object:isValid() and object or nil
+    end
+    local furniture = {}
+    for number, id in ipairs({ @CLASS_FURNITURE@ }) do furniture[number] = find(id) end
+    local seats = { @CLASS_GLOBALS@ }
+    for index, id in ipairs({ @CLASS_REFS@ }) do
+        local object = find(id)
+        local nearest, distance = 0, 1e9
+        for number, piece in ipairs(furniture) do
+            if object and piece and (object.position - piece.position):length() < distance then
+                nearest, distance = number, (object.position - piece.position):length()
+            end
+        end
+        print('OFTEST', 'classroom', tag, index, tostring(world.globals[seats[index]]), nearest,
+            string.format('%.0f', distance))
+    end
+end
 -- Where the player is from the chair (across, along: the chair is not turned), and the way it faces
 local function sits(tag)
     local object, player = chair(), world.players[1]
@@ -1432,7 +1454,8 @@ local steps = {
     { 9.0, function() sits('away') end },
     { 12.5, function() occupied('before') takeSitterChair() end },
     { 13.5, function() occupied('after') end },
-    { 15.0, function() sitter('later') finders('later') core.quit() end },
+    { 6.0, function() classroom('early') end },
+    { 15.0, function() sitter('later') finders('later') classroom('later') core.quit() end },
 }
 
 return {
@@ -1461,7 +1484,10 @@ TRIGGER_SCRIPT = (TRIGGER_SCRIPT.replace("@X@", str(plugin.TRIGGER_PLACE[0])).re
                   .replace("@FINDER_GLOBAL_0@", repr(plugin.FINDER_GLOBALS[0][1]))
                   .replace("@FINDER_GLOBAL_1@", repr(plugin.FINDER_GLOBALS[1][1]))
                   .replace("@FINDER_REF_0@", str(plugin.FINDER_REF_IDS[0]))
-                  .replace("@FINDER_REF_1@", str(plugin.FINDER_REF_IDS[1])))
+                  .replace("@FINDER_REF_1@", str(plugin.FINDER_REF_IDS[1]))
+                  .replace("@CLASS_FURNITURE@", ", ".join(str(value) for value in plugin.CLASSROOM_FURNITURE_REF_IDS))
+                  .replace("@CLASS_GLOBALS@", ", ".join(repr(name) for _, name in plugin.CLASSROOM_GLOBALS))
+                  .replace("@CLASS_REFS@", ", ".join(str(value) for value in plugin.CLASSROOM_REF_IDS)))
 
 # Saves: a script of the world waits for the quests of the plugin to run, sets a global, asks the script of the menu for a
 # save, changes the state (the global, and quest C, which has not been started) and asks the menu for the game to be loaded
@@ -2146,6 +2172,8 @@ local steps = {
         local raider = find(@RAIDER@)
         -- The raider comes from the north and faces the player: a character does not see what is behind it
         if raider then raider:teleport(raider.cell, util.vector3(@COMES@), { rotation = util.transform.rotateZ(math.pi) }) end
+        -- EXPERIMENT (round 10M): the fight is started at once, as the probes of rounds 10K and 10L did
+        if raider and '@FORCE@' == '1' then core.combat.start(core.getFormId('OFTest.esm', @RAIDER@), core.getFormId('OFTest.esm', 0x14)) end
     end },
     { 5.8, function()
         -- Experience for two levels: the level up screen opens by itself
@@ -2222,6 +2250,7 @@ for _name, _value in (("@PROBES@", ", ".join(map(str, plugin.ARENA_PROBE_STAGES)
                       ("@SETUP@", str(plugin.ARENA_SETUP_STAGE)), ("@GRENADES@", str(plugin.ARENA_GRENADE_STAGE)),
                       ("@LEVEL@", str(plugin.ARENA_LEVEL_STAGE)),
                       ("@CRAFT@", str(plugin.ARENA_CRAFT_STAGE)), ("@PINS@", str(plugin.ARENA_PINS_STAGE)),
+                      ("@FORCE@", os.environ.get("OFTEST_FORCE_COMBAT", "0")),
                       ("@COMES@", ", ".join(str(int(value)) for value in plugin.ARENA_RAIDER_COMES))):
     ARENA_SCRIPT = ARENA_SCRIPT.replace(_name, _value)
 for _key, _tag in (("armed", "ARMED"), ("weapon_out", "OUT"), ("ammo", "AMMO"), ("health", "HEALTH"),
@@ -3606,6 +3635,17 @@ def check_triggers(text):
                 problems.append(f"finder {index} should be on the seat of its chair: {distance}")
         if seen[0][2] == seen[1][2]:
             problems.append(f"the two finders took the same chair: {seen}")
+    # The seven classmates of the classroom each sit (GetSitting 3) on a place of their own, within the radius of their package
+    classroom = re.findall(r"OFTEST\tclassroom\tlater\t(\d+)\t(-?\d+)\t(\d+)\t(\d+)$", text, re.M)
+    if len(classroom) != len(plugin.CLASSROOM_NAMES):
+        problems.append(f"expected {len(plugin.CLASSROOM_NAMES)} 'classroom later' lines: {classroom}")
+    else:
+        sitting = [name for (_, value, _, _), name in zip(classroom, plugin.CLASSROOM_NAMES) if value != "3"]
+        if sitting:
+            problems.append(f"the classmates {sitting} should sit (GetSitting 3) by their packages of the type Find: "
+                            f"{classroom}")
+        if len({nearest for _, _, nearest, _ in classroom}) != len(classroom):
+            problems.append(f"the classmates should sit on places of their own: {classroom}")
     if "Quitting peacefully" not in text:
         problems.append("the log does not end with 'Quitting peacefully'")
     return problems

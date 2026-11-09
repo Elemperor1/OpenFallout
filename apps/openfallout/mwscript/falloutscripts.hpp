@@ -1359,8 +1359,9 @@ namespace OFScript
         /// and always does, a character is not so sure of its aim.
         /// `ignoreCooldown` is for an attack of V.A.T.S., which comes when the player queued it and not when the
         /// weapon is ready.
+        /// `noDamage` is for an attack of UseWeapon that hits and does no damage.
         FireResult fire(FalloutScript::FormId attacker, const OFWorld::Ptr& target, int limb = -1, double chance = 1.0,
-            bool ignoreCooldown = false);
+            bool ignoreCooldown = false, bool noDamage = false);
 
         /// V.A.T.S.: what the player's weapon and action points allow
         struct VatsState
@@ -1564,6 +1565,29 @@ namespace OFScript
         /// The character attacks the target with the weapon it holds, as far as its skill allows it to hit. A
         /// weapon that has no ammunition left is put away and the character takes another.
         FireResult attack(const OFWorld::Ptr& attacker, const OFWorld::Ptr& target);
+        /// UseWeapon: the character shoots at the target from the place, with the weapon the script names, which it
+        /// need not carry and spends no round of. The order is a package that the games make at run time; it is kept
+        /// for as long as the attacks are not made, in a cell that is loaded (it is not saved).
+        void useWeapon(FalloutScript::FormId actor, const FalloutScript::UseWeaponOrder& order) override;
+        /// What the order of a character says it does now. `mActive` is false for a character with no order, one whose
+        /// attacks are all made, and one whose target is gone (not in a loaded cell, disabled or dead): the order is
+        /// ended then. Main thread.
+        struct ScriptedAttack
+        {
+            bool mActive = false;
+            FalloutScript::UseWeaponOrder mOrder;
+            OFWorld::Ptr mTarget;
+            /// The reference it shoots from: empty when that is the character itself or is not around
+            OFWorld::Ptr mPlace;
+        };
+        ScriptedAttack scriptedAttack(const OFWorld::Ptr& actor);
+        bool hasScriptedAttack(const OFWorld::Ptr& actor) const;
+        /// An attack of the order, when the weapon is ready again: a hit when the order says so or the character's aim
+        /// is good enough. Main thread.
+        FireResult scriptedShot(const OFWorld::Ptr& actor, const OFWorld::Ptr& target);
+        /// Why `attack` has not fired for a while, in a line for the log: the weapon, its range, the rounds against
+        /// what a shot uses, the time until it is ready again
+        std::string attackDiagnosis(const OFWorld::Ptr& attacker);
         /// The character does not fight any more (it ran far enough from its target, or lost it)
         void endFight(const OFWorld::Ptr& actor);
         /// Whether the character may go for the player on sight at all: its aggression is more than none
@@ -1928,6 +1952,10 @@ namespace OFScript
         bool hasLoaded3D(FalloutScript::FormId reference) override;
         FalloutScript::SkyWeather sky() override;
         bool playerSleeping() override { return mPlayerSleeping; }
+        /// The engine has no crime system: nobody sees a crime, so every count is the 0 that a clean player has in the
+        /// executables (the commands that ask are the greeting lines of the characters)
+        int majorCrimeCount(FalloutScript::FormId) override { return 0; }
+        bool playerMovingIntoNewSpace() override { return mPlayerMoving; }
         bool inZone(FalloutScript::FormId reference, FalloutScript::FormId zone) override;
         bool talksThroughActivator(FalloutScript::FormId actor) override;
 
@@ -1990,6 +2018,18 @@ namespace OFScript
         /// sQuickSaving and sQuickLoading, 2 seconds, the neutral face) and when that cannot be done (sCantQuickSave
         /// and sCantQuickLoad, the sad face), Mac round 12BQ A1. A save made by the autosave has none.
         void quickNote(bool save, bool denied);
+
+        /// The player is about to be moved through a door or by a fast travel (the two moves that the executables
+        /// flag; a move that a script makes, and a walk from one exterior cell to the next, do not count). The
+        /// executables hold the flag for the whole move, a loading screen long; here the move is done within a frame,
+        /// so the scripts of the next pass still see the flag on, and it goes off when they have run.
+        void playerMoveBegins()
+        {
+            mPlayerMoving = true;
+            mPlayerMoveDone = false;
+        }
+        /// The move is done; the flag goes off after the scripts of the next pass
+        void playerMoveEnds() { mPlayerMoveDone = true; }
 
     private:
         /// The voice file of the line that the speaker says, empty when the data has none
@@ -2469,6 +2509,10 @@ namespace OFScript
         std::map<FalloutScript::FormId, FalloutScript::FormId> mTalkingActors;
         /// Whether the player sleeps (IsPCSleeping)
         std::atomic<bool> mPlayerSleeping{ false };
+        /// Whether the player is being moved into another space (IsPlayerMovingIntoNewSpace), and whether the move is
+        /// over
+        std::atomic<bool> mPlayerMoving{ false };
+        std::atomic<bool> mPlayerMoveDone{ false };
         /// The objects that follow the state of another one (their enable parent)
         FalloutScript::EnableParents mEnableParents;
         bool mEnableParentsRead = false;
@@ -2513,6 +2557,13 @@ namespace OFScript
         /// The packages that scripts gave characters, the last given at the end. They stay while the character's cell
         /// is not loaded.
         std::map<FalloutScript::FormId, std::vector<FalloutScript::FormId>> mScriptPackages;
+        /// The attacks that scripts told characters to make (UseWeapon), and how many each has made. Main thread.
+        struct ScriptedOrder
+        {
+            FalloutScript::UseWeaponOrder mOrder;
+            int mMade = 0;
+        };
+        std::map<FalloutScript::FormId, ScriptedOrder> mScriptedAttacks;
         FalloutScript::AiMemory mAi;
         /// The kinds of save that scripts asked for and that were not made yet, one bit for each
         std::atomic<unsigned> mSaveRequests{ 0 };

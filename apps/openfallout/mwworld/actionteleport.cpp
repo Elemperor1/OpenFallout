@@ -11,6 +11,8 @@
 #include "../mwmechanics/actorutil.hpp"
 #include "../mwmechanics/creaturestats.hpp"
 
+#include "../mwscript/falloutscripts.hpp"
+
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
 #include "../mwworld/worldmodel.hpp"
@@ -56,7 +58,13 @@ namespace OFWorld
         if (actor == world->getPlayerPtr())
         {
             world->getPlayer().setTeleported(true);
+            // IsPlayerMovingIntoNewSpace is on while a door or a fast travel moves the player
+            OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+            if (scripts != nullptr)
+                scripts->playerMoveBegins();
             world->changeToCell(mCellId, mPosition, true);
+            if (scripts != nullptr)
+                scripts->playerMoveEnds();
             teleported = world->getPlayerPtr();
         }
         else

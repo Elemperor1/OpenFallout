@@ -34,6 +34,10 @@ namespace
     constexpr std::uint16_t OpResetAI = 0x11FA;
     constexpr std::uint16_t OpGetCurrentAIPackage = 0x106E;
     constexpr std::uint16_t OpGetOffersServicesNow = 0x10FF;
+    constexpr std::uint16_t OpUseWeapon = 0x119C;
+    constexpr FormId pistol = 0x01004000;
+    constexpr FormId marker = 0x01004001;
+    constexpr FormId victim = 0x01004002;
 
     class FakeActors : public FalloutScript::PackageWorld
     {
@@ -44,7 +48,12 @@ namespace
         std::map<FormId, FormId> mCurrent;
         std::map<FormId, int> mTypes;
         std::set<FormId> mOffering;
+        std::vector<std::pair<FormId, FalloutScript::UseWeaponOrder>> mOrders;
 
+        void useWeapon(FormId actor, const FalloutScript::UseWeaponOrder& order) override
+        {
+            mOrders.emplace_back(actor, order);
+        }
         void addScriptPackage(FormId actor, FormId package) override { mPackages[actor].push_back(package); }
         void removeScriptPackage(FormId actor) override
         {
@@ -214,5 +223,86 @@ namespace
         run.mActors.mOffering.insert(guard);
         EXPECT_EQ(offers(guard), 1.0);
         EXPECT_EQ(offers(otherGuard), 0.0);
+    }
+
+    TEST(FalloutScriptPackageCommandsTest, use_weapon_tells_the_character_to_shoot_with_the_flags_the_script_gives)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t weapon = builder.form(pistol);
+        const std::uint16_t place = builder.form(marker);
+        const std::uint16_t target = builder.form(victim);
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + command(OpUseWeapon,
+                arguments(8)
+                    .add(refArg(weapon))
+                    .add(refArg(place))
+                    .add(refArg(target))
+                    .add(intArg(6))
+                    .add(intArg(0))
+                    .add(intArg(0))
+                    .add(intArg(1))
+                    .add(intArg(1)))
+            + end());
+        setup.addScript(builder);
+        setup.mObjects.add(guard, scriptOfGuards);
+
+        setup.mObjects.trigger(guard, BlockType::OnActivate);
+
+        ASSERT_EQ(setup.mActors.mOrders.size(), 1u);
+        EXPECT_EQ(setup.mActors.mOrders[0].first, guard);
+        const FalloutScript::UseWeaponOrder& order = setup.mActors.mOrders[0].second;
+        EXPECT_EQ(order.mWeapon, pistol);
+        EXPECT_EQ(order.mLocation, marker);
+        EXPECT_EQ(order.mTarget, victim);
+        EXPECT_EQ(order.mAttacks, 6);
+        EXPECT_FALSE(order.mCrouchToReload);
+        EXPECT_FALSE(order.mHoldFire);
+        EXPECT_TRUE(order.mAlwaysHit);
+        EXPECT_TRUE(order.mNoDamage);
+        EXPECT_EQ(order.mTargetLocation, 0u);
+        EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
+    TEST(FalloutScriptPackageCommandsTest, use_weapon_leaves_the_flags_the_script_does_not_give_at_their_defaults)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t weapon = builder.form(pistol);
+        const std::uint16_t place = builder.form(guard);
+        const std::uint16_t target = builder.form(victim);
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + command(
+                OpUseWeapon, arguments(4).add(refArg(weapon)).add(refArg(place)).add(refArg(target)).add(intArg(3)))
+            + end());
+        setup.addScript(builder);
+        setup.mObjects.add(guard, scriptOfGuards);
+
+        setup.mObjects.trigger(guard, BlockType::OnActivate);
+
+        ASSERT_EQ(setup.mActors.mOrders.size(), 1u);
+        const FalloutScript::UseWeaponOrder& order = setup.mActors.mOrders[0].second;
+        EXPECT_EQ(order.mAttacks, 3);
+        EXPECT_TRUE(order.mCrouchToReload);
+        EXPECT_TRUE(order.mHoldFire);
+        EXPECT_FALSE(order.mAlwaysHit);
+        EXPECT_FALSE(order.mNoDamage);
+    }
+
+    TEST(FalloutScriptPackageCommandsTest, use_weapon_without_a_weapon_is_not_an_order)
+    {
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t place = builder.form(guard);
+        const std::uint16_t target = builder.form(victim);
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + command(OpUseWeapon, arguments(4).add(intArg(0)).add(refArg(place)).add(refArg(target)).add(intArg(3)))
+            + end());
+        setup.addScript(builder);
+        setup.mObjects.add(guard, scriptOfGuards);
+
+        setup.mObjects.trigger(guard, BlockType::OnActivate);
+
+        EXPECT_THAT(setup.mActors.mOrders, IsEmpty());
     }
 }

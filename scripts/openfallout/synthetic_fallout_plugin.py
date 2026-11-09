@@ -34,6 +34,7 @@ writes `OFTest.esm`, `OFTestMod.esp` (a mod that has it as its master), `meshes/
 """
 import argparse
 import math
+import os
 import struct
 from pathlib import Path
 
@@ -498,7 +499,7 @@ ARENA_BYSTANDER_PLACE = (0.0, -700.0, 0.0)
 # The raider starts where the player does not see it from, beyond the 2500 units that a character sees, and is put where
 # it can see the player when the test says so
 ARENA_RAIDER_PLACE = (-1800.0, 1800.0, 0.0)
-ARENA_RAIDER_COMES = (0.0, 560.0, 0.0)
+ARENA_RAIDER_COMES = (0.0, float(os.environ.get("OFTEST_RAIDER_Y", "560")), 0.0)
 ARENA_RIFLE_DAMAGE = 10
 ARENA_PISTOL_DAMAGE = 10
 ARENA_PISTOL_RANGE = 1200.0
@@ -638,7 +639,7 @@ LOD_LAND_ID = 0x987
 MAP_FIND_REF_ID = 0x9A3 # a map marker in the open world, hidden until the player walks up to it
 MAP_FIND_PLACE = (200.0, 300.0)
 MAP_FIND_NAME = "Test Find"
-LAST_ID = 0x9A7 # the largest form ID of the plugin, which the next object ID of its header follows
+LAST_ID = 0xF70 # the largest form ID of the plugin, which the next object ID of its header follows
 # What the packages tell scripts. The Travel package of the walker has a script for each of its events (its script
 # counts them: it is begun once, done once when the walker gets there, and changed once after that, as no other package is
 # on and the done one is over for the walker), and so has the package that
@@ -705,6 +706,33 @@ FINDER_RADIUS = 350
 FINDER_OBJECT_TYPE_FURNITURE = 11
 FINDER_PLACES = {"marker": (900.0, -1500.0), "chairs": ((800.0, -1500.0), (1000.0, -1500.0), (900.0, -950.0)),
                  "finders": ((880.0, -1650.0), (920.0, -1650.0))}
+# The classroom of Vault 101 (CG03, round 10M), at the scale of the real data: seven characters, each with a Find package for
+# furniture within 350 units (400 for the one who is last) of a marker, and eight pieces of furniture there (two chairs, and six desks
+# whose model has two entries of which the record enables one). Each of the seven must end up sitting (GetSitting 3) on a place
+# of its own. The places are those of the cell of Vault 101 (the offsets from its marker, in units); the models are the two of the
+# game, a desk with the entries (-51.3, -0.5) and (51.8, -0.5) of the kinds 11 and 12.
+CLASSROOM_MARKER_REF_ID = 0xF57
+CLASSROOM_CENTER = (1500.0, 1500.0)
+CLASSROOM_DESK_MESH = "openfallout\\vaultdesk.nif"
+CLASSROOM_DESK_ENTRIES = (((-51.3, -0.5, 0.0), 1570, 11), ((51.8, -0.5, 0.0), 4712, 12))
+CLASSROOM_CHAIR_ID = 0xF58 # the desk model, entry 0 enabled: the chairs and the desks on the left
+CLASSROOM_DESK_RIGHT_ID = 0xF59 # the desk model, entry 1 enabled
+CLASSROOM_RADIUS = 350
+CLASSROOM_LAST_RADIUS = 400
+CLASSROOM_NAMES = ("Amata", "Butch", "Paul", "Wally", "Freddie", "Christine", "Susie")
+CLASSROOM_BASE_IDS = tuple(0xF20 + index for index in range(7))
+CLASSROOM_SCRIPT_IDS = tuple(0xF30 + index for index in range(7))
+CLASSROOM_GLOBALS = tuple((0xF38 + index, "OFTestClass" + name) for index, name in enumerate(CLASSROOM_NAMES))
+CLASSROOM_PACKAGE_IDS = tuple(0xF40 + index for index in range(7))
+CLASSROOM_REF_IDS = tuple(0xF50 + index for index in range(7))
+# Where each of them starts, from the marker (the real data of Vault 101)
+CLASSROOM_START = ((465.8, 310.3), (191.2, 483.9), (187.0, 543.9), (207.9, 602.5), (-53.1, 493.7), (250.6, 11.3),
+                   (248.1, 45.3))
+# The furniture: base (0 chair or desk on the left, 1 desk on the right) and the offset from the marker
+CLASSROOM_FURNITURE = ((0, 134.0, -25.0), (0, 134.0, 72.0), (1, -158.0, -29.0), (1, -158.0, 67.0), (0, 133.0, 168.0),
+                       (1, -157.0, 165.0), (0, 132.0, 265.0), (1, -158.0, 264.0))
+CLASSROOM_FURNITURE_REF_IDS = tuple(0xF60 + index for index in range(8))
+
 # A speaker: a character with a Dialogue package of the kind Say To, which sends it to the player (it stops within
 # SPEAKER_DISTANCE of the player) to say a topic with one response, once. The package is done when the line is over, and its
 # script counts that.
@@ -1693,6 +1721,55 @@ def finder_references():
               for form_id, place, base in zip(FINDER_REF_IDS, FINDER_PLACES["finders"], FINDER_IDS))]
 
 
+def classroom_place(offset):
+    return (CLASSROOM_CENTER[0] + offset[0], CLASSROOM_CENTER[1] + offset[1], 0.0)
+
+
+def classroom_scripts():
+    """The script of each classmate (an SCPT record of type 0): every frame its global is what GetSitting says."""
+    sf = fallout_script
+    records = []
+    for index, script_id in enumerate(CLASSROOM_SCRIPT_IDS):
+        script = sf.Script(0)
+        sitting = script.form(CLASSROOM_GLOBALS[index][0])
+        script.add(sf.statement(sf.SCRIPT_NAME),
+                   sf.block(sf.GAME_MODE, sf.set_to(sf.global_target(sitting), sf.call_token(sf.GET_SITTING))))
+        records.append(record(b"SCPT", script_id, [zstr(b"EDID", f"OFTestClassScript{CLASSROOM_NAMES[index]}"),
+                                                    *sf.sub_records(script)]))
+    return records
+
+
+def classroom_packages():
+    """The Find package of each classmate: furniture (object type 11) within a radius of the marker of the classroom."""
+    return [package(form_id, "OFTestClassFind" + CLASSROOM_NAMES[index], PACKAGE_FIND,
+                    (LOCATION_NEAR_REFERENCE, CLASSROOM_MARKER_REF_ID),
+                    CLASSROOM_LAST_RADIUS if CLASSROOM_NAMES[index] == "Paul" else CLASSROOM_RADIUS,
+                    target=(2, FINDER_OBJECT_TYPE_FURNITURE))
+            for index, form_id in enumerate(CLASSROOM_PACKAGE_IDS)]
+
+
+def classroom_people():
+    return [person(base, "OFTestClass" + CLASSROOM_NAMES[index], [CLASSROOM_PACKAGE_IDS[index]], dressed=False,
+                   script=CLASSROOM_SCRIPT_IDS[index]) for index, base in enumerate(CLASSROOM_BASE_IDS)]
+
+
+def classroom_furniture_bases():
+    return [record(b"FURN", form_id, [zstr(b"EDID", name), zstr(b"FULL", name), zstr(b"MODL", CLASSROOM_DESK_MESH),
+                                      sub(b"MNAM", struct.pack("<I", flags))])
+            for form_id, name, flags in ((CLASSROOM_CHAIR_ID, "OFTestClassDeskLeft", 0x40000001),
+                                         (CLASSROOM_DESK_RIGHT_ID, "OFTestClassDeskRight", 0x40000002))]
+
+
+def classroom_references():
+    """The marker, the furniture and the classmates, in the interior cell."""
+    bases = (CLASSROOM_CHAIR_ID, CLASSROOM_DESK_RIGHT_ID)
+    return [refr(CLASSROOM_MARKER_REF_ID, TARGET_MARKER_ID, classroom_place((0.0, 0.0))),
+            *(refr(form_id, bases[kind], classroom_place((x, y)), rotation=(0.0, 0.0, math.pi))
+              for form_id, (kind, x, y) in zip(CLASSROOM_FURNITURE_REF_IDS, CLASSROOM_FURNITURE)),
+            *(achr(form_id, classroom_place(start), base)
+              for form_id, start, base in zip(CLASSROOM_REF_IDS, CLASSROOM_START, CLASSROOM_BASE_IDS))]
+
+
 def speaker_packages():
     return [package(SPEAKER_PACKAGE_ID, "OFTestSpeak", PACKAGE_DIALOGUE, target=(0, PLAYER_REFERENCE),
                     distance=SPEAKER_DISTANCE, dialogue=(SPEAK_TOPIC_ID, DIALOGUE_SAY_TO),
@@ -2388,6 +2465,7 @@ def plugin():
         furniture_reference(),
         *sitter_references(),
         *finder_references(),
+        *classroom_references(),
         *speaker_references(),
         *intercom_references(),
         *mod_target_references(),
@@ -2410,6 +2488,7 @@ def plugin():
                                     for form_id, name in WORLD_QUERY_GLOBALS.values()),
                                   global_variable(SITTER_GLOBAL[0], SITTER_GLOBAL[1], b"l"),
                                   *(global_variable(form_id, name, b"l") for form_id, name in FINDER_GLOBALS),
+                                  *(global_variable(form_id, name, b"l") for form_id, name in CLASSROOM_GLOBALS),
                                   global_variable(MOD_BASE_GLOBAL_ID, MOD_BASE_GLOBAL_NAME, b"l", MOD_BASE_VALUE),
                                   global_variable(GAME_HOUR_ID, "GameHour", b"f", GAME_HOUR_RECORD_VALUE),
                                   *(global_variable(form_id, name, b"f") for form_id, name in CLOCK_GLOBALS.values()),
@@ -2425,11 +2504,11 @@ def plugin():
             + top_group(b"TACT", [intercom_base()])
             + top_group(b"ACTI", [scripted_object("interior"), scripted_object("exterior"), trigger_base(),
                                   *autoplay_objects()])
-            + top_group(b"FURN", [furniture_base()])
+            + top_group(b"FURN", [furniture_base(), *classroom_furniture_bases()])
             + top_group(b"MESG", [message(), button_message(), new_game_message()])
             + top_group(b"SCPT", [quest_script(), template_script(), object_script("interior"),
                                                  object_script("exterior"), button_script(), chargen_script(),
-                                                 new_game_script(), trigger_script(), sitter_script(), *finder_scripts(), watch_script("interior"),
+                                                 new_game_script(), trigger_script(), sitter_script(), *finder_scripts(), *classroom_scripts(), watch_script("interior"),
                                                  watch_script("exterior"), *arena_scripts(), *autoplay_scripts()])
             + top_group(b"QUST", [*quests(), chargen_quest(), new_game_quest(), arena_quest(), saved_quest()])
             + top_group(b"AMMO", [arena_ammo(), arena_ammo(ARENA_OTHER_AMMO_ID, ARENA_OTHER_AMMO_NAME)])
@@ -2443,10 +2522,12 @@ def plugin():
             + top_group(b"RCCT", arena_categories())
             + top_group(b"RCPE", arena_recipes())
             + top_group(b"WEAP", [arena_weapon(ARENA_RIFLE_ID, "OFTestArenaRifle", ARENA_RIFLE_DAMAGE, 3000.0, 2.0),
-                                  arena_weapon(ARENA_PISTOL_ID, "OFTestArenaPistol", ARENA_PISTOL_DAMAGE,
-                                               ARENA_PISTOL_RANGE, 2.0),
+                                  (real_pistol(ARENA_PISTOL_ID) if os.environ.get("OFTEST_REAL_PISTOL")
+                                   else arena_weapon(ARENA_PISTOL_ID, "OFTestArenaPistol", ARENA_PISTOL_DAMAGE,
+                                                     ARENA_PISTOL_RANGE, 2.0)),
                                   arena_weapon(ARENA_GRENADE_ID, "OFTestArenaGrenade", ARENA_PISTOL_DAMAGE,
                                                ARENA_PISTOL_RANGE, 2.0, grenade=True)])
+            + top_group(b"PROJ", [real_projectile()])
             + top_group(b"PERK", [trait_perk(TRAIT_A_ID, "OFTestTraitA", TRAIT_A_NAME, "The first trait.", True),
                                   trait_perk(TRAIT_B_ID, "OFTestTraitB", TRAIT_B_NAME, "The second trait.", True),
                                   trait_perk(NOT_A_TRAIT_ID, "OFTestPerkNotTrait", NOT_A_TRAIT_NAME, "No trait.", False)])
@@ -2459,11 +2540,12 @@ def plugin():
             + top_group(b"BPTD", [body_parts()])
             + top_group(b"RACE", [race(), race(RACE_TWO_ID, RACE_TWO_NAME)]) + top_group(b"HAIR", [hair()]) + top_group(b"ARMO", [suit()])
             + top_group(b"FACT", [faction(form_id, "OFTestFaction" + "AB"[i]) for i, form_id in enumerate(FACTION_IDS)])
-            + top_group(b"PACK", [*packages(), *sitter_packages(), *finder_packages(), *speaker_packages(),
+            + top_group(b"PACK", [*packages(), *sitter_packages(), *finder_packages(), *classroom_packages(), *speaker_packages(),
                                   *intercom_packages()])
             + top_group(b"NPC_", [person(), *package_people(), *arena_people(),
                                   person(SITTER_ID, "OFTestSitter", list(SITTER_PACKAGE_IDS), dressed=False,
                                          script=SITTER_SCRIPT_ID),
+                                  *classroom_people(),
                                   *(person(base, f"OFTestFinder{index + 1}", [FINDER_PACKAGE_ID], dressed=False,
                                            script=FINDER_SCRIPT_IDS[index]) for index, base in enumerate(FINDER_IDS)),
                                   person(SPEAKER_ID, "OFTestSpeaker", [SPEAKER_PACKAGE_ID], dressed=False),
@@ -2517,6 +2599,31 @@ def arena_recipes():
             sub(b"RCIL", struct.pack("<I", ARENA_SCRAP_ID)), sub(b"RCQY", struct.pack("<I", ARENA_RECIPE_SCRAP)),
             sub(b"RCOD", struct.pack("<I", ARENA_AMMO_ID)), sub(b"RCQY", struct.pack("<I", ARENA_RECIPE_ROUNDS))])
     return [recipe(ARENA_RECIPE_ID, "Rounds", 1), recipe(ARENA_RECIPE_HARD_ID, "Better Rounds", 100)]
+
+
+REAL_PROJECTILE_ID = 0xF11
+REAL_10MM_DNAM = bytes.fromhex(
+    "030000000000803f0000000000ff01000000003f0000003f0000000000008242000000005fcd02000f200100000080430000404400000000"
+    "080000000000803f0000803f000088410000003f000000009a99193e00000000e8ffbf406666a63f0000803f0000000029000000010000"
+    "009a99193e0000803fffffffff0000803fcdcccc3d0000803f")
+
+
+def real_pistol(form_id):
+    """EXPERIMENT (round 10M): the 10 mm pistol as Fallout3.esm has it (the 136 bytes of its DNAM, with the projectile of the
+    test), which the raider of the Fallout 3 wasteland holds."""
+    game = bytearray(REAL_10MM_DNAM)
+    struct.pack_into("<I", game, 36, REAL_PROJECTILE_ID)
+    return record(b"WEAP", form_id, [
+        zstr(b"EDID", "OFTestRealPistol"), zstr(b"FULL", "OFTestRealPistol"),
+        sub(b"DATA", struct.pack("<iifHB", 225, 150, 3.0, 9, 12)),
+        sub(b"DNAM", bytes(game)), sub(b"NAM0", struct.pack("<I", ARENA_AMMO_ID))])
+
+
+def real_projectile():
+    """EXPERIMENT (round 10M): the 10 mm bullet of Fallout3.esm: flags 0x8D, a missile, speed and range 10000."""
+    data = bytearray(68)
+    struct.pack_into("<HHfff", data, 0, 0x8D, 1, 0.0, 10000.0, 10000.0)
+    return record(b"PROJ", REAL_PROJECTILE_ID, [zstr(b"EDID", "OFTestRealBullet"), sub(b"DATA", bytes(data))])
 
 
 def arena_weapon(form_id, name, damage, max_range, attacks_per_second, grenade=False):
@@ -2892,6 +2999,8 @@ def write(out, animation=True, spline=True):
     (out / "meshes" / Path(WALL_MESH.replace("\\", "/"))).write_bytes(
         havok_wall.wall(WALL_HALF_EXTENTS, (0.0, 0.0, WALL_HALF_EXTENTS[2])))
     (out / "meshes" / Path(FURNITURE_MESH.replace("\\", "/"))).write_bytes(furniture_marker.chair([FURNITURE_ENTRY]))
+    (out / "meshes" / Path(CLASSROOM_DESK_MESH.replace("\\", "/"))).write_bytes(
+        furniture_marker.chair(CLASSROOM_DESK_ENTRIES))
     texture = out / "textures" / "sky" / "oftestclouds.dds"
     texture.parent.mkdir(parents=True, exist_ok=True)
     texture.write_bytes(cloud_texture())

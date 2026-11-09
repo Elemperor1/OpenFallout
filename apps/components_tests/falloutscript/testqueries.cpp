@@ -24,10 +24,12 @@ namespace
     constexpr FormId zoneOther = 0x01000201;
 
     constexpr std::uint16_t OpIsRaining = 0x103E;
+    constexpr std::uint16_t OpGetMajorCrimeCount = 0x1075;
     constexpr std::uint16_t OpIsPCSleeping = 0x10AF;
     constexpr std::uint16_t OpGetGameSetting = 0x1100;
     constexpr std::uint16_t OpIsInInterior = 0x112C;
     constexpr std::uint16_t OpIsActorTalkingThroughActivator = 0x11AE;
+    constexpr std::uint16_t OpIsPlayerMovingIntoNewSpace = 0x1166;
     constexpr std::uint16_t OpGetInZone = 0x11BE;
     constexpr std::uint16_t OpHasLoaded3D = 0x122E;
     constexpr std::uint16_t OpGetParentCell = 0x146D;
@@ -49,6 +51,8 @@ namespace
         std::map<FormId, FormId> mWorldspaces;
         std::set<FormId> mRestarted;
         std::set<FormId> mLoaded3;
+        std::map<FormId, int> mCrimes;
+        bool mMoving = false;
 
         bool inInterior(FormId reference) override { return mInteriors.count(reference) != 0; }
         bool hasLoaded3D(FormId reference) override { return mLoaded.count(reference) != 0; }
@@ -72,6 +76,12 @@ namespace
         }
         bool gameRestarted(FormId script) override { return mRestarted.insert(script).second; }
         bool gameLoaded(FormId script) override { return mLoaded3.insert(script).second; }
+        int majorCrimeCount(FormId actor) override
+        {
+            const auto found = mCrimes.find(actor);
+            return found == mCrimes.end() ? 0 : found->second;
+        }
+        bool playerMovingIntoNewSpace() override { return mMoving; }
         std::optional<double> gameSetting(std::string_view name) override
         {
             const auto found = mSettings.find(std::string(name));
@@ -259,5 +269,26 @@ namespace
         EXPECT_EQ(run.call(OpGetGameRestarted, 0), 0.0);
         EXPECT_EQ(run.call(OpGetGameLoaded, 0), 1.0);
         EXPECT_EQ(run.call(OpGetGameLoaded, 0), 0.0);
+    }
+
+    TEST(FalloutScriptQueriesTest, the_major_crimes_of_a_character_are_what_the_world_counts_and_none_for_no_reference)
+    {
+        Runner run;
+        run.mWorld.mCrimes[clerk] = 3;
+        EXPECT_EQ(run.call(OpGetMajorCrimeCount, clerk), 3.0);
+        EXPECT_EQ(run.call(OpGetMajorCrimeCount, item), 0.0);
+        // Called on nothing the answer is 0, as the executables give for a reference that is no character
+        EXPECT_EQ(run.call(OpGetMajorCrimeCount, 0), 0.0);
+    }
+
+    TEST(FalloutScriptQueriesTest, the_player_moves_into_a_new_space_while_the_world_says_it_does_on_any_reference)
+    {
+        Runner run;
+        EXPECT_EQ(run.call(OpIsPlayerMovingIntoNewSpace, clerk), 0.0);
+        run.mWorld.mMoving = true;
+        EXPECT_EQ(run.call(OpIsPlayerMovingIntoNewSpace, clerk), 1.0);
+        EXPECT_EQ(run.call(OpIsPlayerMovingIntoNewSpace, 0), 1.0);
+        run.mWorld.mMoving = false;
+        EXPECT_EQ(run.call(OpIsPlayerMovingIntoNewSpace, 0), 0.0);
     }
 }
