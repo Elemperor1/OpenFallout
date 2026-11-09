@@ -1453,45 +1453,53 @@ namespace OFScript
             { "sUActnQuickload", OFInput::A_QuickLoad },
             { "sUActnQuicksave", OFInput::A_QuickSave },
         };
+        OFBase::InputManager* input = OFBase::Environment::get().getInputManager();
+        // The key (or the pad's button) that is bound to an action, as the settings screen lists it
+        const auto bindingText = [&](int action, bool pad) {
+            std::string binding
+                = pad ? input->getActionControllerBindingName(action) : input->getActionKeyBindingName(action);
+            // The settings screen localises its names: here a mouse button is named by the setting of the games, a
+            // control with no key has no text, and the escaped `#` of the tags is the key itself
+            if (binding.starts_with("#{sMouse} "))
+            {
+                const unsigned button = static_cast<unsigned>(std::max(0, std::atoi(binding.c_str() + 10)));
+                const std::string_view setting = FalloutScript::mouseButtonSetting(button);
+                binding = setting.empty() ? std::string() : deviceName(setting).value_or(std::string());
+            }
+            else if (binding.starts_with("#{"))
+                binding.clear();
+            else
+                for (std::size_t at = binding.find("##"); at != std::string::npos; at = binding.find("##", at + 1))
+                    binding.erase(at, 1);
+            return binding;
+        };
         std::optional<std::string> key;
         for (const auto& [token, action] : actions)
             if (Misc::StringUtils::ciEqual(name, token))
             {
-                OFBase::InputManager* input = OFBase::Environment::get().getInputManager();
                 if (input == nullptr)
                     return std::nullopt;
-                const bool pad = input->joystickLastUsed();
-                std::string binding
-                    = pad ? input->getActionControllerBindingName(action) : input->getActionKeyBindingName(action);
-                // The settings screen localises its names: here a mouse button is named by the setting of the games, a
-                // control with no key has no text, and the escaped `#` of the tags is the key itself
-                if (binding.starts_with("#{sMouse} "))
-                {
-                    const unsigned button = static_cast<unsigned>(std::max(0, std::atoi(binding.c_str() + 10)));
-                    const std::string_view setting = FalloutScript::mouseButtonSetting(button);
-                    binding = setting.empty() ? std::string() : deviceName(setting).value_or(std::string());
-                }
-                else if (binding.starts_with("#{"))
-                    binding.clear();
-                else
-                    for (std::size_t at = binding.find("##"); at != std::string::npos; at = binding.find("##", at + 1))
-                        binding.erase(at, 1);
-                key = std::move(binding);
+                key = bindingText(action, input->joystickLastUsed());
                 break;
             }
-        // The hot keys are the number keys, the second of the eight is the swap of the ammunition (the hot key wheel
-        // and falloutvats.lua keep them), and V.A.T.S. is opened by the V key
+        // The hot keys are the keys of the eight quick key actions (the number keys unless the player moved them: the
+        // hot key wheel and falloutvats.lua read the actions), the second of them is the swap of the ammunition, and
+        // V.A.T.S. is opened by the V key
         if (!key)
         {
+            const auto hotKey = [&](int number) {
+                std::string text = input != nullptr ? bindingText(OFInput::A_QuickKey1 + number - 1, false) : "";
+                return text.empty() ? std::to_string(number) : text;
+            };
             if (Misc::StringUtils::ciEqual(name, "sUActnVats"))
                 key = "V";
             else if (Misc::StringUtils::ciEqual(name, "sUActnBlock"))
                 key = "Block";
             else if (Misc::StringUtils::ciEqual(name, "sUActnAMmoSwap"))
-                key = "2";
+                key = hotKey(2);
             else if (name.size() == 13 && Misc::StringUtils::ciEqual(name.substr(0, 12), "sUActnHotKey")
                 && name[12] >= '1' && name[12] <= '8')
-                key = std::string(1, name[12]);
+                key = hotKey(name[12] - '0');
         }
         if (key)
         {
