@@ -114,7 +114,7 @@ namespace OFScript
         const Derived::SwimBreathStep step
             = Derived::swimBreathStep(derivedSettings(), left, most, headUnder, false, health, frametime);
         mBreathLeft = step.mRemaining;
-        if (step.mDamage <= 0 || mActors.isDead(mPlayer) || world->getGodModeState())
+        if ((step.mDamage <= 0 && !step.mFatal) || mActors.isDead(mPlayer) || world->getGodModeState())
             return;
         // Out of breath the player takes a fifth of its health each second, with the sound of drowning and the flash of
         // a blow
@@ -127,7 +127,8 @@ namespace OFScript
         const std::lock_guard strikeLock(mStrikeMutex);
         const auto transitions = mActors.holdTransitions();
         mActorValues.damage(mPlayer, AV::health, step.mDamage);
-        if (mActorValues.current(mPlayer, AV::health) <= 0)
+        // (a player with less than a point of health is out as well: see SwimBreathStep::mFatal)
+        if (step.mFatal || mActorValues.current(mPlayer, AV::health) <= 0)
             mActors.kill(mPlayer);
     }
 

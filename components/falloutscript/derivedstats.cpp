@@ -114,6 +114,7 @@ namespace FalloutScript
         if (step.mRemaining < 0)
         {
             step.mDamage = settings.mSwimBreathDamage * std::trunc(health) * seconds;
+            step.mFatal = health < 1;
             step.mRemaining = 0;
         }
         return step;

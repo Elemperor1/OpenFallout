@@ -74,10 +74,15 @@ namespace FalloutScript
             double mRemaining = 0;
             /// The health that the frame took (the breath ran out)
             double mDamage = 0;
+            /// The breath is out and the health is under one point: the health counts in whole points, so the frame
+            /// takes none of it and the character would stay alive for ever. The port ends it (the executable's end
+            /// of the drowning, a call after the damage, was not traced).
+            bool mFatal = false;
         };
         /// The breath after a frame of `seconds`. With the head under the water it runs down, unless the character can
         /// breathe there; out of the breath the character takes the share of its health that the settings say for each
-        /// second (whole points of the health), and the breath stays at 0. Above the water it is full again at once.
+        /// second (whole points of the health, and a character with less than one point dies), and the breath stays at
+        /// 0. Above the water it is full again at once.
         SwimBreathStep swimBreathStep(const DerivedStatSettings& settings, double remaining, double longest,
             bool headUnder, bool breathesWater, double health, double seconds);
 

@@ -2090,6 +2090,10 @@ namespace OFGui
         mSelectedSpell = ESM::RefId();
         mCustomMarkers.clear();
 
+        // The air meter is not part of the display that the scripts of the game that is left take down with them
+        if (mAirMeter)
+            mAirMeter->hide();
+
         mForceHidden = GW_None;
         mRestAllowed = true;
 

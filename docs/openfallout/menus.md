@@ -1045,7 +1045,10 @@ its older drawing for a data folder that lacks the file.
   and 10, `fAVDHealRateEndurance6Bonus` to `10Bonus`, so 10 to 15 seconds). With the head under the water (the point at 0.875 of
   the height is) the breath runs down one second for each second; with the head out it is full again at once. When it is gone
   the player loses `fActorSwimBreathDamage` (0.2) times its health (whole points) for each second, with the sound
-  `NPCHumanDrowning` and the flash of a blow, and dies when the health is gone. Only the player is hurt by it. The
+  `NPCHumanDrowning` and the flash of a blow, and dies when the health is gone. The health counts in whole points, so the
+  damage is none below one point and the player would stay at a fraction of a point for ever; the port kills a player with
+  less than a point when the breath is out (the executable's call after the damage, 0x8A7D50, was not traced). Only the
+  player is hurt by it. The
   executable asks for the magic effect of water breathing and for the actor's CanBreatheAir and CanBreatheWater; the port has
   none of them yet, so the breath runs down whenever the head is under. The engine's own drowning (20 seconds, 3 points a
   second) is off for the player. The meter is the tile `BreathMeter` of the file, the model `AirTimer01.NIF` (a ring of 16

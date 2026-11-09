@@ -377,6 +377,37 @@ namespace
         EXPECT_DOUBLE_EQ(step.mDamage, 0);
     }
 
+    TEST(FalloutScriptDerivedStatsTest, a_character_out_of_breath_with_less_than_a_point_of_health_dies)
+    {
+        const DerivedStatSettings settings = settingsOf({});
+        // The health counts in whole points, so the damage is none, and the character would stay at a fraction of a
+        // point for ever
+        auto step = swimBreathStep(settings, 0, 12.5, true, false, 0.6, 0.016);
+        EXPECT_DOUBLE_EQ(step.mDamage, 0);
+        EXPECT_TRUE(step.mFatal);
+        // One point is still damaged, and not killed
+        step = swimBreathStep(settings, 0, 12.5, true, false, 1.0, 0.016);
+        EXPECT_DOUBLE_EQ(step.mDamage, 0.2 * 1 * 0.016);
+        EXPECT_FALSE(step.mFatal);
+        // Nothing of this while there is breath, or above the water
+        EXPECT_FALSE(swimBreathStep(settings, 5, 12.5, true, false, 0.6, 0.016).mFatal);
+        EXPECT_FALSE(swimBreathStep(settings, 0, 12.5, false, false, 0.6, 0.016).mFatal);
+        EXPECT_FALSE(swimBreathStep(settings, 0, 12.5, true, true, 0.6, 0.016).mFatal);
+        // Run from 200 health at 60 frames a second the health runs down to a point and then the character dies
+        double health = 200;
+        double seconds = 0;
+        bool dead = false;
+        while (!dead && seconds < 120)
+        {
+            const auto next = swimBreathStep(settings, 0, 12.5, true, false, health, 1.0 / 60);
+            health -= next.mDamage;
+            dead = next.mFatal;
+            seconds += 1.0 / 60;
+        }
+        EXPECT_TRUE(dead);
+        EXPECT_LT(seconds, 60);
+    }
+
     TEST(FalloutScriptDerivedStatsTest, a_character_that_breathes_water_keeps_its_breath_under_it)
     {
         const DerivedStatSettings settings = settingsOf({});
