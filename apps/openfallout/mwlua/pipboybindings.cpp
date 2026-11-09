@@ -791,7 +791,11 @@ namespace OFLua
         // The game's own box for the death has these: whether there is a save to reload, loading the most recent one,
         // and the main menu (which opens the menu that Escape does)
         api["hasRecentSave"] = []() { return OFBase::Environment::get().getStateManager()->hasRecentSave(); };
-        api["reloadRecent"] = []() { OFBase::Environment::get().getStateManager()->loadRecent(); };
+        api["reloadRecent"] = [manager = context.mLuaManager]() {
+            // (with no save to load it opens the main menu, which is not done while the world is drawn)
+            manager->addAction(
+                [] { OFBase::Environment::get().getStateManager()->loadRecent(); }, "Pipboy.reloadRecent");
+        };
         api["openMainMenu"] = [manager = context.mLuaManager]() {
             manager->addAction([] { OFBase::Environment::get().getWindowManager()->pushGuiMode(OFGui::GM_MainMenu); },
                 "Pipboy.openMainMenu");
