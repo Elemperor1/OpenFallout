@@ -1054,7 +1054,8 @@ namespace OFRender
             else
                 mPlayerBody->clear();
         }
-        mPlayerBody->setPose(scripts->furnitureKindOf(player));
+        // The games do not lie the player down to sleep: the screen fades and the hours pass
+        mPlayerBody->setPose(scripts->isPlayerSleeping() ? 0 : scripts->furnitureKindOf(player));
     }
 
     void RenderingManager::updatePlayerPtr(const OFWorld::Ptr& ptr)

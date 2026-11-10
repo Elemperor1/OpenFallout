@@ -1641,6 +1641,9 @@ namespace OFScript
         /// The kind of the entry of the furniture the actor uses (the position reference byte of the model: 1 to 9
         /// lying, 10 to 20 sitting), 0 when it uses none
         int furnitureKindOf(const OFWorld::Ptr& actor) const;
+        /// Whether the player is sleeping on a bed now (the hours pass behind a fade: the games do not lie the player
+        /// down)
+        bool isPlayerSleeping() const { return mPlayerSleeping; }
         /// How many more characters can use the furniture: the entries of its marker that the record enables and that
         /// no one uses (0 when the model has none)
         int freeFurniturePlaces(const OFWorld::Ptr& furniture);
@@ -2769,8 +2772,8 @@ namespace OFScript
             bool mFinish = false;
             /// The screen of a sleep was made dark (it is made light again when the sleep ends)
             bool mFaded = false;
-            /// The seconds that the sleeper still lies in the dark before the time starts to pass
-            double mFadeHold = 0;
+            /// The seconds of the hour that is passing (an hour passes in a second)
+            double mTickSeconds = 0;
         };
         RestState mRest;
         /// A door or container whose lock was just opened, and the seconds before it is activated again
@@ -2781,11 +2784,12 @@ namespace OFScript
         };
         std::optional<Reactivation> mReactivate;
         float mDiscoveryTimer = 0;
-        /// The hours of waiting that pass for each second of play while the player waits or sleeps
-        static constexpr double sRestHoursPerSecond = 4.0;
-        /// The seconds that the screen takes to go dark when the player lies down to sleep, and to get light again when
-        /// it gets up (a stand-in: the games' own times are not read)
-        static constexpr float sRestFadeSeconds = 1.0f;
+        /// The seconds that a game hour takes while the player waits or sleeps (M13 executable reads: the menu counts
+        /// the hours one for each second, and drops what is left of the second)
+        static constexpr double sRestSecondsPerHour = 1.0;
+        /// The seconds that the screen takes to go dark when the player sleeps, and to get light again when the sleep
+        /// ends (fFadeToBlackFadeSeconds, which neither master has: the executables' default)
+        static constexpr float sRestFadeSeconds = 0.3f;
         /// Moves the game of hacking, waiting and sleeping on; every frame, even while a screen stops the world
         void updateInteraction(float frametime);
         /// Makes the save that a script asked for, when the interface allows one

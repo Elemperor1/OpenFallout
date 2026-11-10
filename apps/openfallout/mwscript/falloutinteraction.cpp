@@ -1044,14 +1044,14 @@ namespace OFScript
         }
         if (sleeping && bed != 0)
         {
-            // The player lies on the bed all the time it sleeps: put on it by the entry of the bed's marker as a
-            // character is (its body lies there in the third person), and it is as far as GetSleeping and the questions
-            // about the furniture of a character are asked
+            // The game does not lay the player on the bed (M13 executable reads: the activation of a bed opens the menu
+            // where the player stands, with no walk to the entry, no lying pose and no getting up): the player is on
+            // the bed all the time it sleeps only as far as GetSleeping and the questions about the furniture of a
+            // character are asked
             const OFWorld::Ptr player = OFBase::Environment::get().getWorld()->getPlayerPtr();
             const OFWorld::Ptr furniture = findReference(bed);
-            if (!player.isEmpty() && !furniture.isEmpty() && !useFurniture(player, furniture, true))
+            if (!player.isEmpty() && !furniture.isEmpty())
             {
-                // A bed with no free entry (or none the record enables): the player sleeps where it stands
                 const std::lock_guard furnitureLock(mFurnitureMutex);
                 FurnitureUse& use = mFurniture[mPlayer];
                 use.mFurniture = bed;
@@ -1065,6 +1065,7 @@ namespace OFScript
         mRest.mActive = true;
         mRest.mTotal = std::clamp(hours, 1.0, 24.0);
         mRest.mDone = 0;
+        mRest.mTickSeconds = 0;
         mRest.mStopped.clear();
         mPlayerSleeping = sleeping;
         return std::string();
@@ -1299,11 +1300,12 @@ namespace OFScript
 
     void FalloutScripts::updateRest(float frametime)
     {
+        namespace AV = FalloutScript::ActorValue;
         bool sleeping = false;
         FalloutScript::FormId bed = 0;
-        double step = 0;
         bool finish = false;
         bool fadeOut = false;
+        bool hour = false;
         {
             const std::lock_guard lock(mInteractionMutex);
             if (!mRest.mActive)
@@ -1313,15 +1315,17 @@ namespace OFScript
             finish = mRest.mFinish;
             if (sleeping && !mRest.mFaded)
             {
-                // The screen goes dark as the player lies down, and the time does not pass until it is dark
+                // The screen goes dark as the sleep begins (waiting leaves it as it is), and stays dark until the end
                 mRest.mFaded = true;
-                mRest.mFadeHold = sRestFadeSeconds;
                 fadeOut = true;
             }
-            if (mRest.mFadeHold > 0)
-                mRest.mFadeHold = std::max(0.0, mRest.mFadeHold - frametime);
-            else
-                step = std::min(mRest.mTotal - mRest.mDone, static_cast<double>(frametime) * sRestHoursPerSecond);
+            // One game hour passes for each second of the frames; what is left of the second after the hour is dropped
+            mRest.mTickSeconds += frametime;
+            if (mRest.mTickSeconds >= sRestSecondsPerHour)
+            {
+                mRest.mTickSeconds = 0;
+                hour = !finish;
+            }
         }
         if (fadeOut)
         {
@@ -1338,41 +1342,50 @@ namespace OFScript
             if (stopped.empty())
                 stopped = "You were interrupted.";
             finish = true;
+            hour = false;
         }
-        else if (!finish && step > 0)
-            OFBase::Environment::get().getWorld()->advanceTime(step);
+        else if (hour)
+        {
+            OFBase::Environment::get().getWorld()->advanceTime(1.0);
+            // The hour heals as any hour does: by the heal rate of the player
+            if (!mActors.isDead(mPlayer))
+                mActorValues.restore(mPlayer, AV::health, std::max(mActorValues.current(mPlayer, AV::healRate), 0.0));
+        }
 
         double done = 0;
+        bool completed = false;
         {
             const std::lock_guard lock(mInteractionMutex);
-            if (!finish)
-                mRest.mDone += step;
+            if (hour)
+                mRest.mDone += 1.0;
             done = mRest.mDone;
-            if (mRest.mDone + 1e-9 >= mRest.mTotal)
+            if (!finish && mRest.mDone + 1e-9 >= mRest.mTotal)
+            {
                 finish = true;
+                completed = true;
+            }
         }
         if (!finish)
             return;
 
-        // Sleep heals: the stand-in is a full recovery in eight hours of it
-        if (sleeping && done > 0)
+        // The last hour of a sleep that was not stopped gives back all the health and fatigue and the condition of
+        // every part of the body (the executables skip it in the hardcore mode of New Vegas, which the port has not)
+        if (sleeping && completed)
         {
-            namespace AV = FalloutScript::ActorValue;
-            const double most = mActorValues.permanent(mPlayer, AV::health);
-            mActorValues.restore(mPlayer, AV::health, most * done / 8.0);
+            constexpr double all = 1.0e9;
+            mActorValues.restore(mPlayer, AV::health, all);
+            mActorValues.restore(mPlayer, AV::fatigue, all);
+            for (int part = AV::firstCondition; part <= AV::lastCondition; ++part)
+                mActorValues.restore(mPlayer, part, all);
         }
         mPlayerSleeping = false;
         if (sleeping)
         {
-            // The player gets up from the bed: it stands at the entry it lay down from
-            bool onTheBed = false;
-            {
-                const std::lock_guard furnitureLock(mFurnitureMutex);
-                const auto found = mFurniture.find(mPlayer);
-                onTheBed = found != mFurniture.end() && found->second.mFurniture == bed;
-            }
-            if (onTheBed)
-                leaveFurniture(OFBase::Environment::get().getWorld()->getPlayerPtr());
+            // The player gets up from the bed
+            const std::lock_guard furnitureLock(mFurnitureMutex);
+            const auto found = mFurniture.find(mPlayer);
+            if (found != mFurniture.end() && found->second.mFurniture == bed)
+                mFurniture.erase(found);
         }
         const int hours = static_cast<int>(std::floor(done + 1e-9));
         if (stopped.empty() && hours > 0)
@@ -1383,7 +1396,6 @@ namespace OFScript
             const std::lock_guard lock(mInteractionMutex);
             faded = mRest.mFaded;
             mRest.mFaded = false;
-            mRest.mFadeHold = 0;
         }
         if (faded)
         {
