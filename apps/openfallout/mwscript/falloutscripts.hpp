@@ -98,6 +98,7 @@ namespace ESM
 namespace ESM4
 {
     struct AIPackage;
+    struct Armor;
     struct IdleAnimation;
     struct Weapon;
 }
@@ -1871,6 +1872,13 @@ namespace OFScript
             ESM4::Npc mRecord;
         };
         bool lookPreview(LookPreview& preview);
+        /// What the body of the player is made from in third person: the look as `lookPreview` makes it, and the armor
+        /// the player wears (the pieces of the record that the player's items stand for). False when the player has no
+        /// look to draw (no plugin of Fallout is loaded).
+        bool playerBody(LookPreview& preview, std::vector<const ESM4::Armor*>& armor);
+        /// A number that changes when what `playerBody` gives changes (the sex, race or look, an item put on or taken
+        /// off), cheap enough to ask every frame
+        std::uint64_t playerBodyRevision();
         /// The traits of the data (New Vegas), by name; the picture is the `ICON` of the perk, which the trait menu of
         /// the executable shows beside the description
         struct ChargenTrait

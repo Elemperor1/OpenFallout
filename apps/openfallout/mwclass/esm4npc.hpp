@@ -154,6 +154,9 @@ namespace OFClass
         /// record it was made from, and wears nothing: what the screen of the face shows of the player, whose own
         /// record is not what the player picked. `traits` must outlive the character.
         static void setLook(const OFWorld::Ptr& ptr, const ESM4::Npc& traits);
+        /// The character wears these pieces of armor (and nothing else) in place of what its record dresses it in: what
+        /// the body of the player shows of the armor the player has put on. The records must outlive the character.
+        static void setWornArmor(const OFWorld::Ptr& ptr, const std::vector<const ESM4::Armor*>& armor);
         /// The half extents of the body that the character is solid as (the cylinder of its physics body), from the
         /// height of its race
         static osg::Vec3f getBodyHalfExtents(const OFWorld::Ptr& ptr);

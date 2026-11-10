@@ -12,6 +12,7 @@
 
 #include <osgUtil/IncrementalCompileOperation>
 
+#include <cstdint>
 #include <deque>
 #include <map>
 #include <memory>
@@ -97,6 +98,7 @@ namespace OFRender
     class FogManager;
     class SkyManager;
     class NpcAnimation;
+    class FalloutPlayerBody;
     class Pathgrid;
     class Camera;
     class Water;
@@ -320,6 +322,9 @@ namespace OFRender
         void reportStats() const;
 
         void updateNavMesh();
+        /// Keeps the body of the player in Fallout 3 and New Vegas up to date: made when the camera first leaves the
+        /// player's eyes and again when the look or the armor changes, shown outside the eyes, sitting where the player sits
+        void updatePlayerBody();
 
         void updateRecastMesh();
 
@@ -362,6 +367,12 @@ namespace OFRender
         std::unique_ptr<SceneUtil::ShadowManager> mShadowManager;
         osg::ref_ptr<PostProcessor> mPostProcessor;
         osg::ref_ptr<NpcAnimation> mPlayerAnimation;
+        /// What the player looks like in Fallout 3 and New Vegas outside of the player's eyes (the engine's player is a
+        /// record of the Morrowind kind with no model of its own)
+        std::unique_ptr<FalloutPlayerBody> mPlayerBody;
+        /// The look and armor (see FalloutScripts::playerBodyRevision) that was last tried; a look that cannot be made is
+        /// not tried again until it changes
+        std::optional<std::uint64_t> mPlayerBodyTried;
         osg::ref_ptr<SceneUtil::PositionAttitudeTransform> mPlayerNode;
         std::unique_ptr<Camera> mCamera;
         osg::ref_ptr<Debug::DebugDrawer> mDebugDraw;

@@ -20,13 +20,21 @@ namespace FalloutScript
         const std::lock_guard lock(mMutex);
         mWorn.clear();
         mChanges.clear();
+        ++mRevision;
     }
 
     void Equipment::noteChange(FormId actor, FormId item, bool worn)
     {
+        ++mRevision;
         constexpr std::size_t mostChanges = 1024;
         if (mChanges.size() < mostChanges)
             mChanges.push_back({ actor, item, worn });
+    }
+
+    std::uint32_t Equipment::revision() const
+    {
+        const std::lock_guard lock(mMutex);
+        return mRevision;
     }
 
     std::vector<Equipment::WornChange> Equipment::takeChanges()

@@ -50,13 +50,16 @@
 #include <components/terrain/terraingrid.hpp>
 
 #include <components/esm3/loadcell.hpp>
+#include <components/esm4/loadarmo.hpp>
 #include <components/esm4/loadcell.hpp>
+#include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadwrld.hpp>
 
 #include <components/debug/debugdraw.hpp>
 #include <components/detournavigator/navigator.hpp>
 #include <components/detournavigator/navmeshcacheitem.hpp>
 
+#include "../mwscript/falloutscripts.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
 #include "../mwworld/esmstore.hpp"
@@ -75,6 +78,7 @@
 #include "camera.hpp"
 #include "effectmanager.hpp"
 #include "falloutlod.hpp"
+#include "falloutplayerbody.hpp"
 #include "fogmanager.hpp"
 #include "groundcover.hpp"
 #include "navmesh.hpp"
@@ -448,6 +452,7 @@ namespace OFRender
 
     RenderingManager::~RenderingManager()
     {
+        mPlayerBody.reset();
         // let background loading thread finish before we delete anything else
         mWorkQueue = nullptr;
     }
@@ -780,6 +785,7 @@ namespace OFRender
             updateProjectionMatrix();
         }
         mCamera->update(dt, paused);
+        updatePlayerBody();
 
         float fogStart = mFog->getFogStart(false);
         float fogEnd = mFog->getFogEnd(false);
@@ -824,12 +830,45 @@ namespace OFRender
         mPostProcessor->setUnderwaterFlag(isUnderwater);
     }
 
+    void RenderingManager::updatePlayerBody()
+    {
+        if (mPlayerAnimation == nullptr || mPlayerNode == nullptr || !OFBase::Environment::get().hasFalloutScripts())
+            return;
+        // The player's eyes are where the camera is in the first person: the body would look out of its own head
+        const bool visible = mCamera->getMode() != Camera::Mode::FirstPerson;
+        if (mPlayerBody == nullptr)
+        {
+            if (!visible)
+                return;
+            mPlayerBody = std::make_unique<FalloutPlayerBody>(mPlayerNode, mResourceSystem);
+        }
+        mPlayerBody->setVisible(visible);
+        if (!visible)
+            return;
+        OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+        const OFWorld::Ptr& player = mPlayerAnimation->getPtr();
+        const std::uint64_t revision = scripts->playerBodyRevision();
+        if (!mPlayerBodyTried || *mPlayerBodyTried != revision)
+        {
+            mPlayerBodyTried = revision;
+            OFScript::FalloutScripts::LookPreview preview;
+            std::vector<const ESM4::Armor*> armor;
+            if (scripts->playerBody(preview, armor))
+                mPlayerBody->set(preview.mTemplate, preview.mRecord, armor, player, revision);
+            else
+                mPlayerBody->clear();
+        }
+        mPlayerBody->setPose(scripts->furnitureKindOf(player));
+    }
+
     void RenderingManager::updatePlayerPtr(const OFWorld::Ptr& ptr)
     {
         if (mPlayerAnimation.get())
         {
             setupPlayer(ptr);
             mPlayerAnimation->updatePtr(ptr);
+            // The body moves by the speed of the player's record, which is another one now
+            mPlayerBodyTried.reset();
         }
         mCamera->attachTo(ptr);
     }

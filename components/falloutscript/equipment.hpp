@@ -194,6 +194,10 @@ namespace FalloutScript
         /// OnUnequip), which the game raises when it is ready for scripts to run
         std::vector<WornChange> takeChanges();
 
+        /// A number that changes whenever an item is put on or taken off (by anyone), for whoever draws the characters
+        /// to know that what one wears has changed
+        std::uint32_t revision() const;
+
     private:
         struct Worn
         {
@@ -240,6 +244,7 @@ namespace FalloutScript
         mutable std::mutex mMutex;
         std::map<FormId, Worn> mWorn;
         std::vector<WornChange> mChanges;
+        std::uint32_t mRevision = 0;
     };
 
     /// Gives the commands about what characters hold and wear to the interpreter: EquipItem, UnequipItem, GetEquipped,

@@ -34,6 +34,11 @@ namespace OFRender
         bool canRun() const { return mGaits.mHasRun; }
         float getRunVelocity() const { return mGaits.mRunVelocity; }
 
+        /// Whose movement decides whether this actor stands, walks or runs, when it is not the actor itself: a body
+        /// that is drawn for a character that has none of its own (the player) takes the speed of that character's
+        /// place from one frame to the next
+        void setMotionSource(const OFWorld::Ptr& source) { mMotionSource = source; }
+
         /// The actor is dead: it stops in the pose it has and falls, a person on its back and a creature on its side,
         /// and lies where it fell (the games have it fall with a ragdoll of Havok, which this does not have). With
         /// `fallen` it lies there at once: it died before it was in sight.
@@ -132,6 +137,7 @@ namespace OFRender
         float mPoseTime = 0.f;
         bool mPoseLogged = false;
 
+        OFWorld::Ptr mMotionSource;
         std::string mWalkGroup;
         std::string mRunGroup;
         FalloutGaits mGaits;
