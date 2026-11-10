@@ -37,6 +37,16 @@ local function switch(option)
     }
 end
 
+-- An item that has a value of the game being played (the difficulty): its position is the value. The engine keeps it while
+-- a game runs (in the switches a save holds); with no game running the screen shows what the player picked
+local function level(option)
+    return {
+        option = option,
+        toIndex = function(value) return round(value) end,
+        fromIndex = function(index) return index end,
+    }
+end
+
 -- The brightness: the game's brightness meter goes from the INI's fGammaMin (the first position) to fGammaMax (the last);
 -- the engine's gamma is the inverse of the game's (the game raises the picture to the power of its value, the engine
 -- to the power of one over its own)
@@ -91,9 +101,10 @@ M.groups = {
         items = {
             -- the words of a toggle are in the order of its values: the game's code builds them from the last to the first
             toggle('killCam', 'sKillCamMode', { 'sKillCamModeNone', 'sKillCamModePlayer', 'sKillCamModeCinematic' }, 2),
-            toggle('hardcore', 'sHardcore', OFF_ON, 0),
+            toggle('hardcore', 'sHardcore', OFF_ON, 0, switch('hardcore')),
             toggle('difficulty', 'sDifficulty',
-                { 'sLockLevelNameVeryEasy', 'sLockLevelNameEasy', 'sNormal', 'sLockLevelNameHard', 'sLockLevelNameVeryHard' }, 2),
+                { 'sLockLevelNameVeryEasy', 'sLockLevelNameEasy', 'sNormal', 'sLockLevelNameHard', 'sLockLevelNameVeryHard' }, 2,
+                level('difficulty')),
             toggle('saveOnRest', 'sSaveOnRest', OFF_ON, 1),
             toggle('saveOnWait', 'sSaveOnWait', OFF_ON, 1),
             toggle('saveOnTravel', 'sSaveOnTravel', OFF_ON, 1),

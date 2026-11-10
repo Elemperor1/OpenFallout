@@ -182,6 +182,17 @@ namespace OFScript
         /// Whether the game that is played is New Vegas (Tale of Two Wastelands is played with its engine)
         bool isNewVegas() const { return mGame == FalloutScript::Game::NewVegas; }
 
+        /// The difficulty of the game, from 0 (very easy) to 4 (very hard), which the Gameplay menu sets: normal for a
+        /// game that never had it set. It is kept with the game (the switches of a save), as the number plus one, so
+        /// that the unset state reads as normal. The port keeps it in the game, as the hardcore mode is, and not in the
+        /// settings of the player (stand-in: where the executables keep it is not read).
+        int gameDifficulty() const;
+        void setGameDifficulty(int difficulty);
+        /// Whether the hardcore mode is on: the flag of the SetHardcore command, which the Gameplay menu writes too.
+        /// Only New Vegas has the mode.
+        bool hardcoreMode() const { return isNewVegas() && mSwitches.get("SetHardcore") > 0; }
+        void setHardcoreMode(bool on) { mSwitches.set("SetHardcore", on ? 1 : 0); }
+
         FalloutScripts(const OFWorld::ESMStore& store, FalloutScript::Game game,
             FalloutScript::FormId player = FalloutScript::playerReference);
 
@@ -2831,7 +2842,7 @@ namespace OFScript
         /// Whether an effect that is running on the player takes health from it (poison), which stops a rest and a trip
         bool playerTakingHealthDamage();
         /// Whether the hardcore mode is on (SetHardcore)
-        bool hardcoreOn() const { return mSwitches.get("SetHardcore") > 0; }
+        bool hardcoreOn() const { return hardcoreMode(); }
         /// The stages of a need of the hardcore mode (the records DEHY, HUNG and SLPD)
         std::vector<FalloutScript::HardcoreNeeds::Stage> hardcoreStages(int need);
         /// Lets the needs of the player go on to the time of the game, when the hardcore mode is on (and takes the

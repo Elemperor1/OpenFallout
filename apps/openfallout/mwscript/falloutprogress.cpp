@@ -420,9 +420,7 @@ namespace OFScript
             return;
         int level = 1;
         levelOf(victim, mProgress.level(), level);
-        // Normal difficulty: the game has no setting of it yet
-        constexpr int normalDifficulty = 2;
-        const int experience = FalloutScript::Levelling::killExperience(rules, creature, level, normalDifficulty);
+        const int experience = FalloutScript::Levelling::killExperience(rules, creature, level, gameDifficulty());
         if (experience > 0)
         {
             rewardExperience(experience);

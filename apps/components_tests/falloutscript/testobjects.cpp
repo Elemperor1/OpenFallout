@@ -2,6 +2,8 @@
 
 #include <components/falloutscript/objectcommands.hpp>
 #include <components/falloutscript/objects.hpp>
+#include <components/falloutscript/savescripts.hpp>
+#include <components/falloutscript/savestate.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
 
 #include <gmock/gmock.h>
@@ -442,6 +444,71 @@ namespace
         setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectFinish, 1);
         setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 2);
         EXPECT_EQ(setup.mHost.mGlobals[seen], 21);
+    }
+
+    TEST(FalloutScriptObjectsTest, a_saved_game_gives_a_running_effect_the_variables_of_its_script_back)
+    {
+        constexpr FormId effectScript = 0x01002100;
+        constexpr FormId seen = 0x01000901;
+        ScriptBuilder builder;
+        const std::uint16_t seenGlobal = builder.form(seen);
+        builder.code(scriptName() + begin(BlockType::ScriptEffectUpdate)
+            + setTo(var('s', 1), var('s', 1) + number("10") + op("+"))
+            + setTo(Bytes().u8('G').u16(seenGlobal), var('s', 1)) + end());
+        builder.variable(1, integerVariable, "count");
+
+        Runner before;
+        before.addScript(effectScript, builder);
+        before.mHost.mGlobals[seen] = -1;
+        // Two effects of the script run on the character, one of them for two frames
+        before.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 4);
+        before.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 4);
+        EXPECT_EQ(before.mHost.mGlobals[seen], 20);
+        before.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 5);
+        EXPECT_EQ(before.mHost.mGlobals[seen], 10);
+        FalloutScript::SaveWriter out;
+        FalloutScript::writeObjectScripts(before.mObjects, out);
+        const std::string bytes = out.take();
+
+        // A new game is loaded: each effect goes on from where it was, the one the save does not hold starts over
+        Runner after;
+        after.addScript(effectScript, builder);
+        after.mHost.mGlobals[seen] = -1;
+        FalloutScript::SaveReader in(bytes);
+        FalloutScript::readObjectScripts(after.mObjects, in, FalloutScript::objectScriptsSectionVersion);
+        EXPECT_TRUE(in.atEnd());
+        after.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 4);
+        EXPECT_EQ(after.mHost.mGlobals[seen], 30);
+        after.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 6);
+        EXPECT_EQ(after.mHost.mGlobals[seen], 10);
+
+        // The effect that has not run since the load is saved again as it was, and goes on after the next load
+        FalloutScript::SaveWriter again;
+        FalloutScript::writeObjectScripts(after.mObjects, again);
+        Runner third;
+        third.addScript(effectScript, builder);
+        third.mHost.mGlobals[seen] = -1;
+        const std::string second = again.take();
+        FalloutScript::SaveReader reading(second);
+        FalloutScript::readObjectScripts(third.mObjects, reading, FalloutScript::objectScriptsSectionVersion);
+        third.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 5);
+        EXPECT_EQ(third.mHost.mGlobals[seen], 20);
+
+        // The end of the effect forgets what the save held, and a save of an earlier version holds no effects
+        after.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectFinish, 5);
+        after.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 5);
+        EXPECT_EQ(after.mHost.mGlobals[seen], 10);
+        Runner old;
+        old.addScript(effectScript, builder);
+        old.mHost.mGlobals[seen] = -1;
+        FalloutScript::SaveWriter nothing;
+        nothing.count(0);
+        const std::string earlier = nothing.take();
+        FalloutScript::SaveReader version1(earlier);
+        FalloutScript::readObjectScripts(old.mObjects, version1, 1);
+        EXPECT_TRUE(version1.atEnd());
+        old.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 4);
+        EXPECT_EQ(old.mHost.mGlobals[seen], 10);
     }
 
     TEST(FalloutScriptObjectsTest, a_script_of_an_effect_that_is_unknown_or_has_no_such_block_runs_nothing)

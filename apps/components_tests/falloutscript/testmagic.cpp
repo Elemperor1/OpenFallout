@@ -407,18 +407,16 @@ namespace
         EXPECT_NE(run.mEffectIds[1], first);
     }
 
-    TEST(FalloutScriptMagicTest, a_loaded_game_numbers_the_effects_that_run_again)
+    TEST(FalloutScriptMagicTest, a_loaded_game_keeps_the_numbers_of_the_effects_that_run_and_numbers_new_ones_above)
     {
         using Stage = Magic::ScriptStage;
         Runner run;
         run.call(OpCastImmediateOnSelf, courier, { restSpell });
+        const Magic::EffectId saved = run.mEffectIds.at(0);
         FalloutScript::SaveWriter out;
         FalloutScript::writeMagic(run.mMagic, out);
 
         Runner other;
-        // A number was given before the load: the numbers of the loaded effects are not among those
-        other.mMagic.noteEffect(courier, restEffect, crate, 1);
-        const Magic::EffectId before = other.mEffectIds.at(0);
         const std::string bytes = out.take();
         FalloutScript::SaveReader in(bytes);
         FalloutScript::readMagic(other.mMagic, in, FalloutScript::magicSectionVersion);
@@ -426,8 +424,43 @@ namespace
         other.mEffectIds.clear();
         other.mMagic.update(1);
         EXPECT_THAT(other.mStages, ElementsAre(Pair(restScript, Stage::Update)));
+        // The saved variables of the script are held by this number
+        EXPECT_THAT(other.mEffectIds, ElementsAre(saved));
+
+        // What runs next does not take the number of one that runs
+        other.mEffectIds.clear();
+        other.mMagic.noteEffect(courier, restEffect, crate, 1);
         ASSERT_EQ(other.mEffectIds.size(), 1u);
-        EXPECT_NE(other.mEffectIds[0], before);
+        EXPECT_GT(other.mEffectIds[0], saved);
+    }
+
+    TEST(FalloutScriptMagicTest, a_game_saved_before_the_effects_were_numbered_numbers_them_when_it_is_loaded)
+    {
+        using Stage = Magic::ScriptStage;
+        // The section as version 1 wrote it: no spells and one running effect, without a number
+        FalloutScript::SaveWriter out;
+        out.count(0);
+        out.count(1);
+        out.form(courier);
+        out.form(restEffect);
+        out.form(restSpell);
+        out.f64(40);
+        out.i32(-1);
+        out.f64(0);
+        const std::string bytes = out.take();
+
+        Runner run;
+        run.mMagic.noteEffect(courier, flashEffect, crate, 1);
+        const Magic::EffectId before = run.mEffectIds.at(0);
+        FalloutScript::SaveReader in(bytes);
+        FalloutScript::readMagic(run.mMagic, in, 1);
+        EXPECT_TRUE(in.atEnd());
+        run.mStages.clear();
+        run.mEffectIds.clear();
+        run.mMagic.update(1);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Update)));
+        ASSERT_EQ(run.mEffectIds.size(), 1u);
+        EXPECT_GT(run.mEffectIds[0], before);
     }
 
     TEST(FalloutScriptMagicTest, an_effect_without_a_script_runs_none_and_the_scripts_wait_for_a_runner)

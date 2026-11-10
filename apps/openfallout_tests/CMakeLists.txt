@@ -38,6 +38,7 @@ file(GLOB UNITTEST_SRC_FILES
     mwrender/testwaterlook.cpp
 
     mwscript/testactorvaluetext.cpp
+    mwscript/testgameoptions.cpp
     mwscript/testscripts.cpp
 
     mwsound/testheadcache.cpp

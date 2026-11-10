@@ -158,8 +158,8 @@ namespace OFScript
         if (OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager())
             windows->activateHitOverlay();
         // The damage of a fall has no attacker and no armor: it is taken off the health as it is, after what the
-        // difficulty makes of the damage to the player (the game has no setting of it yet: normal, which is 1)
-        const double toPlayer = Fall::damageToPlayerMultiplier(Fall::normalDifficulty);
+        // difficulty of the game makes of the damage to the player
+        const double toPlayer = Fall::damageToPlayerMultiplier(gameDifficulty());
         int leftRoll = 0;
         int rightRoll = 0;
         {
@@ -411,5 +411,17 @@ namespace OFScript
         for (HudMarker& enemy : enemies)
             result.push_back(std::move(enemy));
         return result;
+    }
+
+    int FalloutScripts::gameDifficulty() const
+    {
+        // Kept as the number plus one: a switch that is 0 was never set
+        const int kept = mSwitches.get("GameDifficulty");
+        return kept > 0 ? std::clamp(kept - 1, 0, 4) : FalloutScript::FallDamage::normalDifficulty;
+    }
+
+    void FalloutScripts::setGameDifficulty(int difficulty)
+    {
+        mSwitches.set("GameDifficulty", std::clamp(difficulty, 0, 4) + 1);
     }
 }

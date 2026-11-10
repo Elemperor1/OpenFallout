@@ -360,10 +360,12 @@ namespace FalloutScript
                 out.f64(running.mRemaining);
                 out.i32(running.mActorValue);
                 out.f64(running.mDelta);
+                // The number the effect has, which the scripts that run for it are kept by (the objects section)
+                out.u64(running.mId);
             }
         }
 
-        static void read(Magic& magic, SaveReader& in, std::uint32_t)
+        static void read(Magic& magic, SaveReader& in, std::uint32_t version)
         {
             std::map<FormId, std::set<FormId>> spells;
             const std::size_t actors = in.count(8);
@@ -389,6 +391,8 @@ namespace FalloutScript
                 entry.mRemaining = in.f64();
                 entry.mActorValue = in.i32();
                 entry.mDelta = in.f64();
+                if (version >= 2)
+                    entry.mId = in.u64();
                 // What comes from a plugin that is gone is left out
                 if (actor && effect && source)
                 {
@@ -400,9 +404,15 @@ namespace FalloutScript
                 }
             }
             const std::lock_guard lock(magic.mMutex);
-            // A loaded game numbers its running effects again
+            // A game saved before the effects were numbered in it (version 1) is given numbers now. The others keep
+            // theirs, which the saved variables of their scripts are held by, and what runs next gets a number above.
             for (Magic::Running& entry : running)
-                entry.mId = ++magic.mLastId;
+            {
+                if (version < 2 || entry.mId == 0)
+                    entry.mId = ++magic.mLastId;
+                else
+                    magic.mLastId = std::max(magic.mLastId, entry.mId);
+            }
             magic.mSpells = std::move(spells);
             magic.mRunning = std::move(running);
         }

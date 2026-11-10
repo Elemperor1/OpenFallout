@@ -142,7 +142,8 @@ namespace FalloutScript
             double mDelta = 0;
             /// The script of the magic effect, 0 for one without (not saved: the records tell it)
             FormId mScript = 0;
-            /// Which effect it is among those that run (not saved: a loaded game numbers them again)
+            /// Which effect it is among those that run (saved from version 2 of the section, which the saved
+            /// variables of its script are held by; a game saved before that numbers them again when it is loaded)
             EffectId mId = 0;
         };
 
@@ -163,8 +164,9 @@ namespace FalloutScript
         EffectId mLastId = 0;
     };
 
-    /// The section of a saved game that holds the spells and the effects that run
-    constexpr std::uint32_t magicSectionVersion = 1;
+    /// The section of a saved game that holds the spells and the effects that run (version 2 holds the number of each
+    /// effect that runs)
+    constexpr std::uint32_t magicSectionVersion = 2;
     void writeMagic(Magic& magic, SaveWriter& out);
     void readMagic(Magic& magic, SaveReader& in, std::uint32_t version);
 

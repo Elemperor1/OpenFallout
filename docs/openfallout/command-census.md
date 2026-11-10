@@ -120,7 +120,7 @@ Games counted: Fallout 3, New Vegas.
 | 31 | 0x11FD | ClearNoActivationSound | 3 | 0 | 0 | 0 | 3 | 99.6% | accepted and does nothing: an activation that does nothing makes no sound |
 | 32 | 0x118D | GetCauseofDeath | 0 | 0 | 1 | 1 | 2 | 99.7% | answers -1: the cause of a death is not kept |
 | 33 | 0x1202 | SetPCToddler | 2 | 0 | 0 | 0 | 2 | 99.8% | keeps the switch and does nothing with it: the body of the player does not change with its age |
-| 34 | 0x124B | SetHardcore | 0 | 0 | 2 | 0 | 2 | 99.9% | keeps the switch and does nothing with it: the needs of the hardcore mode are not done |
+| 34 | 0x124B | SetHardcore | 0 | 0 | 2 | 0 | 2 | 99.9% | keeps the switch (the needs of the hardcore mode run from it; stimpaks over time, doctor's bags and ammo weight are not done) |
 | 35 | 0x1205 | TriggerScreenBlood | 1 | 0 | 0 | 0 | 1 | 99.9% | accepted and does nothing: the blood on the screen is not drawn |
 | 36 | 0x1231 | KillQuestUpdates | 1 | 0 | 0 | 0 | 1 | 100.0% | keeps the switch and does nothing with it: the messages of quest updates are not held back |
 | 37 | 0x1241 | ClearScreenSplatter | 0 | 0 | 1 | 0 | 1 | 100.0% | accepted and does nothing: the blood on the screen is not drawn |

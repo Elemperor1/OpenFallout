@@ -432,7 +432,10 @@ namespace
         {
             ObjectRunner after;
             SaveReader in(std::string_view(bytes).substr(0, size));
-            EXPECT_THROW(FalloutScript::readObjectScripts(after.mObjects, in, 1), SaveError) << size;
+            EXPECT_THROW(
+                FalloutScript::readObjectScripts(after.mObjects, in, FalloutScript::objectScriptsSectionVersion),
+                SaveError)
+                << size;
         }
     }
 }

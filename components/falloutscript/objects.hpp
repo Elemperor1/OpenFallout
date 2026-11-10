@@ -64,8 +64,8 @@ namespace FalloutScript
         /// Runs a block of the script of a magic effect that works on the character: ScriptEffectStart when the effect
         /// begins (the script starts over, with its variables), ScriptEffectUpdate while it runs, and ScriptEffectFinish
         /// when it ends (the script is forgotten after it). The character is the object of the script, which the
-        /// commands in it that name none act on. Returns whether the script has such a block. The variables of a script
-        /// that was running when the game was saved start over when the game is loaded.
+        /// commands in it that name none act on. Returns whether the script has such a block. A saved game holds the
+        /// variables of the scripts that run, and an effect that runs on after a load takes them with its first block.
         /// The effect number tells apart effects of one script on one character: each has its own script instance, which
         /// the end of another does not forget.
         bool runEffect(FormId character, FormId script, std::uint16_t blockType, std::uint64_t effect = 0);
@@ -136,6 +136,10 @@ namespace FalloutScript
             std::vector<double> mVariables;
         };
 
+        /// Gives the instance of a script the variables that a save held for it, unless the script has others now (one
+        /// that was changed since the save starts over, as the games do)
+        static void applySaved(Instance& instance, FormId script, const SavedInstance& state);
+
         Interpreter& mInterpreter;
         ScriptFinder mFinder;
         std::map<FormId, Object> mObjects;
@@ -148,6 +152,9 @@ namespace FalloutScript
         std::set<FormId> mLoaded;
         /// The scripts of the magic effects that work on a character: by the character, the script and the effect
         std::map<std::tuple<FormId, FormId, std::uint64_t>, std::shared_ptr<Instance>> mEffects;
+        /// The variables that a save held for the script of an effect that runs, taken when the first block of the
+        /// effect runs after the load (the effect number is the one the save gave the effect)
+        std::map<std::tuple<FormId, FormId, std::uint64_t>, SavedInstance> mSavedEffects;
         std::map<const ESM4::ScriptDefinition*, std::shared_ptr<const Script>> mPrepared;
         /// The scripts that were reported as not runnable, so that they are reported once
         std::set<FormId> mReported;
