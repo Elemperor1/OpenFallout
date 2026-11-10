@@ -125,14 +125,18 @@ namespace
         std::vector<std::pair<FormId, Magic::ScriptStage>> mStages;
         /// The effect numbers of the stages, in the same order
         std::vector<Magic::EffectId> mEffectIds;
+        /// The seconds that the stages cover (0 for all but an update), in the same order
+        std::vector<double> mSeconds;
 
         Runner()
         {
-            mMagic.setScriptRunner([this](FormId actor, FormId script, Magic::ScriptStage stage, Magic::EffectId id) {
-                EXPECT_EQ(actor, courier);
-                mStages.emplace_back(script, stage);
-                mEffectIds.push_back(id);
-            });
+            mMagic.setScriptRunner(
+                [this](FormId actor, FormId script, Magic::ScriptStage stage, Magic::EffectId id, double seconds) {
+                    EXPECT_EQ(actor, courier);
+                    mStages.emplace_back(script, stage);
+                    mEffectIds.push_back(id);
+                    mSeconds.push_back(seconds);
+                });
             mMagic.setModifier(
                 [this](FormId, int actorValue, double amount) { mChanges.emplace_back(actorValue, amount); });
             mMagic.setCaster([this](FormId, FormId spell, const std::vector<FalloutScript::SpellEffect>& effects) {
@@ -336,10 +340,13 @@ namespace
         run.mMagic.update(30);
         EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Update), Pair(restScript, Stage::Update)));
 
-        // The frame in which it runs out finishes it: there is no update for it
+        // The step in which it runs out runs its update for the seconds it was still running (40 of the 50), and then
+        // finishes it
         run.mStages.clear();
+        run.mSeconds.clear();
         run.mMagic.update(50);
-        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Finish)));
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Update), Pair(restScript, Stage::Finish)));
+        EXPECT_THAT(run.mSeconds, ElementsAre(40.0, 0.0));
         EXPECT_EQ(run.call(OpHasMagicEffect, courier, { restEffect }), 0.0);
 
         run.mStages.clear();
@@ -368,7 +375,7 @@ namespace
 
         run.mStages.clear();
         run.mMagic.update(50);
-        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Finish)));
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Update), Pair(restScript, Stage::Finish)));
         EXPECT_EQ(run.call(OpHasMagicEffect, courier, { restEffect }), 0.0);
     }
 
@@ -387,9 +394,12 @@ namespace
         run.mStages.clear();
         run.mEffectIds.clear();
         run.mMagic.update(4);
-        // The first one ends and the second goes on, each by its own number
-        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Update), Pair(restScript, Stage::Finish)));
-        EXPECT_THAT(run.mEffectIds, ElementsAre(second, first));
+        // The first one ends and the second goes on, each by its own number (the first runs its last update, for the 3
+        // seconds it had left, and then finishes)
+        EXPECT_THAT(run.mStages,
+            ElementsAre(
+                Pair(restScript, Stage::Update), Pair(restScript, Stage::Update), Pair(restScript, Stage::Finish)));
+        EXPECT_THAT(run.mEffectIds, ElementsAre(second, first, first));
     }
 
     TEST(FalloutScriptMagicTest, a_renewed_script_effect_ends_the_old_number_and_starts_a_new_one)
@@ -513,7 +523,9 @@ namespace
         run.mMagic.noteEffect(courier, restEffect, crate, 3);
         EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Start)));
         run.mMagic.update(4);
-        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Start), Pair(restScript, Stage::Finish)));
+        EXPECT_THAT(run.mStages,
+            ElementsAre(
+                Pair(restScript, Stage::Start), Pair(restScript, Stage::Update), Pair(restScript, Stage::Finish)));
     }
 
     TEST(FalloutScriptMagicTest, an_effect_that_was_running_when_the_game_was_saved_finishes_its_script_after_a_load)
@@ -535,6 +547,25 @@ namespace
         EXPECT_THAT(other.mStages, ElementsAre(Pair(restScript, Stage::Update)));
         other.mStages.clear();
         other.mMagic.update(40);
-        EXPECT_THAT(other.mStages, ElementsAre(Pair(restScript, Stage::Finish)));
+        EXPECT_THAT(other.mStages, ElementsAre(Pair(restScript, Stage::Update), Pair(restScript, Stage::Finish)));
+    }
+
+    TEST(FalloutScriptMagicTest, a_step_of_a_rest_runs_an_effect_for_the_seconds_it_was_still_running)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { restSpell });
+        run.mStages.clear();
+        run.mSeconds.clear();
+        // An effect of 100 seconds has 80 left after a step of 20, and a step of 120 seconds (an hour of rest at the
+        // time scale of 30) goes past its end
+        run.mMagic.update(20);
+        run.mMagic.update(120);
+        EXPECT_THAT(run.mStages,
+            ElementsAre(
+                Pair(restScript, Stage::Update), Pair(restScript, Stage::Update), Pair(restScript, Stage::Finish)));
+        // The first step covers all of its 20 seconds, the second only the 80 that the effect had left, and the end
+        // covers none
+        EXPECT_THAT(run.mSeconds, ElementsAre(20.0, 80.0, 0.0));
     }
 }

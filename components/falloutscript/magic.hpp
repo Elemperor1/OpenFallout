@@ -93,8 +93,11 @@ namespace FalloutScript
         /// Tells one effect that runs from another, though they are of one script on one character (a spell cast twice,
         /// an item used twice): the script of each has variables of its own
         using EffectId = std::uint64_t;
-        /// Runs the script of an effect for the stage, with the character it works on
-        using ScriptRunner = std::function<void(FormId actor, FormId script, ScriptStage stage, EffectId effect)>;
+        /// Runs the script of an effect for the stage, with the character it works on. For an update the last argument
+        /// is the seconds that the update covers (the frame, or the hour of a rest, or the part of the step that the
+        /// effect was still running when it ran out), which GetSecondsPassed tells the script; it is 0 for the others.
+        using ScriptRunner
+            = std::function<void(FormId actor, FormId script, ScriptStage stage, EffectId effect, double seconds)>;
 
         explicit Magic(MagicRecords& records);
 

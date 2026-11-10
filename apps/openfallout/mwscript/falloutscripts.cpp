@@ -478,13 +478,20 @@ namespace OFScript
         mHardcore.setStageListener([this](FalloutScript::FormId actor) { mItemUse.checkHealth(actor); });
         // An effect that runs a script (the well rested bonus of a bed) has its blocks run for the character
         mMagic.setScriptRunner([this](FalloutScript::FormId actor, FalloutScript::FormId script,
-                                   FalloutScript::Magic::ScriptStage stage, FalloutScript::Magic::EffectId effect) {
+                                   FalloutScript::Magic::ScriptStage stage, FalloutScript::Magic::EffectId effect,
+                                   double seconds) {
             using Stage = FalloutScript::Magic::ScriptStage;
+            // An update runs for the seconds it covers (a frame, an hour of rest, or what was left of the effect),
+            // which GetSecondsPassed tells the script; the value of the frame comes back after
+            const float frameSeconds = mObjects.secondsPassed();
+            if (stage == Stage::Update && seconds > 0)
+                mObjects.setSecondsPassed(static_cast<float>(seconds));
             mObjects.runEffect(actor, script,
                 stage == Stage::Start        ? FalloutScript::BlockType::ScriptEffectStart
                     : stage == Stage::Update ? FalloutScript::BlockType::ScriptEffectUpdate
                                              : FalloutScript::BlockType::ScriptEffectFinish,
                 effect);
+            mObjects.setSecondsPassed(frameSeconds);
         });
         // The conditions of a log entry of a stage are about the player, who nobody else is in the way of
         mQuests.setConditionCheck([this](const std::vector<ESM4::TargetCondition>& conditions) {

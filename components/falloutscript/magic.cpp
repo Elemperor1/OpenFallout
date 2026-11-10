@@ -118,7 +118,7 @@ namespace FalloutScript
                 modifier(actor, actorValue, amount);
         if (scripts)
             for (const auto& [script, id] : started)
-                scripts(actor, script, ScriptStage::Start, id);
+                scripts(actor, script, ScriptStage::Start, id, 0.0);
         return true;
     }
 
@@ -155,7 +155,7 @@ namespace FalloutScript
                 modifier(actor, actorValue, amount);
         if (scripts)
             for (const auto& [script, id] : finished)
-                scripts(actor, script, ScriptStage::Finish, id);
+                scripts(actor, script, ScriptStage::Finish, id, 0.0);
         return true;
     }
 
@@ -240,12 +240,12 @@ namespace FalloutScript
         if (scripts)
         {
             for (const auto& [script, id] : replaced)
-                scripts(actor, script, ScriptStage::Finish, id);
+                scripts(actor, script, ScriptStage::Finish, id, 0.0);
             for (const Started& one : started)
             {
-                scripts(actor, one.mScript, ScriptStage::Start, one.mId);
+                scripts(actor, one.mScript, ScriptStage::Start, one.mId, 0.0);
                 if (one.mAtOnce)
-                    scripts(actor, one.mScript, ScriptStage::Finish, one.mId);
+                    scripts(actor, one.mScript, ScriptStage::Finish, one.mId, 0.0);
             }
         }
     }
@@ -268,7 +268,7 @@ namespace FalloutScript
             scripts = mScripts;
         }
         if (scripts && running.mScript != 0)
-            scripts(actor, running.mScript, ScriptStage::Start, running.mId);
+            scripts(actor, running.mScript, ScriptStage::Start, running.mId, 0.0);
     }
 
     bool Magic::hasEffect(FormId actor, FormId effect)
@@ -293,6 +293,8 @@ namespace FalloutScript
             FormId mActor;
             FormId mScript;
             EffectId mId;
+            /// The seconds of the step that the effect was still running for
+            double mSeconds;
         };
         std::vector<Scripted> running;
         std::vector<Scripted> finished;
@@ -302,16 +304,17 @@ namespace FalloutScript
             for (auto it = mRunning.begin(); it != mRunning.end();)
             {
                 // An effect that lasts until its spell is removed has no seconds left to count
+                const double left = it->mRemaining;
                 if (it->mRemaining > 0 && (it->mRemaining -= seconds) <= 0)
                 {
                     if (it->mScript != 0)
-                        finished.push_back({ it->mActor, it->mScript, it->mId });
+                        finished.push_back({ it->mActor, it->mScript, it->mId, std::min(left, seconds) });
                     it = mRunning.erase(it);
                 }
                 else
                 {
                     if (it->mScript != 0)
-                        running.push_back({ it->mActor, it->mScript, it->mId });
+                        running.push_back({ it->mActor, it->mScript, it->mId, seconds });
                     ++it;
                 }
             }
@@ -323,10 +326,15 @@ namespace FalloutScript
             {
                 // The script of an effect that an earlier one took away in this frame has ended: it is not run again
                 if (still(one.mId))
-                    scripts(one.mActor, one.mScript, ScriptStage::Update, one.mId);
+                    scripts(one.mActor, one.mScript, ScriptStage::Update, one.mId, one.mSeconds);
             }
             for (const Scripted& one : finished)
-                scripts(one.mActor, one.mScript, ScriptStage::Finish, one.mId);
+            {
+                // The step in which an effect runs out runs its update for the seconds it was still running (a rest
+                // passes an hour in one step), and then finishes it
+                scripts(one.mActor, one.mScript, ScriptStage::Update, one.mId, one.mSeconds);
+                scripts(one.mActor, one.mScript, ScriptStage::Finish, one.mId, 0.0);
+            }
         }
     }
 
