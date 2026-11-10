@@ -2442,6 +2442,20 @@ namespace OFScript
         return false;
     }
 
+    bool FalloutScripts::canFlyByRecord(FalloutScript::FormId actor)
+    {
+        ESM::FormId base;
+        if (actor == 0 || actor == mPlayer || !baseOf(actor, base) || base.isZeroOrUnset())
+            return false;
+        // Only creatures have the flag in the executables' test (the base data, which a template can give)
+        if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
+        {
+            const ESM4::Creature* owner = templateOwner(mStore, creature, ESM4::Creature::Template_UseBaseData);
+            return owner != nullptr && (owner->mBaseConfig.fo3.flags & ESM4::Creature::FO3_CanFly) != 0;
+        }
+        return false;
+    }
+
     std::optional<FalloutScript::CombatState::Relation> FalloutScripts::recordedRelation(
         FalloutScript::FormId first, FalloutScript::FormId second)
     {
