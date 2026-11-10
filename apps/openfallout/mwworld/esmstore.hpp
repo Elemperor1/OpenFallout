@@ -17,6 +17,9 @@
 #include <components/esm4/loadcdck.hpp>
 #include <components/esm4/loadcmny.hpp>
 #include <components/esm4/loadcsno.hpp>
+#include <components/esm4/loaddehy.hpp>
+#include <components/esm4/loadhung.hpp>
+#include <components/esm4/loadslpd.hpp>
 #include <components/misc/tuplemeta.hpp>
 
 #include "store.hpp"
@@ -205,7 +208,8 @@ namespace OFWorld
             Store<ESM4::Script>, Store<ESM4::Sound>, Store<ESM4::SoundReference>, Store<ESM4::Spell>,
             Store<ESM4::Static>, Store<ESM4::StaticCollection>, Store<ESM4::TalkingActivator>, Store<ESM4::Terminal>,
             Store<ESM4::TextureSet>, Store<ESM4::Tree>, Store<ESM4::VoiceType>, Store<ESM4::Water>, Store<ESM4::Weapon>,
-            Store<ESM4::Weather>, Store<ESM4::World>>;
+            Store<ESM4::Weather>, Store<ESM4::World>, Store<ESM4::DehydrationStage>, Store<ESM4::HungerStage>,
+            Store<ESM4::SleepDeprivationStage>>;
 
     private:
         template <typename T>

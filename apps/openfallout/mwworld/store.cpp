@@ -9,6 +9,9 @@
 #include <components/esm/records.hpp>
 #include <components/esm3/esmreader.hpp>
 #include <components/esm3/esmwriter.hpp>
+#include <components/esm4/loaddehy.hpp>
+#include <components/esm4/loadhung.hpp>
+#include <components/esm4/loadslpd.hpp>
 
 #include <components/loadinglistener/loadinglistener.hpp>
 #include <components/misc/rng.hpp>
@@ -1231,6 +1234,9 @@ template class OFWorld::TypedDynamicStore<ESM4::Recipe>;
 template class OFWorld::TypedDynamicStore<ESM4::RecipeCategory>;
 template class OFWorld::TypedDynamicStore<ESM4::Region>;
 template class OFWorld::TypedDynamicStore<ESM4::Reputation>;
+template class OFWorld::TypedDynamicStore<ESM4::DehydrationStage>;
+template class OFWorld::TypedDynamicStore<ESM4::HungerStage>;
+template class OFWorld::TypedDynamicStore<ESM4::SleepDeprivationStage>;
 template class OFWorld::TypedDynamicStore<ESM4::Script>;
 template class OFWorld::TypedDynamicStore<ESM4::Sound>;
 template class OFWorld::TypedDynamicStore<ESM4::SoundReference>;

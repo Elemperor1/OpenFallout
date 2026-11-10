@@ -50,6 +50,7 @@
 #include <components/falloutscript/formlists.hpp>
 #include <components/falloutscript/furniture.hpp>
 #include <components/falloutscript/hacking.hpp>
+#include <components/falloutscript/hardcore.hpp>
 #include <components/falloutscript/hotkeys.hpp>
 #include <components/falloutscript/hud.hpp>
 #include <components/falloutscript/interpreter.hpp>
@@ -2448,6 +2449,9 @@ namespace OFScript
         FalloutScript::PerkEngine mPerks;
         FalloutScript::ItemUse mItemUse;
         FalloutScript::Magic mMagic;
+        /// The needs of the hardcore mode (New Vegas)
+        FalloutScript::HardcoreNeeds mHardcore;
+        std::atomic<bool> mHardcoreOn{ false };
         FalloutScript::Crafting mCrafting;
         FalloutScript::Limbs mLimbs;
         std::atomic<bool> mVatsOpen{ false };
@@ -2826,6 +2830,13 @@ namespace OFScript
         bool hostilesNearPlayer();
         /// Whether an effect that is running on the player takes health from it (poison), which stops a rest and a trip
         bool playerTakingHealthDamage();
+        /// Whether the hardcore mode is on (SetHardcore)
+        bool hardcoreOn() const { return mSwitches.get("SetHardcore") > 0; }
+        /// The stages of a need of the hardcore mode (the records DEHY, HUNG and SLPD)
+        std::vector<FalloutScript::HardcoreNeeds::Stage> hardcoreStages(int need);
+        /// Lets the needs of the player go on to the time of the game, when the hardcore mode is on (and takes the
+        /// stages off when it was turned off)
+        void updateHardcore(bool sleeping);
         /// Whether the player is in the air: not on the ground, not in water, not held up by flight
         bool playerInAir();
         /// Whether two cells are the same place for eyes, for the compass and for a fight: one cell, or two exterior

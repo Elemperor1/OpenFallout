@@ -199,6 +199,7 @@ namespace OFScript
         , mPerks(*this, mProgress, mActorValues)
         , mItemUse(*this, mActors, mActorValues, mProgress)
         , mMagic(*this)
+        , mHardcore([this](int need) { return hardcoreStages(need); }, mActorValues, mMagic)
         , mCrafting(*this, mActors, mActorValues)
         , mLimbs(*this, mActorValues)
         , mChargen(game)
@@ -473,6 +474,8 @@ namespace OFScript
         });
         mMagic.setCaster([this](FalloutScript::FormId actor, FalloutScript::FormId spell,
                              const std::vector<FalloutScript::SpellEffect>& kept) { castSpell(actor, spell, kept); });
+        // A stage of a need of the hardcore mode that took all the health (the last one) kills the player
+        mHardcore.setStageListener([this](FalloutScript::FormId actor) { mItemUse.checkHealth(actor); });
         // An effect that runs a script (the well rested bonus of a bed) has its blocks run for the character
         mMagic.setScriptRunner([this](FalloutScript::FormId actor, FalloutScript::FormId script,
                                    FalloutScript::Magic::ScriptStage stage) {

@@ -380,6 +380,7 @@ namespace OFScript
             mItemUse.update(frametime);
             mPresentation.update(frametime);
             mMagic.update(frametime);
+            updateHardcore(false);
         }
     }
 

@@ -16,10 +16,12 @@
 #include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loadcrea.hpp>
+#include <components/esm4/loaddehy.hpp>
 #include <components/esm4/loaddoor.hpp>
 #include <components/esm4/loadfact.hpp>
 #include <components/esm4/loadflst.hpp>
 #include <components/esm4/loadfurn.hpp>
+#include <components/esm4/loadhung.hpp>
 #include <components/esm4/loadimod.hpp>
 #include <components/esm4/loadingr.hpp>
 #include <components/esm4/loadkeym.hpp>
@@ -28,6 +30,7 @@
 #include <components/esm4/loadnote.hpp>
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadrefr.hpp>
+#include <components/esm4/loadslpd.hpp>
 #include <components/esm4/loadtact.hpp>
 #include <components/esm4/loadterm.hpp>
 #include <components/esm4/loadweap.hpp>
@@ -1123,7 +1126,8 @@ namespace OFScript
         }
         const std::lock_guard lock(mInteractionMutex);
         mRest.mActive = true;
-        mRest.mTotal = std::clamp(hours, 1.0, 24.0);
+        // Whole hours, as the menu of the games gives (a part of an hour would pass as a whole one)
+        mRest.mTotal = std::floor(std::clamp(hours, 1.0, 24.0) + 1e-9);
         mRest.mDone = 0;
         mRest.mTickSeconds = 0;
         mRest.mStopped.clear();
@@ -1359,6 +1363,51 @@ namespace OFScript
         discoverMarkers(frametime);
     }
 
+    std::vector<FalloutScript::HardcoreNeeds::Stage> FalloutScripts::hardcoreStages(int need)
+    {
+        std::vector<FalloutScript::HardcoreNeeds::Stage> stages;
+        const auto add = [&stages](const auto& records) {
+            for (const auto& record : records)
+                stages.push_back({ static_cast<int>(record.mData.mTriggerThreshold), record.mData.mActorEffect });
+        };
+        switch (need)
+        {
+            case FalloutScript::HardcoreNeeds::Dehydration:
+                add(mStore.get<ESM4::DehydrationStage>());
+                break;
+            case FalloutScript::HardcoreNeeds::Hunger:
+                add(mStore.get<ESM4::HungerStage>());
+                break;
+            default:
+                add(mStore.get<ESM4::SleepDeprivationStage>());
+                break;
+        }
+        return stages;
+    }
+
+    void FalloutScripts::updateHardcore(bool sleeping)
+    {
+        if (!hardcoreOn())
+        {
+            // Turned off (a script chose the casual mode): the stages of the needs come off the player
+            if (mHardcoreOn.exchange(false))
+                mHardcore.end(mPlayer);
+            return;
+        }
+        if (!mHardcoreOn.exchange(true))
+        {
+            // The settings are intervals in game minutes at the time scale of 60 (the executables' defaults are what
+            // the master file of New Vegas says)
+            mHardcore.setRates(gameSetting("fHCDehydrationRate", 10), gameSetting("fHCStarvationRate", 25),
+                gameSetting("fHCSleepDeprivationRate", 50));
+        }
+        OFBase::World* world = OFBase::Environment::get().getWorld();
+        if (world == nullptr || mActors.isDead(mPlayer))
+            return;
+        const double minutes = std::floor(gameDaysPassed()) * 24.0 * 60.0 + gameHour() * 60.0;
+        mHardcore.update(mPlayer, minutes, world->getTimeManager()->getGameTimeScale(), sleeping);
+    }
+
     void FalloutScripts::updateRest(float frametime)
     {
         namespace AV = FalloutScript::ActorValue;
@@ -1396,6 +1445,7 @@ namespace OFScript
             });
         }
         std::string stopped;
+        bool died = false;
         // Characters that come for the player end it
         if (!finish && hostilesNearPlayer())
         {
@@ -1408,6 +1458,8 @@ namespace OFScript
         else if (hour)
         {
             const auto world = OFBase::Environment::get().getWorld();
+            // The needs of the hardcore mode count the time that has gone by, before the hour does
+            updateHardcore(sleeping);
             world->advanceTime(1.0);
             // The hour heals as any hour does: by the heal rate of the player
             if (!mActors.isDead(mPlayer))
@@ -1421,6 +1473,13 @@ namespace OFScript
             const double seconds = 3600.0 / timeScale;
             mItemUse.update(seconds);
             mMagic.update(seconds);
+            // Each hour of sleep lowers the sleep deprivation of the hardcore mode
+            if (sleeping && hardcoreOn())
+                mHardcore.sleepHour(mPlayer, gameSetting("fHCSleepRestorationMod", 60));
+            // An effect that ran out can have taken the last of the health: the rest ends, with nothing given back
+            died = mActors.isDead(mPlayer);
+            if (died)
+                finish = true;
         }
 
         double done = 0;
@@ -1440,8 +1499,8 @@ namespace OFScript
             return;
 
         // The last hour of a sleep that was not stopped gives back all the health and fatigue and the condition of
-        // every part of the body (the executables skip it in the hardcore mode of New Vegas, which the port has not)
-        if (sleeping && completed)
+        // every part of the body (the executables skip it in the hardcore mode of New Vegas)
+        if (sleeping && completed && !hardcoreOn())
         {
             constexpr double all = 1.0e9;
             mActorValues.restore(mPlayer, AV::health, all);
@@ -1459,7 +1518,7 @@ namespace OFScript
                 mFurniture.erase(found);
         }
         const int hours = static_cast<int>(std::floor(done + 1e-9));
-        if (stopped.empty() && hours > 0)
+        if (stopped.empty() && !died && hours > 0)
             tellPlayer(std::string(sleeping ? "You slept " : "You waited ") + std::to_string(hours)
                 + (hours == 1 ? " hour." : " hours."));
         bool faded = false;
