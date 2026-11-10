@@ -1043,12 +1043,14 @@ namespace OFScript
         }
         if (sleeping && bed != 0)
         {
-            // The player lies on the bed all the time it sleeps, as far as GetSleeping and the questions about the
-            // furniture of a character are asked
+            // The player lies on the bed all the time it sleeps: put on it by the entry of the bed's marker as a
+            // character is (its body lies there in the third person), and it is as far as GetSleeping and the questions
+            // about the furniture of a character are asked
             const OFWorld::Ptr player = OFBase::Environment::get().getWorld()->getPlayerPtr();
             const OFWorld::Ptr furniture = findReference(bed);
-            if (!player.isEmpty() && !furniture.isEmpty())
+            if (!player.isEmpty() && !furniture.isEmpty() && !useFurniture(player, furniture, true))
             {
+                // A bed with no free entry (or none the record enables): the player sleeps where it stands
                 const std::lock_guard furnitureLock(mFurnitureMutex);
                 FurnitureUse& use = mFurniture[mPlayer];
                 use.mFurniture = bed;
@@ -1343,11 +1345,15 @@ namespace OFScript
         mPlayerSleeping = false;
         if (sleeping)
         {
-            // The player gets up from the bed
-            const std::lock_guard furnitureLock(mFurnitureMutex);
-            const auto found = mFurniture.find(mPlayer);
-            if (found != mFurniture.end() && found->second.mFurniture == bed)
-                mFurniture.erase(found);
+            // The player gets up from the bed: it stands at the entry it lay down from
+            bool onTheBed = false;
+            {
+                const std::lock_guard furnitureLock(mFurnitureMutex);
+                const auto found = mFurniture.find(mPlayer);
+                onTheBed = found != mFurniture.end() && found->second.mFurniture == bed;
+            }
+            if (onTheBed)
+                leaveFurniture(OFBase::Environment::get().getWorld()->getPlayerPtr());
         }
         const int hours = static_cast<int>(std::floor(done + 1e-9));
         if (stopped.empty() && hours > 0)
