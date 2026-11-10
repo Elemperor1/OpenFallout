@@ -1564,7 +1564,14 @@ namespace OFMechanics
             };
 
             // A script told it to shoot (UseWeapon): that takes the place of a fight and of the packages
-            const OFScript::FalloutScripts::ScriptedAttack order = scripts.scriptedAttack(mind.mPtr);
+            OFScript::FalloutScripts::ScriptedAttack order = scripts.scriptedAttack(mind.mPtr);
+            // A target that is in another interior, or in a cell that is not around, is where the shooter can not go
+            // to and its shots can not land: the order is over, as a fight is
+            if (order.mActive && !sharesSpace(mind.mPtr, order.mTarget))
+            {
+                scripts.endScriptedAttack(mind.mPtr, "its target is in another space");
+                order = OFScript::FalloutScripts::ScriptedAttack();
+            }
             if (order.mActive)
             {
                 // A second order replaces the first one, and gets the walk to its place from the start

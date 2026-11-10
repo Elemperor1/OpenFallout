@@ -3412,6 +3412,17 @@ namespace OFScript
         return self != 0 && mScriptedAttacks.count(self) != 0;
     }
 
+    void FalloutScripts::endScriptedAttack(const OFWorld::Ptr& actor, const char* why)
+    {
+        const FalloutScript::FormId self = referenceOf(actor);
+        const auto found = self != 0 ? mScriptedAttacks.find(self) : mScriptedAttacks.end();
+        if (found == mScriptedAttacks.end())
+            return;
+        Log(Debug::Info) << "UseWeapon: " << FalloutScript::hex(self) << " is done (" << why << ") after "
+                         << found->second.mMade << " attack(s)";
+        mScriptedAttacks.erase(found);
+    }
+
     FalloutScripts::ScriptedAttack FalloutScripts::scriptedAttack(const OFWorld::Ptr& actor)
     {
         ScriptedAttack result;
@@ -3421,9 +3432,7 @@ namespace OFScript
             return result;
         const FalloutScript::UseWeaponOrder& order = found->second.mOrder;
         const auto finish = [&](const char* why) {
-            Log(Debug::Info) << "UseWeapon: " << FalloutScript::hex(self) << " is done (" << why << ") after "
-                             << found->second.mMade << " attack(s)";
-            mScriptedAttacks.erase(found);
+            endScriptedAttack(actor, why);
             return result;
         };
         if (order.mAttacks > 0 && found->second.mMade >= order.mAttacks)

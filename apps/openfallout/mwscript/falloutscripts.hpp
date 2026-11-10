@@ -1590,6 +1590,8 @@ namespace OFScript
             OFWorld::Ptr mAim;
         };
         ScriptedAttack scriptedAttack(const OFWorld::Ptr& actor);
+        /// The order is dropped, with the reason in the log line (the target is where the shooter can not go to)
+        void endScriptedAttack(const OFWorld::Ptr& actor, const char* why);
         bool hasScriptedAttack(const OFWorld::Ptr& actor) const;
         /// An attack of the order, when the weapon is ready again: a hit when the order says so or the character's aim
         /// is good enough. Main thread.
