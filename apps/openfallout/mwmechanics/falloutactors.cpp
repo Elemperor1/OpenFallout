@@ -884,11 +884,13 @@ namespace OFMechanics
                         return false;
                     // Only where it can go from where it is: a place in another space (a building and the world outside
                     // it) is gone to through the door that leads there, as the characters of the games leave a building
-                    // by its door (the place may be in a cell that is not loaded)
+                    // by its door (the place may be in a cell that is not loaded). Only a package that goes to the
+                    // place and stays there does so: the others (going about the place, using furniture there) go on
+                    // as they did, which is to be left out.
                     if (reference.isEmpty() || !sharesSpace(mind.mPtr, reference))
                     {
                         osg::Vec3f door;
-                        if (frame.mScripts == nullptr
+                        if (goal.mBehaviour != ESM4::PackageBehaviour::Stay || frame.mScripts == nullptr
                             || !frame.mScripts->doorTowards(mind.mPtr, target.toUint32(), door))
                             return false;
                         goal.mCenter = door;

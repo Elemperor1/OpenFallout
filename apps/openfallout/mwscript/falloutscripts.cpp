@@ -62,6 +62,7 @@
 #include <components/resource/imagemanager.hpp>
 #include <components/resource/niffilemanager.hpp>
 #include <components/resource/resourcesystem.hpp>
+#include <components/resource/scenemanager.hpp>
 #include <components/sceneutil/positionattitudetransform.hpp>
 #include <components/settings/values.hpp>
 #include <components/vfs/manager.hpp>
@@ -5071,6 +5072,17 @@ namespace OFScript
     {
         if (reference == 0 || shape.empty() || texture.empty())
             return false;
+        // The shape is found by its name, which the optimizer takes from a shape it merges into another: the model
+        // of this object is loaded with its shapes apart from now on (one that is in the scene already is as it is,
+        // the cards of the doctor are put there when they are enabled)
+        const OFWorld::Ptr ptr = findReference(reference);
+        Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem();
+        if (!ptr.isEmpty() && resources != nullptr)
+        {
+            const VFS::Path::Normalized model = ptr.getClass().getCorrectedModel(ptr);
+            if (!model.value().empty())
+                resources->getSceneManager()->keepShapesOf(model);
+        }
         const std::lock_guard lock(mTextureSwapMutex);
         std::vector<TextureSwap>& swaps = mTextureSwaps[reference];
         // A shape has one picture: the one that was told last
