@@ -127,6 +127,28 @@ namespace
         EXPECT_TRUE(setup.mEquipment.isEquipped(guard, rifle));
     }
 
+    TEST(FalloutScriptEquipmentTest, the_revision_changes_when_something_goes_on_or_off_and_not_when_nothing_changes)
+    {
+        Wardrobe setup;
+        const std::uint32_t start = setup.mEquipment.revision();
+        EXPECT_EQ(setup.mEquipment.revision(), start);
+
+        ASSERT_EQ(setup.mEquipment.equip(guard, vest), Equipment::Outcome::Equipped);
+        const std::uint32_t worn = setup.mEquipment.revision();
+        EXPECT_NE(worn, start);
+
+        // what is worn already does not change what is drawn
+        EXPECT_EQ(setup.mEquipment.equip(guard, vest), Equipment::Outcome::AlreadyEquipped);
+        EXPECT_EQ(setup.mEquipment.revision(), worn);
+
+        ASSERT_TRUE(setup.mEquipment.unequip(guard, vest));
+        const std::uint32_t off = setup.mEquipment.revision();
+        EXPECT_NE(off, worn);
+
+        setup.mEquipment.clear();
+        EXPECT_NE(setup.mEquipment.revision(), off);
+    }
+
     TEST(FalloutScriptEquipmentTest, a_weapon_that_goes_on_is_the_best_copy_unless_a_copy_is_asked_for)
     {
         Wardrobe setup;
