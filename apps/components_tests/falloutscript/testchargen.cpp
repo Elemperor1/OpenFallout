@@ -925,4 +925,32 @@ namespace
         EXPECT_EQ(loaded.race(), 0u);
         EXPECT_FALSE(loaded.look().has_value());
     }
+
+    TEST(FalloutScriptChargenTest, the_revision_changes_with_the_sex_the_race_and_the_look_for_whoever_draws_the_player)
+    {
+        Chargen chargen;
+        const std::uint32_t start = chargen.revision();
+        // asking changes nothing
+        chargen.female();
+        chargen.look();
+        EXPECT_EQ(chargen.revision(), start);
+
+        chargen.setFemale(true);
+        const std::uint32_t sex = chargen.revision();
+        EXPECT_NE(sex, start);
+
+        chargen.setRace(0x1000);
+        const std::uint32_t race = chargen.revision();
+        EXPECT_NE(race, sex);
+
+        FalloutScript::FaceLook look;
+        look.mRace = 0x1000;
+        look.mHair = 0x2000;
+        chargen.setLook(look);
+        const std::uint32_t looked = chargen.revision();
+        EXPECT_NE(looked, race);
+
+        chargen.clear();
+        EXPECT_NE(chargen.revision(), looked);
+    }
 }

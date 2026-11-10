@@ -25,6 +25,7 @@ namespace
     using FalloutScript::DerivedStats::meleeDamage;
     using FalloutScript::DerivedStats::npcHealth;
     using FalloutScript::DerivedStats::playerHealth;
+    using FalloutScript::DerivedStats::regeneration;
     using FalloutScript::DerivedStats::swimBreath;
     using FalloutScript::DerivedStats::swimBreathStep;
     namespace ActorValue = FalloutScript::ActorValue;
@@ -432,5 +433,19 @@ namespace
         EXPECT_EQ(airMeterVisibleTicks(20, 12.5), 16);
         EXPECT_EQ(airMeterVisibleTicks(-1, 12.5), 0);
         EXPECT_EQ(airMeterVisibleTicks(3, 0), 16);
+    }
+
+    TEST(FalloutScriptDerivedStatsTest, regeneration_is_the_heal_rate_over_3600_for_each_simulated_second)
+    {
+        // A heal rate of 5 gives 5 points for an hour of the simulation
+        EXPECT_DOUBLE_EQ(regeneration(5, 3600), 5);
+        // A game hour at the time scale of 30 is 120 seconds of it: a thirtieth of the rate, not the whole rate
+        EXPECT_NEAR(regeneration(5, 3600.0 / 30.0), 5.0 / 30.0, 1e-12);
+        EXPECT_NEAR(regeneration(10, 3600.0 / 30.0), 10.0 / 30.0, 1e-12);
+        // None for a character with no heal rate, a negative one or no time
+        EXPECT_DOUBLE_EQ(regeneration(0, 120), 0);
+        EXPECT_DOUBLE_EQ(regeneration(-3, 120), 0);
+        EXPECT_DOUBLE_EQ(regeneration(5, 0), 0);
+        EXPECT_DOUBLE_EQ(regeneration(5, -1), 0);
     }
 }

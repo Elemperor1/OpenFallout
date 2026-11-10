@@ -93,6 +93,11 @@ namespace FalloutScript
         return settings.mHealRateEnduranceBonus[points - 6];
     }
 
+    double DerivedStats::regeneration(double healRate, double seconds)
+    {
+        return std::max(healRate, 0.0) / 3600.0 * std::max(seconds, 0.0);
+    }
+
     double DerivedStats::swimBreath(const DerivedStatSettings& settings, double healRate)
     {
         return std::max(settings.mSwimBreathBase + settings.mSwimBreathMult * std::trunc(healRate), 0.0);

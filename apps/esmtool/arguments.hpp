@@ -31,6 +31,8 @@ namespace EsmTool
         // The names of script commands whose callers the scriptcode mode lists, separated by commas (needs
         // commandsFile)
         std::string findCommands;
+        // Where the scriptcode and dialogue modes also write their counts as a CSV that other tools read
+        std::filesystem::path csvFile;
     };
 }
 

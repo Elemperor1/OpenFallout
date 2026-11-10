@@ -96,6 +96,7 @@ namespace FalloutScript
         mFemale.reset();
         mRace = 0;
         mLook.reset();
+        ++mRevision;
         mAttributes.fill(5);
         mTagSlots.clear();
         mTraits.clear();
@@ -292,6 +293,7 @@ namespace FalloutScript
         mFemale = female;
         if (mLook)
             mLook->mFemale = female;
+        ++mRevision;
     }
 
     std::optional<bool> Chargen::female() const
@@ -307,6 +309,7 @@ namespace FalloutScript
         if (mLook)
             mLook->mRace = race;
         mLostForms &= ~1u;
+        ++mRevision;
     }
 
     FormId Chargen::race() const
@@ -323,6 +326,13 @@ namespace FalloutScript
         mFemale = look.mFemale;
         if (look.mRace != 0)
             mRace = look.mRace;
+        ++mRevision;
+    }
+
+    std::uint32_t Chargen::revision() const
+    {
+        const std::lock_guard lock(mMutex);
+        return mRevision;
     }
 
     std::optional<FaceLook> Chargen::look() const
@@ -350,6 +360,7 @@ namespace FalloutScript
                 mLook->mEyes = record.mEyes;
         }
         mLostForms = 0;
+        ++mRevision;
     }
 
     int Chargen::attribute(int number) const
@@ -635,6 +646,7 @@ namespace FalloutScript
         mRace = race;
         mLook = std::move(look);
         mLostForms = lost;
+        ++mRevision;
     }
 
     void addChargenCommands(Interpreter& interpreter, Chargen& chargen, std::function<void()> opened)

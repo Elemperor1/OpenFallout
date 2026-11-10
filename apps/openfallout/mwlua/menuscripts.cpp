@@ -3,6 +3,7 @@
 #include <SDL_gamecontroller.h>
 #include <SDL_joystick.h>
 
+#include <cmath>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -18,6 +19,7 @@
 #include "../mwbase/statemanager.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
+#include "../mwscript/falloutscripts.hpp"
 #include "../mwstate/character.hpp"
 #include "../mwworld/esmstore.hpp"
 #include "../mwworld/globals.hpp"
@@ -78,6 +80,34 @@ namespace OFLua
                 if (option.mName == name)
                     return option;
             throw std::runtime_error("Not a setting of the menu: " + std::string(name));
+        }
+
+        // The two items of the Gameplay screen that belong to the game being played rather than to the settings file:
+        // the difficulty (0 very easy to 4 very hard) and the hardcore mode (New Vegas). The rules keep them in the
+        // switches of the game, which a save holds, and they exist while a game of a Fallout runs.
+        enum class GameItem
+        {
+            None,
+            Difficulty,
+            Hardcore,
+        };
+
+        GameItem gameItem(std::string_view name)
+        {
+            if (name == "difficulty")
+                return GameItem::Difficulty;
+            if (name == "hardcore")
+                return GameItem::Hardcore;
+            return GameItem::None;
+        }
+
+        OFScript::FalloutScripts* runningGame()
+        {
+            const OFBase::Environment& environment = OFBase::Environment::get();
+            if (!environment.hasFalloutScripts()
+                || environment.getStateManager()->getState() != OFBase::StateManager::State_Running)
+                return nullptr;
+            return environment.getFalloutScripts();
         }
 
         bool shouldBypass(const sol::optional<sol::table>& options)
@@ -226,12 +256,42 @@ namespace OFLua
         // setting is now (a number, or a boolean for those that are switches), and a change of it, which the engine
         // takes at once
         api["getOption"] = [](sol::this_state thisState, std::string_view name) -> sol::object {
+            // (nil while no game runs: the script then shows what the player picked)
+            if (const GameItem item = gameItem(name); item != GameItem::None)
+            {
+                OFScript::FalloutScripts* game = runningGame();
+                if (game == nullptr)
+                    return sol::nil;
+                if (item == GameItem::Difficulty)
+                    return sol::make_object(thisState, game->gameDifficulty());
+                return sol::make_object(thisState, game->hardcoreMode());
+            }
             const Option& option = findOption(name);
             if (option.mIsBool)
                 return sol::make_object(thisState, Settings::get<bool>(option.mCategory, option.mSetting).get());
             return sol::make_object(thisState, Settings::get<float>(option.mCategory, option.mSetting).get());
         };
         api["setOption"] = [](std::string_view name, sol::object value) {
+            if (const GameItem item = gameItem(name); item != GameItem::None)
+            {
+                // (with no game running there is nothing to change: the script keeps what the player picked)
+                OFScript::FalloutScripts* game = runningGame();
+                if (item == GameItem::Difficulty)
+                {
+                    if (!value.is<double>())
+                        throw std::runtime_error("The setting is a number: " + std::string(name));
+                    if (game != nullptr)
+                        game->setGameDifficulty(static_cast<int>(std::lround(value.as<double>())));
+                }
+                else
+                {
+                    if (!value.is<bool>())
+                        throw std::runtime_error("The setting is a switch (true or false): " + std::string(name));
+                    if (game != nullptr)
+                        game->setHardcoreMode(value.as<bool>());
+                }
+                return;
+            }
             const Option& option = findOption(name);
             if (option.mIsBool)
             {

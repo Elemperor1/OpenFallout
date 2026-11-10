@@ -1,6 +1,8 @@
 #include "savescripts.hpp"
 
 #include <algorithm>
+#include <map>
+#include <tuple>
 
 #include "objects.hpp"
 #include "quests.hpp"
@@ -212,9 +214,30 @@ namespace FalloutScript
                     writeSaved(saved.mKinds, saved.mVariables, out);
                 }
             }
+            // The scripts of the magic effects that run (version 2), with the number the magic section gives each
+            // effect, and those that a save gave variables to and whose effect has not run since
+            std::map<std::tuple<FormId, FormId, std::uint64_t>, bool> effects;
+            for (const auto& [key, instance] : objects.mEffects)
+                effects[key] = true;
+            for (const auto& [key, saved] : objects.mSavedEffects)
+                effects.emplace(key, false);
+            out.count(effects.size());
+            for (const auto& [key, live] : effects)
+            {
+                out.form(std::get<0>(key));
+                out.form(std::get<1>(key));
+                out.u64(std::get<2>(key));
+                if (live)
+                    writeVariables(*objects.mEffects.at(key), out);
+                else
+                {
+                    const ObjectScripts::SavedInstance& saved = objects.mSavedEffects.at(key);
+                    writeSaved(saved.mKinds, saved.mVariables, out);
+                }
+            }
         }
 
-        static void read(ObjectScripts& objects, SaveReader& in, std::uint32_t)
+        static void read(ObjectScripts& objects, SaveReader& in, std::uint32_t version)
         {
             const std::size_t count = in.count(12);
             for (std::size_t i = 0; i < count; ++i)
@@ -232,6 +255,30 @@ namespace FalloutScript
                     continue;
                 }
                 ObjectScripts::SavedInstance& saved = objects.mSaved[*reference];
+                saved.mScript = *script;
+                saved.mKinds = std::move(variables.mKinds);
+                saved.mVariables = std::move(variables.mValues);
+            }
+            if (version < 2)
+                return;
+            // A character, a script, the number of the effect and the variables, at least
+            const std::size_t effects = in.count(20);
+            for (std::size_t i = 0; i < effects; ++i)
+            {
+                const std::optional<FormId> character = in.form();
+                const std::optional<FormId> script = in.form();
+                const std::uint64_t effect = in.u64();
+                SavedVariables variables = readVariables(in);
+                // A character or a script from a plugin that is gone has nothing to keep them for
+                if (!character || !script)
+                    continue;
+                const std::tuple<FormId, FormId, std::uint64_t> key(*character, *script, effect);
+                if (const auto found = objects.mEffects.find(key); found != objects.mEffects.end())
+                {
+                    applyVariables(*found->second, variables);
+                    continue;
+                }
+                ObjectScripts::SavedInstance& saved = objects.mSavedEffects[key];
                 saved.mScript = *script;
                 saved.mKinds = std::move(variables.mKinds);
                 saved.mVariables = std::move(variables.mValues);

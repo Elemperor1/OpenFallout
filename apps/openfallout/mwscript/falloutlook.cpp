@@ -5,6 +5,7 @@
 #include <sstream>
 
 #include <components/debug/debuglog.hpp>
+#include <components/esm4/loadarmo.hpp>
 #include <components/esm4/loadeyes.hpp>
 #include <components/esm4/loadhair.hpp>
 #include <components/esm4/loadhdpt.hpp>
@@ -419,6 +420,22 @@ namespace OFScript
         record.mAsymShapeModeCoefficients = look.mAsymmetric;
         record.mSymTextureModeCoefficients = look.mTone;
         return true;
+    }
+
+    bool FalloutScripts::playerBody(LookPreview& preview, std::vector<const ESM4::Armor*>& armor)
+    {
+        if (!lookPreview(preview))
+            return false;
+        armor.clear();
+        for (const FormId item : mEquipment.armor(mPlayer))
+            if (const ESM4::Armor* piece = mStore.get<ESM4::Armor>().search(refId(item)))
+                armor.push_back(piece);
+        return true;
+    }
+
+    std::uint64_t FalloutScripts::playerBodyRevision()
+    {
+        return (static_cast<std::uint64_t>(mChargen.revision()) << 32) | mEquipment.revision(mPlayer);
     }
 
     const FalloutScript::FaceControlFile& FalloutScripts::faceControls()

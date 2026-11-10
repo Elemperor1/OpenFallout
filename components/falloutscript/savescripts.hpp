@@ -21,8 +21,9 @@ namespace FalloutScript
     void readQuests(QuestManager& quests, SaveReader& in, std::uint32_t version);
 
     /// The variables of the scripts of objects. A script that no object has yet (its cell was not loaded since) gets
-    /// its variables when it is given to the object.
-    constexpr std::uint32_t objectScriptsSectionVersion = 1;
+    /// its variables when it is given to the object. Version 2 holds those of the scripts of the magic effects that
+    /// run, by the number the magic section gives each effect.
+    constexpr std::uint32_t objectScriptsSectionVersion = 2;
     void writeObjectScripts(const ObjectScripts& objects, SaveWriter& out);
     void readObjectScripts(ObjectScripts& objects, SaveReader& in, std::uint32_t version);
 }

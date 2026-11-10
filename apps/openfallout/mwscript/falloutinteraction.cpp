@@ -16,10 +16,12 @@
 #include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loadcrea.hpp>
+#include <components/esm4/loaddehy.hpp>
 #include <components/esm4/loaddoor.hpp>
 #include <components/esm4/loadfact.hpp>
 #include <components/esm4/loadflst.hpp>
 #include <components/esm4/loadfurn.hpp>
+#include <components/esm4/loadhung.hpp>
 #include <components/esm4/loadimod.hpp>
 #include <components/esm4/loadingr.hpp>
 #include <components/esm4/loadkeym.hpp>
@@ -28,6 +30,7 @@
 #include <components/esm4/loadnote.hpp>
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadrefr.hpp>
+#include <components/esm4/loadslpd.hpp>
 #include <components/esm4/loadtact.hpp>
 #include <components/esm4/loadterm.hpp>
 #include <components/esm4/loadweap.hpp>
@@ -45,9 +48,11 @@
 #include "../mwbase/inputmanager.hpp"
 #include "../mwbase/luamanager.hpp"
 #include "../mwbase/mechanicsmanager.hpp"
+#include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
+#include "../mwworld/datetimemanager.hpp"
 #include "../mwworld/esmstore.hpp"
 #include "../mwworld/refdata.hpp"
 
@@ -947,6 +952,11 @@ namespace OFScript
         const OFWorld::Ptr player = OFBase::Environment::get().getWorld()->getPlayerPtr();
         if (player.isEmpty() || !player.isInCell())
             return false;
+        // The reach of the check: the executables look as far as fHostileActorInteriorDistance (2000) in an interior and
+        // fHostileActorExteriorDistance (3000) outside, both absent from the master files (the reads of M13)
+        const double reach = player.getCell()->isExterior() ? gameSetting("fHostileActorExteriorDistance", 3000)
+                                                            : gameSetting("fHostileActorInteriorDistance", 2000);
+        const osg::Vec3f here = player.getRefData().getPosition().asVec3();
         for (const FalloutScript::FormId attacker : mCombat.attackersOf(mPlayer))
         {
             if (mActors.isDead(attacker))
@@ -954,10 +964,50 @@ namespace OFScript
             // One that was removed or disabled is no threat, whatever it was doing
             const OFWorld::Ptr enemy = findReference(attacker);
             if (!enemy.isEmpty() && enemy.isInCell() && sharesSpace(enemy.getCell(), player.getCell())
-                && enemy.getRefData().isEnabled() && enemy.getCellRef().getCount() > 0)
+                && enemy.getRefData().isEnabled() && enemy.getCellRef().getCount() > 0
+                && (enemy.getRefData().getPosition().asVec3() - here).length() <= reach)
                 return true;
         }
         return false;
+    }
+
+    bool FalloutScripts::playerTakingHealthDamage()
+    {
+        // The executables look for a running effect that changes health and is harmful, whatever its size
+        for (const FalloutScript::ItemUse::Active& active : mItemUse.active(mPlayer))
+            if (active.mActorValue == FalloutScript::ActorValue::health && active.mMagnitude < 0 && active.mRemaining > 0)
+                return true;
+        return false;
+    }
+
+    void FalloutScripts::wakePlayer(double hours)
+    {
+        // Only a sleep that is going on is cut short (M13 executable reads, WakeUpPC): what is asked is no less than none
+        // and replaces the hours that are left, and none ends the sleep where it is
+        const std::lock_guard lock(mInteractionMutex);
+        if (!mRest.mActive || !mRest.mSleeping)
+            return;
+        const double left = std::isnan(hours) ? 0.0 : std::max(hours, 0.0);
+        if (left <= 0)
+            mRest.mFinish = true;
+        else
+            mRest.mTotal = mRest.mDone + left;
+    }
+
+    void FalloutScripts::setPlayerSleepHours(double hours)
+    {
+        // The hours the script gives are the ones that are left, with no limit of the menu on them (the command stores
+        // them as they are; a number below one leaves none for the hourly count to pass)
+        const std::lock_guard lock(mInteractionMutex);
+        if (!mRest.mActive)
+            return;
+        const double left = std::isnan(hours) ? 0.0 : hours;
+        // (a fraction of an hour above one counts as a whole one when the count reaches it: what the hourly check does
+        // with a fraction is not traced)
+        if (left < 1.0)
+            mRest.mFinish = true;
+        else
+            mRest.mTotal = mRest.mDone + left;
     }
 
     bool FalloutScripts::playerInAir()
@@ -979,8 +1029,24 @@ namespace OFScript
         Interaction::RestConditions conditions;
         conditions.mSleeping = sleeping;
         conditions.mHostilesNear = hostilesNearPlayer();
+        conditions.mTakingHealthDamage = playerTakingHealthDamage();
         conditions.mUnderwater = world.isSwimming(player);
         conditions.mInAir = playerInAir();
+        if (!sleeping)
+        {
+            // A place can forbid waiting by a flag of its record: the cell of an interior, the worldspace outside
+            if (inOpenWorld(mPlayer))
+            {
+                const ESM4::World* space
+                    = mStore.get<ESM4::World>().search(ESM::FormId::fromUint32(worldspaceOf(mPlayer)));
+                conditions.mPlaceForbidsWaiting = space != nullptr && (space->mFlags & ESM4::Rec_CanNotWait) != 0;
+            }
+            else if (const FalloutScript::FormId cell = parentCell(mPlayer); cell != 0)
+            {
+                const ESM4::Cell* record = mStore.get<ESM4::Cell>().search(ESM::FormId::fromUint32(cell));
+                conditions.mPlaceForbidsWaiting = record != nullptr && (record->mFlags & ESM4::Rec_CanNotWait) != 0;
+            }
+        }
         if (sleeping && bed != 0)
         {
             // What a script made of the bed counts, so the owner is not the one the record names
@@ -1043,8 +1109,10 @@ namespace OFScript
         }
         if (sleeping && bed != 0)
         {
-            // The player lies on the bed all the time it sleeps, as far as GetSleeping and the questions about the
-            // furniture of a character are asked
+            // The game does not lay the player on the bed (M13 executable reads: the activation of a bed opens the menu
+            // where the player stands, with no walk to the entry, no lying pose and no getting up): the player is on
+            // the bed all the time it sleeps only as far as GetSleeping and the questions about the furniture of a
+            // character are asked
             const OFWorld::Ptr player = OFBase::Environment::get().getWorld()->getPlayerPtr();
             const OFWorld::Ptr furniture = findReference(bed);
             if (!player.isEmpty() && !furniture.isEmpty())
@@ -1060,8 +1128,10 @@ namespace OFScript
         }
         const std::lock_guard lock(mInteractionMutex);
         mRest.mActive = true;
-        mRest.mTotal = std::clamp(hours, 1.0, 24.0);
+        // Whole hours, as the menu of the games gives (a part of an hour would pass as a whole one)
+        mRest.mTotal = std::floor(std::clamp(hours, 1.0, 24.0) + 1e-9);
         mRest.mDone = 0;
+        mRest.mTickSeconds = 0;
         mRest.mStopped.clear();
         mPlayerSleeping = sleeping;
         return std::string();
@@ -1208,6 +1278,7 @@ namespace OFScript
         Interaction::TravelConditions conditions;
         conditions.mUndiscovered = mMapMarkers.state(marker) != 2;
         conditions.mHostilesNear = hostilesNearPlayer();
+        conditions.mTakingHealthDamage = playerTakingHealthDamage();
         conditions.mScriptBlocked = !mMapMarkers.fastTravelAllowed();
         const PipboyStats stats = pipboyStats();
         conditions.mOverencumbered = stats.mWeight > stats.mMaxWeight;
@@ -1294,12 +1365,66 @@ namespace OFScript
         discoverMarkers(frametime);
     }
 
+    std::vector<FalloutScript::HardcoreNeeds::Stage> FalloutScripts::hardcoreStages(int need)
+    {
+        std::vector<FalloutScript::HardcoreNeeds::Stage> stages;
+        const auto add = [&stages](const auto& records) {
+            for (const auto& record : records)
+                stages.push_back({ static_cast<int>(record.mData.mTriggerThreshold), record.mData.mActorEffect });
+        };
+        switch (need)
+        {
+            case FalloutScript::HardcoreNeeds::Dehydration:
+                add(mStore.get<ESM4::DehydrationStage>());
+                break;
+            case FalloutScript::HardcoreNeeds::Hunger:
+                add(mStore.get<ESM4::HungerStage>());
+                break;
+            default:
+                add(mStore.get<ESM4::SleepDeprivationStage>());
+                break;
+        }
+        return stages;
+    }
+
+    void FalloutScripts::updateHardcore(bool sleeping)
+    {
+        if (!hardcoreOn())
+        {
+            // Turned off (a script chose the casual mode): the stages of the needs come off the player
+            if (mHardcoreOn.exchange(false))
+                mHardcore.end(mPlayer);
+            return;
+        }
+        if (!mHardcoreOn.exchange(true))
+        {
+            // The settings are intervals in game minutes at the time scale of 60 (the executables' defaults are what
+            // the master file of New Vegas says)
+            mHardcore.setRates(gameSetting("fHCDehydrationRate", 10), gameSetting("fHCStarvationRate", 25),
+                gameSetting("fHCSleepDeprivationRate", 50));
+        }
+        OFBase::World* world = OFBase::Environment::get().getWorld();
+        if (world == nullptr || mActors.isDead(mPlayer))
+            return;
+        if (world->getGodModeState())
+        {
+            // A player that cannot be hurt is not worn down by the needs either (the last stage takes all the health):
+            // they stop counting, and count again from where the god mode ends
+            mHardcore.clear();
+            return;
+        }
+        const double minutes = std::floor(gameDaysPassed()) * 24.0 * 60.0 + gameHour() * 60.0;
+        mHardcore.update(mPlayer, minutes, world->getTimeManager()->getGameTimeScale(), sleeping);
+    }
+
     void FalloutScripts::updateRest(float frametime)
     {
+        namespace AV = FalloutScript::ActorValue;
         bool sleeping = false;
         FalloutScript::FormId bed = 0;
-        double step = 0;
         bool finish = false;
+        bool fadeOut = false;
+        bool hour = false;
         {
             const std::lock_guard lock(mInteractionMutex);
             if (!mRest.mActive)
@@ -1307,9 +1432,29 @@ namespace OFScript
             sleeping = mRest.mSleeping;
             bed = mRest.mBed;
             finish = mRest.mFinish;
-            step = std::min(mRest.mTotal - mRest.mDone, static_cast<double>(frametime) * sRestHoursPerSecond);
+            if (sleeping && !mRest.mFaded)
+            {
+                // The screen goes dark as the sleep begins (waiting leaves it as it is), and stays dark until the end
+                mRest.mFaded = true;
+                fadeOut = true;
+            }
+            // One game hour passes for each second of the frames; what is left of the second after the hour is dropped
+            mRest.mTickSeconds += frametime;
+            if (mRest.mTickSeconds >= sRestSecondsPerHour)
+            {
+                mRest.mTickSeconds = 0;
+                hour = !finish;
+            }
+        }
+        if (fadeOut)
+        {
+            runOnMainThread([] {
+                if (OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager())
+                    windows->fadeScreenOut(sRestFadeSeconds);
+            });
         }
         std::string stopped;
+        bool died = false;
         // Characters that come for the player end it
         if (!finish && hostilesNearPlayer())
         {
@@ -1317,28 +1462,73 @@ namespace OFScript
             if (stopped.empty())
                 stopped = "You were interrupted.";
             finish = true;
+            hour = false;
         }
-        else if (!finish && step > 0)
-            OFBase::Environment::get().getWorld()->advanceTime(step);
+        else if (hour)
+        {
+            const auto world = OFBase::Environment::get().getWorld();
+            world->advanceTime(1.0);
+            {
+                // The hour has gone by before the scripts of the effects run in it, so the hours that one of them asks
+                // for (SetPCSleepHours, WakeUpPC) are the ones after it
+                const std::lock_guard lock(mInteractionMutex);
+                mRest.mDone += 1.0;
+            }
+            // The needs of the hardcore mode count the hour that went by, as one slept when this is a sleep (the hour
+            // that ends the rest included: it is not left to the frames after it, which count awake time)
+            updateHardcore(sleeping);
+            // The game runs what it simulates by the seconds of its own clock, which is 3600 over the time scale for
+            // each hour that goes by (12 hours of rest is 1440 of them at the scale of 30, the lifetime of the effect
+            // of a good night's sleep in the reads)
+            const double timeScale = std::max(static_cast<double>(world->getTimeManager()->getGameTimeScale()), 1.0);
+            const double seconds = 3600.0 / timeScale;
+            // The hour heals as the time of any frame does: by the heal rate of the player over 3600 for each of those
+            // seconds (FalloutNV.exe 0x88B510, item 17 of m13-exe-reads.md)
+            if (!mActors.isDead(mPlayer))
+                mActorValues.restore(mPlayer, AV::health,
+                    FalloutScript::DerivedStats::regeneration(mActorValues.current(mPlayer, AV::healRate), seconds));
+            // The effects that are running age by the hour as well. Both halves of an effect go on together, what it
+            // does to the actor values (the item use: boosts that end, points over time) and the record that it is
+            // running (the magic), as the frames of the game do when it is not paused
+            mItemUse.update(seconds);
+            // (the scripts of those effects run for the seconds of the hour, which GetSecondsPassed tells them)
+            mMagic.update(seconds);
+            // Each hour of sleep lowers the sleep deprivation of the hardcore mode
+            if (sleeping && hardcoreOn())
+                mHardcore.sleepHour(mPlayer, gameSetting("fHCSleepRestorationMod", 60));
+            // An effect that ran out can have taken the last of the health: the rest ends, with nothing given back
+            died = mActors.isDead(mPlayer);
+            if (died)
+                finish = true;
+        }
 
         double done = 0;
+        bool completed = false;
         {
             const std::lock_guard lock(mInteractionMutex);
-            if (!finish)
-                mRest.mDone += step;
             done = mRest.mDone;
-            if (mRest.mDone + 1e-9 >= mRest.mTotal)
+            // A script that ran in the hour (that of a running effect) can have asked to wake up, or left no hours:
+            // the rest ends here, and is not a completed sleep
+            if (mRest.mFinish)
                 finish = true;
+            if (!finish && mRest.mDone + 1e-9 >= mRest.mTotal)
+            {
+                finish = true;
+                completed = true;
+            }
         }
         if (!finish)
             return;
 
-        // Sleep heals: the stand-in is a full recovery in eight hours of it
-        if (sleeping && done > 0)
+        // The last hour of a sleep that was not stopped gives back all the health and fatigue and the condition of
+        // every part of the body (the executables skip it in the hardcore mode of New Vegas)
+        if (sleeping && completed && !hardcoreOn())
         {
-            namespace AV = FalloutScript::ActorValue;
-            const double most = mActorValues.permanent(mPlayer, AV::health);
-            mActorValues.restore(mPlayer, AV::health, most * done / 8.0);
+            constexpr double all = 1.0e9;
+            mActorValues.restore(mPlayer, AV::health, all);
+            mActorValues.restore(mPlayer, AV::fatigue, all);
+            for (int part = AV::firstCondition; part <= AV::lastCondition; ++part)
+                mActorValues.restore(mPlayer, part, all);
         }
         mPlayerSleeping = false;
         if (sleeping)
@@ -1350,9 +1540,23 @@ namespace OFScript
                 mFurniture.erase(found);
         }
         const int hours = static_cast<int>(std::floor(done + 1e-9));
-        if (stopped.empty() && hours > 0)
+        if (stopped.empty() && !died && hours > 0)
             tellPlayer(std::string(sleeping ? "You slept " : "You waited ") + std::to_string(hours)
                 + (hours == 1 ? " hour." : " hours."));
+        bool faded = false;
+        {
+            const std::lock_guard lock(mInteractionMutex);
+            faded = mRest.mFaded;
+            mRest.mFaded = false;
+        }
+        if (faded)
+        {
+            // Whatever ended the sleep, the screen gets light again
+            runOnMainThread([] {
+                if (OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager())
+                    windows->fadeScreenIn(sRestFadeSeconds);
+            });
+        }
         const std::lock_guard lock(mInteractionMutex);
         mRest.mActive = false;
         mRest.mOpen = false;

@@ -50,6 +50,7 @@
 #include <components/falloutscript/formlists.hpp>
 #include <components/falloutscript/furniture.hpp>
 #include <components/falloutscript/hacking.hpp>
+#include <components/falloutscript/hardcore.hpp>
 #include <components/falloutscript/hotkeys.hpp>
 #include <components/falloutscript/hud.hpp>
 #include <components/falloutscript/interpreter.hpp>
@@ -98,6 +99,7 @@ namespace ESM
 namespace ESM4
 {
     struct AIPackage;
+    struct Armor;
     struct IdleAnimation;
     struct Weapon;
 }
@@ -179,6 +181,17 @@ namespace OFScript
     public:
         /// Whether the game that is played is New Vegas (Tale of Two Wastelands is played with its engine)
         bool isNewVegas() const { return mGame == FalloutScript::Game::NewVegas; }
+
+        /// The difficulty of the game, from 0 (very easy) to 4 (very hard), which the Gameplay menu sets: normal for a
+        /// game that never had it set. It is kept with the game (the switches of a save), as the number plus one, so
+        /// that the unset state reads as normal. The port keeps it in the game, as the hardcore mode is, and not in the
+        /// settings of the player (stand-in: where the executables keep it is not read).
+        int gameDifficulty() const;
+        void setGameDifficulty(int difficulty);
+        /// Whether the hardcore mode is on: the flag of the SetHardcore command, which the Gameplay menu writes too.
+        /// Only New Vegas has the mode.
+        bool hardcoreMode() const { return isNewVegas() && mSwitches.get("SetHardcore") > 0; }
+        void setHardcoreMode(bool on) { mSwitches.set("SetHardcore", on ? 1 : 0); }
 
         FalloutScripts(const OFWorld::ESMStore& store, FalloutScript::Game game,
             FalloutScript::FormId player = FalloutScript::playerReference);
@@ -1640,6 +1653,11 @@ namespace OFScript
         /// The kind of the entry of the furniture the actor uses (the position reference byte of the model: 1 to 9
         /// lying, 10 to 20 sitting), 0 when it uses none
         int furnitureKindOf(const OFWorld::Ptr& actor) const;
+        /// Whether the player is sleeping on a bed now (the hours pass behind a fade: the games do not lie the player
+        /// down)
+        bool isPlayerSleeping() const { return mPlayerSleeping; }
+        /// Whether the player is dead (the third person body falls, and stands again when the player is revived)
+        bool isPlayerDead() const { return mPlayer != 0 && mActors.isDead(mPlayer); }
         /// How many more characters can use the furniture: the entries of its marker that the record enables and that
         /// no one uses (0 when the model has none)
         int freeFurniturePlaces(const OFWorld::Ptr& furniture);
@@ -1715,6 +1733,9 @@ namespace OFScript
         bool startConversation(const OFWorld::Ptr& speaker, FalloutScript::FormId topic = 0);
         /// startConversation and the interface that shows it. For the thread of the frame.
         bool talkTo(const OFWorld::Ptr& speaker, FalloutScript::FormId topic = 0);
+        /// The character that the player is in a conversation with, empty when there is no conversation open. For the
+        /// thread of the frame (the camera turns to the speaker).
+        OFWorld::Ptr conversationSpeaker();
         /// What a character with a Dialogue package does once it is where it talks: a Say To package for the player
         /// says one response of its topic, a Conversation package for the player begins a conversation (the interface
         /// opens, which is for the thread of the frame), and a package for another character makes the exchange of the
@@ -1871,6 +1892,19 @@ namespace OFScript
             ESM4::Npc mRecord;
         };
         bool lookPreview(LookPreview& preview);
+        /// What the body of the player is made from in third person: the look as `lookPreview` makes it, and the armor
+        /// the player wears (the pieces of the record that the player's items stand for). False when the player has no
+        /// look to draw (no plugin of Fallout is loaded).
+        bool playerBody(LookPreview& preview, std::vector<const ESM4::Armor*>& armor);
+        /// The player lands after a fall that lost that much height (the actor that is falling is the player's: the
+        /// caller is its character controller): the games' rule hurts it (the damage of the fall by the exponent of its
+        /// height, the legs, the sound of a hard landing, the red flash) and it dies of what is left of none, so the
+        /// rule of Morrowind that the controller has is not used. False for a character that is not the player, whose
+        /// falls the rule does not read yet.
+        bool landed(const OFWorld::Ptr& ptr, float heightLost);
+        /// A number that changes when what `playerBody` gives changes (the sex, race or look, armor put on or taken
+        /// off), cheap enough to ask every frame
+        std::uint64_t playerBodyRevision();
         /// The traits of the data (New Vegas), by name; the picture is the `ICON` of the perk, which the trait menu of
         /// the executable shows beside the description
         struct ChargenTrait
@@ -1966,6 +2000,8 @@ namespace OFScript
         bool hasLoaded3D(FalloutScript::FormId reference) override;
         FalloutScript::SkyWeather sky() override;
         bool playerSleeping() override { return mPlayerSleeping; }
+        void wakePlayer(double hours) override;
+        void setPlayerSleepHours(double hours) override;
         /// The engine has no crime system: nobody sees a crime, so every count is the 0 that a clean player has in the
         /// executables (the commands that ask are the greeting lines of the characters)
         int majorCrimeCount(FalloutScript::FormId) override { return 0; }
@@ -2182,6 +2218,7 @@ namespace OFScript
         bool abilityEffects(FalloutScript::FormId ability, std::vector<FalloutScript::AbilityEffect>& effects) override;
         bool consumable(FalloutScript::FormId item, FalloutScript::Consumable& result) override;
         bool spell(FalloutScript::FormId spell, FalloutScript::SpellInfo& info) override;
+        FalloutScript::FormId effectScript(FalloutScript::FormId effect) override;
         /// What one effect of an item or a spell is, false for one that is of no use
         bool effectOf(const ESM4::EffectEntry& entry, FalloutScript::ConsumableEffect& made);
         /// The character takes the effects of a spell it cast on itself
@@ -2423,6 +2460,9 @@ namespace OFScript
         FalloutScript::PerkEngine mPerks;
         FalloutScript::ItemUse mItemUse;
         FalloutScript::Magic mMagic;
+        /// The needs of the hardcore mode (New Vegas)
+        FalloutScript::HardcoreNeeds mHardcore;
+        std::atomic<bool> mHardcoreOn{ false };
         FalloutScript::Crafting mCrafting;
         FalloutScript::Limbs mLimbs;
         std::atomic<bool> mVatsOpen{ false };
@@ -2750,6 +2790,10 @@ namespace OFScript
             int mEnded = 0;
             /// The player stopped it: it ends where it is, in the next frame
             bool mFinish = false;
+            /// The screen of a sleep was made dark (it is made light again when the sleep ends)
+            bool mFaded = false;
+            /// The seconds of the hour that is passing (an hour passes in a second)
+            double mTickSeconds = 0;
         };
         RestState mRest;
         /// A door or container whose lock was just opened, and the seconds before it is activated again
@@ -2760,8 +2804,12 @@ namespace OFScript
         };
         std::optional<Reactivation> mReactivate;
         float mDiscoveryTimer = 0;
-        /// The hours of waiting that pass for each second of play while the player waits or sleeps
-        static constexpr double sRestHoursPerSecond = 4.0;
+        /// The seconds that a game hour takes while the player waits or sleeps (M13 executable reads: the menu counts
+        /// the hours one for each second, and drops what is left of the second)
+        static constexpr double sRestSecondsPerHour = 1.0;
+        /// The seconds that the screen takes to go dark when the player sleeps, and to get light again when the sleep
+        /// ends (fFadeToBlackFadeSeconds, which neither master has: the executables' default)
+        static constexpr float sRestFadeSeconds = 0.3f;
         /// Moves the game of hacking, waiting and sleeping on; every frame, even while a screen stops the world
         void updateInteraction(float frametime);
         /// Makes the save that a script asked for, when the interface allows one
@@ -2791,6 +2839,15 @@ namespace OFScript
         std::string terminalFormat(const std::string& text);
         /// The things that make fast travel and waiting impossible, as far as the host can tell
         bool hostilesNearPlayer();
+        /// Whether an effect that is running on the player takes health from it (poison), which stops a rest and a trip
+        bool playerTakingHealthDamage();
+        /// Whether the hardcore mode is on (SetHardcore)
+        bool hardcoreOn() const { return hardcoreMode(); }
+        /// The stages of a need of the hardcore mode (the records DEHY, HUNG and SLPD)
+        std::vector<FalloutScript::HardcoreNeeds::Stage> hardcoreStages(int need);
+        /// Lets the needs of the player go on to the time of the game, when the hardcore mode is on (and takes the
+        /// stages off when it was turned off)
+        void updateHardcore(bool sleeping);
         /// Whether the player is in the air: not on the ground, not in water, not held up by flight
         bool playerInAir();
         /// Whether two cells are the same place for eyes, for the compass and for a fight: one cell, or two exterior

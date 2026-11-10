@@ -354,6 +354,13 @@ namespace OFClass
         data.mEquippedClothing.clear();
     }
 
+    void ESM4Npc::setWornArmor(const OFWorld::Ptr& ptr, const std::vector<const ESM4::Armor*>& armor)
+    {
+        ESM4NpcCustomData& data = getCustomData(ptr);
+        data.mEquippedArmor = armor;
+        data.mEquippedClothing.clear();
+    }
+
     VFS::Path::NormalizedView ESM4Npc::getModel(const OFWorld::ConstPtr& ptr) const
     {
         const ESM4NpcCustomData& data = getCustomData(ptr);

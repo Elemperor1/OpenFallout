@@ -41,6 +41,7 @@
 #include "../mwbase/soundmanager.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
+#include "../mwscript/falloutscripts.hpp"
 
 #include "../mwworld/class.hpp"
 #include "../mwworld/esmstore.hpp"
@@ -2240,7 +2241,11 @@ namespace OFMechanics
                 {
                     float height = cls.getCreatureStats(mPtr).land(isPlayer);
                     float healthLost = 0.f;
-                    if (!inwater)
+                    // The games' own rule hurts the player when there is a Fallout game (a fall in water hurts none);
+                    // what it does not read yet goes on by the rule of Morrowind
+                    const bool falloutRule = !inwater && OFBase::Environment::get().hasFalloutScripts()
+                        && OFBase::Environment::get().getFalloutScripts()->landed(mPtr, height);
+                    if (!inwater && !falloutRule)
                         healthLost = getFallDamage(mPtr, height);
 
                     if (healthLost > 0.0f)

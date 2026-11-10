@@ -71,6 +71,9 @@ namespace FalloutScript::Interaction
         bool mInCombat = false;
         /// A bed that belongs to someone else (when sleeping)
         bool mOwnedBed = false;
+        /// The place the character stands in forbids waiting (the flag of its cell, or of its worldspace outside). The
+        /// games have the message for waiting only (sNoWaitInCell), so it is no reason not to sleep
+        bool mPlaceForbidsWaiting = false;
     };
 
     /// The game setting that holds the refusal, none when the character may rest (the order is that of the checks of

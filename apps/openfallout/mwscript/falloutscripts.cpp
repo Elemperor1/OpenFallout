@@ -199,6 +199,7 @@ namespace OFScript
         , mPerks(*this, mProgress, mActorValues)
         , mItemUse(*this, mActors, mActorValues, mProgress)
         , mMagic(*this)
+        , mHardcore([this](int need) { return hardcoreStages(need); }, mActorValues, mMagic)
         , mCrafting(*this, mActors, mActorValues)
         , mLimbs(*this, mActorValues)
         , mChargen(game)
@@ -473,6 +474,25 @@ namespace OFScript
         });
         mMagic.setCaster([this](FalloutScript::FormId actor, FalloutScript::FormId spell,
                              const std::vector<FalloutScript::SpellEffect>& kept) { castSpell(actor, spell, kept); });
+        // A stage of a need of the hardcore mode that took all the health (the last one) kills the player
+        mHardcore.setStageListener([this](FalloutScript::FormId actor) { mItemUse.checkHealth(actor); });
+        // An effect that runs a script (the well rested bonus of a bed) has its blocks run for the character
+        mMagic.setScriptRunner([this](FalloutScript::FormId actor, FalloutScript::FormId script,
+                                   FalloutScript::Magic::ScriptStage stage, FalloutScript::Magic::EffectId effect,
+                                   double seconds) {
+            using Stage = FalloutScript::Magic::ScriptStage;
+            // An update runs for the seconds it covers (a frame, an hour of rest, or what was left of the effect),
+            // which GetSecondsPassed tells the script; the value of the frame comes back after
+            const float frameSeconds = mObjects.secondsPassed();
+            if (stage == Stage::Update && seconds > 0)
+                mObjects.setSecondsPassed(static_cast<float>(seconds));
+            mObjects.runEffect(actor, script,
+                stage == Stage::Start        ? FalloutScript::BlockType::ScriptEffectStart
+                    : stage == Stage::Update ? FalloutScript::BlockType::ScriptEffectUpdate
+                                             : FalloutScript::BlockType::ScriptEffectFinish,
+                effect);
+            mObjects.setSecondsPassed(frameSeconds);
+        });
         // The conditions of a log entry of a stage are about the player, who nobody else is in the way of
         mQuests.setConditionCheck([this](const std::vector<ESM4::TargetCondition>& conditions) {
             return mConditions.holds(conditions, FalloutScript::ConditionContext());
@@ -659,6 +679,10 @@ namespace OFScript
         mPresentation.clear();
         mSwitches.clear();
         mMagic.clear();
+        // The needs of the hardcore mode count from the game that is loaded or started, not from the one that is left:
+        // the days between two saves are not time the player lived through
+        mHardcore.clear();
+        mHardcoreOn.store(false);
         {
             // A new game and a loaded game are both told to the scripts once; the program was started only once
             const std::lock_guard lock(mSessionMutex);
@@ -4380,6 +4404,17 @@ namespace OFScript
             return false;
         OFBase::Environment::get().getWindowManager()->pushGuiMode(OFGui::GM_Dialogue, speaker);
         return true;
+    }
+
+    OFWorld::Ptr FalloutScripts::conversationSpeaker()
+    {
+        FalloutScript::FormId reference = 0;
+        {
+            const std::lock_guard lock(mDialogueMutex);
+            if (mDialogue.active())
+                reference = mDialogue.speaker().mReference;
+        }
+        return reference != 0 ? findReference(reference) : OFWorld::Ptr();
     }
 
     bool FalloutScripts::speakPackage(

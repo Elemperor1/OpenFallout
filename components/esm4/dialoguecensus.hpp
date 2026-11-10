@@ -120,6 +120,12 @@ namespace ESM4
 
         void write(std::ostream& stream) const;
 
+        /// The functions that the conditions of the responses call, as a CSV that other tools read
+        /// (scripts/openfallout/command_census.py), the same layout as ScriptCodeCensus::writeCsv: `kind,code,name,
+        /// measure,count`, with kind `dialogue_condition`, the code of the command (0x1000 and up) and the measures
+        /// `uses`, `on_player`, `on_reference` and `on_other`. A count of 0 is left out.
+        void writeCsv(std::ostream& stream) const;
+
     private:
         struct Topic
         {

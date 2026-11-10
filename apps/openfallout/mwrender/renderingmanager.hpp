@@ -12,6 +12,7 @@
 
 #include <osgUtil/IncrementalCompileOperation>
 
+#include <cstdint>
 #include <deque>
 #include <map>
 #include <memory>
@@ -97,6 +98,7 @@ namespace OFRender
     class FogManager;
     class SkyManager;
     class NpcAnimation;
+    class FalloutPlayerBody;
     class Pathgrid;
     class Camera;
     class Water;
@@ -320,6 +322,13 @@ namespace OFRender
         void reportStats() const;
 
         void updateNavMesh();
+        /// Keeps the body of the player in Fallout 3 and New Vegas up to date: made when the camera first leaves the
+        /// player's eyes and again when the look or the armor changes, shown outside the eyes, sitting where the player sits
+        void updatePlayerBody();
+        /// The view of a conversation (Fallout 3 and New Vegas): first person, the player turned to the head of the
+        /// character that it talks with and the field of view narrowed on it (1.5 seconds), and after it the view that
+        /// the player had (0.5 seconds of zooming out)
+        void updateDialogueCamera(float dt);
 
         void updateRecastMesh();
 
@@ -362,6 +371,35 @@ namespace OFRender
         std::unique_ptr<SceneUtil::ShadowManager> mShadowManager;
         osg::ref_ptr<PostProcessor> mPostProcessor;
         osg::ref_ptr<NpcAnimation> mPlayerAnimation;
+        /// What the player looks like in Fallout 3 and New Vegas outside of the player's eyes (the engine's player is a
+        /// record of the Morrowind kind with no model of its own)
+        std::unique_ptr<FalloutPlayerBody> mPlayerBody;
+        /// The look and armor (see FalloutScripts::playerBodyRevision) that was last tried; a look that cannot be made is
+        /// not tried again until it changes
+        std::optional<std::uint64_t> mPlayerBodyTried;
+        /// What a conversation does to the view (see updateDialogueCamera)
+        struct DialogueView
+        {
+            /// The view is held: first person, and zoomed in or zooming out
+            bool mHeld = false;
+            /// The conversation is open (otherwise the view is zooming out)
+            bool mOpen = false;
+            /// Seconds since the conversation opened (or closed)
+            float mSeconds = 0;
+            /// How far the view has opened, from 0 to 1
+            float mProgress = 0;
+            /// The share of the field of view of the settings, and the share when the conversation ended
+            float mZoom = 1;
+            float mZoomAtClose = 1;
+            /// The player is being turned to the head by the correction that goes on after the opening
+            bool mTurning = false;
+            /// The view the player had (a Camera::Mode), and whether it was changed to the first person
+            int mSavedMode = 0;
+            bool mModeChanged = false;
+        };
+        DialogueView mDialogueView;
+        /// The field of view is overridden by the view of a conversation
+        bool mDialogueFieldOfView = false;
         osg::ref_ptr<SceneUtil::PositionAttitudeTransform> mPlayerNode;
         std::unique_ptr<Camera> mCamera;
         osg::ref_ptr<Debug::DebugDrawer> mDebugDraw;

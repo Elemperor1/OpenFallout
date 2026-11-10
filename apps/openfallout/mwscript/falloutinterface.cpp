@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <random>
 #include <set>
 
 #include <components/esm4/loadcrea.hpp>
@@ -11,6 +12,7 @@
 #include <components/esm4/loadrefr.hpp>
 #include <components/falloutscript/actorvalues.hpp>
 #include <components/falloutscript/derivedstats.hpp>
+#include <components/falloutscript/falldamage.hpp>
 #include <components/falloutscript/hud.hpp>
 #include <components/falloutscript/messagetext.hpp>
 
@@ -130,6 +132,56 @@ namespace OFScript
         // (a player with less than a point of health is out as well: see SwimBreathStep::mFatal)
         if (step.mFatal || mActorValues.current(mPlayer, AV::health) <= 0)
             mActors.kill(mPlayer);
+    }
+
+    bool FalloutScripts::landed(const OFWorld::Ptr& ptr, float heightLost)
+    {
+        namespace AV = FalloutScript::ActorValue;
+        namespace Fall = FalloutScript::FallDamage;
+        // Only the player lands here: the characters and creatures of the world are moved by the Fallout actor update,
+        // which keeps them on the ground and has no fall to measure (the executables hurt them by the same formula,
+        // minus the exemptions of the reads, so this is where it would go if they ever fall)
+        if (mPlayer == 0 || ptr.isEmpty() || scriptReferenceOf(ptr) != mPlayer)
+            return false;
+        const Fall::Settings settings = Fall::Settings::fromGameSettings(
+            [this](std::string_view name) -> std::optional<double> { return gameSetting(name); });
+        const double damage = Fall::damage(settings, heightLost);
+        if (damage <= 0)
+            return true;
+        // A landing that hurts has a sound of its own, heavy above the threshold; the god mode does not silence it
+        if (const FalloutScript::FormId landing
+            = soundByEditorId(Fall::isHardLanding(settings, damage) ? "FSTLandHardHeavy" : "FSTLandHardLight");
+            landing != 0)
+            playSound(landing, mPlayer);
+        if (OFBase::Environment::get().getWorld()->getGodModeState() || mActors.isDead(mPlayer))
+            return true;
+        if (OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager())
+            windows->activateHitOverlay();
+        // The damage of a fall has no attacker and no armor: it is taken off the health as it is, after what the
+        // difficulty of the game makes of the damage to the player
+        const double toPlayer = Fall::damageToPlayerMultiplier(gameDifficulty());
+        int leftRoll = 0;
+        int rightRoll = 0;
+        {
+            const std::lock_guard lock(mCombatRandomMutex);
+            std::uniform_int_distribution<int> percent(0, 99);
+            leftRoll = percent(mCombatRandom);
+            rightRoll = percent(mCombatRandom);
+        }
+        const std::lock_guard strikeLock(mStrikeMutex);
+        const auto transitions = mActors.holdTransitions();
+        mActorValues.damage(mPlayer, AV::health, damage * toPlayer);
+        // Each leg is hurt on its own chance by half of the damage before the difficulty, and with that gets crippled
+        // (the condition of the part is the actor value, 0x1D for the left leg and 0x1E for the right)
+        constexpr int leftLegCondition = 29;
+        constexpr int rightLegCondition = 30;
+        if (Fall::legHurt(settings, leftRoll))
+            mActorValues.damage(mPlayer, leftLegCondition, damage * settings.mLegMultiplier);
+        if (Fall::legHurt(settings, rightRoll))
+            mActorValues.damage(mPlayer, rightLegCondition, damage * settings.mLegMultiplier);
+        if (mActorValues.current(mPlayer, AV::health) <= 0)
+            mActors.kill(mPlayer);
+        return true;
     }
 
     FalloutScripts::HudStatus FalloutScripts::hudStatus()
@@ -359,5 +411,17 @@ namespace OFScript
         for (HudMarker& enemy : enemies)
             result.push_back(std::move(enemy));
         return result;
+    }
+
+    int FalloutScripts::gameDifficulty() const
+    {
+        // Kept as the number plus one: a switch that is 0 was never set
+        const int kept = mSwitches.get("GameDifficulty");
+        return kept > 0 ? std::clamp(kept - 1, 0, 4) : FalloutScript::FallDamage::normalDifficulty;
+    }
+
+    void FalloutScripts::setGameDifficulty(int difficulty)
+    {
+        mSwitches.set("GameDifficulty", std::clamp(difficulty, 0, 4) + 1);
     }
 }

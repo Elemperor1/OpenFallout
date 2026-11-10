@@ -477,7 +477,7 @@ namespace OFRender
         // place to another is a teleport and not a movement.
         constexpr float teleportSpeed = 3000.f;
         constexpr float smoothingTime = 0.2f;
-        const osg::Vec3f position = mPtr.getRefData().getPosition().asVec3();
+        const osg::Vec3f position = (mMotionSource.isEmpty() ? mPtr : mMotionSource).getRefData().getPosition().asVec3();
         if (mHasLastPosition && duration > 0.f)
         {
             const osg::Vec2f step(position.x() - mLastPosition.x(), position.y() - mLastPosition.y());

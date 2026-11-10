@@ -60,21 +60,23 @@ namespace FalloutScript
         object.mScript = script;
         if (const auto saved = mSaved.find(reference); saved != mSaved.end())
         {
-            // A script that was changed since the save (other variables) starts over, as the games do
-            const std::vector<Variable>& variables = object.mInstance->script().variables();
-            const SavedInstance& state = saved->second;
-            if (state.mScript == script && state.mVariables.size() + 1 == variables.size())
-            {
-                bool same = true;
-                for (std::size_t i = 0; i < state.mKinds.size(); ++i)
-                    same = same && variables[i + 1].mKind == state.mKinds[i];
-                if (same)
-                    for (std::size_t i = 0; i < state.mVariables.size(); ++i)
-                        object.mInstance->setVariable(static_cast<std::uint32_t>(i + 1), state.mVariables[i]);
-            }
+            applySaved(*object.mInstance, script, saved->second);
             mSaved.erase(saved);
         }
         return object.mInstance.get();
+    }
+
+    void ObjectScripts::applySaved(Instance& instance, FormId script, const SavedInstance& state)
+    {
+        // A script that was changed since the save (other variables) starts over, as the games do
+        const std::vector<Variable>& variables = instance.script().variables();
+        if (state.mScript != script || state.mVariables.size() + 1 != variables.size())
+            return;
+        for (std::size_t i = 0; i < state.mKinds.size(); ++i)
+            if (variables[i + 1].mKind != state.mKinds[i])
+                return;
+        for (std::size_t i = 0; i < state.mVariables.size(); ++i)
+            instance.setVariable(static_cast<std::uint32_t>(i + 1), state.mVariables[i]);
     }
 
     Instance* ObjectScripts::instance(FormId reference)
@@ -131,6 +133,55 @@ namespace FalloutScript
         return true;
     }
 
+    bool ObjectScripts::runEffect(FormId character, FormId script, std::uint16_t blockType, std::uint64_t effect)
+    {
+        if (character == 0 || script == 0)
+            return false;
+        const std::tuple<FormId, FormId, std::uint64_t> key(character, script, effect);
+        std::shared_ptr<Instance> instance;
+        if (const auto found = mEffects.find(key); found != mEffects.end() && blockType != BlockType::ScriptEffectStart)
+            instance = found->second;
+        else
+        {
+            const ESM4::Script* record = mFinder ? mFinder(script) : nullptr;
+            if (record == nullptr)
+            {
+                if (mReported.insert(script).second)
+                    mInterpreter.host().log("The script " + hex(script) + " of a magic effect is not known");
+                return false;
+            }
+            std::shared_ptr<const Script> prepared = this->prepared(record->mScript, script);
+            if (!prepared->usable())
+            {
+                if (mReported.insert(script).second)
+                    mInterpreter.host().log(
+                        "The script " + hex(script) + " of a magic effect cannot be run: " + prepared->problemText());
+                return false;
+            }
+            instance = std::make_shared<Instance>(std::move(prepared), character);
+            mEffects[key] = instance;
+            // An effect that runs on from a saved game takes the variables its script had
+            if (const auto saved = mSavedEffects.find(key); saved != mSavedEffects.end())
+            {
+                applySaved(*instance, script, saved->second);
+                mSavedEffects.erase(saved);
+            }
+        }
+        const bool has = hasBlockOfType(instance->script(), blockType);
+        if (has)
+        {
+            const ActionScope scope(mActionReference, 0);
+            mInterpreter.run(*instance, blockType);
+        }
+        // The script lives as long as its effect; one without such blocks has nothing to keep
+        if (blockType == BlockType::ScriptEffectFinish)
+        {
+            mEffects.erase(key);
+            mSavedEffects.erase(key);
+        }
+        return has;
+    }
+
     bool ObjectScripts::runResult(const ESM4::ScriptDefinition& definition, FormId reference)
     {
         if (reference == 0 || definition.compiledScript.empty())
@@ -181,6 +232,8 @@ namespace FalloutScript
     void ObjectScripts::clear()
     {
         mObjects.clear();
+        mEffects.clear();
+        mSavedEffects.clear();
         mSaved.clear();
         mUpdating.clear();
         mMenuUpdating.clear();

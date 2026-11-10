@@ -60,6 +60,10 @@ namespace FalloutScript
         constexpr std::uint16_t OnCombatEnd = 12;
         constexpr std::uint16_t OnPackageStart = 15;
         constexpr std::uint16_t OnPackageDone = 16;
+        // The blocks of the script of a magic effect: it starts, runs each frame and ends on its character
+        constexpr std::uint16_t ScriptEffectStart = 17;
+        constexpr std::uint16_t ScriptEffectFinish = 18;
+        constexpr std::uint16_t ScriptEffectUpdate = 19;
         constexpr std::uint16_t OnPackageChange = 20;
         constexpr std::uint16_t OnLoad = 21;
         constexpr std::uint16_t OnTrigger = 24; // an actor is inside a volume: every pass

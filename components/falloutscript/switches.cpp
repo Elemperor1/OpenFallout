@@ -55,7 +55,8 @@ namespace FalloutScript
         // The commands that set a switch that is kept; the reason says what the switch does not do. The value is the
         // first argument, 1 for a command that has none.
         constexpr SwitchCommand switchCommands[] = {
-            { "SetHardcore", "the needs of the hardcore mode are not done", false },
+            { "SetHardcore", "stimpaks over time, doctor's bags and ammo weight of the hardcore mode are not done",
+                false },
             { "SetPCYoung", "the body of the player does not change with its age", false },
             { "SetPCToddler", "the body of the player does not change with its age", false },
             { "SetLocationSpecificLoadScreensOnly", "load screens are not chosen by the place", false },

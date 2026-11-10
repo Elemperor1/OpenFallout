@@ -20,13 +20,24 @@ namespace FalloutScript
         const std::lock_guard lock(mMutex);
         mWorn.clear();
         mChanges.clear();
+        ++mRevision;
     }
 
     void Equipment::noteChange(FormId actor, FormId item, bool worn)
     {
+        ItemInfo info;
+        if (mRecords.itemInfo(item, info) && info.mKind == ItemKind::Armor)
+            ++mArmorRevisions[actor];
         constexpr std::size_t mostChanges = 1024;
         if (mChanges.size() < mostChanges)
             mChanges.push_back({ actor, item, worn });
+    }
+
+    std::uint32_t Equipment::revision(FormId actor) const
+    {
+        const std::lock_guard lock(mMutex);
+        const auto found = mArmorRevisions.find(actor);
+        return mRevision + (found != mArmorRevisions.end() ? found->second : 0);
     }
 
     std::vector<Equipment::WornChange> Equipment::takeChanges()

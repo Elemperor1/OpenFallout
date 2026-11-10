@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <ostream>
 #include <set>
+#include <sstream>
 #include <string>
 
 #include "censusreading.hpp"
@@ -292,6 +293,26 @@ namespace ESM4
         }
 
         return summary;
+    }
+
+    void DialogueCensus::writeCsv(std::ostream& stream) const
+    {
+        stream << "kind,code,name,measure,count\n";
+        for (const auto& [function, use] : summarize().mFunctions)
+        {
+            const std::string name = mFunctionNames ? mFunctionNames(function) : std::string();
+            std::ostringstream code;
+            code << "0x" << std::hex << std::uppercase << std::setfill('0') << std::setw(4) << (0x1000 + function);
+            const auto line = [&](const char* measure, std::size_t count) {
+                if (count != 0)
+                    stream << "dialogue_condition," << code.str() << ',' << name << ',' << measure << ',' << count
+                           << '\n';
+            };
+            line("uses", use.mUses);
+            line("on_player", use.mOnTarget);
+            line("on_reference", use.mOnReference);
+            line("on_other", use.mOnOther);
+        }
     }
 
     void DialogueCensus::write(std::ostream& stream) const

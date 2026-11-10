@@ -8,7 +8,9 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <functional>
 #include <map>
+#include <set>
 
 namespace
 {
@@ -31,6 +33,25 @@ namespace
     constexpr FormId fire = 0x00200003;
     constexpr FormId gatedBoost = 0x00200004;
     constexpr FormId gatedFire = 0x00200005;
+    constexpr FormId restSpell = 0x00100006;
+    constexpr FormId restEffect = 0x00200006;
+    constexpr FormId restScript = 0x00300001;
+    constexpr FormId flashSpell = 0x00100007;
+    constexpr FormId flashEffect = 0x00200007;
+    constexpr FormId flashScript = 0x00300002;
+    constexpr FormId scriptedAbility = 0x00100008;
+    constexpr FormId scriptedAbilityEffect = 0x00200008;
+    constexpr FormId scriptedAbilityScript = 0x00300003;
+    constexpr FormId twinSpell = 0x00100009;
+    constexpr FormId twinFirstEffect = 0x00200009;
+    constexpr FormId twinSecondEffect = 0x0020000A;
+    constexpr FormId twinFirstScript = 0x00300004;
+    constexpr FormId twinSecondScript = 0x00300005;
+    constexpr FormId twinAbility = 0x0010000A;
+    constexpr FormId twinAbilityFirstEffect = 0x0020000B;
+    constexpr FormId twinAbilitySecondEffect = 0x0020000C;
+    constexpr FormId twinAbilityFirstScript = 0x00300006;
+    constexpr FormId twinAbilitySecondScript = 0x00300007;
 
     constexpr std::uint16_t OpAddSpell = 0x101C;
     constexpr std::uint16_t OpRemoveSpell = 0x101D;
@@ -69,6 +90,30 @@ namespace
             gatedFlame.mEffects.push_back({ gatedFire, 0, FalloutScript::ActorValue::health, 5, 10, true });
             gatedFlame.mEffects.back().mConditions.emplace_back();
             mSpells[gatedBlast] = gatedFlame;
+            // Effects of the script archetype (1): one that lasts, one that happens at once, one an ability keeps
+            SpellInfo rest;
+            rest.mType = 0;
+            rest.mEffects.push_back({ restEffect, 1, -1, 0, 100, false });
+            mSpells[restSpell] = rest;
+            SpellInfo flash;
+            flash.mType = 0;
+            flash.mEffects.push_back({ flashEffect, 1, -1, 0, 0, false });
+            mSpells[flashSpell] = flash;
+            SpellInfo kept;
+            kept.mType = 4;
+            kept.mEffects.push_back({ scriptedAbilityEffect, 1, -1, 0, 0, false });
+            mSpells[scriptedAbility] = kept;
+            // A spell and an ability with two script effects each
+            SpellInfo twin;
+            twin.mType = 0;
+            twin.mEffects.push_back({ twinFirstEffect, 1, -1, 0, 100, false });
+            twin.mEffects.push_back({ twinSecondEffect, 1, -1, 0, 100, false });
+            mSpells[twinSpell] = twin;
+            SpellInfo twinKept;
+            twinKept.mType = 4;
+            twinKept.mEffects.push_back({ twinAbilityFirstEffect, 1, -1, 0, 0, false });
+            twinKept.mEffects.push_back({ twinAbilitySecondEffect, 1, -1, 0, 0, false });
+            mSpells[twinAbility] = twinKept;
         }
 
         bool spell(FormId spell, SpellInfo& info) override
@@ -80,6 +125,17 @@ namespace
             return true;
         }
         bool isActor(FormId reference) override { return reference == courier; }
+        FormId effectScript(FormId effect) override
+        {
+            return effect == restEffect             ? restScript
+                : effect == flashEffect             ? flashScript
+                : effect == scriptedAbilityEffect   ? scriptedAbilityScript
+                : effect == twinFirstEffect         ? twinFirstScript
+                : effect == twinSecondEffect        ? twinSecondScript
+                : effect == twinAbilityFirstEffect  ? twinAbilityFirstScript
+                : effect == twinAbilitySecondEffect ? twinAbilitySecondScript
+                                                    : 0;
+        }
     };
 
     struct Runner
@@ -92,9 +148,26 @@ namespace
         std::vector<std::pair<int, double>> mChanges;
         std::vector<FormId> mCast;
         std::vector<std::size_t> mCastEffects;
+        /// The scripts of effects that ran: the script and its stage, in order
+        std::vector<std::pair<FormId, Magic::ScriptStage>> mStages;
+        /// The effect numbers of the stages, in the same order
+        std::vector<Magic::EffectId> mEffectIds;
+        /// The seconds that the stages cover (0 for all but an update), in the same order
+        std::vector<double> mSeconds;
+        /// What the scripts do when a stage has been noted (a script that casts or takes away a spell)
+        std::function<void(FormId, Magic::ScriptStage)> mOnStage;
 
         Runner()
         {
+            mMagic.setScriptRunner(
+                [this](FormId actor, FormId script, Magic::ScriptStage stage, Magic::EffectId id, double seconds) {
+                    EXPECT_EQ(actor, courier);
+                    mStages.emplace_back(script, stage);
+                    mEffectIds.push_back(id);
+                    mSeconds.push_back(seconds);
+                    if (mOnStage)
+                        mOnStage(script, stage);
+                });
             mMagic.setModifier(
                 [this](FormId, int actorValue, double amount) { mChanges.emplace_back(actorValue, amount); });
             mMagic.setCaster([this](FormId, FormId spell, const std::vector<FalloutScript::SpellEffect>& effects) {
@@ -283,5 +356,289 @@ namespace
         other.mMagic.clear();
         EXPECT_FALSE(other.mMagic.hasSpell(courier, ability));
         EXPECT_EQ(other.call(OpHasMagicEffect, courier, { fire }), 0.0);
+    }
+
+    TEST(FalloutScriptMagicTest, the_script_of_an_effect_starts_runs_each_frame_and_finishes_with_it)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { restSpell });
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Start)));
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { restEffect }), 1.0);
+
+        run.mStages.clear();
+        run.mMagic.update(30);
+        run.mMagic.update(30);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Update), Pair(restScript, Stage::Update)));
+
+        // The step in which it runs out runs its update for the seconds it was still running (40 of the 50), and then
+        // finishes it
+        run.mStages.clear();
+        run.mSeconds.clear();
+        run.mMagic.update(50);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Update), Pair(restScript, Stage::Finish)));
+        EXPECT_THAT(run.mSeconds, ElementsAre(40.0, 0.0));
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { restEffect }), 0.0);
+
+        run.mStages.clear();
+        run.mMagic.update(50);
+        EXPECT_TRUE(run.mStages.empty());
+    }
+
+    TEST(FalloutScriptMagicTest, a_spell_cast_again_renews_its_script_effect_and_the_old_one_does_not_end_the_new)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { restSpell });
+        run.mMagic.update(60);
+        run.mStages.clear();
+
+        // The earlier effect ends before the new one begins
+        run.call(OpCastImmediateOnSelf, courier, { restSpell });
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Finish), Pair(restScript, Stage::Start)));
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { restEffect }), 1.0);
+
+        // The time the earlier effect had left (40) passes without it ending anything: the new one has its whole time
+        run.mStages.clear();
+        run.mMagic.update(50);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Update)));
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { restEffect }), 1.0);
+
+        run.mStages.clear();
+        run.mMagic.update(50);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Update), Pair(restScript, Stage::Finish)));
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { restEffect }), 0.0);
+    }
+
+    TEST(FalloutScriptMagicTest, the_effects_of_one_script_on_one_character_are_told_apart_by_their_numbers)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        // An item used twice: two effects of one script, one running out before the other
+        run.mMagic.noteEffect(courier, restEffect, crate, 3);
+        run.mMagic.noteEffect(courier, restEffect, crate, 10);
+        ASSERT_EQ(run.mEffectIds.size(), 2u);
+        const Magic::EffectId first = run.mEffectIds[0];
+        const Magic::EffectId second = run.mEffectIds[1];
+        EXPECT_NE(first, second);
+
+        run.mStages.clear();
+        run.mEffectIds.clear();
+        run.mMagic.update(4);
+        // The first one ends and the second goes on, each by its own number (the first runs its last update, for the 3
+        // seconds it had left, and then finishes)
+        EXPECT_THAT(run.mStages,
+            ElementsAre(
+                Pair(restScript, Stage::Update), Pair(restScript, Stage::Update), Pair(restScript, Stage::Finish)));
+        EXPECT_THAT(run.mEffectIds, ElementsAre(second, first, first));
+    }
+
+    TEST(FalloutScriptMagicTest, a_renewed_script_effect_ends_the_old_number_and_starts_a_new_one)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { restSpell });
+        const Magic::EffectId first = run.mEffectIds.at(0);
+        run.mEffectIds.clear();
+        run.mStages.clear();
+        run.call(OpCastImmediateOnSelf, courier, { restSpell });
+        ASSERT_EQ(run.mEffectIds.size(), 2u);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Finish), Pair(restScript, Stage::Start)));
+        EXPECT_EQ(run.mEffectIds[0], first);
+        EXPECT_NE(run.mEffectIds[1], first);
+    }
+
+    TEST(FalloutScriptMagicTest, a_loaded_game_keeps_the_numbers_of_the_effects_that_run_and_numbers_new_ones_above)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { restSpell });
+        const Magic::EffectId saved = run.mEffectIds.at(0);
+        FalloutScript::SaveWriter out;
+        FalloutScript::writeMagic(run.mMagic, out);
+
+        Runner other;
+        const std::string bytes = out.take();
+        FalloutScript::SaveReader in(bytes);
+        FalloutScript::readMagic(other.mMagic, in, FalloutScript::magicSectionVersion);
+        other.mStages.clear();
+        other.mEffectIds.clear();
+        other.mMagic.update(1);
+        EXPECT_THAT(other.mStages, ElementsAre(Pair(restScript, Stage::Update)));
+        // The saved variables of the script are held by this number
+        EXPECT_THAT(other.mEffectIds, ElementsAre(saved));
+
+        // What runs next does not take the number of one that runs
+        other.mEffectIds.clear();
+        other.mMagic.noteEffect(courier, restEffect, crate, 1);
+        ASSERT_EQ(other.mEffectIds.size(), 1u);
+        EXPECT_GT(other.mEffectIds[0], saved);
+    }
+
+    TEST(FalloutScriptMagicTest, a_game_saved_before_the_effects_were_numbered_numbers_them_when_it_is_loaded)
+    {
+        using Stage = Magic::ScriptStage;
+        // The section as version 1 wrote it: no spells and one running effect, without a number
+        FalloutScript::SaveWriter out;
+        out.count(0);
+        out.count(1);
+        out.form(courier);
+        out.form(restEffect);
+        out.form(restSpell);
+        out.f64(40);
+        out.i32(-1);
+        out.f64(0);
+        const std::string bytes = out.take();
+
+        Runner run;
+        run.mMagic.noteEffect(courier, flashEffect, crate, 1);
+        const Magic::EffectId before = run.mEffectIds.at(0);
+        FalloutScript::SaveReader in(bytes);
+        FalloutScript::readMagic(run.mMagic, in, 1);
+        EXPECT_TRUE(in.atEnd());
+        run.mStages.clear();
+        run.mEffectIds.clear();
+        run.mMagic.update(1);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Update)));
+        ASSERT_EQ(run.mEffectIds.size(), 1u);
+        EXPECT_GT(run.mEffectIds[0], before);
+    }
+
+    TEST(FalloutScriptMagicTest, an_effect_without_a_script_runs_none_and_the_scripts_wait_for_a_runner)
+    {
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { blast });
+        run.mMagic.update(3);
+        run.mMagic.update(30);
+        EXPECT_TRUE(run.mStages.empty());
+
+        // Nothing runs, and nothing breaks, without a host that runs scripts
+        Runner quiet;
+        quiet.mMagic.setScriptRunner(nullptr);
+        quiet.call(OpCastImmediateOnSelf, courier, { restSpell });
+        quiet.mMagic.update(500);
+        EXPECT_TRUE(quiet.mStages.empty());
+        EXPECT_EQ(quiet.call(OpHasMagicEffect, courier, { restEffect }), 0.0);
+    }
+
+    TEST(FalloutScriptMagicTest, an_effect_that_happens_at_once_runs_its_script_from_start_to_finish)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { flashSpell });
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(flashScript, Stage::Start), Pair(flashScript, Stage::Finish)));
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { flashEffect }), 0.0);
+    }
+
+    TEST(FalloutScriptMagicTest, an_ability_with_a_script_finishes_it_when_it_is_taken_away)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.call(OpAddSpell, courier, { scriptedAbility });
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(scriptedAbilityScript, Stage::Start)));
+
+        // It has no time to run out: it goes on each frame until the spell goes
+        run.mStages.clear();
+        run.mMagic.update(1000);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(scriptedAbilityScript, Stage::Update)));
+
+        run.mStages.clear();
+        run.call(OpRemoveSpell, courier, { scriptedAbility });
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(scriptedAbilityScript, Stage::Finish)));
+    }
+
+    TEST(FalloutScriptMagicTest, the_script_of_the_effect_of_an_item_runs_for_the_time_it_lasts)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.mMagic.noteEffect(courier, restEffect, crate, 3);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Start)));
+        run.mMagic.update(4);
+        EXPECT_THAT(run.mStages,
+            ElementsAre(
+                Pair(restScript, Stage::Start), Pair(restScript, Stage::Update), Pair(restScript, Stage::Finish)));
+    }
+
+    TEST(FalloutScriptMagicTest, an_effect_that_was_running_when_the_game_was_saved_finishes_its_script_after_a_load)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { restSpell });
+        run.mMagic.update(40);
+        FalloutScript::SaveWriter out;
+        FalloutScript::writeMagic(run.mMagic, out);
+
+        Runner other;
+        const std::string bytes = out.take();
+        FalloutScript::SaveReader in(bytes);
+        FalloutScript::readMagic(other.mMagic, in, FalloutScript::magicSectionVersion);
+        // The start is not run again: the effect was begun before the save
+        EXPECT_TRUE(other.mStages.empty());
+        other.mMagic.update(30);
+        EXPECT_THAT(other.mStages, ElementsAre(Pair(restScript, Stage::Update)));
+        other.mStages.clear();
+        other.mMagic.update(40);
+        EXPECT_THAT(other.mStages, ElementsAre(Pair(restScript, Stage::Update), Pair(restScript, Stage::Finish)));
+    }
+
+    TEST(FalloutScriptMagicTest, a_step_of_a_rest_runs_an_effect_for_the_seconds_it_was_still_running)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { restSpell });
+        run.mStages.clear();
+        run.mSeconds.clear();
+        // An effect of 100 seconds has 80 left after a step of 20, and a step of 120 seconds (an hour of rest at the
+        // time scale of 30) goes past its end
+        run.mMagic.update(20);
+        run.mMagic.update(120);
+        EXPECT_THAT(run.mStages,
+            ElementsAre(
+                Pair(restScript, Stage::Update), Pair(restScript, Stage::Update), Pair(restScript, Stage::Finish)));
+        // The first step covers all of its 20 seconds, the second only the 80 that the effect had left, and the end
+        // covers none
+        EXPECT_THAT(run.mSeconds, ElementsAre(20.0, 80.0, 0.0));
+    }
+
+    TEST(FalloutScriptMagicTest, an_effect_that_an_earlier_start_took_away_with_its_spell_does_not_begin)
+    {
+        Runner run;
+        bool removed = false;
+        run.mOnStage = [&](FormId script, Magic::ScriptStage stage) {
+            if (script == twinAbilityFirstScript && stage == Magic::ScriptStage::Start && !removed)
+            {
+                removed = true;
+                run.call(OpRemoveSpell, courier, { twinAbility });
+            }
+        };
+        run.call(OpAddSpell, courier, { twinAbility });
+        // The first begins and ends with the spell; the second ends without having begun, and is not begun after it
+        EXPECT_THAT(run.mStages,
+            ElementsAre(Pair(twinAbilityFirstScript, Magic::ScriptStage::Start),
+                Pair(twinAbilityFirstScript, Magic::ScriptStage::Finish),
+                Pair(twinAbilitySecondScript, Magic::ScriptStage::Finish)));
+    }
+
+    TEST(FalloutScriptMagicTest, an_effect_that_an_earlier_start_renewed_does_not_begin_as_the_old_one)
+    {
+        Runner run;
+        bool cast = false;
+        run.mOnStage = [&](FormId script, Magic::ScriptStage stage) {
+            if (script == twinFirstScript && stage == Magic::ScriptStage::Start && !cast)
+            {
+                cast = true;
+                run.call(OpCastImmediateOnSelf, courier, { twinSpell });
+            }
+        };
+        run.call(OpCastImmediateOnSelf, courier, { twinSpell });
+        // The cast that the first start made ends the two effects of the first cast and starts its own two; the second
+        // effect of the first cast does not start after its end
+        EXPECT_THAT(run.mStages,
+            ElementsAre(Pair(twinFirstScript, Magic::ScriptStage::Start),
+                Pair(twinFirstScript, Magic::ScriptStage::Finish), Pair(twinSecondScript, Magic::ScriptStage::Finish),
+                Pair(twinFirstScript, Magic::ScriptStage::Start), Pair(twinSecondScript, Magic::ScriptStage::Start)));
+        const std::set<Magic::EffectId> started = { run.mEffectIds[3], run.mEffectIds[4] };
+        EXPECT_EQ(started.size(), 2u);
+        EXPECT_EQ(started.count(run.mEffectIds[0]), 0u);
     }
 }

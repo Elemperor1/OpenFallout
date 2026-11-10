@@ -125,6 +125,9 @@ Allowed options)");
         addOption("commands", bpo::value<std::string>(),
             "The CSV of the script commands of the game, which scripts/openfallout/dump_command_table.py writes.  Only "
             "affects the scriptcode and dialogue modes.");
+        addOption("csv", bpo::value<std::string>(),
+            "A file to which the scriptcode and dialogue modes also write their counts of commands and functions, "
+            "one line for each count (kind, code, name, measure, count), for scripts/openfallout/command_census.py.");
         addOption("find", bpo::value<std::string>(),
             "Script commands, separated by commas, whose callers the scriptcode mode lists (the type and form id of "
             "the records whose scripts call them).  Needs --commands.");
@@ -192,6 +195,8 @@ Allowed options)");
             info.findCommands = variables["find"].as<std::string>();
         if (variables.count("commands") > 0)
             info.commandsFile = Files::pathFromUnicodeString(variables["commands"].as<std::string>());
+        if (variables.count("csv") > 0)
+            info.csvFile = Files::pathFromUnicodeString(variables["csv"].as<std::string>());
 
         info.mode = variables["mode"].as<std::string>();
         if (!(info.mode == "dump" || info.mode == "clone" || info.mode == "comp" || info.mode == "census"

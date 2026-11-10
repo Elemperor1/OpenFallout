@@ -2,6 +2,8 @@
 
 #include <components/falloutscript/objectcommands.hpp>
 #include <components/falloutscript/objects.hpp>
+#include <components/falloutscript/savescripts.hpp>
+#include <components/falloutscript/savestate.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
 
 #include <gmock/gmock.h>
@@ -349,6 +351,184 @@ namespace
         EXPECT_EQ(setup.variable(crate, 2), 1);
         EXPECT_EQ(setup.variable(crate, 3), 2);
         EXPECT_EQ(setup.variable(crate, 4), 1);
+    }
+
+    TEST(FalloutScriptObjectsTest, the_script_of_a_magic_effect_runs_its_blocks_for_the_character_it_works_on)
+    {
+        constexpr FormId effectScript = 0x01002100;
+        constexpr FormId updates = 0x01000901;
+        constexpr FormId finished = 0x01000902;
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t updatesGlobal = builder.form(updates);
+        const std::uint16_t finishedGlobal = builder.form(finished);
+        // The start gives a variable a value, which the update and the finish tell: the script is the one that began
+        builder.code(scriptName() + begin(BlockType::ScriptEffectStart) + setTo(var('s', 1), number("5"))
+            + command(OpDisable, arguments(0)) + end() + begin(BlockType::ScriptEffectUpdate)
+            + setTo(Bytes().u8('G').u16(updatesGlobal), var('s', 1)) + end() + begin(BlockType::ScriptEffectFinish)
+            + setTo(Bytes().u8('G').u16(finishedGlobal), var('s', 1)) + end());
+        builder.variable(1, integerVariable, "remembered");
+        setup.addScript(effectScript, builder);
+        setup.mHost.mGlobals[updates] = -1;
+        setup.mHost.mGlobals[finished] = -1;
+
+        EXPECT_TRUE(setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectStart));
+        // The command that names no object acts on the character the effect works on
+        EXPECT_EQ(setup.mWorld.mDisabled, std::set<FormId>{ player });
+        EXPECT_TRUE(setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate));
+        EXPECT_EQ(setup.mHost.mGlobals[updates], 5);
+        EXPECT_TRUE(setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectFinish));
+        EXPECT_EQ(setup.mHost.mGlobals[finished], 5);
+
+        // It is forgotten when it ends: the next one starts with fresh variables
+        EXPECT_TRUE(setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate));
+        EXPECT_EQ(setup.mHost.mGlobals[updates], 0);
+        // The effect is not an object of the game: it has no instance of its own among them
+        EXPECT_FALSE(setup.mObjects.has(player));
+    }
+
+    TEST(FalloutScriptObjectsTest, a_second_start_of_an_effect_begins_its_script_over_for_each_character)
+    {
+        constexpr FormId effectScript = 0x01002100;
+        constexpr FormId seen = 0x01000901;
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t seenGlobal = builder.form(seen);
+        builder.code(scriptName() + begin(BlockType::ScriptEffectStart)
+            + setTo(var('s', 1), var('s', 1) + number("1") + op("+")) + end() + begin(BlockType::ScriptEffectUpdate)
+            + setTo(Bytes().u8('G').u16(seenGlobal), var('s', 1)) + end());
+        builder.variable(1, integerVariable, "starts");
+        setup.addScript(effectScript, builder);
+        setup.mHost.mGlobals[seen] = -1;
+
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectStart);
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectStart);
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate);
+        EXPECT_EQ(setup.mHost.mGlobals[seen], 1);
+
+        // Another character has the effect with variables of its own
+        setup.mObjects.runEffect(crate, effectScript, BlockType::ScriptEffectUpdate);
+        EXPECT_EQ(setup.mHost.mGlobals[seen], 0);
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate);
+        EXPECT_EQ(setup.mHost.mGlobals[seen], 1);
+
+        setup.mObjects.clear();
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate);
+        EXPECT_EQ(setup.mHost.mGlobals[seen], 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, effects_of_one_script_on_one_character_keep_their_variables_apart_by_number)
+    {
+        constexpr FormId effectScript = 0x01002100;
+        constexpr FormId seen = 0x01000901;
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t seenGlobal = builder.form(seen);
+        builder.code(scriptName() + begin(BlockType::ScriptEffectStart)
+            + setTo(var('s', 1), var('s', 1) + number("1") + op("+")) + end() + begin(BlockType::ScriptEffectUpdate)
+            + setTo(var('s', 1), var('s', 1) + number("10") + op("+"))
+            + setTo(Bytes().u8('G').u16(seenGlobal), var('s', 1)) + end());
+        builder.variable(1, integerVariable, "count");
+        setup.addScript(effectScript, builder);
+        setup.mHost.mGlobals[seen] = -1;
+
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectStart, 1);
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 1);
+        EXPECT_EQ(setup.mHost.mGlobals[seen], 11);
+        // A second effect of the same script has variables of its own
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectStart, 2);
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 2);
+        EXPECT_EQ(setup.mHost.mGlobals[seen], 11);
+
+        // The end of the first does not forget the second
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectFinish, 1);
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 2);
+        EXPECT_EQ(setup.mHost.mGlobals[seen], 21);
+    }
+
+    TEST(FalloutScriptObjectsTest, a_saved_game_gives_a_running_effect_the_variables_of_its_script_back)
+    {
+        constexpr FormId effectScript = 0x01002100;
+        constexpr FormId seen = 0x01000901;
+        ScriptBuilder builder;
+        const std::uint16_t seenGlobal = builder.form(seen);
+        builder.code(scriptName() + begin(BlockType::ScriptEffectUpdate)
+            + setTo(var('s', 1), var('s', 1) + number("10") + op("+"))
+            + setTo(Bytes().u8('G').u16(seenGlobal), var('s', 1)) + end());
+        builder.variable(1, integerVariable, "count");
+
+        Runner before;
+        before.addScript(effectScript, builder);
+        before.mHost.mGlobals[seen] = -1;
+        // Two effects of the script run on the character, one of them for two frames
+        before.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 4);
+        before.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 4);
+        EXPECT_EQ(before.mHost.mGlobals[seen], 20);
+        before.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 5);
+        EXPECT_EQ(before.mHost.mGlobals[seen], 10);
+        FalloutScript::SaveWriter out;
+        FalloutScript::writeObjectScripts(before.mObjects, out);
+        const std::string bytes = out.take();
+
+        // A new game is loaded: each effect goes on from where it was, the one the save does not hold starts over
+        Runner after;
+        after.addScript(effectScript, builder);
+        after.mHost.mGlobals[seen] = -1;
+        FalloutScript::SaveReader in(bytes);
+        FalloutScript::readObjectScripts(after.mObjects, in, FalloutScript::objectScriptsSectionVersion);
+        EXPECT_TRUE(in.atEnd());
+        after.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 4);
+        EXPECT_EQ(after.mHost.mGlobals[seen], 30);
+        after.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 6);
+        EXPECT_EQ(after.mHost.mGlobals[seen], 10);
+
+        // The effect that has not run since the load is saved again as it was, and goes on after the next load
+        FalloutScript::SaveWriter again;
+        FalloutScript::writeObjectScripts(after.mObjects, again);
+        Runner third;
+        third.addScript(effectScript, builder);
+        third.mHost.mGlobals[seen] = -1;
+        const std::string second = again.take();
+        FalloutScript::SaveReader reading(second);
+        FalloutScript::readObjectScripts(third.mObjects, reading, FalloutScript::objectScriptsSectionVersion);
+        third.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 5);
+        EXPECT_EQ(third.mHost.mGlobals[seen], 20);
+
+        // The end of the effect forgets what the save held, and a save of an earlier version holds no effects
+        after.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectFinish, 5);
+        after.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 5);
+        EXPECT_EQ(after.mHost.mGlobals[seen], 10);
+        Runner old;
+        old.addScript(effectScript, builder);
+        old.mHost.mGlobals[seen] = -1;
+        FalloutScript::SaveWriter nothing;
+        nothing.count(0);
+        const std::string earlier = nothing.take();
+        FalloutScript::SaveReader version1(earlier);
+        FalloutScript::readObjectScripts(old.mObjects, version1, 1);
+        EXPECT_TRUE(version1.atEnd());
+        old.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 4);
+        EXPECT_EQ(old.mHost.mGlobals[seen], 10);
+    }
+
+    TEST(FalloutScriptObjectsTest, a_script_of_an_effect_that_is_unknown_or_has_no_such_block_runs_nothing)
+    {
+        constexpr FormId effectScript = 0x01002100;
+        Runner setup;
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::ScriptEffectStart) + command(OpDisable, arguments(0)) + end());
+        setup.addScript(effectScript, builder);
+
+        EXPECT_FALSE(setup.mObjects.runEffect(player, 0x01002101, BlockType::ScriptEffectStart));
+        EXPECT_FALSE(setup.mObjects.runEffect(0, effectScript, BlockType::ScriptEffectStart));
+        EXPECT_FALSE(setup.mObjects.runEffect(player, 0, BlockType::ScriptEffectStart));
+        EXPECT_TRUE(setup.mWorld.mDisabled.empty());
+        // It has a start and nothing else: the other blocks are not there to run
+        EXPECT_FALSE(setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate));
+        EXPECT_FALSE(setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectFinish));
+        EXPECT_TRUE(setup.mWorld.mDisabled.empty());
+        EXPECT_TRUE(setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectStart));
+        EXPECT_EQ(setup.mWorld.mDisabled, std::set<FormId>{ player });
     }
 
     TEST(FalloutScriptObjectsTest, a_reference_that_is_loaded_runs_its_menu_mode_while_a_menu_is_open)

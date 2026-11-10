@@ -55,14 +55,18 @@ namespace FalloutScript
         virtual bool spell(FormId spell, SpellInfo& info) = 0;
         /// Whether the reference is a character or a creature
         virtual bool isActor(FormId reference) = 0;
+        /// The script that a magic effect runs on its character (an effect of the script archetype), 0 for any other
+        virtual FormId effectScript(FormId /*effect*/) { return 0; }
     };
 
     /// The spells that characters have and the magic effects that are running on them, which HasMagicEffect asks
     /// about. Adding an ability, a disease or an addiction puts its effects on the character for good (the spell is
     /// listed, with its effects running until it is removed, and an effect that changes an actor value does so for as
     /// long); a spell of another type is only listed. Casting a spell on oneself runs its effects for their duration;
-    /// the changes of actor values they make for that time are made by the caster of the host. It can be used from any
-    /// thread.
+    /// the changes of actor values they make for that time are made by the caster of the host. An effect of the script
+    /// archetype runs the script of its magic effect on the character: its start block when the effect begins, its
+    /// update block each time update is called while it runs, and its finish block when it runs out or is taken away
+    /// (with the host's script runner). It can be used from any thread.
     class Magic
     {
         template <class T>
@@ -76,6 +80,24 @@ namespace FalloutScript
         using Caster = std::function<void(FormId actor, FormId spell, const std::vector<SpellEffect>& effects)>;
         /// Whether the conditions of an effect hold for the character who has it
         using ConditionCheck = std::function<bool(const std::vector<ESM4::TargetCondition>&, const ConditionContext&)>;
+        /// What happens to an effect that has a script of its own
+        enum class ScriptStage
+        {
+            /// The effect begins on the character
+            Start,
+            /// A frame (or an hour of rest) passes while it runs
+            Update,
+            /// It ends, run out or taken away
+            Finish,
+        };
+        /// Tells one effect that runs from another, though they are of one script on one character (a spell cast twice,
+        /// an item used twice): the script of each has variables of its own
+        using EffectId = std::uint64_t;
+        /// Runs the script of an effect for the stage, with the character it works on. For an update the last argument
+        /// is the seconds that the update covers (the frame, or the hour of a rest, or the part of the step that the
+        /// effect was still running when it ran out), which GetSecondsPassed tells the script; it is 0 for the others.
+        using ScriptRunner
+            = std::function<void(FormId actor, FormId script, ScriptStage stage, EffectId effect, double seconds)>;
 
         explicit Magic(MagicRecords& records);
 
@@ -83,6 +105,8 @@ namespace FalloutScript
         void setCaster(Caster caster);
         /// Without it an effect that has conditions is never on a character
         void setConditions(ConditionCheck check);
+        /// Without it the scripts of effects do not run
+        void setScriptRunner(ScriptRunner runner);
 
         /// Forgets everything, as for a new game
         void clear();
@@ -119,22 +143,33 @@ namespace FalloutScript
             /// What it changed an actor value by, which the end of the effect takes back
             int mActorValue = -1;
             double mDelta = 0;
+            /// The script of the magic effect, 0 for one without (not saved: the records tell it)
+            FormId mScript = 0;
+            /// Which effect it is among those that run (saved from version 2 of the section, which the saved
+            /// variables of its script are held by; a game saved before that numbers them again when it is loaded)
+            EffectId mId = 0;
         };
 
         /// Takes the effects of a spell whose conditions do not hold for the character out of its record
         void dropFailing(FormId actor, SpellInfo& info);
+        /// Whether the effect still runs
+        bool still(EffectId id);
 
         MagicRecords& mRecords;
         std::mutex mMutex;
         Modifier mModifier;
         Caster mCaster;
         ConditionCheck mConditions;
+        ScriptRunner mScripts;
         std::map<FormId, std::set<FormId>> mSpells;
         std::vector<Running> mRunning;
+        /// The last number given to an effect that runs; the numbers are not used again
+        EffectId mLastId = 0;
     };
 
-    /// The section of a saved game that holds the spells and the effects that run
-    constexpr std::uint32_t magicSectionVersion = 1;
+    /// The section of a saved game that holds the spells and the effects that run (version 2 holds the number of each
+    /// effect that runs)
+    constexpr std::uint32_t magicSectionVersion = 2;
     void writeMagic(Magic& magic, SaveWriter& out);
     void readMagic(Magic& magic, SaveReader& in, std::uint32_t version);
 

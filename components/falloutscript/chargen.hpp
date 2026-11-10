@@ -159,6 +159,9 @@ namespace FalloutScript
         /// The sex and race of it are the ones above.
         void setLook(const FaceLook& look);
         std::optional<FaceLook> look() const;
+        /// A number that changes whenever the sex, the race or the look changes (a screen of the character, a script's
+        /// SexChange, a load, a new game), for whoever draws the player to know that it has to draw it again
+        std::uint32_t revision() const;
         /// A save that names a race, hair or eyes of a plugin that is not loaded now gives the look none of it. That is
         /// not the same as a look that has none on purpose (a hairless face): the forms that were lost stay marked until
         /// the look is given the record's own with resolveLostForms, or is set again
@@ -248,6 +251,7 @@ namespace FalloutScript
         std::optional<FaceLook> mLook;
         /// The forms of the look that a load found no plugin for: 1 race, 2 hair, 4 eyes (not saved)
         unsigned mLostForms = 0;
+        std::uint32_t mRevision = 0;
         std::array<int, attributeCount> mAttributes;
         std::vector<int> mTagSlots; // the tagged skills in their places, 0 for a place with none
         std::vector<FormId> mTraits;

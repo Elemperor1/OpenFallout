@@ -60,6 +60,11 @@ namespace FalloutScript
         /// of a character last by it
         double healRate(const DerivedStatSettings& settings, double endurance);
 
+        /// The health that a character gets back by its heal rate in the simulated seconds that pass: the games give
+        /// the heal rate over 3600 for each second of the simulation (FalloutNV.exe 0x648B00 and 0x88B510, item 17 of
+        /// m13-exe-reads.md), so a game hour is 3600 over the time scale of those seconds. A negative rate gives none.
+        double regeneration(double healRate, double seconds);
+
         /// How far under water a character has to be for the breath to run out, as a share of its height: the head is
         /// under the water when the point at that share of the height is (FalloutNV.exe 0x889930, Mac rounds 12BI B and
         /// 12BM A)

@@ -734,9 +734,13 @@ once, when the screens are left (`menu.saveOptions`).
   the inverse of the game's), Mouse Sensitivity (the camera's sensitivity: the game's meter goes from 0.0005 to 0.0100 and
   starts at 0.002, the engine's value is the game's over what the game starts from, so 1 is where the game starts),
   Camera Pitch (the invert-Y setting), Crosshair, and Dialog Subtitles (the subtitles setting; the engine has one setting
-  for both kinds). The other items are kept (in the permanent storage, `FalloutOptions`, so the screens show what was
-  picked) and nothing in the engine reads them yet: Kill Cam, Hardcore, Difficulty, the three saves, True Iron Sights, HUD
-  Opacity, the two colours, Texture Size, the nine fades, General Subtitles, Radio Volume, and the two items of the pad.
+  for both kinds). Difficulty and Hardcore are the engine's too while a game of a Fallout runs (`menu.getOption` and
+  `menu.setOption` read and write the game's own value: the switches the save holds, which Difficulty feeds into fall
+  damage and kill experience and Hardcore into the needs; with no game running the screens show what was picked, and a
+  game starts at normal with hardcore off; Hardcore does nothing in Fallout 3). The other items are kept (in the
+  permanent storage, `FalloutOptions`, so the screens show what was picked) and nothing in the engine reads them yet: Kill
+  Cam, the three saves, True Iron Sights, HUD Opacity, the two colours, Texture Size, the nine fades, General Subtitles,
+  Radio Volume, and the two items of the pad.
 - The list of submenus ends with a row of the port's own, "Engine", that opens the engine's window of settings (the size
   and the mode of the window, the shaders, the mods): the game's screens do not have those. The Defaults button (it resets
   the bindings of the controls and does nothing in the other submenus, round 12W) is not shown, because the rows of the

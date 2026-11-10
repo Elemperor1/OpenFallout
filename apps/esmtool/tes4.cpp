@@ -830,6 +830,28 @@ namespace EsmTool
         return survey.getFatalErrors().empty() ? result : -1;
     }
 
+    /// The files that a census reads: the plugins named and the file of the commands, if one is given.
+    std::vector<std::filesystem::path> readFiles(const Arguments& info)
+    {
+        std::vector<std::filesystem::path> files = info.inputFiles;
+        if (!info.commandsFile.empty())
+            files.push_back(info.commandsFile);
+        return files;
+    }
+
+    /// Whether `path` is the same file as one of `inputs` (the same name, or a link or hard link to it: opening it to
+    /// write would empty the input).
+    bool refersToAnyOf(const std::filesystem::path& path, const std::vector<std::filesystem::path>& inputs)
+    {
+        for (const std::filesystem::path& input : inputs)
+        {
+            std::error_code error;
+            if (std::filesystem::equivalent(path, input, error) && !error)
+                return true;
+        }
+        return false;
+    }
+
     /// Read every file named on the command line in the order given, with its mod index and the indices of its
     /// masters, into a census that has collect(Reader&), write(std::ostream&) and getFatalErrors(), and print what the
     /// census counted. `mode` names the mode in the message for a file that is not TES4-format and `counted` what the
@@ -882,6 +904,41 @@ namespace EsmTool
 
         std::cout << "Counted the " << counted << " of " << info.inputFiles.size() << " files\n\n";
         census.write(std::cout);
+        if constexpr (requires { census.writeCsv(std::cout); })
+        {
+            if (!info.csvFile.empty())
+            {
+                if (result != 0 || !census.getFatalErrors().empty())
+                {
+                    // Counts of some of the files would read as the counts of all of them, and replace a good file
+                    std::cout << "\nThe CSV file " << Files::pathToUnicodeString(info.csvFile)
+                              << " was not written: the census is incomplete\n";
+                }
+                else if (refersToAnyOf(info.csvFile, readFiles(info)))
+                {
+                    // Opening it would empty a plugin that was just counted, or the commands file that was read
+                    std::cout << "\nThe CSV file " << Files::pathToUnicodeString(info.csvFile)
+                              << " was not written: it is one of the files read\n";
+                    result = -1;
+                }
+                else
+                {
+                    std::ofstream csv(info.csvFile);
+                    if (csv)
+                    {
+                        census.writeCsv(csv);
+                        // Closing writes what is still held back, so a failure of that is seen below
+                        csv.close();
+                    }
+                    if (!csv)
+                    {
+                        std::cout << "\nFailed to write the CSV file " << Files::pathToUnicodeString(info.csvFile)
+                                  << '\n';
+                        result = -1;
+                    }
+                }
+            }
+        }
         return census.getFatalErrors().empty() ? result : -1;
     }
 
