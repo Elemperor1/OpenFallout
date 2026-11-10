@@ -62,6 +62,7 @@
 #include <components/detournavigator/navigator.hpp>
 #include <components/detournavigator/navmeshcacheitem.hpp>
 
+#include "../mwphysics/raycasting.hpp"
 #include "../mwscript/falloutscripts.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
@@ -850,7 +851,18 @@ namespace OFRender
         const OFWorld::Ptr speaker = OFBase::Environment::get().getFalloutScripts()->conversationSpeaker();
         const OFWorld::Ptr& player = mPlayerAnimation->getPtr();
         if (speaker.isEmpty() || speaker == player || !speaker.isInCell() || speaker.getRefData().getBaseNode() == nullptr
-            || !player.isInCell() || speaker.getCell() != player.getCell())
+            || !player.isInCell())
+        {
+            mCamera->clearShot();
+            return;
+        }
+        // The two stand in one place when they are in one cell, or in exterior cells of one worldspace (the line of a
+        // cell is not seen in a conversation across it)
+        const OFWorld::CellStore* speakerCell = speaker.getCell();
+        const OFWorld::CellStore* playerCell = player.getCell();
+        if (speakerCell != playerCell
+            && !(speakerCell->isExterior() && playerCell->isExterior()
+                && speakerCell->getCell()->getWorldSpace() == playerCell->getCell()->getWorldSpace()))
         {
             mCamera->clearShot();
             return;
@@ -881,7 +893,17 @@ namespace OFRender
         if (toPlayer.length2() < 1.0)
             toPlayer = osg::Vec3d(0, -1, 0);
         toPlayer.normalize();
-        const osg::Vec3d position = head + toPlayer * dialogueShotDistance;
+        osg::Vec3d position = head + toPlayer * dialogueShotDistance;
+        // A wall between the head and the shot pulls the camera in front of it, as it does the camera of the player
+        constexpr float obstacleLimit = 5.f;
+        constexpr double nearestShot = 20.0;
+        const OFPhysics::RayCastingResult hit = OFBase::Environment::get().getWorld()->getRayCasting()->castSphere(
+            head, position, obstacleLimit, mCamera->getCollisionType());
+        if (hit.mHit)
+        {
+            const osg::Vec3d pulled = osg::Vec3d(hit.mHitPos) + osg::Vec3d(hit.mHitNormal) * obstacleLimit;
+            position = head + toPlayer * std::clamp((pulled - head).length(), nearestShot, dialogueShotDistance);
+        }
         osg::Vec3d forward = head - position;
         forward.normalize();
         const double pitch = std::asin(std::clamp(forward.z(), -1.0, 1.0));
