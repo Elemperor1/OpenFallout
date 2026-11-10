@@ -1585,6 +1585,9 @@ namespace OFScript
             OFWorld::Ptr mTarget;
             /// The reference it shoots from: empty when that is the character itself or is not around
             OFWorld::Ptr mPlace;
+            /// The reference it aims at instead of the target (the target is still who the shot hits): empty when the
+            /// order names none or it is not around
+            OFWorld::Ptr mAim;
         };
         ScriptedAttack scriptedAttack(const OFWorld::Ptr& actor);
         bool hasScriptedAttack(const OFWorld::Ptr& actor) const;

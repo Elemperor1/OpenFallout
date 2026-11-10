@@ -3441,6 +3441,12 @@ namespace OFScript
             if (!place.isEmpty() && place.isInCell() && place.getRefData().isEnabled())
                 result.mPlace = place;
         }
+        if (order.mTargetLocation != 0)
+        {
+            const OFWorld::Ptr aim = findReference(order.mTargetLocation);
+            if (!aim.isEmpty() && aim.isInCell() && aim.getRefData().isEnabled())
+                result.mAim = aim;
+        }
         return result;
     }
 

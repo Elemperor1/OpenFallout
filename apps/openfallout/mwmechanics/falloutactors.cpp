@@ -1607,7 +1607,9 @@ namespace OFMechanics
                 if (distanceAcross(mind.position(), frame.mPlayer)
                     > scripts.gameSetting("fAIUseWeaponDistance").value_or(5000.0))
                     return true;
-                const osg::Vec3f aim = order.mTarget.getRefData().getPosition().asVec3();
+                // It aims at the place the order names when there is one, and the shot is still at the target
+                const osg::Vec3f aim
+                    = (order.mAim.isEmpty() ? order.mTarget : order.mAim).getRefData().getPosition().asVec3();
                 faceToward(
                     frame, mind, std::atan2(aim.x() - mind.position().x(), aim.y() - mind.position().y()), duration);
                 // With HoldFire it does not shoot while another character stands in the way, nearer than the target
