@@ -1404,6 +1404,13 @@ namespace OFScript
         OFBase::World* world = OFBase::Environment::get().getWorld();
         if (world == nullptr || mActors.isDead(mPlayer))
             return;
+        if (world->getGodModeState())
+        {
+            // A player that cannot be hurt is not worn down by the needs either (the last stage takes all the health):
+            // they stop counting, and count again from where the god mode ends
+            mHardcore.clear();
+            return;
+        }
         const double minutes = std::floor(gameDaysPassed()) * 24.0 * 60.0 + gameHour() * 60.0;
         mHardcore.update(mPlayer, minutes, world->getTimeManager()->getGameTimeScale(), sleeping);
     }
@@ -1458,9 +1465,10 @@ namespace OFScript
         else if (hour)
         {
             const auto world = OFBase::Environment::get().getWorld();
-            // The needs of the hardcore mode count the time that has gone by, before the hour does
-            updateHardcore(sleeping);
             world->advanceTime(1.0);
+            // The needs of the hardcore mode count the hour that went by, as one slept when this is a sleep (the hour
+            // that ends the rest included: it is not left to the frames after it, which count awake time)
+            updateHardcore(sleeping);
             // The game runs what it simulates by the seconds of its own clock, which is 3600 over the time scale for
             // each hour that goes by (12 hours of rest is 1440 of them at the scale of 30, the lifetime of the effect
             // of a good night's sleep in the reads)
