@@ -1988,6 +1988,8 @@ namespace OFScript
         bool hasLoaded3D(FalloutScript::FormId reference) override;
         FalloutScript::SkyWeather sky() override;
         bool playerSleeping() override { return mPlayerSleeping; }
+        void wakePlayer(double hours) override;
+        void setPlayerSleepHours(double hours) override;
         /// The engine has no crime system: nobody sees a crime, so every count is the 0 that a clean player has in the
         /// executables (the commands that ask are the greeting lines of the characters)
         int majorCrimeCount(FalloutScript::FormId) override { return 0; }

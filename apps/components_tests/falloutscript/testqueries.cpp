@@ -25,7 +25,9 @@ namespace
 
     constexpr std::uint16_t OpIsRaining = 0x103E;
     constexpr std::uint16_t OpGetMajorCrimeCount = 0x1075;
+    constexpr std::uint16_t OpWakeUpPC = 0x10AE;
     constexpr std::uint16_t OpIsPCSleeping = 0x10AF;
+    constexpr std::uint16_t OpSetPCSleepHours = 0x10BD;
     constexpr std::uint16_t OpGetGameSetting = 0x1100;
     constexpr std::uint16_t OpIsInInterior = 0x112C;
     constexpr std::uint16_t OpIsActorTalkingThroughActivator = 0x11AE;
@@ -44,6 +46,8 @@ namespace
         std::set<FormId> mLoaded;
         SkyWeather mSky;
         bool mSleeping = false;
+        std::vector<double> mWoken;
+        std::vector<double> mSleepHours;
         std::map<FormId, FormId> mZones;
         std::set<FormId> mTalking;
         std::map<std::string, double> mSettings;
@@ -58,6 +62,8 @@ namespace
         bool hasLoaded3D(FormId reference) override { return mLoaded.count(reference) != 0; }
         SkyWeather sky() override { return mSky; }
         bool playerSleeping() override { return mSleeping; }
+        void wakePlayer(double hours) override { mWoken.push_back(hours); }
+        void setPlayerSleepHours(double hours) override { mSleepHours.push_back(hours); }
         bool inZone(FormId reference, FormId zone) override
         {
             const auto found = mZones.find(reference);
@@ -213,6 +219,16 @@ namespace
         run.mWorld.mSleeping = true;
         EXPECT_EQ(run.call(OpIsPCSleeping, clerk), 1.0);
         EXPECT_EQ(run.call(OpIsPCSleeping, 0), 1.0);
+    }
+
+    TEST(FalloutScriptQueriesTest, the_scripts_wake_the_player_and_set_the_hours_of_its_sleep)
+    {
+        Runner run;
+        run.call(OpWakeUpPC, 0);
+        run.call(OpWakeUpPC, 0, { { 3, {}, false } });
+        run.call(OpSetPCSleepHours, 0, { { 6, {}, false } });
+        EXPECT_EQ(run.mWorld.mWoken, (std::vector<double>{ 0.0, 3.0 }));
+        EXPECT_EQ(run.mWorld.mSleepHours, (std::vector<double>{ 6.0 }));
     }
 
     TEST(FalloutScriptQueriesTest, a_reference_is_in_the_zone_the_world_gives_it)

@@ -36,6 +36,16 @@ namespace FalloutScript
         interpreter.setHandler("IsRaining", [&world](CallContext&) { return isRaining(world.sky()) ? 1.0 : 0.0; });
         // The player is asked, whatever the command is called on
         interpreter.setHandler("IsPCSleeping", [&world](CallContext&) { return world.playerSleeping() ? 1.0 : 0.0; });
+        // The sleep of the player is cut short or made longer by the scripts that run while the menu of the rest counts
+        // the hours (no hours given to WakeUpPC is none left)
+        interpreter.setHandler("WakeUpPC", [&world](CallContext& call) {
+            world.wakePlayer(argument(call, 0));
+            return 0.0;
+        });
+        interpreter.setHandler("SetPCSleepHours", [&world](CallContext& call) {
+            world.setPlayerSleepHours(argument(call, 0));
+            return 0.0;
+        });
         interpreter.setHandler("GetInZone", [&world](CallContext& call) {
             const FormId zone = formArgument(call, 0);
             return call.mReference != 0 && zone != 0 && world.inZone(call.mReference, zone) ? 1.0 : 0.0;

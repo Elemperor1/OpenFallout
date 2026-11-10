@@ -50,6 +50,12 @@ namespace FalloutScript
         virtual SkyWeather sky() = 0;
         /// Whether the player sleeps (in a bed, waiting does not count)
         virtual bool playerSleeping() = 0;
+        /// WakeUpPC: a sleep that is going on has that many hours left (none: it ends at once). Nothing happens when
+        /// the player does not sleep.
+        virtual void wakePlayer(double hours) = 0;
+        /// SetPCSleepHours: a rest that is going on has that many hours left, however many the menu allowed (a
+        /// number below one ends it). Nothing happens when the player is not resting.
+        virtual void setPlayerSleepHours(double hours) = 0;
         /// Whether the encounter zone of the cell the reference stands in is the zone (the zone of the worldspace
         /// when the cell has none). The zone of the reference itself is not asked.
         virtual bool inZone(FormId reference, FormId zone) = 0;
@@ -78,7 +84,7 @@ namespace FalloutScript
         virtual bool playerMovingIntoNewSpace() = 0;
     };
 
-    /// Gives the commands IsInInterior, HasLoaded3D, IsRaining, IsPCSleeping, GetInZone,
+    /// Gives the commands IsInInterior, HasLoaded3D, IsRaining, IsPCSleeping, WakeUpPC, SetPCSleepHours, GetInZone,
     /// IsActorTalkingThroughActivator and GetGameSetting to the interpreter, and the commands of the script extenders
     /// that Tale of Two Wastelands calls in its intro: GetParentCell, GetParentWorldspace, GetGameRestarted and
     /// GetGameLoaded, and GetMajorCrimeCount and IsPlayerMovingIntoNewSpace, which the intro of Fallout 3 calls. Those

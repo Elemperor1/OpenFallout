@@ -977,6 +977,34 @@ namespace OFScript
         return false;
     }
 
+    void FalloutScripts::wakePlayer(double hours)
+    {
+        // Only a sleep that is going on is cut short (M13 executable reads, WakeUpPC): what is asked is no less than none
+        // and replaces the hours that are left, and none ends the sleep where it is
+        const std::lock_guard lock(mInteractionMutex);
+        if (!mRest.mActive || !mRest.mSleeping)
+            return;
+        const double left = std::isnan(hours) ? 0.0 : std::max(hours, 0.0);
+        if (left <= 0)
+            mRest.mFinish = true;
+        else
+            mRest.mTotal = mRest.mDone + left;
+    }
+
+    void FalloutScripts::setPlayerSleepHours(double hours)
+    {
+        // The hours the script gives are the ones that are left, with no limit of the menu on them (the command stores
+        // them as they are; a number below one leaves none for the hourly count to pass)
+        const std::lock_guard lock(mInteractionMutex);
+        if (!mRest.mActive)
+            return;
+        const double left = std::isnan(hours) ? 0.0 : hours;
+        if (left < 1.0)
+            mRest.mFinish = true;
+        else
+            mRest.mTotal = mRest.mDone + left;
+    }
+
     bool FalloutScripts::playerInAir()
     {
         OFBase::World& world = *OFBase::Environment::get().getWorld();
