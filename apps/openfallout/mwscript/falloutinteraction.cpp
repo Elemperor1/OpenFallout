@@ -49,6 +49,7 @@
 #include "../mwbase/world.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
+#include "../mwworld/datetimemanager.hpp"
 #include "../mwworld/esmstore.hpp"
 #include "../mwworld/refdata.hpp"
 
@@ -1346,10 +1347,16 @@ namespace OFScript
         }
         else if (hour)
         {
-            OFBase::Environment::get().getWorld()->advanceTime(1.0);
+            const auto world = OFBase::Environment::get().getWorld();
+            world->advanceTime(1.0);
             // The hour heals as any hour does: by the heal rate of the player
             if (!mActors.isDead(mPlayer))
                 mActorValues.restore(mPlayer, AV::health, std::max(mActorValues.current(mPlayer, AV::healRate), 0.0));
+            // The effects that are running age by the hour as well: the game runs them by the seconds of its own clock,
+            // which is 3600 over the time scale for each hour that goes by (12 hours of rest is 1440 of them at the
+            // scale of 30, the lifetime of the effect of a good night's sleep in the reads)
+            const double timeScale = std::max(static_cast<double>(world->getTimeManager()->getGameTimeScale()), 1.0);
+            mMagic.update(3600.0 / timeScale);
         }
 
         double done = 0;
