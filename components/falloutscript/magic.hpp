@@ -90,8 +90,11 @@ namespace FalloutScript
             /// It ends, run out or taken away
             Finish,
         };
+        /// Tells one effect that runs from another, though they are of one script on one character (a spell cast twice,
+        /// an item used twice): the script of each has variables of its own
+        using EffectId = std::uint64_t;
         /// Runs the script of an effect for the stage, with the character it works on
-        using ScriptRunner = std::function<void(FormId actor, FormId script, ScriptStage stage)>;
+        using ScriptRunner = std::function<void(FormId actor, FormId script, ScriptStage stage, EffectId effect)>;
 
         explicit Magic(MagicRecords& records);
 
@@ -139,10 +142,14 @@ namespace FalloutScript
             double mDelta = 0;
             /// The script of the magic effect, 0 for one without (not saved: the records tell it)
             FormId mScript = 0;
+            /// Which effect it is among those that run (not saved: a loaded game numbers them again)
+            EffectId mId = 0;
         };
 
         /// Takes the effects of a spell whose conditions do not hold for the character out of its record
         void dropFailing(FormId actor, SpellInfo& info);
+        /// Whether the effect still runs
+        bool still(EffectId id);
 
         MagicRecords& mRecords;
         std::mutex mMutex;
@@ -152,6 +159,8 @@ namespace FalloutScript
         ScriptRunner mScripts;
         std::map<FormId, std::set<FormId>> mSpells;
         std::vector<Running> mRunning;
+        /// The last number given to an effect that runs; the numbers are not used again
+        EffectId mLastId = 0;
     };
 
     /// The section of a saved game that holds the spells and the effects that run

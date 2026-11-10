@@ -131,11 +131,11 @@ namespace FalloutScript
         return true;
     }
 
-    bool ObjectScripts::runEffect(FormId character, FormId script, std::uint16_t blockType)
+    bool ObjectScripts::runEffect(FormId character, FormId script, std::uint16_t blockType, std::uint64_t effect)
     {
         if (character == 0 || script == 0)
             return false;
-        const std::pair<FormId, FormId> key(character, script);
+        const std::tuple<FormId, FormId, std::uint64_t> key(character, script, effect);
         std::shared_ptr<Instance> instance;
         if (const auto found = mEffects.find(key); found != mEffects.end() && blockType != BlockType::ScriptEffectStart)
             instance = found->second;

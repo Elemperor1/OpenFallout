@@ -7,6 +7,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -65,7 +66,9 @@ namespace FalloutScript
         /// when it ends (the script is forgotten after it). The character is the object of the script, which the
         /// commands in it that name none act on. Returns whether the script has such a block. The variables of a script
         /// that was running when the game was saved start over when the game is loaded.
-        bool runEffect(FormId character, FormId script, std::uint16_t blockType);
+        /// The effect number tells apart effects of one script on one character: each has its own script instance, which
+        /// the end of another does not forget.
+        bool runEffect(FormId character, FormId script, std::uint16_t blockType, std::uint64_t effect = 0);
 
         /// Runs a script that is a list of statements, such as the one a package runs when it begins, ends or changes,
         /// with the reference as its object: the commands in it that name none act on the reference. Returns whether
@@ -143,8 +146,8 @@ namespace FalloutScript
         std::set<FormId> mMenuUpdating;
         /// The references that are loaded
         std::set<FormId> mLoaded;
-        /// The scripts of the magic effects that work on a character: by the character and the script
-        std::map<std::pair<FormId, FormId>, std::shared_ptr<Instance>> mEffects;
+        /// The scripts of the magic effects that work on a character: by the character, the script and the effect
+        std::map<std::tuple<FormId, FormId, std::uint64_t>, std::shared_ptr<Instance>> mEffects;
         std::map<const ESM4::ScriptDefinition*, std::shared_ptr<const Script>> mPrepared;
         /// The scripts that were reported as not runnable, so that they are reported once
         std::set<FormId> mReported;

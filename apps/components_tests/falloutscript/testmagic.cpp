@@ -123,12 +123,15 @@ namespace
         std::vector<std::size_t> mCastEffects;
         /// The scripts of effects that ran: the script and its stage, in order
         std::vector<std::pair<FormId, Magic::ScriptStage>> mStages;
+        /// The effect numbers of the stages, in the same order
+        std::vector<Magic::EffectId> mEffectIds;
 
         Runner()
         {
-            mMagic.setScriptRunner([this](FormId actor, FormId script, Magic::ScriptStage stage) {
+            mMagic.setScriptRunner([this](FormId actor, FormId script, Magic::ScriptStage stage, Magic::EffectId id) {
                 EXPECT_EQ(actor, courier);
                 mStages.emplace_back(script, stage);
+                mEffectIds.push_back(id);
             });
             mMagic.setModifier(
                 [this](FormId, int actorValue, double amount) { mChanges.emplace_back(actorValue, amount); });
@@ -367,6 +370,64 @@ namespace
         run.mMagic.update(50);
         EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Finish)));
         EXPECT_EQ(run.call(OpHasMagicEffect, courier, { restEffect }), 0.0);
+    }
+
+    TEST(FalloutScriptMagicTest, the_effects_of_one_script_on_one_character_are_told_apart_by_their_numbers)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        // An item used twice: two effects of one script, one running out before the other
+        run.mMagic.noteEffect(courier, restEffect, crate, 3);
+        run.mMagic.noteEffect(courier, restEffect, crate, 10);
+        ASSERT_EQ(run.mEffectIds.size(), 2u);
+        const Magic::EffectId first = run.mEffectIds[0];
+        const Magic::EffectId second = run.mEffectIds[1];
+        EXPECT_NE(first, second);
+
+        run.mStages.clear();
+        run.mEffectIds.clear();
+        run.mMagic.update(4);
+        // The first one ends and the second goes on, each by its own number
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Update), Pair(restScript, Stage::Finish)));
+        EXPECT_THAT(run.mEffectIds, ElementsAre(second, first));
+    }
+
+    TEST(FalloutScriptMagicTest, a_renewed_script_effect_ends_the_old_number_and_starts_a_new_one)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { restSpell });
+        const Magic::EffectId first = run.mEffectIds.at(0);
+        run.mEffectIds.clear();
+        run.mStages.clear();
+        run.call(OpCastImmediateOnSelf, courier, { restSpell });
+        ASSERT_EQ(run.mEffectIds.size(), 2u);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Finish), Pair(restScript, Stage::Start)));
+        EXPECT_EQ(run.mEffectIds[0], first);
+        EXPECT_NE(run.mEffectIds[1], first);
+    }
+
+    TEST(FalloutScriptMagicTest, a_loaded_game_numbers_the_effects_that_run_again)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { restSpell });
+        FalloutScript::SaveWriter out;
+        FalloutScript::writeMagic(run.mMagic, out);
+
+        Runner other;
+        // A number was given before the load: the numbers of the loaded effects are not among those
+        other.mMagic.noteEffect(courier, restEffect, crate, 1);
+        const Magic::EffectId before = other.mEffectIds.at(0);
+        const std::string bytes = out.take();
+        FalloutScript::SaveReader in(bytes);
+        FalloutScript::readMagic(other.mMagic, in, FalloutScript::magicSectionVersion);
+        other.mStages.clear();
+        other.mEffectIds.clear();
+        other.mMagic.update(1);
+        EXPECT_THAT(other.mStages, ElementsAre(Pair(restScript, Stage::Update)));
+        ASSERT_EQ(other.mEffectIds.size(), 1u);
+        EXPECT_NE(other.mEffectIds[0], before);
     }
 
     TEST(FalloutScriptMagicTest, an_effect_without_a_script_runs_none_and_the_scripts_wait_for_a_runner)

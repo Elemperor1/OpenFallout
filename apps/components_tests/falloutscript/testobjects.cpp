@@ -415,6 +415,35 @@ namespace
         EXPECT_EQ(setup.mHost.mGlobals[seen], 0);
     }
 
+    TEST(FalloutScriptObjectsTest, effects_of_one_script_on_one_character_keep_their_variables_apart_by_number)
+    {
+        constexpr FormId effectScript = 0x01002100;
+        constexpr FormId seen = 0x01000901;
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t seenGlobal = builder.form(seen);
+        builder.code(scriptName() + begin(BlockType::ScriptEffectStart)
+            + setTo(var('s', 1), var('s', 1) + number("1") + op("+")) + end() + begin(BlockType::ScriptEffectUpdate)
+            + setTo(var('s', 1), var('s', 1) + number("10") + op("+"))
+            + setTo(Bytes().u8('G').u16(seenGlobal), var('s', 1)) + end());
+        builder.variable(1, integerVariable, "count");
+        setup.addScript(effectScript, builder);
+        setup.mHost.mGlobals[seen] = -1;
+
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectStart, 1);
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 1);
+        EXPECT_EQ(setup.mHost.mGlobals[seen], 11);
+        // A second effect of the same script has variables of its own
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectStart, 2);
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 2);
+        EXPECT_EQ(setup.mHost.mGlobals[seen], 11);
+
+        // The end of the first does not forget the second
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectFinish, 1);
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate, 2);
+        EXPECT_EQ(setup.mHost.mGlobals[seen], 21);
+    }
+
     TEST(FalloutScriptObjectsTest, a_script_of_an_effect_that_is_unknown_or_has_no_such_block_runs_nothing)
     {
         constexpr FormId effectScript = 0x01002100;
