@@ -18,8 +18,10 @@
 
 #include <osg/AlphaFunc>
 #include <osg/Geometry>
+#include <osg/Image>
 #include <osgDB/Registry>
 
+#include <algorithm>
 #include <array>
 #include <limits>
 #include <sstream>
@@ -384,6 +386,52 @@ osg::Group {
         const osg::ref_ptr<osg::Node> result = Loader::load(file, &mImageManager, &mMaterialManager);
 
         EXPECT_EQ(alphaTestOf(*result), nullptr);
+    }
+
+    // One 4 by 4 block of DXT1 in which every texel is see-through: the first colour is not above the second and every
+    // index is 3
+    constexpr std::array<unsigned char, 8> seeThroughBlock = { 0, 0, 0, 0, 0xff, 0xff, 0xff, 0xff };
+
+    osg::ref_ptr<osg::Image> makeDxt1Image(GLenum format)
+    {
+        osg::ref_ptr<osg::Image> image(new osg::Image);
+        unsigned char* data = new unsigned char[seeThroughBlock.size()];
+        std::copy(seeThroughBlock.begin(), seeThroughBlock.end(), data);
+        image->setImage(4, 4, 1, format, format, GL_UNSIGNED_BYTE, data, osg::Image::USE_NEW_DELETE);
+        return image;
+    }
+
+    TEST(NifOsgDxt1Test, givesADxt1PictureThatHasNoAlphaTheFormatThatHasIt)
+    {
+        const osg::ref_ptr<osg::Image> image = makeDxt1Image(GL_COMPRESSED_RGB_S3TC_DXT1_EXT);
+        EXPECT_FALSE(image->isImageTranslucent());
+
+        EXPECT_TRUE(allowTransparencyOfDxt1(*image));
+
+        EXPECT_EQ(image->getPixelFormat(), static_cast<GLenum>(GL_COMPRESSED_RGBA_S3TC_DXT1_EXT));
+        EXPECT_EQ(image->getInternalTextureFormat(), static_cast<GLint>(GL_COMPRESSED_RGBA_S3TC_DXT1_EXT));
+        EXPECT_TRUE(image->isImageTranslucent());
+        // the data is as it was
+        EXPECT_EQ(static_cast<const unsigned char*>(image->getDataPointer())[4], 0xff);
+        EXPECT_EQ(image->s(), 4);
+        EXPECT_EQ(image->t(), 4);
+    }
+
+    TEST(NifOsgDxt1Test, leavesAPictureThatHasAlphaOrIsOfAnotherFormatAsItIs)
+    {
+        const osg::ref_ptr<osg::Image> withAlpha = makeDxt1Image(GL_COMPRESSED_RGBA_S3TC_DXT1_EXT);
+        EXPECT_FALSE(allowTransparencyOfDxt1(*withAlpha));
+        EXPECT_EQ(withAlpha->getPixelFormat(), static_cast<GLenum>(GL_COMPRESSED_RGBA_S3TC_DXT1_EXT));
+
+        osg::ref_ptr<osg::Image> plain(new osg::Image);
+        plain->allocateImage(2, 2, 1, GL_RGB, GL_UNSIGNED_BYTE);
+        EXPECT_FALSE(allowTransparencyOfDxt1(*plain));
+        EXPECT_EQ(plain->getPixelFormat(), static_cast<GLenum>(GL_RGB));
+
+        // asked twice, the second time there is nothing to change
+        const osg::ref_ptr<osg::Image> once = makeDxt1Image(GL_COMPRESSED_RGB_S3TC_DXT1_EXT);
+        EXPECT_TRUE(allowTransparencyOfDxt1(*once));
+        EXPECT_FALSE(allowTransparencyOfDxt1(*once));
     }
 
     std::string formatOsgNodeForBSShaderProperty(std::string_view shaderPrefix)
