@@ -156,6 +156,14 @@ namespace
         EXPECT_EQ(run.mAnimations.mIdles[1], std::make_tuple(gate, std::string(), FormId(0x3BCC)));
     }
 
+    TEST(FalloutScriptAnimationCommandsTest, a_texture_name_without_an_extension_is_a_dds_file)
+    {
+        EXPECT_EQ(FalloutScript::textureFileName("clutter\\rorchachtest\\pipboycard01"),
+            "clutter\\rorchachtest\\pipboycard01.dds");
+        EXPECT_EQ(FalloutScript::textureFileName("clutter\\card.tga"), "clutter\\card.tga");
+        EXPECT_EQ(FalloutScript::textureFileName("clutter.v2\\card"), "clutter.v2\\card.dds");
+    }
+
     TEST(
         FalloutScriptAnimationCommandsTest, a_texture_is_swapped_on_the_shape_of_the_reference_the_first_argument_names)
     {

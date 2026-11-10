@@ -1865,6 +1865,45 @@ namespace OFMechanics
         }
     }
 
+    namespace
+    {
+        /// The character that the player talks with stands still and turns to the player, as the games have it face
+        /// the one it talks with (the camera of the conversation looks at its face); one in a piece of furniture stays
+        /// in it. True for that character, whose turn it is then.
+        bool facesSpeaker(const Frame& frame, FalloutActors::Mind& mind, const OFWorld::Ptr& speaker, float duration)
+        {
+            if (speaker.isEmpty() || !(mind.mPtr == speaker) || frame.mScripts == nullptr
+                || !sharesSpace(mind.mPtr, frame.mWorld.getPlayerPtr()) || frame.mScripts->usesFurniture(mind.mPtr))
+                return false;
+            stopWalking(mind);
+            faceToward(frame, mind,
+                std::atan2(frame.mPlayer.x() - mind.position().x(), frame.mPlayer.y() - mind.position().y()), duration);
+            return true;
+        }
+    }
+
+    void FalloutActors::faceSpeaker(float duration)
+    {
+        // A conversation pauses the world, and the minds are not given their turn then: the one it is with turns here
+        OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+        if (mMinds.empty() || scripts == nullptr)
+            return;
+        const OFWorld::Ptr speaker = scripts->conversationSpeaker();
+        if (speaker.isEmpty())
+            return;
+        const auto found = mMinds.find(speaker.mRef);
+        if (found == mMinds.end())
+            return;
+        OFBase::World& world = *OFBase::Environment::get().getWorld();
+        const OFWorld::Ptr player = world.getPlayerPtr();
+        if (player.isEmpty() || !player.isInCell())
+            return;
+        const OFWorld::TimeStamp now = world.getTimeStamp();
+        Frame frame{ world, falloutClock(now.getHour(), now.getDay()), player.getRefData().getPosition().asVec3(),
+            Settings::navigator().mEnable, scripts, nullptr, &mMinds };
+        facesSpeaker(frame, *found->second, speaker, std::min(duration, longestStep));
+    }
+
     void FalloutActors::update(float duration)
     {
         if (mMinds.empty())
@@ -1915,18 +1954,8 @@ namespace OFMechanics
             }
             mind.mSeenAlive = true;
 
-            // The character that the player talks with stands still and turns to the player, as the games have it face
-            // the one it talks with (the camera of the conversation looks at its face); one in a piece of furniture
-            // stays in it
-            if (!speaker.isEmpty() && mind.mPtr == speaker && frame.mScripts != nullptr
-                && sharesSpace(mind.mPtr, frame.mWorld.getPlayerPtr()) && !frame.mScripts->usesFurniture(mind.mPtr))
-            {
-                stopWalking(mind);
-                faceToward(frame, mind,
-                    std::atan2(frame.mPlayer.x() - mind.position().x(), frame.mPlayer.y() - mind.position().y()),
-                    duration);
+            if (facesSpeaker(frame, mind, speaker, duration))
                 continue;
-            }
 
             // A character in a piece of furniture holds the pose of its entry
             if (frame.mScripts != nullptr)

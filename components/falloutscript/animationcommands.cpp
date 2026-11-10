@@ -5,6 +5,16 @@
 
 namespace FalloutScript
 {
+    std::string textureFileName(std::string_view texture)
+    {
+        std::string name(texture);
+        // The last part of the name is the file: a dot in a folder name is not an extension
+        const std::size_t dot = name.find_last_of("./\\");
+        if (dot == std::string::npos || name[dot] != '.')
+            name += ".dds";
+        return name;
+    }
+
     namespace
     {
         constexpr std::string_view openGroup = "Open";

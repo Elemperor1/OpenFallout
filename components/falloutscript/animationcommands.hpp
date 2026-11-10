@@ -2,6 +2,7 @@
 #define OPENFALLOUT_COMPONENTS_FALLOUTSCRIPT_ANIMATIONCOMMANDS_H
 
 #include <mutex>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 
@@ -36,6 +37,10 @@ namespace FalloutScript
         /// reference that is known: the model may not be there to show it yet.
         virtual bool swapTexture(FormId reference, std::string_view shape, std::string_view texture) = 0;
     };
+
+    /// The file of the picture that a script names: a name with no extension (as scripts write them) is a DDS file,
+    /// a name with one is kept
+    std::string textureFileName(std::string_view texture);
 
     /// What GetOpenState gives
     namespace OpenState

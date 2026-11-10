@@ -331,6 +331,8 @@ namespace OFMechanics
         mObjects.update(duration, paused);
         if (!paused && mAI)
             mFalloutActors.update(duration);
+        if (mAI)
+            mFalloutActors.faceSpeaker(duration);
     }
 
     void MechanicsManager::processChangedSettings(const Settings::CategorySettingVector& changed)

@@ -819,6 +819,9 @@ namespace OFScript
             // A menu is open: the scripts that wait for one, or are to go on while it is open, have their MenuMode
             // blocks run in place of GameMode
             mObjects.setSecondsPassed(frametime);
+            // A picture that a script swapped is shown while the menu is open (a conversation is one: the doctor shows
+            // his card while he asks what you see)
+            updateTextureSwaps();
             // What the blocks of the menu did to the items is told while it is open, not when it is closed
             raiseItemEvents();
             updateProgress(0);
@@ -5109,8 +5112,11 @@ namespace OFScript
                 // The model has this picture already (the same node, the same file)
                 if (swap.mGivenTo.get() == model && swap.mGiven == swap.mTexture)
                     continue;
-                const VFS::Path::Normalized path = Misc::ResourceHelpers::correctTexturePath(
-                    VFS::Path::toNormalized(swap.mTexture), *resources->getVFS());
+                // A script names a picture with no extension (the cards of the doctor): it is a DDS file, which the
+                // helper only looks for when it is asked to change an extension
+                const std::string name = FalloutScript::textureFileName(swap.mTexture);
+                const VFS::Path::Normalized path
+                    = Misc::ResourceHelpers::correctTexturePath(VFS::Path::toNormalized(name), *resources->getVFS());
                 osg::ref_ptr<osg::Image> image;
                 if (resources->getVFS()->exists(path))
                     image = resources->getImageManager()->getImage(path);
