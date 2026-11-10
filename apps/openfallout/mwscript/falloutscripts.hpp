@@ -1594,6 +1594,9 @@ namespace OFScript
         /// Why `attack` has not fired for a while, in a line for the log: the weapon, its range, the rounds against
         /// what a shot uses, the time until it is ready again
         std::string attackDiagnosis(const OFWorld::Ptr& attacker);
+        /// The reference of the actor in hex, as the lines of the log that name a placed character write it (the
+        /// editor id of a character is that of its base, which all of its kind share)
+        std::string referenceName(const OFWorld::Ptr& actor) const;
         /// The character does not fight any more (it ran far enough from its target, or lost it)
         void endFight(const OFWorld::Ptr& actor);
         /// Whether the character may go for the player on sight at all: its aggression is more than none

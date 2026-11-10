@@ -1823,7 +1823,7 @@ namespace OFMechanics
                     : *walked == Walk::Waiting
                     ? (mind.mPartial ? "waiting, the path stops short" : "waiting for a path")
                     : "moving";
-                Log(Debug::Info) << mind.mPtr.getCellRef().getRefId() << " has stood still in a fight for "
+                Log(Debug::Info) << scripts.referenceName(mind.mPtr) << " has stood still in a fight for "
                                  << static_cast<int>(holdFireReportAfter) << " s, " << moveName << ", "
                                  << static_cast<int>(away) << " units away (engage " << static_cast<int>(stance.mEngage)
                                  << ", " << (visible ? "sees" : "does not see") << " it; " << walkName

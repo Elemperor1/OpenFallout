@@ -69,6 +69,13 @@ class AptMirrorsTest(unittest.TestCase):
     def number_of_updates(self):
         return len(self.calls.read_text().splitlines()) if self.calls.exists() else 0
 
+    def test_a_failed_index_is_an_error_of_the_update(self):
+        # apt-get update ends with status 0 when only some of the indexes could not be downloaded, unless it is told that
+        # any of them is an error
+        self.run_update(dead="archive.ubuntu.com")
+        for line in self.calls.read_text().splitlines():
+            self.assertIn("APT::Update::Error-Mode=any", line)
+
     def test_default_mirror_that_answers_is_left_alone(self):
         result = self.run_update(dead="")
         self.assertEqual(result.returncode, 0, result.stderr)

@@ -5,7 +5,7 @@
 -- `refs`), 'fire' makes the player shoot at it with the weapon in hand (`shots` times, or, with `untilDead`, until it is
 -- dead; autoplay.lua does the shooting), 'teleport' takes the player to the cell `cell` of the plugin at the place `at` (for
 -- a room the data has no door to), 'setstage' puts the quest at the stage `to` (a stand-in for what the engine cannot bring
--- about yet; since the Mac rounds 10K and 10L the table has one, CG03 stage 55). A gate is tried `tries` times at most (its
+-- about yet; the table has none since the Mac rounds 10O and 10P). A gate is tried `tries` times at most (its
 -- own `tries` if it has one: activating a piece of furniture a second time gets the player up from it). A gate can have its
 -- own `settle` (the quest has to stand still that long first) and its own
 -- `gap` (the real seconds since the gate before it): the stand-ins that come after the gate that is meant to bring the stage
@@ -96,10 +96,10 @@ return {
         { quest = 'CG03', stage = 42, file = 'Fallout3.esm', ref = 0x02B793, how = 'activate', settle = 2, gap = 0, tries = 1 },
         { quest = 'CG03', stage = 45, file = 'Fallout3.esm', ref = 0x02B799, how = 'walk' },
         { quest = 'CG03', stage = 55, file = 'Fallout3.esm', ref = 0x02B799, how = 'walk' },
-        -- The stand-in for the case that the engine does not bring 60 about by itself (the Mac rounds 10I, 10K and 10L used it
-        -- once in each run of Fallout 3 and Tale of Two Wastelands, at about 800 s, before the player sat down); it is given a
-        -- minute, so that what the engine does is not covered up, and the log says when it was used
-        { quest = 'CG03', stage = 55, how = 'setstage', to = 60, settle = 60 },
+        -- There is no stand-in for 60 any more (the Mac rounds 10I, 10K and 10L used `setstage` 55 -> 60 once in each run of
+        -- Fallout 3 and Tale of Two Wastelands, at about 800 s, before the player sat down): with the player at the desk the
+        -- scripts of the game bring 55 and 60 about at 744-745 s in Fallout 3 alone (round 10O) and at 754-755 s in Tale
+        -- of Two Wastelands (round 10P), and the row never fired in either
         { quest = 'CG03', stage = 70, file = 'Fallout3.esm', ref = 0x01CFB8, how = 'activate', settle = 90 }, -- Mr. Brotch again
         { quest = 'CG03', stage = 80, file = 'Fallout3.esm', ref = 0x02B797, how = 'walk' },
         -- The escape (CG04): Amata, the trigger in the corridor, the radroaches (a fight), Butch, the trigger in

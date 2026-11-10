@@ -39,16 +39,19 @@ apt_use_mirror() {
   done
 }
 
+# `apt-get update` ends with status 0 when only some of the indexes could not be downloaded (it prints "Failed to fetch"
+# and goes on), which would leave the unreachable archive in use: with Update::Error-Mode "any" every failed index is an
+# error, so the next mirror is tried.
 apt_update_with_fallback() {
   local mirror
   apt_retry_settings
-  if "$APT_GET" update; then
+  if "$APT_GET" -o APT::Update::Error-Mode=any update; then
     return 0
   fi
   for mirror in "${APT_FALLBACK_MIRRORS[@]}"; do
     echo "apt-get update failed; trying the mirror $mirror" >&2
     apt_use_mirror "$mirror"
-    if "$APT_GET" update; then
+    if "$APT_GET" -o APT::Update::Error-Mode=any update; then
       return 0
     fi
   done

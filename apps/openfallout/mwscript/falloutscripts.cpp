@@ -3344,6 +3344,11 @@ namespace OFScript
         return result;
     }
 
+    std::string FalloutScripts::referenceName(const OFWorld::Ptr& actor) const
+    {
+        return FalloutScript::hex(scriptReferenceOf(actor));
+    }
+
     std::string FalloutScripts::attackDiagnosis(const OFWorld::Ptr& attacker)
     {
         const FalloutScript::FormId self = scriptReferenceOf(attacker);
