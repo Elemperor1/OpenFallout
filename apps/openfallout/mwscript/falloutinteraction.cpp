@@ -1483,7 +1483,12 @@ namespace OFScript
             // does to the actor values (the item use: boosts that end, points over time) and the record that it is
             // running (the magic), as the frames of the game do when it is not paused
             mItemUse.update(seconds);
+            // (the scripts of those effects run for the seconds of the hour, which GetSecondsPassed tells them, not
+            // for the last frame; the frame's own value comes back after)
+            const float frameSeconds = mObjects.secondsPassed();
+            mObjects.setSecondsPassed(static_cast<float>(seconds));
             mMagic.update(seconds);
+            mObjects.setSecondsPassed(frameSeconds);
             // Each hour of sleep lowers the sleep deprivation of the hardcore mode
             if (sleeping && hardcoreOn())
                 mHardcore.sleepHour(mPlayer, gameSetting("fHCSleepRestorationMod", 60));
