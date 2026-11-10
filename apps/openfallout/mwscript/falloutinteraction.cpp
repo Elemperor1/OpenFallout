@@ -1461,16 +1461,19 @@ namespace OFScript
             // The needs of the hardcore mode count the time that has gone by, before the hour does
             updateHardcore(sleeping);
             world->advanceTime(1.0);
-            // The hour heals as any hour does: by the heal rate of the player
-            if (!mActors.isDead(mPlayer))
-                mActorValues.restore(mPlayer, AV::health, std::max(mActorValues.current(mPlayer, AV::healRate), 0.0));
-            // The effects that are running age by the hour as well: the game runs them by the seconds of its own clock,
-            // which is 3600 over the time scale for each hour that goes by (12 hours of rest is 1440 of them at the
-            // scale of 30, the lifetime of the effect of a good night's sleep in the reads). Both halves of an effect
-            // go on together, what it does to the actor values (the item use: boosts that end, points over time) and
-            // the record that it is running (the magic), as the frames of the game do when it is not paused
+            // The game runs what it simulates by the seconds of its own clock, which is 3600 over the time scale for
+            // each hour that goes by (12 hours of rest is 1440 of them at the scale of 30, the lifetime of the effect
+            // of a good night's sleep in the reads)
             const double timeScale = std::max(static_cast<double>(world->getTimeManager()->getGameTimeScale()), 1.0);
             const double seconds = 3600.0 / timeScale;
+            // The hour heals as the time of any frame does: by the heal rate of the player over 3600 for each of those
+            // seconds (FalloutNV.exe 0x88B510, item 17 of m13-exe-reads.md)
+            if (!mActors.isDead(mPlayer))
+                mActorValues.restore(mPlayer, AV::health,
+                    FalloutScript::DerivedStats::regeneration(mActorValues.current(mPlayer, AV::healRate), seconds));
+            // The effects that are running age by the hour as well. Both halves of an effect go on together, what it
+            // does to the actor values (the item use: boosts that end, points over time) and the record that it is
+            // running (the magic), as the frames of the game do when it is not paused
             mItemUse.update(seconds);
             mMagic.update(seconds);
             // Each hour of sleep lowers the sleep deprivation of the hardcore mode
