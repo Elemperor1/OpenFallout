@@ -25,17 +25,20 @@ apt_retry_settings() {
     'Acquire::https::Timeout "30";' >"$APT_ETC/apt.conf.d/80-ci-retries"
 }
 
-# Point every source that names an archive.ubuntu.com host (the default mirror, or a country's) at the mirror given. The
-# sources are always made from the copy taken before the first change (`.ci-orig`, which apt does not read), so a
-# second mirror is never a rewrite of the first.
+# Point every source that names an archive.ubuntu.com host (the default mirror, or a country's) at the mirror given; with
+# "security" as the second argument the sources of security.ubuntu.com go to the mirror too (the mirrors of the list
+# serve the security suites as well, a little later than their own host). The sources are always made from the copy
+# taken before the first change (`.ci-orig`, which apt does not read), so a second mirror is never a rewrite of the first.
 apt_use_mirror() {
-  local mirror="$1" file escaped
+  local mirror="$1" with_security="${2:-}" file escaped hosts
+  hosts='([a-z0-9-]+\.)*archive\.ubuntu\.com'
+  [ "$with_security" = security ] && hosts="($hosts|security\.ubuntu\.com)"
   # The mirror goes into the replacement of sed, where the delimiter, & and \ mean something
   escaped=$(printf '%s' "$mirror" | sed -e 's/[\\&#]/\\&/g')
   for file in "$APT_ETC/sources.list" "$APT_ETC"/sources.list.d/*.sources "$APT_ETC"/sources.list.d/*.list; do
     [ -f "$file" ] || continue
     [ -f "$file.ci-orig" ] || cp "$file" "$file.ci-orig"
-    sed -E "s#https?://([a-z0-9-]+\.)*archive\.ubuntu\.com/ubuntu/?#${escaped}/#g" "$file.ci-orig" >"$file"
+    sed -E "s#https?://${hosts}/ubuntu/?#${escaped}/#g" "$file.ci-orig" >"$file"
   done
 }
 
@@ -53,6 +56,15 @@ apt_update_with_fallback() {
     apt_use_mirror "$mirror"
     if "$APT_GET" -o APT::Update::Error-Mode=any update; then
       return 0
+    fi
+    # The security suites stay on their own host, which kept working when the archive host did not; when that host is
+    # out of reach as well, the mirror serves them too (the first mirror of the list is that host)
+    if [[ "$mirror" != *"//security.ubuntu.com/"* ]]; then
+      echo "apt-get update failed; trying the mirror $mirror for the security suites too" >&2
+      apt_use_mirror "$mirror" security
+      if "$APT_GET" -o APT::Update::Error-Mode=any update; then
+        return 0
+      fi
     fi
   done
   echo "apt-get update failed on every mirror" >&2

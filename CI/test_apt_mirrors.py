@@ -27,13 +27,19 @@ Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 """
 
 # Fails (as apt-get update does for a host it cannot reach) when the first source of the file, the one for the
-# noble suites, names one of the hosts in $DEAD, and records every call in $CALLS. The security pocket stays on its own
-# host in the file, so only the first source tells which mirror is being tried.
+# noble suites, names one of the hosts in $DEAD, or when any source of the file names one of the hosts in $DEAD_ANY (the
+# security pocket stays on its own host in the file unless it is asked for), and records every call in $CALLS.
 FAKE_APT = """#!/usr/bin/env bash
 echo "$*" >>"$CALLS"
 first=$(grep -m1 '^URIs:' "$APT_ETC/sources.list.d/ubuntu.sources")
 for dead in $DEAD; do
   if [[ "$first" == *"//$dead/"* ]]; then
+    echo "Err: could not reach $dead" >&2
+    exit 100
+  fi
+done
+for dead in $DEAD_ANY; do
+  if grep -q "^URIs: .*//$dead/" "$APT_ETC/sources.list.d/ubuntu.sources"; then
     echo "Err: could not reach $dead" >&2
     exit 100
   fi
@@ -57,8 +63,15 @@ class AptMirrorsTest(unittest.TestCase):
         fake.chmod(0o755)
         self.fake = fake
 
-    def run_update(self, dead):
-        env = dict(os.environ, APT_ETC=str(self.etc), APT_GET=str(self.fake), CALLS=str(self.calls), DEAD=dead)
+    def run_update(self, dead, dead_any=""):
+        env = dict(
+            os.environ,
+            APT_ETC=str(self.etc),
+            APT_GET=str(self.fake),
+            CALLS=str(self.calls),
+            DEAD=dead,
+            DEAD_ANY=dead_any,
+        )
         return subprocess.run(
             ["bash", "-c", f"set -euo pipefail; source {SCRIPT}; apt_update_with_fallback"],
             env=env,
@@ -108,7 +121,20 @@ class AptMirrorsTest(unittest.TestCase):
         text = self.sources.read_text()
         self.assertIn("http://us-central1.gce.archive.ubuntu.com/ubuntu", text)
         self.assertNotIn("http://archive.ubuntu.com", text)
+        # The security pocket stays on its own host while that host is not what failed the update
+        self.assertEqual(text.count("URIs: http://security.ubuntu.com/ubuntu/\n"), 1)
         self.assertEqual((self.etc / "sources.list.d" / "ubuntu.sources.ci-orig").read_text(), DEB822)
+
+    def test_security_source_follows_the_mirror_when_its_own_host_is_out_of_reach(self):
+        # Every try that leaves the security pocket on security.ubuntu.com fails; the cloud mirror then takes it too
+        result = self.run_update(dead="archive.ubuntu.com", dead_any="security.ubuntu.com")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        # the default, the security host, the cloud mirror alone, the cloud mirror with the security pocket
+        self.assertEqual(self.number_of_updates(), 4)
+        text = self.sources.read_text()
+        self.assertNotIn("security.ubuntu.com", text)
+        self.assertEqual(text.count("URIs: http://us-central1.gce.archive.ubuntu.com/ubuntu/\n"), 2)
+        self.assertIn("Suites: noble-security", text)
 
     def test_a_country_mirror_is_replaced_too(self):
         self.sources.write_text(DEB822.replace("http://archive.ubuntu.com", "http://us.archive.ubuntu.com"))
@@ -122,19 +148,19 @@ class AptMirrorsTest(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("failed on every mirror", result.stderr)
-        # the default and the three of the list
-        self.assertEqual(self.number_of_updates(), 4)
+        # the default, the security host, and the two cloud mirrors, each alone and with the security pocket
+        self.assertEqual(self.number_of_updates(), 6)
 
     def test_old_style_sources_list_is_rewritten_too(self):
         (self.etc / "sources.list").write_text("deb http://archive.ubuntu.com/ubuntu noble main\n")
         self.run_update(dead="archive.ubuntu.com")
-        self.assertEqual(
-            (self.etc / "sources.list").read_text(), "deb http://security.ubuntu.com/ubuntu/ noble main\n"
-        )
+        self.assertEqual((self.etc / "sources.list").read_text(), "deb http://security.ubuntu.com/ubuntu/ noble main\n")
 
     def test_a_mirror_with_characters_that_sed_reads_is_written_as_it_is(self):
         mirror = "http://mirror.example/ubuntu?a=1&b=2#c\\d"
-        env = dict(os.environ, APT_ETC=str(self.etc), APT_GET=str(self.fake), CALLS=str(self.calls), DEAD="")
+        env = dict(
+            os.environ, APT_ETC=str(self.etc), APT_GET=str(self.fake), CALLS=str(self.calls), DEAD="", DEAD_ANY=""
+        )
         subprocess.run(
             ["bash", "-c", f"set -euo pipefail; source {SCRIPT}; apt_use_mirror '{mirror}'"],
             env=env,
