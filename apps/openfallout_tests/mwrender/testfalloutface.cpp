@@ -285,6 +285,42 @@ namespace
         EXPECT_EQ(part->getStateSet(), stateset.get());
         EXPECT_EQ(replaceDiffuseMap(*part, nullptr), 0u);
     }
+    TEST(OpenFalloutRenderReplaceDiffuseMap, theShapeOfTheNameIsTheOnlyOneThatChangesWhateverTheCaseOfTheName)
+    {
+        const osg::ref_ptr<osg::Image> original = makeImage(2);
+        const osg::ref_ptr<osg::Image> replacement = makeImage(4);
+        osg::ref_ptr<osg::StateSet> shared = new osg::StateSet;
+        shared->setTextureAttribute(0, new osg::Texture2D(original), osg::StateAttribute::ON);
+        shared->setTextureAttribute(0, new SceneUtil::TextureType("diffuseMap"), osg::StateAttribute::ON);
+
+        // A model of two shapes that share a state set, as the shapes of one file with the same material do
+        osg::ref_ptr<osg::Group> model = new osg::Group;
+        osg::ref_ptr<osg::Geometry> card = new osg::Geometry;
+        card->setName("PipBoyCard01:0");
+        card->setStateSet(shared);
+        osg::ref_ptr<osg::Geometry> frame = new osg::Geometry;
+        frame->setName("Frame:0");
+        frame->setStateSet(shared);
+        model->addChild(frame);
+        model->addChild(card);
+
+        EXPECT_EQ(replaceDiffuseMapOfShape(*model, "pipboycard01:0", replacement), 1u);
+
+        const osg::Texture2D* swapped = static_cast<const osg::Texture2D*>(
+            card->getStateSet()->getTextureAttribute(0, osg::StateAttribute::TEXTURE));
+        EXPECT_EQ(swapped->getImage(), replacement.get());
+        // The other shape and the state set that other models have are as they were
+        EXPECT_EQ(frame->getStateSet(), shared.get());
+        EXPECT_EQ(static_cast<const osg::Texture2D*>(shared->getTextureAttribute(0, osg::StateAttribute::TEXTURE))
+                      ->getImage(),
+            original.get());
+        // A name that no shape has changes nothing, and neither does a picture that is not there
+        EXPECT_EQ(replaceDiffuseMapOfShape(*model, "Nothing:0", replacement), 0u);
+        EXPECT_EQ(replaceDiffuseMapOfShape(*model, "Frame:0", nullptr), 0u);
+        EXPECT_EQ(replaceDiffuseMapOfShape(*model, "", replacement), 0u);
+        EXPECT_EQ(frame->getStateSet(), shared.get());
+    }
+
     osg::ref_ptr<osg::Image> makeRgb(
         int width, int height, unsigned char r, unsigned char g, unsigned char b, const std::string& name)
     {

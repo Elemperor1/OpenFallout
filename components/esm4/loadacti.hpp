@@ -56,6 +56,8 @@ namespace ESM4
 
         ESM::FormId mRadioTemplate; // SOUN
         ESM::FormId mRadioStation; // TACT
+        /// The water the activator holds (WNAM, a WATR): what a sink or a toilet gives to drink
+        ESM::FormId mWaterType;
 
         std::string mActivationPrompt;
 

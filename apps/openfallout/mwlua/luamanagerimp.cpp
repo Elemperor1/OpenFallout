@@ -17,6 +17,7 @@
 #include <components/esm/luascripts.hpp>
 #include <components/esm3/esmreader.hpp>
 #include <components/esm3/esmwriter.hpp>
+#include <components/esm4/loadacti.hpp>
 #include <components/esm4/loadbook.hpp>
 #include <components/esm4/loadcont.hpp>
 #include <components/esm4/loadcrea.hpp>
@@ -664,6 +665,9 @@ namespace OFLua
             }
             if (object.getType() == ESM4::Furniture::sRecordId)
                 scripts->activateFurniture(actor, object);
+            // An activator that no script took does what its record says: it plays its sound, and its water is drunk
+            else if (object.getType() == ESM4::Activator::sRecordId)
+                scripts->activateActivator(object, actor);
             // A door of Fallout that is no teleport door opens, and closes when it is open
             else if (object.getType() == ESM4::Door::sRecordId)
             {

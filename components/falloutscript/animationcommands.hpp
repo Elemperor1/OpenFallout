@@ -29,6 +29,12 @@ namespace FalloutScript
         /// Has the character or creature play an idle record, named by its editor id (any case) or by the form (when
         /// the name is empty), once. False when the records or the files have no such idle for it.
         virtual bool playIdle(FormId reference, std::string_view name, FormId idle) = 0;
+        /// Gives the shape of the model of the reference named so (the name of its node in the file, as
+        /// "PipBoyCard01:0") the picture of the file under `textures`, written as the scripts write it: no folder of
+        /// textures, no extension. The model keeps it for as long as the reference does, also when the reference is not
+        /// in the world yet (a card that is switched on afterwards) or its model is made again. Always true for a
+        /// reference that is known: the model may not be there to show it yet.
+        virtual bool swapTexture(FormId reference, std::string_view shape, std::string_view texture) = 0;
     };
 
     /// What GetOpenState gives
@@ -75,7 +81,9 @@ namespace FalloutScript
         std::unordered_map<FormId, bool> mOpen;
     };
 
-    /// Gives the commands of animations to the interpreter: PlayGroup, IsAnimPlaying, GetOpenState and SetOpenState.
+    /// Gives the commands of animations to the interpreter: PlayGroup, IsAnimPlaying, PlayIdle, GetOpenState,
+    /// SetOpenState
+    /// and SwapTextureOnRef.
     /// The groups scripts name by number are the ones of the table of the game.
     void addAnimationCommands(Interpreter& interpreter, OpenStates& states, AnimationWorld& world, Game game);
 }

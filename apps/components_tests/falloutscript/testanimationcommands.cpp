@@ -47,6 +47,7 @@ namespace
         std::vector<std::pair<FormId, std::string>> mPlayed;
         std::vector<bool> mRestarted;
         std::vector<std::tuple<FormId, std::string, FormId>> mIdles;
+        std::vector<std::tuple<FormId, std::string, std::string>> mSwapped;
 
         bool hasGroup(FormId reference, std::string_view group) override
         {
@@ -75,6 +76,12 @@ namespace
         bool playIdle(FormId reference, std::string_view name, FormId idle) override
         {
             mIdles.emplace_back(reference, std::string(name), idle);
+            return true;
+        }
+
+        bool swapTexture(FormId reference, std::string_view shape, std::string_view texture) override
+        {
+            mSwapped.emplace_back(reference, std::string(shape), std::string(texture));
             return true;
         }
 
@@ -147,6 +154,46 @@ namespace
         ASSERT_EQ(run.mAnimations.mIdles.size(), 2u);
         EXPECT_EQ(run.mAnimations.mIdles[0], std::make_tuple(gate, std::string("SitDown"), FormId(0)));
         EXPECT_EQ(run.mAnimations.mIdles[1], std::make_tuple(gate, std::string(), FormId(0x3BCC)));
+    }
+
+    TEST(
+        FalloutScriptAnimationCommandsTest, a_texture_is_swapped_on_the_shape_of_the_reference_the_first_argument_names)
+    {
+        Runner run;
+        FalloutScript::Value target;
+        target.mNumber = lever;
+        FalloutScript::Value shape;
+        shape.mText = "PipBoyCard01:0";
+        shape.mIsText = true;
+        FalloutScript::Value texture;
+        texture.mText = "clutter\\rorchachtest\\pipboycard01";
+        texture.mIsText = true;
+        // The command is not called on a reference: the one it works on is its first argument
+        run.mInterpreter.call(0x1269, 0, false, { target, shape, texture });
+        run.mInterpreter.call(0x1269, gate, true, { target, shape, texture });
+
+        ASSERT_EQ(run.mAnimations.mSwapped.size(), 2u);
+        EXPECT_EQ(run.mAnimations.mSwapped[0],
+            std::make_tuple(lever, std::string("PipBoyCard01:0"), std::string("clutter\\rorchachtest\\pipboycard01")));
+        EXPECT_EQ(run.mAnimations.mSwapped[1], run.mAnimations.mSwapped[0]);
+    }
+
+    TEST(FalloutScriptAnimationCommandsTest, a_texture_is_not_swapped_without_a_reference_or_a_name_or_a_texture)
+    {
+        Runner run;
+        FalloutScript::Value target;
+        target.mNumber = lever;
+        FalloutScript::Value none;
+        FalloutScript::Value text;
+        text.mText = "x";
+        text.mIsText = true;
+        run.mInterpreter.call(0x1269, 0, false, { none, text, text });
+        run.mInterpreter.call(0x1269, 0, false, { target, text });
+        run.mInterpreter.call(0x1269, 0, false, { target, none, text });
+        run.mInterpreter.call(0x1269, 0, false, { target, text, none });
+        run.mInterpreter.call(0x1269, 0, false, {});
+
+        EXPECT_THAT(run.mAnimations.mSwapped, IsEmpty());
     }
 
     TEST(FalloutScriptAnimationGroupsTest, names_the_groups_that_scripts_call_by_number)

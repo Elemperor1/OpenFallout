@@ -992,6 +992,102 @@ namespace
         EXPECT_TRUE(setup.mDialogue.start(speaker).mOptions.size() == 1);
     }
 
+    // The test of the doctor of Goodsprings: a greeting and a run of answers that offer no goodbye
+    void addTest(Harness& setup)
+    {
+        setup.mRecords.addTopic(greeting, "Greeting", "GREETING");
+        setup.mRecords.addInfo(0x3001, greeting, "Say the first thing that comes to mind").mChoices
+            = { id(topicA), id(topicB) };
+        setup.mRecords.addTopic(topicA, "Dog", "TopicA", false);
+        setup.mRecords.addInfo(0x3002, topicA, "Okay").mChoices = { id(topicB) };
+        setup.mRecords.addTopic(topicB, "Cat", "TopicB", false);
+        setup.mRecords.addInfo(0x3003, topicB, "Fine").mInfoFlags = ESM4::INFO_Goodbye;
+        setup.mRecords.addTopic(goodbye, "Goodbye", "GOODBYE", true);
+        setup.mRecords.addInfo(0x3004, goodbye, "Farewell").mInfoFlags = ESM4::INFO_Goodbye;
+        setup.start();
+    }
+
+    TEST(FalloutScriptDialogueTest, noConversationIsOpenSoThereIsNothingToLeave)
+    {
+        Harness setup;
+        addTest(setup);
+
+        EXPECT_TRUE(setup.mDialogue.canLeave());
+    }
+
+    TEST(FalloutScriptDialogueTest, aConversationThatOffersOnlyAnswersCannotBeLeft)
+    {
+        Harness setup;
+        addTest(setup);
+
+        // While the greeting is said, and when the answers are there to pick from
+        setup.mDialogue.start(speaker);
+        EXPECT_FALSE(setup.mDialogue.canLeave());
+        EXPECT_THAT(setup.topics(setup.mDialogue.finish()), ElementsAre(topicA, topicB));
+        EXPECT_FALSE(setup.mDialogue.canLeave());
+
+        // And after an answer that offers the next
+        setup.mDialogue.choose(topicA);
+        EXPECT_FALSE(setup.mDialogue.canLeave());
+        EXPECT_THAT(setup.topics(setup.mDialogue.finish()), ElementsAre(topicB));
+        EXPECT_FALSE(setup.mDialogue.canLeave());
+    }
+
+    TEST(FalloutScriptDialogueTest, theLastAnswerFlaggedGoodbyeLetsTheConversationBeLeft)
+    {
+        Harness setup;
+        addTest(setup);
+        setup.mDialogue.start(speaker);
+        setup.mDialogue.finish();
+
+        setup.mDialogue.choose(topicB);
+
+        // It is said and the conversation is over after it: leaving it is the same
+        EXPECT_TRUE(setup.mDialogue.canLeave());
+        setup.mDialogue.finish();
+        EXPECT_FALSE(setup.mDialogue.active());
+        EXPECT_TRUE(setup.mDialogue.canLeave());
+    }
+
+    TEST(FalloutScriptDialogueTest, aConversationThatOffersTheGoodbyeCanBeLeft)
+    {
+        Harness setup;
+        setup.mRecords.addTopic(greeting, "Greeting", "GREETING");
+        setup.mRecords.addInfo(0x3001, greeting, "Hello there");
+        setup.mRecords.addTopic(topicA, "Rumours", "TopicA", true, 10);
+        setup.mRecords.addInfo(0x3002, topicA, "a").mChoices = { id(topicC), id(goodbye) };
+        setup.mRecords.addTopic(topicC, "C", "TopicC", false);
+        setup.mRecords.addInfo(0x3003, topicC, "c");
+        setup.mRecords.addTopic(goodbye, "Goodbye", "GOODBYE", true, 1);
+        setup.mRecords.addInfo(0x3004, goodbye, "Farewell").mInfoFlags = ESM4::INFO_Goodbye;
+        setup.start();
+
+        // The greeting names no choice: the list of the speaker's topics follows it, and it has the Goodbye
+        setup.mDialogue.start(speaker);
+        EXPECT_TRUE(setup.mDialogue.canLeave());
+        EXPECT_THAT(setup.topics(setup.mDialogue.finish()), ElementsAre(topicA, goodbye));
+        EXPECT_TRUE(setup.mDialogue.canLeave());
+
+        // A response whose choices include the Goodbye can be left while it is said and after it
+        setup.mDialogue.choose(topicA);
+        EXPECT_TRUE(setup.mDialogue.canLeave());
+        EXPECT_THAT(setup.topics(setup.mDialogue.finish()), ElementsAre(topicC, goodbye));
+        EXPECT_TRUE(setup.mDialogue.canLeave());
+    }
+
+    TEST(FalloutScriptDialogueTest, aConversationWithNothingToPickFromCanBeLeft)
+    {
+        Harness setup;
+        setup.mRecords.addTopic(greeting, "Greeting", "GREETING");
+        setup.mRecords.addInfo(0x3001, greeting, "Hello there");
+        setup.start();
+
+        setup.mDialogue.start(speaker);
+        EXPECT_TRUE(setup.mDialogue.canLeave());
+        EXPECT_THAT(setup.mDialogue.finish().mOptions, IsEmpty());
+        EXPECT_TRUE(setup.mDialogue.canLeave());
+    }
+
     TEST(FalloutScriptDialogueTest, aResponseThatGoesOnIsFollowedByTheFirstFollowUpThatCanBeSaid)
     {
         Harness setup;

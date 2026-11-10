@@ -32,6 +32,8 @@
 #include "../mwmechanics/creaturestats.hpp"
 #include "../mwmechanics/npcstats.hpp"
 
+#include "../mwscript/falloutscripts.hpp"
+
 #include "bookpage.hpp"
 #include "textcolours.hpp"
 
@@ -366,6 +368,11 @@ namespace OFGui
 
     bool DialogueWindow::exit()
     {
+        // A conversation of Fallout that offers no goodbye is not left: the window manager opens the pause menu over it
+        // instead (the doctor's test of Goodsprings, which a player who walked out of it half way could not go on with)
+        if (const OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+            scripts != nullptr && scripts->conversationHeld())
+            return false;
         if (mPtr.isEmpty())
             return true;
         if ((OFBase::Environment::get().getDialogueManager()->isInChoice()))

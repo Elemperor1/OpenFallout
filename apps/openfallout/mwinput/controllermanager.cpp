@@ -379,7 +379,12 @@ namespace OFInput
 
         // A message box that a script draws is modal: the triggers do not cycle the windows beneath it and the sticks
         // do not scroll them, as the buttons do not. A trigger is still followed, so one let go under the box can cycle
-        // the windows again when it is gone
+        // the windows again when it is gone.
+        // Every axis still reaches the bindings, though: the pointer is moved by the value that the bindings hold for
+        // the left stick (ControllerManager::update), and a stick that was pushed when the box opened and let go under
+        // it would keep the value it had then, so the pointer drifted on by itself and the player walked on by itself
+        // after the box was closed (the Mac hour of round 13P: "when a popup opens while my cursor is moving, it stays
+        // in that moving state")
         if (const OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
             scripts != nullptr && scripts->luaMessageOpen())
         {
@@ -387,7 +392,7 @@ namespace OFInput
                 handleTriggerPress(arg.value, mRightTriggerGuiPressed, [] {});
             else if (arg.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT)
                 handleTriggerPress(arg.value, mLeftTriggerGuiPressed, [] {});
-            return true;
+            return false;
         }
 
         OFBase::WindowManager* winMgr = OFBase::Environment::get().getWindowManager();

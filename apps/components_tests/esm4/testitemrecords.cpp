@@ -78,8 +78,8 @@ namespace
                 + valueSubRecord<std::uint32_t>("SCRI", 0x811) + valueSubRecord<std::uint32_t>("SNAM", 0x812)
                 + valueSubRecord<std::uint32_t>("VNAM", 0x813) + valueSubRecord<float>("MODB", 3.5f)
                 + valueSubRecord<std::uint32_t>("INAM", 0x814) + valueSubRecord<std::uint32_t>("RNAM", 0x815)
-                + zString("XATO", "Pull") + subRecord("DEST", "abcd") + subRecord("OBND", "abcdefghijkl")
-                + zString("FNAM", "skipped"));
+                + zString("XATO", "Pull") + valueSubRecord<std::uint32_t>("WNAM", 0x816) + subRecord("DEST", "abcd")
+                + subRecord("OBND", "abcdefghijkl") + zString("FNAM", "skipped"));
 
         EXPECT_EQ(acti.mId.toUint32(), 0x801u);
         EXPECT_EQ(acti.mEditorId, "Activator");
@@ -92,6 +92,7 @@ namespace
         EXPECT_EQ(acti.mRadioTemplate.toUint32(), 0x814u);
         EXPECT_EQ(acti.mRadioStation.toUint32(), 0x815u);
         EXPECT_EQ(acti.mActivationPrompt, "Pull");
+        EXPECT_EQ(acti.mWaterType.toUint32(), 0x816u);
         expectUnknownSubrecordRefused<ESM4::Activator>("ACTI");
     }
 

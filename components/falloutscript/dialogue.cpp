@@ -166,6 +166,29 @@ namespace FalloutScript
         });
     }
 
+    bool DialogueManager::canLeave() const
+    {
+        if (!mActive)
+            return true;
+        const auto offersGoodbye = [this](const auto& topics, auto toTopic) {
+            return mGoodbye != 0 && std::any_of(topics.begin(), topics.end(), [&](const auto& entry) {
+                return toTopic(entry) == mGoodbye;
+            });
+        };
+        if (mSpeaking != nullptr)
+        {
+            // What follows the response decides: a response that names no choice is followed by the list of the
+            // speaker's own topics, and one that has follow-ups goes on to them (where it ends is not looked for)
+            if (hasFlag(*mSpeaking, ESM4::INFO_Goodbye) || mSpeaking->mChoices.empty()
+                || !mSpeaking->mFollowUps.empty())
+                return true;
+            return offersGoodbye(mSpeaking->mChoices, [](ESM::FormId choice) { return toId(choice); });
+        }
+        if (mView.mOptions.empty())
+            return true;
+        return offersGoodbye(mView.mOptions, [](const DialogueOption& option) { return option.mTopic; });
+    }
+
     void DialogueManager::addTopic(FormId topic)
     {
         if (mTopics.insert(topic).second)

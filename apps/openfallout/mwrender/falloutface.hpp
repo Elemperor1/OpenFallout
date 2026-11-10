@@ -47,6 +47,11 @@ namespace OFRender
     /// part only. Returns how many nodes it changed.
     std::size_t replaceDiffuseMap(osg::Node& part, const DiffuseChooser& choose);
 
+    /// Gives the diffuse map of the shape of the model named so (in any case; a name that is the one of the node of the
+    /// shape in the file, as "PipBoyCard01:0") the picture, on the nodes of this model only (SwapTextureOnRef: the
+    /// card of the doctor's test, the slides of the endings). Returns how many nodes it changed.
+    std::size_t replaceDiffuseMapOfShape(osg::Node& model, std::string_view shape, osg::Image* image);
+
     /// The skin with the texture that the editor wrote for a character (its facemods or bodymods file, the base mod)
     /// on it, as the skin shaders of the games do it: twice what the texture has above a half grey is added to each
     /// colour of the skin, and the sum is multiplied by the default of the detail mod, nearly one. The texture is

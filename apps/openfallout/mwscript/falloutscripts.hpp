@@ -86,7 +86,9 @@
 #include <components/falloutscript/voicefiles.hpp>
 #include <components/falloutscript/wear.hpp>
 
+#include <osg/Node>
 #include <osg/Vec3f>
+#include <osg/observer_ptr>
 
 #include "../mwworld/ptr.hpp"
 
@@ -1638,6 +1640,10 @@ namespace OFScript
         /// What the default activation of a furniture does: a character, creature or the player that uses furniture
         /// already gets up (whichever furniture it activates), another one uses it as `useFurniture` does with `place`
         void activateFurniture(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture);
+        /// What the default activation of an activator does when no script of it takes the activation: its activation
+        /// sound plays (the click of a switch, the swallowing at a sink) and the player drinks the water the activator
+        /// holds (the consume spell of the water type: a sink or a toilet heals a little and, in hardcore, quenches)
+        void activateActivator(const OFWorld::Ptr& activator, const OFWorld::Ptr& actor);
         /// The actor gets up from the furniture it uses (it is where it was: the games play an animation there)
         void leaveFurniture(const OFWorld::Ptr& actor);
         /// Where the actor would stand to use the furniture: the entry of its marker that the record enables, that no
@@ -1787,6 +1793,9 @@ namespace OFScript
         /// A message box that a script of Lua draws is open: it is modal, and the actions of the keys and buttons of
         /// the game (Escape, which would close the screen under it) are not carried out while it is (any thread)
         bool luaMessageOpen() const;
+        /// A conversation of Fallout is open that the player cannot walk out of (it offers no goodbye: the test of the
+        /// doctor of Goodsprings): Escape and B do not close it, and open the pause menu over it instead (any thread)
+        bool conversationHeld() const;
         /// A screen of Lua has a question open in a box of its own (I.FalloutMessage.ask, which the engine knows
         /// nothing of otherwise): it is modal as a message box is. The script says it every frame while the question is
         /// open, and a question that has not been said for a second is gone (a script that stopped must not leave the
@@ -2024,6 +2033,11 @@ namespace OFScript
         bool playGroup(FalloutScript::FormId reference, std::string_view group, bool restart) override;
         bool isGroupPlaying(FalloutScript::FormId reference, std::string_view group) override;
         bool playIdle(FalloutScript::FormId reference, std::string_view name, FalloutScript::FormId idle) override;
+        bool swapTexture(FalloutScript::FormId reference, std::string_view shape, std::string_view texture) override;
+        /// Gives the models of the references that scripts swapped a texture of the pictures they were told to show:
+        /// once a model is there (a card that is switched on later, a cell that was loaded again), on the thread of
+        /// the frame
+        void updateTextureSwaps();
         /// The idle record named by its editor id, or the form when the name is empty; null when there is none
         const ESM4::IdleAnimation* findIdle(std::string_view name, FalloutScript::FormId form);
         /// The animation of the object a reference stands for, when it is in the scene and is no character
@@ -2894,6 +2908,17 @@ namespace OFScript
         FalloutScript::OpenStates mOpenStates;
         /// The doors that are open or on the way to be closed: their collision is away until they are closed
         std::set<FalloutScript::FormId> mDoorsWithoutCollision;
+        /// The shapes that scripts swapped the picture of, for each reference (SwapTextureOnRef), in the order they
+        /// were told, with the model they were last given to
+        struct TextureSwap
+        {
+            std::string mShape;
+            std::string mTexture;
+            osg::observer_ptr<osg::Node> mGivenTo;
+            std::string mGiven;
+        };
+        std::mutex mTextureSwapMutex;
+        std::map<FalloutScript::FormId, std::vector<TextureSwap>> mTextureSwaps;
         /// The blows are rolled for from any thread
         std::mutex mCombatRandomMutex;
         std::mt19937 mCombatRandom;

@@ -150,6 +150,14 @@ namespace FalloutScript
         void end();
 
         bool active() const { return mActive; }
+        /// Whether the player can walk out of the conversation now (Escape, B). The games end a conversation by its
+        /// Goodbye: a conversation that offers none cannot be left, which is how the test of the doctor of Goodsprings
+        /// keeps the player in it (the plugin has no other guard: leaving it half way left the player in a chair with
+        /// the controls taken away, and the doctor never asked again). It can be left when no conversation is open,
+        /// when the response being said ends it (a response flagged Goodbye) or is followed by the list of the
+        /// speaker's own topics, when the choices that follow it or the topics on offer include the Goodbye, and when
+        /// there is nothing to pick from (the window offers its own Goodbye then).
+        bool canLeave() const;
         const DialogueView& view() const { return mView; }
         const DialogueSpeaker& speaker() const { return mSpeaker; }
 

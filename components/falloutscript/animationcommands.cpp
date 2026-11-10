@@ -104,6 +104,15 @@ namespace FalloutScript
                 world.playIdle(call.mReference, {}, form);
             return 0.0;
         });
+        // SwapTexture reference "shape" "texture": the reference is the first argument, not the one the command is
+        // called on, and both names are strings
+        interpreter.setHandler("SwapTextureOnRef", [&world](CallContext& call) {
+            if (call.mArguments.size() < 3 || !call.mArguments[1].mIsText || !call.mArguments[2].mIsText)
+                return 0.0;
+            if (const FormId target = formArgument(call, 0); target != 0)
+                world.swapTexture(target, call.mArguments[1].mText, call.mArguments[2].mText);
+            return 0.0;
+        });
         interpreter.setHandler("GetOpenState", [&states, &world](CallContext& call) {
             return call.mReference != 0 ? static_cast<double>(states.stateOf(call.mReference, world)) : 0.0;
         });
