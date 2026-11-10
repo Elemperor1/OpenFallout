@@ -895,7 +895,7 @@ namespace OFMechanics
                             return false;
                         goal.mCenter = door;
                         goal.mThrough = target;
-                        goal.mRadius = std::max(goal.mRadius, doorArrival);
+                        goal.mRadius = doorArrival;
                         return true;
                     }
                     goal.mCenter = reference.getRefData().getPosition().asVec3();
