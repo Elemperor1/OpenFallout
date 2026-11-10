@@ -275,6 +275,18 @@ def write_csv(rows, path):
             )
 
 
+def refers_to_any(path, inputs):
+    """Whether `path` is the same file as one of `inputs` (the same name, or a link or hard link to it)."""
+    for other in inputs:
+        try:
+            if os.path.samefile(path, other):
+                return True
+        except OSError:
+            # a path that is not there yet is none of the inputs
+            continue
+    return False
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--fallout3", nargs="+", metavar="CSV", default=[], help="the census files of the Fallout 3 plugins")
@@ -285,6 +297,10 @@ def main():
     args = parser.parse_args()
     if not args.fallout3 and not args.newvegas:
         parser.error("give the census files of at least one game (--fallout3, --newvegas)")
+    # Writing a report over a census file would replace what the report is made of
+    for option, output in (("--markdown", args.markdown), ("--csv", args.csv)):
+        if output and refers_to_any(output, args.fallout3 + args.newvegas):
+            parser.error("%s names one of the census files: the report would replace it" % option)
 
     games = {
         "fallout3": merge_counts([read_census_csv(path) for path in args.fallout3]),

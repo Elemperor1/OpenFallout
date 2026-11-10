@@ -4,6 +4,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import command_census as census  # noqa: E402
@@ -136,6 +137,40 @@ class RankingTest(unittest.TestCase):
         self.assertEqual(lines[0], "code,name,state,fo3_calls,fo3_scripts,fo3_conditions,nv_calls,nv_scripts,nv_conditions,uses")
         self.assertEqual(lines[1], "0x1048,GetIsID,todo,0,0,107,0,0,0,107")
         self.assertEqual(lines[2], "0x1002,AddItem,done,11,4,0,5,0,0,16")
+
+
+class OutputTest(unittest.TestCase):
+    def setUp(self):
+        self.files = Files(self)
+        self.census = self.files.write("scripts.csv", SCRIPTS)
+
+    def run_main(self, *arguments):
+        with mock.patch.object(sys, "argv", ["command_census.py", "--fallout3", self.census, *arguments]):
+            with mock.patch("sys.stdout"), mock.patch("sys.stderr"):
+                return census.main()
+
+    def test_a_report_is_not_written_over_a_census_file(self):
+        for option in ("--markdown", "--csv"):
+            with self.assertRaises(SystemExit):
+                self.run_main(option, self.census)
+            with open(self.census, encoding="utf-8") as stream:
+                self.assertEqual(stream.read(), SCRIPTS)
+
+    def test_a_link_to_a_census_file_is_the_census_file(self):
+        link = os.path.join(self.files.directory.name, "link.csv")
+        try:
+            os.symlink(self.census, link)
+        except (OSError, NotImplementedError):
+            self.skipTest("no links here")
+        with self.assertRaises(SystemExit):
+            self.run_main("--csv", link)
+        with open(self.census, encoding="utf-8") as stream:
+            self.assertEqual(stream.read(), SCRIPTS)
+
+    def test_a_report_goes_to_a_path_that_is_not_there_yet(self):
+        report = os.path.join(self.files.directory.name, "usage.csv")
+        self.assertEqual(self.run_main("--csv", report), 0)
+        self.assertTrue(os.path.exists(report))
 
 
 class TreeTest(unittest.TestCase):
