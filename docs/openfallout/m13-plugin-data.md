@@ -1,15 +1,16 @@
 # M13 plugin data: fall, camera and sleep GMSTs, landing sounds
 
-Read from the plugin files only (Fallout3.esm, FalloutNV.esm, and the add-on plugins of both games, which add no matches), on the Mac in round 13B of M13. Values are the plugin records; nothing here comes from an executable. What it settles for M13:
+Read from the plugin files only (Fallout3.esm and FalloutNV.esm, and the five add-on plugins of each game that the Mac scanned too, which its report does not name; they add no matches), on the Mac in round 13B of M13. Values are the plugin records; nothing here comes from an executable. What it settles for M13:
 
 - Fall damage: the plugins hold `fJumpFallHeightMin` = 600, `fJumpFallHeightExponent` = 1.65 and `fJumpFallVelocityMin` = 2785 (same in both games) and **no** `fJumpFallHeightMult`, `fFallLegDamageMult` or `iFallLegDamageChance`, so the formula's multiplier and the leg damage are not in the data.
-- Dialogue camera: no GMST names a conversation camera distance, height, offset, blend or field of view (the 35 names found are AI timers, combat barks and V.A.T.S.), so those numbers are not in the data either.
+- Dialogue camera: no GMST names a conversation camera distance, height, offset, blend or field of view (the 35 names found are AI timers, combat barks, V.A.T.S. cameras and the `fOverShoulder*` offset, position and blend settings of the player's over-the-shoulder view, none of which is a conversation camera), so those numbers are not in the data either.
 - Sleep: no GMST names a heal rate per hour or a limit of hours. New Vegas adds `fHCSleepDeprivationRate` = 50 (hardcore mode).
 
 ---
 
 Message as received (round 13B):
 
+```text
 Plugin files only (Fallout3.esm, FalloutNV.esm; the five FO3 and five NV DLC plugins were also scanned and hold 0 matches for every pattern below). No executable was read for this message. Names, values and counts only; string-type GMSTs are listed by name and length, not text.
 
 == 1. B5 ==
@@ -138,3 +139,4 @@ FO3 ModDisposition (0x1053): 41 scripts = INFO 39 + QUST 2. The --find list stop
 Plugin reads only, run with nice -n 10. New scratch files: scratch-m13/b13_gmst.py, scratch-m13/b13_qust.py, scratch-m13/data13b/ (GMST and sound lists). Nothing in the repository or the game folders was changed, nothing committed or pushed, no game started, no keys, pointer, screenshots or lldb; the front app was never touched. I did not go back to the saved Part B notes.
 
 MAC ROUND 13B - DONE
+```

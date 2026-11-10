@@ -886,13 +886,23 @@ namespace EsmTool
         {
             if (!info.csvFile.empty())
             {
-                std::ofstream csv(info.csvFile);
-                if (csv)
-                    census.writeCsv(csv);
-                if (!csv)
+                if (result != 0 || !census.getFatalErrors().empty())
                 {
-                    std::cout << "\nFailed to write the CSV file " << Files::pathToUnicodeString(info.csvFile) << '\n';
-                    result = -1;
+                    // Counts of some of the files would read as the counts of all of them, and replace a good file
+                    std::cout << "\nThe CSV file " << Files::pathToUnicodeString(info.csvFile)
+                              << " was not written: the census is incomplete\n";
+                }
+                else
+                {
+                    std::ofstream csv(info.csvFile);
+                    if (csv)
+                        census.writeCsv(csv);
+                    if (!csv)
+                    {
+                        std::cout << "\nFailed to write the CSV file " << Files::pathToUnicodeString(info.csvFile)
+                                  << '\n';
+                        result = -1;
+                    }
                 }
             }
         }
