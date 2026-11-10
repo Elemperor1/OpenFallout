@@ -1,11 +1,14 @@
 #include "renderingmanager.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdlib>
 
 #include <osg/ClipControl>
 #include <osg/ComputeBoundsVisitor>
 #include <osg/Group>
 #include <osg/Matrix>
+#include <osg/Transform>
 #include <osg/UserDataContainer>
 
 #include <osgUtil/LineSegmentIntersector>
@@ -165,6 +168,15 @@ namespace
 
 namespace OFRender
 {
+    namespace
+    {
+        /// The shot of a conversation (Fallout 3 and New Vegas): the camera stands this far from the head of the
+        /// character that the player talks with, on the side of the player, and takes this long to get there and back.
+        /// Stand-ins until the executables' numbers are read (Mac round 13A, part C).
+        constexpr double dialogueShotDistance = 90.0;
+        constexpr float dialogueShotSeconds = 0.5f;
+    }
+
     class PreloadCommonAssetsWorkItem : public SceneUtil::WorkItem
     {
     public:
@@ -784,6 +796,7 @@ namespace OFRender
             mUpdateProjectionMatrix = false;
             updateProjectionMatrix();
         }
+        updateDialogueCamera();
         mCamera->update(dt, paused);
         updatePlayerBody();
 
@@ -828,6 +841,53 @@ namespace OFRender
         stateUpdater->setWindSpeed(world->getWindSpeed());
         stateUpdater->setSkyColor(mSky->getSkyColor());
         mPostProcessor->setUnderwaterFlag(isUnderwater);
+    }
+
+    void RenderingManager::updateDialogueCamera()
+    {
+        if (mPlayerAnimation == nullptr || !OFBase::Environment::get().hasFalloutScripts())
+            return;
+        const OFWorld::Ptr speaker = OFBase::Environment::get().getFalloutScripts()->conversationSpeaker();
+        const OFWorld::Ptr& player = mPlayerAnimation->getPtr();
+        if (speaker.isEmpty() || speaker == player || !speaker.isInCell() || speaker.getRefData().getBaseNode() == nullptr
+            || !player.isInCell() || speaker.getCell() != player.getCell())
+        {
+            mCamera->clearShot();
+            return;
+        }
+        // What the camera looks at: the head of the character, or the middle of what has no head (a talking activator)
+        osg::Vec3d head;
+        bool found = false;
+        if (const Animation* animation = mObjects->getAnimation(speaker))
+        {
+            if (const osg::Node* bone = animation->getNode("Bip01 Head"))
+            {
+                const osg::NodePathList paths = bone->getParentalNodePaths();
+                if (!paths.empty())
+                {
+                    head = osg::computeLocalToWorld(paths.front()).getTrans();
+                    found = true;
+                }
+            }
+        }
+        if (!found)
+        {
+            head = osg::Vec3d(speaker.getRefData().getPosition().asVec3());
+            head.z() += OFBase::Environment::get().getWorld()->getHalfExtents(speaker).z();
+        }
+        // On the side of the player, as far from the head as the shot is
+        const osg::Vec3f playerPosition = player.getRefData().getPosition().asVec3();
+        osg::Vec3d toPlayer(playerPosition.x() - head.x(), playerPosition.y() - head.y(), 0);
+        if (toPlayer.length2() < 1.0)
+            toPlayer = osg::Vec3d(0, -1, 0);
+        toPlayer.normalize();
+        const osg::Vec3d position = head + toPlayer * dialogueShotDistance;
+        osg::Vec3d forward = head - position;
+        forward.normalize();
+        const double pitch = std::asin(std::clamp(forward.z(), -1.0, 1.0));
+        const double yaw = std::atan2(-forward.x(), forward.y());
+        mCamera->setShotSeconds(dialogueShotSeconds);
+        mCamera->setShot(position, osg::Quat(pitch, osg::Vec3d(1, 0, 0)) * osg::Quat(yaw, osg::Vec3d(0, 0, 1)));
     }
 
     void RenderingManager::updatePlayerBody()

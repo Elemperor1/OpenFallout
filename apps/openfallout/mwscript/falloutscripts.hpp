@@ -1716,6 +1716,9 @@ namespace OFScript
         bool startConversation(const OFWorld::Ptr& speaker, FalloutScript::FormId topic = 0);
         /// startConversation and the interface that shows it. For the thread of the frame.
         bool talkTo(const OFWorld::Ptr& speaker, FalloutScript::FormId topic = 0);
+        /// The character that the player is in a conversation with, empty when there is no conversation open. For the
+        /// thread of the frame (the camera turns to the speaker).
+        OFWorld::Ptr conversationSpeaker();
         /// What a character with a Dialogue package does once it is where it talks: a Say To package for the player
         /// says one response of its topic, a Conversation package for the player begins a conversation (the interface
         /// opens, which is for the thread of the frame), and a package for another character makes the exchange of the

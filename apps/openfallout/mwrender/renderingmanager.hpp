@@ -325,6 +325,9 @@ namespace OFRender
         /// Keeps the body of the player in Fallout 3 and New Vegas up to date: made when the camera first leaves the
         /// player's eyes and again when the look or the armor changes, shown outside the eyes, sitting where the player sits
         void updatePlayerBody();
+        /// Turns the camera to the character that the player talks with (Fallout 3 and New Vegas) while a conversation
+        /// is open, and lets it go back to the player's view when it ends
+        void updateDialogueCamera();
 
         void updateRecastMesh();
 

@@ -4382,6 +4382,17 @@ namespace OFScript
         return true;
     }
 
+    OFWorld::Ptr FalloutScripts::conversationSpeaker()
+    {
+        FalloutScript::FormId reference = 0;
+        {
+            const std::lock_guard lock(mDialogueMutex);
+            if (mDialogue.active())
+                reference = mDialogue.speaker().mReference;
+        }
+        return reference != 0 ? findReference(reference) : OFWorld::Ptr();
+    }
+
     bool FalloutScripts::speakPackage(
         const OFWorld::Ptr& speaker, const ESM4::AIPackage& package, const OFWorld::Ptr& listener, std::string* busy)
     {
