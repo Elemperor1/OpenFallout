@@ -138,8 +138,9 @@ namespace OFScript
     {
         namespace AV = FalloutScript::ActorValue;
         namespace Fall = FalloutScript::FallDamage;
-        // The fall of a character of the world is not read yet (the executables skip some of them by their records,
-        // and the rest of what they skip is not known), so it is not hurt
+        // Only the player lands here: the characters and creatures of the world are moved by the Fallout actor update,
+        // which keeps them on the ground and has no fall to measure (the executables hurt them by the same formula,
+        // minus the exemptions of the reads, so this is where it would go if they ever fall)
         if (mPlayer == 0 || ptr.isEmpty() || scriptReferenceOf(ptr) != mPlayer)
             return false;
         const Fall::Settings settings = Fall::Settings::fromGameSettings(
