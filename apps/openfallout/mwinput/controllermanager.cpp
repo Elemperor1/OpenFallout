@@ -5,6 +5,8 @@
 
 #include <SDL.h>
 
+#include <cmath>
+
 #include <components/debug/debuglog.hpp>
 #include <components/esm/refid.hpp>
 #include <components/files/conversion.hpp>
@@ -25,6 +27,12 @@
 
 namespace OFInput
 {
+    namespace
+    {
+        // A stick this near to the middle (of 32,768) is let go: the window that reads the sticks takes no notice of it
+        constexpr int stickNeutralValue = 2000;
+    }
+
     ControllerManager::ControllerManager(BindingsManager* bindingsManager, MouseManager* mouseManager,
         const std::filesystem::path& userControllerBindingsFile, const std::filesystem::path& controllerBindingsFile)
         : mBindingsManager(bindingsManager)
@@ -234,7 +242,16 @@ namespace OFInput
         if (OFBase::Environment::get().getWindowManager()->isGuiMode())
         {
             if (gamepadToGuiControl(arg))
+            {
+                // A stick that is let go under a window that takes its events (or under the box of a script, whose
+                // pushes the bindings were given) would keep the value it had, and the pointer or the player would go
+                // on by itself when the window is gone. The bindings are told of the rest.
+                const bool stick = arg.axis == SDL_CONTROLLER_AXIS_LEFTX || arg.axis == SDL_CONTROLLER_AXIS_LEFTY
+                    || arg.axis == SDL_CONTROLLER_AXIS_RIGHTX || arg.axis == SDL_CONTROLLER_AXIS_RIGHTY;
+                if (stick && std::abs(arg.value) < stickNeutralValue)
+                    mBindingsManager->controllerAxisMoved(deviceID, arg);
                 return;
+            }
         }
         else if (mBindingsManager->actionIsActive(A_TogglePOV)
             && (arg.axis == SDL_CONTROLLER_AXIS_TRIGGERRIGHT || arg.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT))
@@ -422,7 +439,7 @@ namespace OFInput
                     winMgr->setCursorActive(false);
 
                 // Deadzone check
-                if (std::abs(arg.value) < 2000)
+                if (std::abs(arg.value) < stickNeutralValue)
                     return !mGamepadGuiCursorEnabled;
 
                 if (mGamepadGuiCursorEnabled
