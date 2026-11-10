@@ -2,7 +2,7 @@
 
 Read-only static examination, 2026-11-10. PASS = read and understood; FAIL = read and contradicts the stated expectation; NOT TRACED = the requested rule is not fully established. A setting or record's existence does not establish that a particular path uses it.
 Addresses are preferred-image virtual addresses, not file offsets. NV precedes FO3 throughout. No game was launched; no executable, plugin, asset, script source, game text, or disassembly is reproduced here. Only the base masters were evaluated; DLC, mods and local INI overrides can change effective behavior.
-Verified PE file versions: FalloutNV.exe 1.4.0.525; Fallout3.exe 1.7.0.3. Evidence: direct PE bytes/Capstone, Ghidra decompilation for both games, command records, GMST/SOUN/IMAD/IDLE/PERK/SPEL/FURN records, compiled script control flow, and the sleep/wait menu's numeric configuration in Fallout - Misc.bsa.
+Verified PE file versions: FalloutNV.exe 1.4.0.525; Fallout3.exe 1.7.0.3. Evidence: direct PE bytes/Capstone, Ghidra decompilation for both games, command records, GMST/SOUN/IMAD/IDLE/PERK/SPEL/FURN/TACT/DEHY/HUNG/SLPD records, compiled script control flow, the intercom NIF node hierarchy, and the sleep/wait menu's numeric configuration in Fallout - Misc.bsa.
 Exe SHA-256 NV: `89e7020487e80f20ddc92ea641c4433b2c6839a82f45a076e414d167d11dd0fe`; FO3: `df9f0e1ec2c5413a9cef2db2dde6d926b99707d528049af4eb15538587d55f99`.
 Master SHA-256 FalloutNV.esm: `50991d36804b7d1e70df1afd7471b72f0e29d1b456ee2516a9717c002564e7c1`; Fallout3.esm: `d9fb0a33af495ddb43992b96ea74f2741b123fefdb1fcdcea28096f7649b0d06`.
 
@@ -41,12 +41,15 @@ Movement helpers NV `0x647D10`, FO3 `0x5845B0` use fMoveOneCrippledLegSpeedMult 
 ### 4. NOT TRACED — Fatal-fall completion and protection edge cases
 
 Confirmed NV health callback chain: `0x93B7A0` → virtual `+0x4B8` (`0x9508F0`) → `0x898650`; health less than 1 enters generic death processing `0x89D900`, with a deferred-processing branch.
-This is ordinary actor death processing with a null fall attacker, not a separate fall-death opcode. Final ragdoll, death camera and reload timing are NOT TRACED.
+Ordinary death processing requests Death animation group NV `0xE0` (`0x89E7AB`) / FO3 `0xA5` (`0x71B51C`); the player branch requests MUSDeath `00078595`, `fx\mus\mus_death.wav` (NV `0x89EA87`, FO3 `0x71B6C9`). Final ragdoll and death-camera behavior remain NOT TRACED; the reload countdown is established below.
 Confirmed NV god-mode gate: `0x952720` → `0x9526B0`, using global `0x11E07BA`; ToggleGodMode handler `0x5B6F80` toggles it through `0x9526A0`.
 `0x89D6F0` rejects health damage when protected; `0x952730` also rejects negative Health and limb AVs `0x19..0x1F`. The landing sound branch itself is not guarded by that health-damage result.
 FO3 ToggleGodMode handler `0x51EDC0` → setter `0x76CEB0`, getter `0x76CEC0`, global `0x107BA65`; the getter is PlayerCharacter's magic-target virtual `+0x10`. `0x6FD240` gates health damage and `0x76CED0` rejects negative Health/condition AV changes while protected.
 FO3 player Health damage `0x76E570/0x76E7C0` invokes virtual `+0x4A8` (`0x76CC80`) → `0x71C320`; Health < 1 enters `0x71AC50`, or queues deferred processing through `0x6F2910`. This matches NV's ordinary-death threshold.
-All essential/NPC exceptions and fatal-fall ragdoll/camera/reload timing remain NOT TRACED; limb-zero transitions are now established in item 3.
+NV reload sites `0x93FEDF..0x93FF85`: when actor life state `+0x108` is 1 or 2 and fPlayerDeathReloadTime > 0, initialize countdown `0x11A3B34` from that GMST, subtract frame delta, then attempt saved-game reload `0x8512F0` → `0x850760` when countdown < 0. Default 5 seconds; neither master overrides it.
+FO3 sites `0x78B194..0x78B240` use life state `+0xFC`, countdown `0xF6EA20`, the same default 5, and reload `0x6D5960` → `0x6D5750`. A nonpositive setting selects a separate death-menu branch in both games.
+Essential handling NV `0x89DE28..0x89DF74`, FO3 `0x71AED9..0x71B07B`: bEssentialTakeNoDamage:GamePlay = 1 gates protection; the incapacitation branch supplies fEssentialDeathTime = 10 to process virtual `+0xE8`, while life states 3/5 restore Health toward 0.3 × the integer Health returned by AV-owner virtual `+0x00` (fEssentialHealthPercentReGain). Both GMSTs are absent from both masters.
+NV eligibility `0x87F3D0` additionally accepts non-hardcore teammates or actor flag `+0x140 & 0x80000000`; FO3 `0x6F4A10` tests base/template essential bit `+0x34 & 2`. Complete recovery/ragdoll/camera behavior and other NPC exceptions remain NOT TRACED.
 
 ### 5. FAIL — ResetFallDamageTimer does not reset in this NV executable
 
@@ -66,6 +69,7 @@ Enable's queued processing, every load/door route, and all state transitions aft
 FO3's clearing command alone does not prove that every relocation/loading path invokes it.
 FO3 MoveTo `0x528A60` → `0x528730` queues player `+0x1B0` via `0x7882F0`; consumer `0x786560` → `0x782B00/0x7820F0` invokes position virtual `+0x2A8` (`0x766A40`), which clears starting height `+0x3D0` and landing bit `+0x294 & 0x80`. This is a zero reset, versus NV's destination-Z baseline.
 FO3 SetPos `0x532410` → `0x522910` → `0x4E6580` → `0x8EA270` relocates Havok state through a different route; complete subsequent state reset remains NOT TRACED.
+Separate airborne-state check: NV `0xCD3FB0` tests controller `+0x548 > 1` and height loss < 0.10000000149011612 while next-state `+0x520 == 0xB`, then requests state 0; updater `0xC6E2E0` accumulates controller step `+0x4E8` into `+0x548`. FO3 `0x96B630` has the same comparisons at `+0x3D4/+0x350`. Neither establishes a post-load/teleport grace interval.
 
 ### 7. NOT TRACED — Landing presentation and special surfaces
 
@@ -76,6 +80,7 @@ JumpLand is animation-group `0xE5` in NV's table at `0x11977D8`, and `0xAA` in F
 NV pain path `0x8A7D50` calls image-space application `0x5299A0` with GetHit IMAD `00000162`, fGetHitPainMult = 1.5 and zero third argument, subject to its alive/state gates.
 Both masters' GetHit record declares duration 0.4 seconds; both executable pain rumble defaults are fRumblePainTime = 0.5 and fRumblePainStrength = 0.75. Pain helpers also read fPainDelay = 1.5 (both masters absent); complete effect lifetime/retrigger interaction remains NOT TRACED.
 FO3 pain helper `0x6FF9E0` calls `0x4C2700` with fGetHitPainMult = 1.5 and zero third argument; lookup `0x51DEC0` resolves GetHit form `00000162`, matching NV's effect selection, subject to alive/state/VATS gates.
+The in-air transition NV `0xCD3FB0`, FO3 `0x96B630`, sets landing bit `0x80` and requests state 0 when controller flags contain `0x100`; the swimming update NV `0xCD44E0` has no equivalent write of landing bit `0x80`. The complete collision-to-state selection still needs tracing.
 Water damage exemption, shallow/deep-water distinctions, landing on another character, and whether that character receives damage remain NOT TRACED.
 
 ### 8. FAIL — Dialogue is not a fixed 90-unit speaker camera
@@ -119,7 +124,9 @@ Ordinary targets are fDefaultWorldFOV:Display = 75 and fDefault1stPersonFOV:Disp
 FO3 close `0x63F060` writes saved-POV flags `0x108D018/0x108D019`, calls focus with skipTurning and refreshes camera through `0x77D670`; ordinary FOV updater `0x777DB0` has the same dt × 30 / 0.25 step and 75-degree defaults.
 If neither a usable head nor a fallback node exists, NV `0x953060` skips target-framing/turn math; a node without a head geometry can use radius 32.
 No explicit race-specific camera formula appeared in the traced focus function; creatures/robots can use their available nodes/bounds. Their actual model-by-model framing was not verified.
-FO3 `0x775D80` likewise skips target-framing/turn math if neither head geometry nor its configured head node is usable; its node-only radius is 32. Vault 101 intercom model/script behavior remains NOT TRACED; no invented intercom offset is supplied.
+Both masters map CG02DinerIntercom `00031D47` (TACT) to `Clutter\Consoles\Intercom01.NIF`. Both Meshes BSAs contain a child NiNode named `Bip01 Head`, local XYZ = (−0.014251708984375, 6.549276351928711, 1.108830213546753), identity rotation, scale 1: this model is not missing a camera-target node.
+NV fallback `0x953230` → `0x8A30F0` and FO3 `0x775E73` search the configured head node; initializers NV `0x4B7A05..0x4B7A37`, FO3 `0x4769DB..0x4769F9`, name it `Bip01 Head`. Node-only framing uses world node position, radius 32 and the −5 Z look adjustment; there is no intercom-specific camera distance in these branches.
+CG02DinerIntercomSCRIPT `00077786` has identical compiled flow in both masters: player activation uses ordinary Activate during CG02 stages 35 <= stage < 38, otherwise ShowMessage; non-player activation uses Activate. No camera-offset command. Complete script/quest switching and unusual-speaker exit restoration remain NOT TRACED.
 
 ### 12. PASS — Distinct terminal, barter, repair and container entry paths
 
@@ -157,7 +164,7 @@ Updater `0x7011D0` changes alpha by ±dt/duration, clamped to [0,1]: linear fade
 There is no separate fixed hold duration here: black persists through the hourly countdown, so more selected hours keep it black longer. At one tick per second, H hours nominally occupy H seconds, subject to frame scheduling and interruption.
 The tick discards accumulator remainder after each hour, so this is not an exact wall-clock guarantee and can be slower at low update rates.
 FO3 confirmation `0x6745A0` calls fader `0x6181F0` with default 0.3; close `0x674530` reverses it through `0x617FD0`. Alpha updater `0x618090` likewise adds/subtracts effective frame delta / duration, clamps to [0,1], and writes material alpha `+0x78`; its delta is divided by global `0xF7544C` (static value 1).
-Audio manager receives a mode-4 request per hour (NV `0xAD8780`, FO3 `0x78C030`); its audible mixing consequences are NOT TRACED.
+The hourly mode-4 call is a no-op in both shipped executables: NV `0xAD8780` returns without reading its argument or changing state; FO3 `0x78C030` immediately returns. It causes no audio fade, mute or mix change; unrelated menu/audio paths were not exhaustively traced.
 
 ### 16. FAIL — A lying player camera is not part of normal sleep
 
@@ -172,7 +179,7 @@ On the final selected hour, if sleeping and not hardcore, `0x8A0960` restores da
 It also requests 1000 restoration for each condition AV `0x1F,0x1D,0x1E,0x1B,0x1C,0x1A,0x19`; helper `0x88B740` only issues positive restoration when that AV has a negative damage modifier. This is completion restoration, not a fixed HP-per-hour rule.
 The per-hour path can also run general regeneration `0x88B510`: helper `0x648B00` gives HealRate/3600, or (2 × HealRate + 2)/3600 if actor state `+0x1AC == 9`, then multiplies by simulated delta; player perk entry point `0x0C` can add a rate.
 Do not assume that animation-state-9 branch is set merely because the sleep-menu flag is true; these are different fields.
-Hardcore skips this completion full restoration; when sleeping, it reduces SleepDeprivation AV `0x4B` by min(current value, fHCSleepRestorationMod = 60) per hourly step. fHCSleepDeprivationRate is 50 in FalloutNV.esm, default 0.26. The separate rested-bed ResetHealth script in item 18 has no hardcore guard.
+Hardcore skips this completion full restoration; when sleeping, it reduces SleepDeprevation AV `0x4B` (the executable registration spells it this way) by min(current value, fHCSleepRestorationMod = 60) per hourly step. fHCSleepDeprivationRate is 50 in FalloutNV.esm, default 0.26. The separate rested-bed ResetHealth script in item 18 has no hardcore guard.
 FO3 `0x76C8F0` uses the same 3600/TimeScale step and calls full restore `0x6F6A80` at sleep completion, with the same Health/Fatigue/condition restoration requests; no hardcore branch exists there.
 
 ### 18. PASS — Rested-bed script flow and separate healing
@@ -192,16 +199,36 @@ NV and FO3 use the same sleep/wait menu and hourly advancement, with the sleep f
 Both confirm handlers start the black fader only for sleep. Waiting does not invoke a lying animation or the sleep completion full-heal call; general simulation/regeneration can still run.
 The same 1..24 selection and nominal one game-hour-per-real-second countdown apply; waiting is not ordinary real-time simulation with an enlarged TimeScale.
 
-### 20. NOT TRACED — Rested duration and remaining interruption rules
+### 20. PASS — Rested duration clock and expiry
 
-Both masters' WellRestedSpell effect `00062744` has duration field 1440; its active-effect clock and conversion to game-clock hours remain NOT TRACED. The numeric field alone is not proof of 1440 in-game seconds.
+Both masters' WellRestedSpell `00062697` supplies duration 1440 to effect `00062744`; NV constructor `0x803D30` reads it through `0x4044D0` into ActiveEffect `+0x20`, with elapsed time `+0x04` initially zero.
+NV updater `0x804560`, reached through `0x823C40`, adds positive simulation delta to elapsed, clamps the last update to remaining duration, and marks expired at elapsed >= duration (`+0x13 = 1`); it invokes the finish virtual once.
+Actor update `0x8C3C40` uses the simulation-clock difference, or 3600 / TimeScale for an hourly skipped-time update; sleep/wait `0x94DF80` invokes that hourly path. This is a simulation-seconds budget, not 1440 game-clock seconds.
+Both masters' TimeScale GLOB `0000003A` is 30: an unmodified 1440-second budget corresponds to 1440 × 30 / 3600 = 12 game hours, or 24 minutes of ordinary unpaused simulation. Changed TimeScale changes that game-clock equivalence.
+FO3 constructor `0x6A13F0` and updater `0x6A27E0` use the same elapsed `+0x04`, duration `+0x20` and expiry flag `+0x13`; list updater `0x6B8190` calls it. Hourly caller `0x76C8F0` → `0x723100` also supplies 3600 / TimeScale.
+Script-effect finish dispatch reaches the effect-finish script, which removes WellRestedPerk as described in item 18. Dispel/recast and other interruptions can end or replace the effect before its budget expires; this is not an unconditional wall-clock promise.
+
+### 21. PASS — New Vegas hardcore needs during skipped hours
+
+NV menu tick `0x7C0580` calls `0x969C30` when hardcore is active, before calling hourly advancement `0x94DF80`; the needs update therefore observes time already elapsed, not the hour about to be advanced.
+`0x969C30` reads absolute game minutes through `0x867EA0`, tracks separate previous timestamps at `0x11E0D7C/0x11E0D78/0x11E0D74`, and uses interval I = rate × TimeScale / 60 game minutes per point.
+When elapsed minutes >= I, add trunc(elapsed / I) through actor virtual `+0x3B0`, then replace that need's timestamp with current minutes: fractional remainder is discarded. Initial zero timestamp or player byte `+0xE39` resets the baselines; player `+0x680 & 4` skips the updater.
+Rates: fHCDehydrationRate = 10 (master absent/default 10), fHCStarvationRate = 25 (`00162BC9`, default 0.39), fHCSleepDeprivationRate = 50 (`00162BCA`, default 0.26). These are intervals, so a larger rate slows accumulation.
+AVs are Dehydration `0x49`, Hunger `0x4A`, SleepDeprevation `0x4B`. At TimeScale 30, their intervals are 5, 12.5 and 25 game minutes. A fully elapsed 60-minute interval gives integer additions 12, 4 and 2; this is not a guaranteed addition on the first or final menu tick.
+While sleeping (`0x5A1E50`), the sleep-deprivation addition is suppressed but its timestamp still advances; hunger and dehydration have no equivalent sleep suppression. The separate hourly reduction is min(current SleepDeprevation, 60), as in item 17.
+Callbacks `0x8C5610/0x8C5890/0x8C5B10` replace stage spells when the selected stage changes; selectors `0x4018B0/0x402030/0x402760` compare value >= each record threshold. Base-master DEHY/HUNG/SLPD records supply thresholds 200/400/600/800/1000.
+At 1000, records Water5 `00161905`, hunger5 `0016190A`, sleep5 `0016190F` select Dehydration1000 `0015FA20`, Starvation1000 `0015FA25`, SleepDeprivation1000 `0015FA2A`: each specifies DamageHealth `00033595`, magnitude 10000, duration 0, Health AV `0x10`. This is a damaging effect, not a menu-specific instant-kill opcode.
+FO3 has no corresponding hardcore needs path. Exact protection interactions with the fatal stage and all quest-driven interruptions remain NOT TRACED.
+
+### 22. NOT TRACED — Remaining sleep/wait interruption rules
+
 Both `Fallout - Misc.bsa` menu files configure 24 choices; code adds 1 to the zero-based slider, giving 1..24 selected hours.
 NV tick `0x7C0580` checks cancel input and remaining hours; cancel handler `0x7C0220` clears hours/sleep flag and closes. Full environmental/quest interruption behavior remains NOT TRACED.
 NV nearby-hostility test `0x9764A0` uses fHostileActorInteriorDistance = 2000 or fHostileActorExteriorDistance = 3000; it checks enabled, living nearby actors and hostility predicates. Both GMSTs are absent from both masters; both executables have those defaults.
 Activation also tests ownership, combat, trespass, radiation state and damaging Health effects; some predicate semantics and radiation thresholds remain NOT TRACED. Do not infer an exact threshold from the refusal-setting name.
-Hardcore hunger/thirst/death interactions during the accelerated hours, audio mode-4 mixing, all quest interruptions, and FO3's complete restriction call graph remain NOT TRACED.
+FO3's complete restriction call graph, scripted interruptions, and the final menu/health interaction when hardcore needs reach a fatal stage remain NOT TRACED.
 
-### 21. PASS — Numeric GMST inventory; NOT TRACED entries are explicit
+### 23. PASS — Numeric GMST inventory; NOT TRACED entries are explicit
 
 The table below covers all numeric registered/extracted GMST names containing Jump, Fall, Dialog, Conversation, Speak, Camera, Zoom, FOV, Focus, Sleep, Rest or Wait or Heal, case-insensitively, plus the directly relevant additional GMSTs.
 This deliberately includes broad matches such as Health, Restore, Restrictions and OverShoulder; a match does not establish use by these three features. No separate numeric Rested-family GMST was found.
@@ -290,6 +317,7 @@ Decimal float values denote the nearest float32; short decimals below round-trip
 | fDiffMultHPToPCVH | — / 2 | — / 2 |
 | fDistancetoPlayerforConversations | — / 3000 | — / 3000 |
 | fEnemyHealthBarTimer | — / 5.5 | — / 5.5 |
+| fEssentialDeathTime | — / 10 | — / 10 |
 | fEssentialHealthPercentReGain | — / 0.3 | — / 0.3 |
 | fExplosiveProjectileBlockedWaitTime | — / 2.5 | — / 2.5 |
 | fFadeToBlackFadeSeconds | — / 0.3 | — / 0.3 |
@@ -302,8 +330,10 @@ Decimal float values denote the nearest float32; short decimals below round-trip
 | fGunDecalCameraDistance | — / 2048 | — / 2048 |
 | fGunParticleCameraDistance | 2048 / 1024 | 2048 / 1024 |
 | fGunShellCameraDistance | — / 512 | — / 512 |
+| fHCDehydrationRate | — / 10 | — / — |
 | fHCSleepDeprivationRate | 50 / 0.26 | — / — |
 | fHCSleepRestorationMod | — / 60 | — / — |
+| fHCStarvationRate | 25 / 0.39 | — / — |
 | fHandHealthMax | — / 20 | — / 20 |
 | fHandHealthMin | — / 1 | — / 1 |
 | fHealingRateSleepingBase | — / 2 | — / 2 |
@@ -350,6 +380,7 @@ Decimal float values denote the nearest float32; short decimals below round-trip
 | fPainDelay | — / 1.5 | — / 1.5 |
 | fPerkJumpFatigueExpertMult | — / 0.5 | — / 0.5 |
 | fPersAdmireStre | — / 1 | — / 1 |
+| fPlayerDeathReloadTime | — / 5 | — / 5 |
 | fPlayerHealthHeartbeatFast | — / 0.1 | — / 0.1 |
 | fPlayerHealthHeartbeatSlow | — / 0.2 | — / 0.2 |
 | fRumblePainStrength | — / 0.75 | — / 0.75 |
@@ -466,3 +497,4 @@ Related INI settings, not GMSTs: values below are executable defaults; no local 
 | fDefault1stPersonFOV:Display | 75; 0x1203168 | 75; 0x116da08 |
 | fPipboy1stPersonFOV:Display | 68; 0x1203174 | 68; 0x116da14 |
 | bIronSightsZoomEnable:Combat | 1; 0x11e097c | 1; 0x107bc00 |
+| bEssentialTakeNoDamage:GamePlay | 1; 0x11e0888 | 1; 0x107bb18 |
