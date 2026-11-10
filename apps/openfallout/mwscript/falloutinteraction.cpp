@@ -1002,6 +1002,8 @@ namespace OFScript
         if (!mRest.mActive)
             return;
         const double left = std::isnan(hours) ? 0.0 : hours;
+        // (a fraction of an hour above one counts as a whole one when the count reaches it: what the hourly check does
+        // with a fraction is not traced)
         if (left < 1.0)
             mRest.mFinish = true;
         else
@@ -1505,6 +1507,10 @@ namespace OFScript
             if (hour)
                 mRest.mDone += 1.0;
             done = mRest.mDone;
+            // A script that ran in the hour (that of a running effect) can have asked to wake up, or left no hours:
+            // the rest ends here, and is not a completed sleep
+            if (mRest.mFinish)
+                finish = true;
             if (!finish && mRest.mDone + 1e-9 >= mRest.mTotal)
             {
                 finish = true;
