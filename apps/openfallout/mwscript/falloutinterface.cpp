@@ -138,30 +138,13 @@ namespace OFScript
     {
         namespace AV = FalloutScript::ActorValue;
         namespace Fall = FalloutScript::FallDamage;
-        if (mPlayer == 0 || ptr.isEmpty())
-            return false;
-        const FalloutScript::FormId actor = scriptReferenceOf(ptr);
-        if (actor == 0)
+        // The fall of a character of the world is not read yet (the executables skip some of them by their records,
+        // and the rest of what they skip is not known), so it is not hurt
+        if (mPlayer == 0 || ptr.isEmpty() || scriptReferenceOf(ptr) != mPlayer)
             return false;
         const Fall::Settings settings = Fall::Settings::fromGameSettings(
             [this](std::string_view name) -> std::optional<double> { return gameSetting(name); });
         const double damage = Fall::damage(settings, heightLost);
-        if (actor != mPlayer)
-        {
-            // A character of the world takes the same damage off its health, by the difficulty's share for what the
-            // player's side deals (the same call, with no attacker and no limb), and nothing else: no sound, no
-            // crippled legs. The executables skip a creature that can fly and, in New Vegas, a teammate of the
-            // player (the cell flag they also test is not known, so it is not read). A dead one is not hurt again.
-            if (damage <= 0 || mActors.isDead(actor) || canFlyByRecord(actor)
-                || (isNewVegas() && mObjectState.teammate(actor)))
-                return true;
-            const std::lock_guard strikeLock(mStrikeMutex);
-            const auto transitions = mActors.holdTransitions();
-            mActorValues.damage(actor, AV::health, damage * Fall::damageByPlayerMultiplier(Fall::normalDifficulty));
-            if (mActorValues.current(actor, AV::health) <= 0)
-                mActors.kill(actor);
-            return true;
-        }
         if (damage <= 0)
             return true;
         // A landing that hurts has a sound of its own, heavy above the threshold; the god mode does not silence it

@@ -2123,8 +2123,6 @@ namespace OFScript
         void raiseItemEvents();
         bool detects(FalloutScript::FormId viewer, FalloutScript::FormId target) override;
         bool essentialByRecord(FalloutScript::FormId actor) override;
-        /// Whether the record of a creature says it can fly (the executables do not hurt such a creature by a fall)
-        bool canFlyByRecord(FalloutScript::FormId actor);
         std::optional<FalloutScript::CombatState::Relation> recordedRelation(
             FalloutScript::FormId first, FalloutScript::FormId second) override;
         /// What a weapon does with a blow, for the attacker that holds it; the hands for a weapon that is none. The
