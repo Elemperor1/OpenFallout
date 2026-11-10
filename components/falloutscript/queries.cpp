@@ -54,6 +54,13 @@ namespace FalloutScript
             [&world](CallContext& call) { return world.gameRestarted(call.mInstance.script().form()) ? 1.0 : 0.0; });
         interpreter.setHandler("GetGameLoaded",
             [&world](CallContext& call) { return world.gameLoaded(call.mInstance.script().form()) ? 1.0 : 0.0; });
+        // Both are the executables' own: a reference that is no character answers 0, and the player is asked about its
+        // move whatever the command is called on
+        interpreter.setHandler("GetMajorCrimeCount", [&world](CallContext& call) {
+            return call.mReference != 0 ? static_cast<double>(world.majorCrimeCount(call.mReference)) : 0.0;
+        });
+        interpreter.setHandler("IsPlayerMovingIntoNewSpace",
+            [&world](CallContext&) { return world.playerMovingIntoNewSpace() ? 1.0 : 0.0; });
         // A setting that holds text, or that nobody has, is 0 as in the games
         interpreter.setHandler("GetGameSetting", [&world](CallContext& call) {
             if (call.mArguments.empty() || !call.mArguments[0].mIsText)

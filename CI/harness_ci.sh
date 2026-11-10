@@ -4,7 +4,10 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 export CCACHE_DIR="${CCACHE_DIR:-/harness/.ccache}"
 cat /etc/os-release
-apt-get update
+# archive.ubuntu.com has been unreachable from the Harness VMs while security.ubuntu.com was not: take another mirror
+# for the whole run when the default one does not answer (the same sources serve CI/install_debian_deps.sh below)
+source CI/apt_mirrors.sh
+apt_update_with_fallback
 apt-get install -y --no-install-recommends python3 software-properties-common ca-certificates
 bash CI/install_debian_deps.sh gcc openmw-deps openmw-deps-dynamic
 apt-get install -y --no-install-recommends qt6-l10n-tools

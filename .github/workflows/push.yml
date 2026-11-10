@@ -46,6 +46,9 @@ jobs:
     - name: Test macOS bundle selection
       run: python3 -m unittest discover -s CI -p test_mac_bundles.py -v
 
+    - name: Test the apt mirror fallback of the Harness build
+      run: python3 -m unittest discover -s CI -p test_apt_mirrors.py -v
+
     # These tests read the Lua scripts and the tracker, so they run on every change, including the
     # documentation-only ones that skip the platform builds.  The Lua checks need lupa, and some tests need
     # a luajit executable (they are skipped without one).

@@ -1248,8 +1248,11 @@ namespace OFScript
         const double hours = Interaction::travelHours(distance);
         runOnMainThread([this, marker, hours] {
             OFBase::Environment::get().getWorld()->advanceTime(hours);
-            // A little above the marker, which stands about where a character would
+            // A little above the marker, which stands about where a character would. IsPlayerMovingIntoNewSpace is on
+            // for the whole trip (the executable's worker of the fast travel sets it and clears it).
+            playerMoveBegins();
             moveTo(mPlayer, marker, { 0.0, 0.0, 48.0 });
+            playerMoveEnds();
         });
         return std::string();
     }

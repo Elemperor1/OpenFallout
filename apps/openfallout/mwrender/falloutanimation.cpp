@@ -300,6 +300,15 @@ namespace OFRender
         return {};
     }
 
+    bool falloutPoseToStart(int wantedKind, int heldKind, bool heldGroupKnown, bool heldGroupPresent)
+    {
+        if (wantedKind < 0)
+            wantedKind = 0;
+        if (wantedKind != heldKind)
+            return true;
+        return wantedKind != 0 && heldGroupKnown && !heldGroupPresent;
+    }
+
     void lowerToTheFloor(osg::MatrixTransform& node)
     {
         osg::Matrix matrix = node.getMatrix();

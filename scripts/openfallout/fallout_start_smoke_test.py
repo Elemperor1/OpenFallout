@@ -1402,6 +1402,28 @@ local function finders(tag)
             string.format('%.0f', distance))
     end
 end
+-- The classroom: each of the seven classmates has a Find package for furniture near the marker; its script sets its global to
+-- GetSitting (3 when it sits). The furniture each is nearest to and how far
+local function classroom(tag)
+    local function find(id)
+        local ok, object = pcall(world.getObjectByFormId, core.getFormId('OFTest.esm', id))
+        return ok and object:isValid() and object or nil
+    end
+    local furniture = {}
+    for number, id in ipairs({ @CLASS_FURNITURE@ }) do furniture[number] = find(id) end
+    local seats = { @CLASS_GLOBALS@ }
+    for index, id in ipairs({ @CLASS_REFS@ }) do
+        local object = find(id)
+        local nearest, distance = 0, 1e9
+        for number, piece in ipairs(furniture) do
+            if object and piece and (object.position - piece.position):length() < distance then
+                nearest, distance = number, (object.position - piece.position):length()
+            end
+        end
+        print('OFTEST', 'classroom', tag, index, tostring(world.globals[seats[index]]), nearest,
+            string.format('%.0f', distance))
+    end
+end
 -- Where the player is from the chair (across, along: the chair is not turned), and the way it faces
 local function sits(tag)
     local object, player = chair(), world.players[1]
@@ -1427,12 +1449,13 @@ local steps = {
     { 3.0, function() report('inside') put(100, 0) end },
     { 4.5, function() report('outside') put(0, -100) end },
     { 6.0, function() report('again') put(100, 0) end },
+    { 6.0, function() classroom('early') end },
     { 7.0, function() sits('before') local object = chair() if object then object:activateBy(world.players[1]) end end },
     { 8.0, function() sits('sat') put(300, 0) end },
     { 9.0, function() sits('away') end },
     { 12.5, function() occupied('before') takeSitterChair() end },
     { 13.5, function() occupied('after') end },
-    { 15.0, function() sitter('later') finders('later') core.quit() end },
+    { 15.0, function() sitter('later') finders('later') classroom('later') core.quit() end },
 }
 
 return {
@@ -1461,7 +1484,10 @@ TRIGGER_SCRIPT = (TRIGGER_SCRIPT.replace("@X@", str(plugin.TRIGGER_PLACE[0])).re
                   .replace("@FINDER_GLOBAL_0@", repr(plugin.FINDER_GLOBALS[0][1]))
                   .replace("@FINDER_GLOBAL_1@", repr(plugin.FINDER_GLOBALS[1][1]))
                   .replace("@FINDER_REF_0@", str(plugin.FINDER_REF_IDS[0]))
-                  .replace("@FINDER_REF_1@", str(plugin.FINDER_REF_IDS[1])))
+                  .replace("@FINDER_REF_1@", str(plugin.FINDER_REF_IDS[1]))
+                  .replace("@CLASS_FURNITURE@", ", ".join(str(value) for value in plugin.CLASSROOM_FURNITURE_REF_IDS))
+                  .replace("@CLASS_GLOBALS@", ", ".join(repr(name) for _, name in plugin.CLASSROOM_GLOBALS))
+                  .replace("@CLASS_REFS@", ", ".join(str(value) for value in plugin.CLASSROOM_REF_IDS)))
 
 # Saves: a script of the world waits for the quests of the plugin to run, sets a global, asks the script of the menu for a
 # save, changes the state (the global, and quest C, which has not been started) and asks the menu for the game to be loaded
@@ -1552,6 +1578,10 @@ local function describe(tag)
     local g = world.globals
     print('OFTEST', 'saves characters', tag, string.format('items=%d dead=%d luck=%d karma=%d',
         g.@G_ITEMS@, g.@G_DEAD@, g.@G_LUCK@, g.@G_KARMA@))
+    -- What the packages of the walker told its script: the Travel package is begun once and done once (the globals are
+    -- saved with the game, so a package that is begun or done again after the load counts twice)
+    print('OFTEST', 'saves packages', tag, string.format('begin=%d end=%d',
+        g.@G_TRAVEL_BEGIN@, g.@G_TRAVEL_END@))
 end
 
 -- Sets the stage that writes what the game knows into the globals, and reads them a moment after
@@ -1664,7 +1694,9 @@ SAVES_WORLD_SCRIPT = (SAVES_WORLD_SCRIPT.replace("@FROM@", str(SAVES_FROM)).repl
                       .replace("@G_ITEMS@", plugin.SAVED_GLOBALS["items"][1])
                       .replace("@G_DEAD@", plugin.SAVED_GLOBALS["dead"][1])
                       .replace("@G_LUCK@", plugin.SAVED_GLOBALS["luck"][1])
-                      .replace("@G_KARMA@", plugin.SAVED_GLOBALS["karma"][1]))
+                      .replace("@G_KARMA@", plugin.SAVED_GLOBALS["karma"][1])
+                      .replace("@G_TRAVEL_BEGIN@", plugin.PACKAGE_EVENT_GLOBALS["travel_begin"][1])
+                      .replace("@G_TRAVEL_END@", plugin.PACKAGE_EVENT_GLOBALS["travel_end"][1]))
 SAVES_LOCAL_SCRIPT = """\
 local core = require('openfallout.core')
 
@@ -2146,6 +2178,8 @@ local steps = {
         local raider = find(@RAIDER@)
         -- The raider comes from the north and faces the player: a character does not see what is behind it
         if raider then raider:teleport(raider.cell, util.vector3(@COMES@), { rotation = util.transform.rotateZ(math.pi) }) end
+        -- EXPERIMENT (round 10M): the fight is started at once, as the probes of rounds 10K and 10L did
+        if raider and '@FORCE@' == '1' then core.combat.start(core.getFormId('OFTest.esm', @RAIDER@), core.getFormId('OFTest.esm', 0x14)) end
     end },
     { 5.8, function()
         -- Experience for two levels: the level up screen opens by itself
@@ -2222,12 +2256,57 @@ for _name, _value in (("@PROBES@", ", ".join(map(str, plugin.ARENA_PROBE_STAGES)
                       ("@SETUP@", str(plugin.ARENA_SETUP_STAGE)), ("@GRENADES@", str(plugin.ARENA_GRENADE_STAGE)),
                       ("@LEVEL@", str(plugin.ARENA_LEVEL_STAGE)),
                       ("@CRAFT@", str(plugin.ARENA_CRAFT_STAGE)), ("@PINS@", str(plugin.ARENA_PINS_STAGE)),
+                      ("@FORCE@", os.environ.get("OFTEST_FORCE_COMBAT", "0")),
                       ("@COMES@", ", ".join(str(int(value)) for value in plugin.ARENA_RAIDER_COMES))):
     ARENA_SCRIPT = ARENA_SCRIPT.replace(_name, _value)
 for _key, _tag in (("armed", "ARMED"), ("weapon_out", "OUT"), ("ammo", "AMMO"), ("health", "HEALTH"),
                    ("dummy_dead", "DUMMY_DEAD"), ("raider_dead", "RAIDER_DEAD"), ("raider_combat", "RAIDER_COMBAT"),
                    ("raider_ammo", "RAIDER_AMMO"), ("hits", "HITS"), ("deaths", "DEATHS"), ("started", "STARTED")):
     ARENA_SCRIPT = ARENA_SCRIPT.replace("@" + _tag + "@", plugin.ARENA_GLOBALS[_key][1])
+
+# The shooting range of the arena: the shooter is told by its script to use the pistol on the target (UseWeapon, three attacks that
+# always hit and do no damage, holding fire) while the blocker stands in the way: it must not shoot; the blocker goes away
+# and it must make its three attacks, the target hears of each blow (its script counts them) and keeps its health
+RANGE_SCRIPT = """\
+local world = require('openfallout.world')
+local core = require('openfallout.core')
+
+local elapsed, step = 0, 0
+local function find(id)
+    local ok, object = pcall(world.getObjectByFormId, core.getFormId('OFTest.esm', id))
+    return ok and object:isValid() and object or nil
+end
+local function report(tag)
+    local g = world.globals
+    local shooter, target = find(@SHOOTER@), find(@TARGET@)
+    print('OFTEST', 'range', tag, string.format('ordered=%.0f hits=%.0f health=%.1f targetDistance=%s',
+        g.@ORDERED@, g.@HITS@, g.@HEALTH@,
+        shooter and target and string.format('%.0f', (shooter.position - target.position):length()) or 'none'))
+end
+local steps = {
+    { 1.0, function() world.globals.@GO@ = 1 end },
+    { 8.0, function() report('blocked') end },
+    { 8.5, function() world.globals.@RELEASE@ = 1 end },
+    { 16.0, function() report('released') end },
+    { 17.0, core.quit },
+}
+return {
+    engineHandlers = {
+        onUpdate = function(dt)
+            elapsed = elapsed + dt
+            local next = steps[step + 1]
+            if next and elapsed >= next[1] then
+                step = step + 1
+                next[2]()
+            end
+        end,
+    },
+}
+"""
+for _name, _value in (("@SHOOTER@", str(plugin.RANGE_SHOOTER_REF_ID)), ("@TARGET@", str(plugin.RANGE_TARGET_REF_ID)),
+                      *((f"@{key.upper()}@", plugin.RANGE_GLOBALS[key][1])
+                        for key in ("go", "release", "ordered", "hits", "health"))):
+    RANGE_SCRIPT = RANGE_SCRIPT.replace(_name, _value)
 
 # The player script of the arena: shoots at the object it is told to, once the weapon is ready again, as the player script of
 # the engine does, and logs each shot
@@ -3606,6 +3685,17 @@ def check_triggers(text):
                 problems.append(f"finder {index} should be on the seat of its chair: {distance}")
         if seen[0][2] == seen[1][2]:
             problems.append(f"the two finders took the same chair: {seen}")
+    # The seven classmates of the classroom each sit (GetSitting 3) on a place of their own, within the radius of their package
+    classroom = re.findall(r"OFTEST\tclassroom\tlater\t(\d+)\t(-?\d+)\t(\d+)\t(\d+)$", text, re.M)
+    if len(classroom) != len(plugin.CLASSROOM_NAMES):
+        problems.append(f"expected {len(plugin.CLASSROOM_NAMES)} 'classroom later' lines: {classroom}")
+    else:
+        sitting = [name for (_, value, _, _), name in zip(classroom, plugin.CLASSROOM_NAMES) if value != "3"]
+        if sitting:
+            problems.append(f"the classmates {sitting} should sit (GetSitting 3) by their packages of the type Find: "
+                            f"{classroom}")
+        if len({nearest for _, _, nearest, _ in classroom}) != len(classroom):
+            problems.append(f"the classmates should sit on places of their own: {classroom}")
     if "Quitting peacefully" not in text:
         problems.append("the log does not end with 'Quitting peacefully'")
     return problems
@@ -3934,11 +4024,65 @@ def check_saves(first, second, third=None):
             if made.get(tag) != made_id:
                 problems.append(f"{name}: after the load ({tag}) the cube that was made should be {made_id} to Lua: "
                                 f"{made.get(tag)}")
+    # The packages: the walker began and finished its Travel package before the save, and a package that a save kept goes on
+    # from where the character is: after the load (and in the engines that were started on the save) it is not begun or done
+    # again, so its script counts the same events as before (a mind that forgot its packages begins the Travel package
+    # again, and counts 2 and 2)
+    first_packages = tagged(first, "packages", r"(begin=\d+ end=\d+)")
+    if first_packages.get("before") != "begin=1 end=1":
+        problems.append(f"before the save the walker should have begun and done its Travel package once: {first_packages}")
+    for name, text in (("the engine that saved", first), *started):
+        packages = tagged(text, "packages", r"(begin=\d+ end=\d+)")
+        for tag in ("loaded", "later"):
+            if packages.get(tag) != first_packages.get("before"):
+                problems.append(f"{name}: after the load ({tag}) the walker should not begin or end its Travel package again "
+                                f"({first_packages.get('before')}): {packages.get(tag)}")
     if "Quitting peacefully" not in first:
         problems.append("the log of the engine that saved does not end with 'Quitting peacefully'")
     for name, text in started:
         if "Quitting peacefully" not in text:
             problems.append(f"the log of {name} does not end with 'Quitting peacefully'")
+    return problems
+
+
+def check_range(text):
+    """The problems with the shooting range: the shooter is told to use the pistol (UseWeapon) and, with the blocker in the
+    line of fire, makes no attack and says that it holds fire; when the blocker has gone it makes its three attacks and is
+    done after them, the target hears of each blow (they are hits though they do no damage) and keeps the health it had."""
+    problems = []
+    for line in text.splitlines():
+        if re.search(r"Lua error|Fatal error|Failed to load Lua|cannot be run|Frame error", line, re.I):
+            problems.append(line)
+    pattern = r"OFTEST\trange\t(\w+)\tordered=(-?[\d.]+) hits=(-?[\d.]+) health=(-?[\d.]+) targetDistance=(\w+)$"
+    reports = {}
+    for line in text.splitlines():
+        match = re.search(pattern, line)
+        if match:
+            reports[match.group(1)] = {"ordered": float(match.group(2)), "hits": float(match.group(3)),
+                                       "health": float(match.group(4)),
+                                       "distance": None if match.group(5) == "none" else float(match.group(5))}
+    for tag in ("blocked", "released"):
+        if tag not in reports:
+            problems.append(f"no 'range {tag}' line in the log")
+    if problems:
+        return problems
+    blocked, released = reports["blocked"], reports["released"]
+    attacks = plugin.RANGE_ATTACKS
+    if blocked["ordered"] != 1:
+        problems.append("the shooter was not told to use the weapon")
+    if blocked["hits"] != 0:
+        problems.append(f"the shooter hit the target {blocked['hits']:.0f} time(s) with a character in the line of fire")
+    if not re.search(r"holds fire: another character is in the way of its shot", text):
+        problems.append("the shooter did not say that it holds fire")
+    if released["hits"] < attacks:
+        problems.append(f"the target was hit {released['hits']:.0f} time(s) after the blocker went, not {attacks}")
+    if released["health"] != plugin.RANGE_TARGET_HEALTH:
+        problems.append(f"the target had {released['health']:.1f} health after its third blow, not "
+                        f"{plugin.RANGE_TARGET_HEALTH:.1f}: the attacks that do no damage hurt it")
+    if not re.search(rf"UseWeapon: \S+ shoots {attacks} time\(s\)", text):
+        problems.append("no 'UseWeapon ... shoots' line in the log")
+    if not re.search(rf"UseWeapon: \S+ is done \(all its attacks are made\) after {attacks} attack\(s\)", text):
+        problems.append(f"the order did not end after its {attacks} attacks")
     return problems
 
 
@@ -5095,7 +5239,7 @@ def main():
     parser.add_argument("--display-lists", action="store_true",
                         help="run with `force vertex buffer objects = false`, the display lists of OpenGL: the engine "
                              "must not say it draws from vertex buffer objects")
-    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena", "autoplay", "saves", "savesprobe", "mods", "activation", "archives"],
+    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena", "range", "autoplay", "saves", "savesprobe", "mods", "activation", "archives"],
                         help="run only this start (or the conversation, the making of the character or the new game), "
                              "not all")
     args = parser.parse_args()
@@ -5133,6 +5277,8 @@ def main():
     (data / "scripts" / "arenaplayer.lua").write_text(ARENA_PLAYER_SCRIPT, encoding="ascii")
     (data / "arenatest.omwscripts").write_text(
         "PLAYER: scripts/arenaplayer.lua\nGLOBAL: scripts/arenatest.lua\n", encoding="ascii")
+    (data / "scripts" / "rangetest.lua").write_text(RANGE_SCRIPT, encoding="ascii")
+    (data / "rangetest.omwscripts").write_text("GLOBAL: scripts/rangetest.lua\n", encoding="ascii")
     (data / "scripts" / "savesworld.lua").write_text(SAVES_WORLD_SCRIPT, encoding="ascii")
     (data / "scripts" / "savesmenu.lua").write_text(SAVES_MENU_SCRIPT, encoding="ascii")
     (data / "scripts" / "saveslocal.lua").write_text(SAVES_LOCAL_SCRIPT, encoding="ascii")
@@ -5277,6 +5423,26 @@ def main():
             print(line.split("]", 1)[-1].strip())
         for problem in found:
             print("PROBLEM (arena):", problem)
+        problems += found
+    if args.only in (None, "range"):
+        home = work / "range" / "home"
+        home.mkdir(parents=True)
+        runtime = work / "range" / "runtime"
+        runtime.mkdir(mode=0o700)
+        print("== range: --start", plugin.ARENA_CELL_NAME)
+        status, _ = run_engine(program, build / "resources", data, home, runtime, max(args.seconds, 40),
+                               plugin.ARENA_CELL_NAME, [], "rangetest.omwscripts")
+        log = home / ".config" / "openfallout" / "openfallout.log"
+        text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+        print(f"log: {log}")
+        found = []
+        if status != 0:
+            found.append(f"the engine exited with status {status}")
+        found += check_range(text)
+        for line in (line for line in text.splitlines() if "OFTEST" in line or "UseWeapon" in line or "holds fire" in line):
+            print(line.split("]", 1)[-1].strip())
+        for problem in found:
+            print("PROBLEM (range):", problem)
         problems += found
     if args.only in (None, "autoplay"):
         # The gates of autoplay have a table of their own (a data folder of their own, since the table is a script of it)

@@ -107,6 +107,14 @@ namespace OFRender
     /// their conditions; those are not played. Empty when the kind has no pose or the files do not have it.
     std::string chooseFalloutPose(std::string_view folder, int entryKind, const std::vector<std::string>& files);
 
+    /// Whether a character has to start the pose of the furniture entry it is in (`wantedKind`, 0 when it is in none)
+    /// this frame: the entry is not the one whose pose it holds (`heldKind`), or it holds that one and the group of it
+    /// (`heldGroup`, empty when the kind has no pose) is no longer among the states of the animation. A group that
+    /// plays at the priority of the pose takes it off the states, as the walking and running ones do when the place of
+    /// a character that sits changes by a few units (a game loaded, or put on its seat), and nothing started the pose
+    /// again: the characters of a loaded game stood in their seats with the idle (found on the Mac, round 10O).
+    bool falloutPoseToStart(int wantedKind, int heldKind, bool heldGroupKnown, bool heldGroupPresent);
+
     /// Takes the height out of the place of a node and keeps the rest of it (the place across the floor and the turn).
     /// The skeleton file of a person has its node "Bip01" at the standing height of the pelvis (67.77), but the
     /// animations of the games put that height on the child "Bip01 NonAccum" and key "Bip01" at 0 (the walking ones do;

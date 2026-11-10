@@ -44,6 +44,27 @@ namespace FalloutScript
         interpreter.setHandler("GetOffersServicesNow", [&world](CallContext& call) {
             return call.mReference != 0 && world.currentPackageOffersServices(call.mReference) ? 1.0 : 0.0;
         });
+        // The arguments are the weapon, the place to shoot from, the target and the number of attacks, and then, when
+        // the script gives them, whether the character crouches to reload (1 when it does not say), whether it holds
+        // fire (1), whether every attack hits (0), whether none does damage (0) and a place to aim at (none). Only a
+        // character can use a weapon.
+        interpreter.setHandler("UseWeapon", [&world](CallContext& call) {
+            if (call.mReference == 0)
+                return 0.0;
+            UseWeaponOrder order;
+            order.mWeapon = formArgument(call, 0);
+            order.mLocation = formArgument(call, 1);
+            order.mTarget = formArgument(call, 2);
+            order.mAttacks = std::max(intArgument(call, 3), 0);
+            order.mCrouchToReload = call.mArguments.size() <= 4 || intArgument(call, 4) != 0;
+            order.mHoldFire = call.mArguments.size() <= 5 || intArgument(call, 5) != 0;
+            order.mAlwaysHit = intArgument(call, 6) != 0;
+            order.mNoDamage = intArgument(call, 7) != 0;
+            order.mTargetLocation = formArgument(call, 8);
+            if (order.mWeapon != 0)
+                world.useWeapon(call.mReference, order);
+            return 0.0;
+        });
         // ResetAI also drops what the character was doing: it gets up from the furniture it uses (the scripts of the
         // New Vegas intro use it to get Doc out of his chair). Combat and conversations are not kept here, so it comes
         // to the character looking at its packages again.

@@ -5,7 +5,7 @@
 -- `refs`), 'fire' makes the player shoot at it with the weapon in hand (`shots` times, or, with `untilDead`, until it is
 -- dead; autoplay.lua does the shooting), 'teleport' takes the player to the cell `cell` of the plugin at the place `at` (for
 -- a room the data has no door to), 'setstage' puts the quest at the stage `to` (a stand-in for what the engine cannot bring
--- about yet; since the Mac rounds 10K and 10L the table has one, CG03 stage 55). A gate is tried `tries` times at most (its
+-- about yet; the table has none since the Mac rounds 10O and 10P). A gate is tried `tries` times at most (its
 -- own `tries` if it has one: activating a piece of furniture a second time gets the player up from it). A gate can have its
 -- own `settle` (the quest has to stand still that long first) and its own
 -- `gap` (the real seconds since the gate before it): the stand-ins that come after the gate that is meant to bring the stage
@@ -86,12 +86,20 @@ return {
         { quest = 'CG03', stage = 10, file = 'Fallout3.esm', ref = 0x057AEB, how = 'walk' },
         { quest = 'CG03', stage = 15, file = 'Fallout3.esm', ref = 0x01CE25, how = 'activate' },
         { quest = 'CG03', stage = 25, file = 'Fallout3.esm', ref = 0x01CFB8, how = 'activate' },
+        -- The script of the classroom trigger needs the player sitting at a desk (stage 50 comes when the player sits while in the
+        -- trigger, unless Mr. Brotch's dialogue went by way of 45, the skipped test), and at 55 the seven classmates sitting too,
+        -- which their packages of the type Find bring about (Mac round 10M: all seven sit within 12 s of stage 40, on seven
+        -- of the eight places of the classroom, and desk 0x02B793 is the one that is left; round 10N: all eight places are
+        -- inside the box of the trigger). So the player sits at it, as the player does in the game, and stages 50, 55 and 60 come by
+        -- themselves. The seat is taken once (`tries = 1`: activating a piece of furniture a second time gets the player up
+        -- from it)
+        { quest = 'CG03', stage = 42, file = 'Fallout3.esm', ref = 0x02B793, how = 'activate', settle = 2, gap = 0, tries = 1 },
         { quest = 'CG03', stage = 45, file = 'Fallout3.esm', ref = 0x02B799, how = 'walk' },
         { quest = 'CG03', stage = 55, file = 'Fallout3.esm', ref = 0x02B799, how = 'walk' },
-        -- The script of the classroom trigger waits for the seven classmates to be sitting, which their packages of the type Find
-        -- bring about. The one stand-in that is left: the packages run (M10 slice 5) but the stage does not come by itself; the
-        -- Mac rounds 10I, 10K and 10L used it once in each run of Fallout 3 and Tale of Two Wastelands (at about 800 s)
-        { quest = 'CG03', stage = 55, how = 'setstage', to = 60, settle = 60 },
+        -- There is no stand-in for 60 any more (the Mac rounds 10I, 10K and 10L used `setstage` 55 -> 60 once in each run of
+        -- Fallout 3 and Tale of Two Wastelands, at about 800 s, before the player sat down): with the player at the desk the
+        -- scripts of the game bring 55 and 60 about at 744-745 s in Fallout 3 alone (round 10O) and at 754-755 s in Tale
+        -- of Two Wastelands (round 10P), and the row never fired in either
         { quest = 'CG03', stage = 70, file = 'Fallout3.esm', ref = 0x01CFB8, how = 'activate', settle = 90 }, -- Mr. Brotch again
         { quest = 'CG03', stage = 80, file = 'Fallout3.esm', ref = 0x02B797, how = 'walk' },
         -- The escape (CG04): Amata, the trigger in the corridor, the radroaches (a fight), Butch, the trigger in

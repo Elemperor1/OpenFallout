@@ -18,6 +18,11 @@ Actions. `CI/harness_ci.sh` installs the repository's Debian dependencies and Qt
 translation tools, builds in Debug with eight compiler jobs, and runs all three
 GoogleTest suites with JUnit ingestion.
 
+The container's `apt-get update` goes through `CI/apt_mirrors.sh`: it retries failed downloads and, when the default
+mirror does not answer (the Harness VMs lost their route to `archive.ubuntu.com` port 80 in November 2026, while
+`security.ubuntu.com` kept working and serves the whole archive), takes `security.ubuntu.com` and then two cloud mirrors
+instead of failing the run. The security suites stay on `security.ubuntu.com`; when that host fails the update as well, a cloud mirror takes the security suites too. The update runs with `APT::Update::Error-Mode=any`, so an archive whose indexes could not be downloaded counts as a failure even when `apt-get update` would end with status 0 (it only prints "Failed to fetch" otherwise). `CI/test_apt_mirrors.py` tests it without a network.
+
 The checked-out `CI/harness_ci.sh` is used when present, so PRs exercise their
 driver changes. Older source branches use an immutable fallback driver pinned in
 the pipeline YAML, allowing master builds before this setup is merged.

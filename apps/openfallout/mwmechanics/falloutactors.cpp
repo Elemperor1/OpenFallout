@@ -103,6 +103,13 @@ namespace OFMechanics
         // A shot or a throw is shown with the weapon that made it: when it used the weapon up and the character took
         // another, the next weapon is drawn this many seconds later
         constexpr float shotShownFor = 0.8f;
+        /// Real seconds a character in range of its target may go without firing before it says why
+        constexpr float holdFireReportAfter = 5.f;
+        /// A character in a fight that has not shot and has not gone this far in holdFireReportAfter seconds says where
+        /// it stands and why (round 10O: a raider stood idle 113 and 402 units from the player and no line said why)
+        constexpr float idleReportMove = 30.f;
+        /// How near to the place it was told to shoot from a character has to be to shoot
+        constexpr float scriptedPlaceReach = 64.f;
 
         enum class Walk
         {
@@ -168,6 +175,12 @@ namespace OFMechanics
         FalloutScript::FormId mDrawn = 0; // the weapon whose animations it was last given in a fight
         float mShowAfter = 0.f; // seconds until the weapon it holds is drawn, after a shot that used the last one up
         float mWatch = 0.f; // seconds until it looks for the player again, for the sneak meter
+        float mHeld = 0.f; // seconds it has stood in range of its target without firing (it says why now and then)
+        float mIdle = 0.f; // seconds a character in a fight has neither shot nor moved far (it says where it stands)
+        osg::Vec3f mIdleAt; // where it stood when that began
+        bool mOrdered = false; // a script told it to shoot (UseWeapon) the last time it was looked at
+        bool mPlaceAbandoned = false; // it could not get to the place of the order: it shoots from where it stands
+        unsigned mOrderSerial = 0; // which order of the script that is (a new order has another number)
         bool mSeenAlive = false; // it was alive when it was looked at
         bool mFell = false; // it is dead and its body has fallen
         float mReview = 0.f; // seconds until the packages are looked at again
@@ -175,6 +188,7 @@ namespace OFMechanics
         bool mWalking = false; // it goes to mDestination
         bool mFleeing = false; // mDestination is a place to run to from the target of its fight, not the target
         bool mPartial = false; // the path it follows stops short of mDestination: the navigator could not make the rest
+        std::string mPathStatus; // why the last path asked for was not one (said when a package cannot be walked)
         bool mAtGoal = false; // a goal that stays is reached
         bool mSpoke = false; // a Dialogue package: it has said what it came to say, and is done when the lines are over
         /// A package that is done and has nothing after it is over for the actor, and its Change script has been told
@@ -330,7 +344,8 @@ namespace OFMechanics
         {
             OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
             return scripts != nullptr && ptr != OFBase::Environment::get().getWorld()->getPlayerPtr()
-                && (scripts->isAggressive(ptr) || scripts->fighting(ptr) || scripts->isDead(ptr));
+                && (scripts->isAggressive(ptr) || scripts->fighting(ptr) || scripts->isDead(ptr)
+                    || scripts->hasScriptedAttack(ptr));
         }
 
         /// Whether the place is in a cell of the game that is loaded, so that an actor that goes there stays in the
@@ -896,6 +911,7 @@ namespace OFMechanics
         {
             mind.mWaypoints.clear();
             mind.mPartial = false;
+            mind.mPathStatus.clear();
             const osg::Vec3f start = mind.position();
             if (!frame.mNavigator)
             {
@@ -912,6 +928,7 @@ namespace OFMechanics
                 case DetourNavigator::Status::Success:
                     if (!mind.mWaypoints.empty())
                         return Walk::Moving;
+                    mind.mPathStatus = "the path has no waypoints";
                     return Walk::Failed;
                 case DetourNavigator::Status::PartialPath:
                     // The place is on another island of the mesh, or in a part of it that is not made yet: the path
@@ -920,13 +937,18 @@ namespace OFMechanics
                     if (mind.mWaypoints.empty() || (start - mind.mWaypoints.back()).length() < waypointDistance)
                     {
                         mind.mWaypoints.clear();
+                        mind.mPathStatus
+                            = "the path goes nowhere from here (another island of the mesh, or a part of "
+                              "it that is not made)";
                         return Walk::Failed;
                     }
                     return Walk::Moving;
                 case DetourNavigator::Status::NavMeshNotFound:
                     mind.mWaypoints.clear();
+                    mind.mPathStatus = "the navigator has no mesh for the cell yet";
                     return Walk::Waiting;
                 default:
+                    mind.mPathStatus = DetourNavigator::getMessage(status);
                     Log(Debug::Verbose) << "No path for " << mind.mPtr.getCellRef().getRefId() << " from " << start.x()
                                         << "," << start.y() << " to " << destination.x() << "," << destination.y()
                                         << ": " << DetourNavigator::getMessage(status);
@@ -1306,7 +1328,12 @@ namespace OFMechanics
                              << ": no way to get there ("
                              << (walker(frame.mWorld, mind.mPtr) == nullptr ? "it cannot walk"
                                                                             : "the navigator has no path")
-                             << ")" << (jump ? ", put there" : "");
+                             << (mind.mPathStatus.empty() ? "" : ": " + mind.mPathStatus) << "; from "
+                             << static_cast<int>(mind.position().x()) << "," << static_cast<int>(mind.position().y())
+                             << "," << static_cast<int>(mind.position().z()) << " to "
+                             << static_cast<int>(mind.mGoal.mCenter.x()) << ","
+                             << static_cast<int>(mind.mGoal.mCenter.y()) << ","
+                             << static_cast<int>(mind.mGoal.mCenter.z()) << ")" << (jump ? ", put there" : "");
             if (!jump)
                 return;
             osg::Vec3f place = mind.mGoal.mCenter;
@@ -1536,6 +1563,108 @@ namespace OFMechanics
                 mind.mReview = 0.f;
             };
 
+            // A script told it to shoot (UseWeapon): that takes the place of a fight and of the packages
+            OFScript::FalloutScripts::ScriptedAttack order = scripts.scriptedAttack(mind.mPtr);
+            // A target that is in another interior, or in a cell that is not around, is where the shooter can not go
+            // to and its shots can not land: the order is over, as a fight is
+            if (order.mActive && !sharesSpace(mind.mPtr, order.mTarget))
+            {
+                scripts.endScriptedAttack(mind.mPtr, "its target is in another space");
+                order = OFScript::FalloutScripts::ScriptedAttack();
+            }
+            if (order.mActive)
+            {
+                // A second order replaces the first one, and gets the walk to its place from the start
+                if (!mind.mOrdered || mind.mOrderSerial != order.mSerial)
+                {
+                    mind.mOrdered = true;
+                    mind.mOrderSerial = order.mSerial;
+                    mind.mPlaceAbandoned = false;
+                    mind.mFighting = true;
+                    stopWalking(mind);
+                    mind.mAtGoal = false;
+                    showWeapon(frame, mind, scripts);
+                }
+                // It shoots from the place it was told to, which it goes to first
+                if (!mind.mPlaceAbandoned && !order.mPlace.isEmpty()
+                    && !isNear(mind.position(), order.mPlace.getRefData().getPosition().asVec3(), scriptedPlaceReach))
+                {
+                    const osg::Vec3f place = order.mPlace.getRefData().getPosition().asVec3();
+                    if (!mind.mWalking || distanceAcross(place, mind.mDestination) > fightRepathDistance)
+                    {
+                        mind.mWaypoints.clear();
+                        mind.mDestination = place;
+                        mind.mFleeing = false;
+                    }
+                    switch (walkTo(frame, mind, mind.mDestination, duration, scriptedPlaceReach, true))
+                    {
+                        case Walk::Moving:
+                        case Walk::Waiting:
+                            return true;
+                        default:
+                            // It is there, or it cannot get there: it shoots from where it stands, and does not try
+                            // the walk again for this order (a failed walk waits a second before the next try)
+                            stopWalking(mind);
+                            mind.mPlaceAbandoned = true;
+                            break;
+                    }
+                }
+                // Far from the player it does nothing, and keeps the order (fAIUseWeaponDistance: 5000 in the
+                // executable, 15000 in both master files; FalloutNV.exe 0x8f7776)
+                if (distanceAcross(mind.position(), frame.mPlayer)
+                    > scripts.gameSetting("fAIUseWeaponDistance").value_or(5000.0))
+                    return true;
+                // It turns toward the place the order names when there is one, and the shot is still at the target
+                const osg::Vec3f victim = order.mTarget.getRefData().getPosition().asVec3();
+                const osg::Vec3f aim = order.mAim.isEmpty() ? victim : order.mAim.getRefData().getPosition().asVec3();
+                faceToward(
+                    frame, mind, std::atan2(aim.x() - mind.position().x(), aim.y() - mind.position().y()), duration);
+                // With HoldFire it does not shoot while another character stands in the way, nearer than the target
+                // and within 30 degrees of the line to it (FalloutNV.exe 0x8f8966; what the list of the executable
+                // holds is not known, the characters of the cell stand for it). The line and the distance are those
+                // of the victim, because the shot lands on the victim whatever place the character turns toward
+                if (order.mOrder.mHoldFire && mind.mPtr.getCell() != nullptr)
+                {
+                    // Characters that have no mind stand in the way as well: they are all the characters of the cell
+                    std::vector<FalloutScript::FightAI::FloorPoint> others;
+                    mind.mPtr.getCell()->forEach([&](const OFWorld::Ptr& other) {
+                        if ((other.getType() == ESM4::Npc::sRecordId || other.getType() == ESM4::Creature::sRecordId)
+                            && other != mind.mPtr && other != order.mTarget && other.getRefData().isEnabled()
+                            && !scripts.isDead(other))
+                        {
+                            const osg::Vec3f at = other.getRefData().getPosition().asVec3();
+                            others.push_back({ at.x(), at.y() });
+                        }
+                        return true;
+                    });
+                    if (FalloutScript::FightAI::lineOfFireBlocked(
+                            { mind.position().x(), mind.position().y() }, { victim.x(), victim.y() }, others))
+                    {
+                        if ((mind.mHeld += duration) >= holdFireReportAfter)
+                        {
+                            mind.mHeld = 0.f;
+                            Log(Debug::Info) << mind.mPtr.getCellRef().getRefId()
+                                             << " holds fire: another character is in the way of its shot";
+                        }
+                        return true;
+                    }
+                }
+                if (scripts.scriptedShot(mind.mPtr, order.mTarget).mFired)
+                {
+                    mind.mHeld = 0.f;
+                    if (auto* animation
+                        = dynamic_cast<OFRender::FalloutActorAnimation*>(frame.mWorld.getAnimation(mind.mPtr)))
+                        animation->attack();
+                }
+                return true;
+            }
+            if (mind.mOrdered)
+            {
+                // The attacks are made, or the target is gone: the character goes back to what it was doing
+                mind.mOrdered = false;
+                over();
+            }
+
             OFScript::FalloutScripts::FightStance stance = scripts.fightStance(mind.mPtr);
             if (stance.mTarget.isEmpty())
             {
@@ -1575,7 +1704,7 @@ namespace OFMechanics
             {
                 mind.mFighting = true;
                 stopWalking(mind);
-                scripts.prepareFight(mind.mPtr);
+                scripts.prepareFight(mind.mPtr, true);
                 showWeapon(frame, mind, scripts);
             }
 
@@ -1584,7 +1713,11 @@ namespace OFMechanics
             const bool visible = canSee(frame.mWorld, mind.position(), target);
             const float arrival = visible ? static_cast<float>(stance.mEngage) * engageShare : 0.f;
             const float heading = std::atan2(target.x() - mind.position().x(), target.y() - mind.position().y());
-            switch (FalloutScript::FightAI::decide(away, stance.mEngage, visible, stance.mFlee))
+            const FalloutScript::FightAI::Move move
+                = FalloutScript::FightAI::decide(away, stance.mEngage, visible, stance.mFlee);
+            std::optional<Walk> walked;
+            bool shotMade = false;
+            switch (move)
             {
                 case FalloutScript::FightAI::Move::Approach:
                 {
@@ -1595,15 +1728,12 @@ namespace OFMechanics
                         mind.mDestination = target;
                         mind.mFleeing = false;
                     }
-                    switch (walkTo(frame, mind, mind.mDestination, duration, arrival, true))
-                    {
-                        case Walk::Arrived:
-                        case Walk::Failed:
-                            stopWalking(mind);
-                            break;
-                        default:
-                            break;
-                    }
+                    // A character that cannot get to its target, or see it from where the path ends, stands there
+                    // with its weapon drawn (the pistol raider of Fallout 3 in rounds 10L and 10O): the line at the end
+                    // of the fight says so
+                    walked = walkTo(frame, mind, mind.mDestination, duration, arrival, true);
+                    if (walked == Walk::Arrived || walked == Walk::Failed)
+                        stopWalking(mind);
                     break;
                 }
                 case FalloutScript::FightAI::Move::Retreat:
@@ -1655,8 +1785,21 @@ namespace OFMechanics
                         // The weapon may have changed without a shot (it was empty, the character took another)
                         if (mind.mShowAfter <= 0.f)
                             showWeapon(frame, mind, scripts);
+                        // A character in range that does not fire for a while says why (round 10L: the pistol raider of
+                        // Fallout 3 stood at 1,250 units for 30 s and the log had no line about it)
+                        if ((mind.mHeld += duration) >= holdFireReportAfter)
+                        {
+                            mind.mHeld = 0.f;
+                            Log(Debug::Info)
+                                << mind.mPtr.getCellRef().getRefId() << " holds fire at " << static_cast<int>(away)
+                                << " units (engage " << static_cast<int>(stance.mEngage) << ", "
+                                << (visible ? "sees" : "does not see")
+                                << " the target): " << scripts.attackDiagnosis(mind.mPtr);
+                        }
                         break;
                     }
+                    mind.mHeld = 0.f;
+                    shotMade = true;
                     // The weapon that fired is the one that is shown with the shot, which has used it up when it was
                     // the last round or the last grenade and the character took another: that one is drawn after the
                     // shot
@@ -1671,6 +1814,30 @@ namespace OFMechanics
                     if (scripts.heldWeapon(mind.mPtr).mWeapon != mind.mDrawn)
                         mind.mShowAfter = shotShownFor;
                     break;
+            }
+            // A character that has neither shot nor gone anywhere for a while says what it is doing and why
+            if (shotMade || distanceAcross(mind.position(), mind.mIdleAt) > idleReportMove)
+            {
+                mind.mIdle = 0.f;
+                mind.mIdleAt = mind.position();
+            }
+            else if ((mind.mIdle += duration) >= holdFireReportAfter)
+            {
+                mind.mIdle = 0.f;
+                const char* moveName = move == FalloutScript::FightAI::Move::Approach ? "going for the target"
+                    : move == FalloutScript::FightAI::Move::Retreat                   ? "running from the target"
+                                                                                      : "in range of the target";
+                const char* walkName = !walked ? "not walking"
+                    : *walked == Walk::Arrived ? "arrived"
+                    : *walked == Walk::Failed  ? "no way"
+                    : *walked == Walk::Waiting
+                    ? (mind.mPartial ? "waiting, the path stops short" : "waiting for a path")
+                    : "moving";
+                Log(Debug::Info) << scripts.referenceName(mind.mPtr) << " has stood still in a fight for "
+                                 << static_cast<int>(holdFireReportAfter) << " s, " << moveName << ", "
+                                 << static_cast<int>(away) << " units away (engage " << static_cast<int>(stance.mEngage)
+                                 << ", " << (visible ? "sees" : "does not see") << " it; " << walkName
+                                 << "): " << scripts.attackDiagnosis(mind.mPtr);
             }
             return true;
         }

@@ -1,6 +1,7 @@
 #include "fightai.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 namespace FalloutScript::FightAI
 {
@@ -82,5 +83,27 @@ namespace FalloutScript::FightAI
     double hitChance(double skill)
     {
         return std::clamp(skill / 100.0, 0.3, 0.95);
+    }
+
+    bool lineOfFireBlocked(FloorPoint shooter, FloorPoint target, const std::vector<FloorPoint>& others)
+    {
+        const double aimX = target.mX - shooter.mX;
+        const double aimY = target.mY - shooter.mY;
+        const double aimLength = std::hypot(aimX, aimY);
+        if (aimLength <= 0)
+            return false;
+        for (const FloorPoint& other : others)
+        {
+            const double x = other.mX - shooter.mX;
+            const double y = other.mY - shooter.mY;
+            const double length = std::hypot(x, y);
+            // One that is as near as the target, or on the shooter, is not in the way
+            if (length <= 0 || length >= aimLength)
+                continue;
+            const double cosine = std::clamp((x * aimX + y * aimY) / (length * aimLength), -1.0, 1.0);
+            if (std::acos(cosine) < lineOfFireAngle)
+                return true;
+        }
+        return false;
     }
 }

@@ -116,6 +116,7 @@ namespace OFRender
         /// The pose it holds in furniture: the kind of the entry and the group that plays
         int mPoseKind = 0;
         std::string mPoseGroup;
+        bool mPoseLostReported = false;
         std::map<std::string, std::string> mPoseGroups;
         /// The animations that scripts had it play, by file
         std::map<std::string, std::string> mIdleGroups;

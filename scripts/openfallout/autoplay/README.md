@@ -30,8 +30,10 @@ stage 100 at about 460 s in New Vegas).
 
 A gate can also put the quest at a stage (`setstage`): a stand-in for what the engine cannot bring about yet, and for what a gate
 before it should have brought about. Such a stand-in has a `settle` of its own (a minute, so a run that waits is not stalled), and
-each one that the log shows was used is something the engine does not do yet. The table has one left: `CG03` stage 55, in
-Fallout 3 and Tale of Two Wastelands, where the packages of the classroom do not bring the stage about. The table also
+each one that the log shows was used is something the engine does not do yet. The table has none left: the last one, `CG03`
+stage 55 to 60, went in the Mac rounds 10O and 10P, which played the classroom without it in Fallout 3 and in Tale of Two
+Wastelands (the player sits at the free desk `0x02B793` at stage 42, as the player does in the game, and the scripts of the
+game bring 50, 55 and 60 about themselves). The table also
 names the button of a message box that is not the first (the box at the door
 out of Vault 101 leaves with its last button). The table holds the references that the static surveys found; a stage that waits for
 something else (the characters finishing their packages, the timers of the intros) is left as it is, and the quest line shows where

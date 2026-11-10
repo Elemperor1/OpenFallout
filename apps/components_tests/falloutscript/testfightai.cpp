@@ -88,6 +88,26 @@ namespace
         EXPECT_EQ(bestWeapon(weapons), 0x14u);
     }
 
+    TEST(FalloutScriptFightAiTest, a_character_nearer_than_the_target_and_in_the_line_blocks_the_shot)
+    {
+        const FloorPoint shooter{ 0, 0 };
+        const FloorPoint target{ 1000, 0 };
+        EXPECT_FALSE(lineOfFireBlocked(shooter, target, {}));
+        // on the line, and nearer
+        EXPECT_TRUE(lineOfFireBlocked(shooter, target, { { 500, 0 } }));
+        // within 30 degrees of the line (the tangent of 25 degrees is 0.466), and outside it (35 degrees: 0.700)
+        EXPECT_TRUE(lineOfFireBlocked(shooter, target, { { 500, 233 } }));
+        EXPECT_FALSE(lineOfFireBlocked(shooter, target, { { 500, 350 } }));
+        // behind the shooter, beside it, beyond the target, and as far away as the target
+        EXPECT_FALSE(lineOfFireBlocked(shooter, target, { { -500, 0 } }));
+        EXPECT_FALSE(lineOfFireBlocked(shooter, target, { { 0, 500 } }));
+        EXPECT_FALSE(lineOfFireBlocked(shooter, target, { { 1500, 0 } }));
+        EXPECT_FALSE(lineOfFireBlocked(shooter, target, { { 1000, 0 } }));
+        // one is enough, and a shooter on its target is blocked by nothing
+        EXPECT_TRUE(lineOfFireBlocked(shooter, target, { { 0, 500 }, { 300, -50 } }));
+        EXPECT_FALSE(lineOfFireBlocked(shooter, shooter, { { 0, 0 }, { 5, 5 } }));
+    }
+
     TEST(FalloutScriptFightAiTest, the_chance_to_hit_follows_the_skill_between_limits)
     {
         EXPECT_DOUBLE_EQ(hitChance(0), 0.3);
