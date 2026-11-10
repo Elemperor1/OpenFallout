@@ -297,6 +297,9 @@ namespace
 
 namespace NifOsg
 {
+    /// The alpha (of 255) above which a texel of the atlas of a block of distant objects is drawn
+    constexpr int sLodBuildingAlphaThreshold = 128;
+
     bool Loader::sShowMarkers = false;
 
     void Loader::setShowMarkers(bool show)
@@ -3057,6 +3060,11 @@ namespace NifOsg
                     {
                         auto shaderprop = static_cast<const Nif::BSShaderPPLightingProperty*>(property);
                         specEnabled = shaderprop->specular();
+                        // The shape of a block of distant objects draws its trees as pictures with see-through parts
+                        // from one atlas, and no alpha property asks for the test: the games test the alpha of what the
+                        // flag marks, and without it each tree is a dark rectangle
+                        if (shaderprop->lodBuilding())
+                            handleAlphaTesting(true, osg::AlphaFunc::GREATER, sLodBuildingAlphaThreshold, *node);
                         break;
                     }
                     case Nif::RC_BSLightingShaderProperty:

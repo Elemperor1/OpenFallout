@@ -27,6 +27,10 @@ namespace OFMechanics
         float mRadius = 0.f;
         /// What a Use package takes: the piece of furniture that the character goes to and uses when it is there
         ESM::FormId mTarget;
+        /// The place of the package is in another space (a building and the world outside it): the character goes to
+        /// the door that leads there (the center), and is at the place, whose reference this is, when it has gone
+        /// through
+        ESM::FormId mThrough;
     };
 
     /// The smallest and largest distances from the center of the place, in game units, at which a character has

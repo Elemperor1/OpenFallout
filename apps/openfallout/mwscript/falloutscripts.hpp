@@ -1644,6 +1644,13 @@ namespace OFScript
         /// sound plays (the click of a switch, the swallowing at a sink) and the player drinks the water the activator
         /// holds (the consume spell of the water type: a sink or a toilet heals a little and, in hardcore, quenches)
         void activateActivator(const OFWorld::Ptr& activator, const OFWorld::Ptr& actor);
+        /// The place a character that cannot walk to the reference (it is in another cell, or outside while the
+        /// character is in a building) goes to first: the door of the cell of the actor that leads to the cell of the
+        /// reference (or to the same worldspace), the nearest one to the actor. False when no door does.
+        bool doorTowards(const OFWorld::Ptr& actor, FalloutScript::FormId reference, osg::Vec3f& position);
+        /// The actor goes through a door to the reference: it is put at the place of the reference, in its cell (the
+        /// cell may not be loaded; the character is there when it is)
+        void goThrough(const OFWorld::Ptr& actor, FalloutScript::FormId reference);
         /// The actor gets up from the furniture it uses (it is where it was: the games play an animation there)
         void leaveFurniture(const OFWorld::Ptr& actor);
         /// Where the actor would stand to use the furniture: the entry of its marker that the record enables, that no

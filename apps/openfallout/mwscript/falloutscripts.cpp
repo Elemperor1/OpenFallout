@@ -4905,6 +4905,56 @@ namespace OFScript
         return true;
     }
 
+    bool FalloutScripts::doorTowards(const OFWorld::Ptr& actor, FalloutScript::FormId reference, osg::Vec3f& position)
+    {
+        Place wanted;
+        if (actor.isEmpty() || actor.getCell() == nullptr || !whereIs(reference, wanted))
+            return false;
+        const OFWorld::CellStore* target = cellAt(wanted);
+        if (target == nullptr)
+            return false;
+        OFWorld::WorldModel* model = OFBase::Environment::get().getWorldModel();
+        const osg::Vec3f from = actor.getRefData().getPosition().asVec3();
+        float nearest = std::numeric_limits<float>::max();
+        bool found = false;
+        actor.getCell()->forEachType<ESM4::Door>([&](const OFWorld::Ptr& door) {
+            if (!door.getCellRef().getTeleport() || !door.getRefData().isEnabled())
+                return true;
+            const OFWorld::CellStore* leadsTo = model->findCell(door.getCellRef().getDestCell());
+            if (leadsTo == nullptr)
+                return true;
+            const bool sameSpace = leadsTo == target
+                || (leadsTo->isExterior() && target->isExterior()
+                    && leadsTo->getCell()->getWorldSpace() == target->getCell()->getWorldSpace());
+            if (!sameSpace)
+                return true;
+            const osg::Vec3f at = door.getRefData().getPosition().asVec3();
+            const float distance = (at - from).length();
+            if (distance < nearest)
+            {
+                nearest = distance;
+                position = at;
+                found = true;
+            }
+            return true;
+        });
+        return found;
+    }
+
+    void FalloutScripts::goThrough(const OFWorld::Ptr& actor, FalloutScript::FormId reference)
+    {
+        const FalloutScript::FormId user = scriptReferenceOf(actor);
+        Place place;
+        if (user == 0 || !whereIs(reference, place))
+            return;
+        Move move;
+        move.mWhere = place;
+        move.mParts = Move::Cell | Move::PositionX | Move::PositionY | Move::PositionZ | Move::AngleZ;
+        Log(Debug::Info) << "Package: " << FalloutScript::hex(user) << " goes through a door to "
+                         << FalloutScript::hex(reference);
+        askForMove(user, move);
+    }
+
     bool FalloutScripts::useFurniture(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture, bool place)
     {
         const FalloutScript::FormId user = scriptReferenceOf(actor);
@@ -4952,9 +5002,17 @@ namespace OFScript
             use.mEntry = place && entry ? static_cast<int>(entry->mIndex) : -1;
             use.mKind = entry ? entry->mRef : 10;
         }
+        // Where the furniture is and whether it is in the scene: a character on a seat that is not drawn is seen
+        // sitting on nothing
+        const osg::Vec3f at = furniture.getRefData().getPosition().asVec3();
         Log(Debug::Info) << "Furniture: " << FalloutScript::hex(user) << " uses " << FalloutScript::hex(seat)
                          << (entry ? " at entry " + std::to_string(entry->mIndex) : std::string())
-                         << (place ? " (put there)" : "");
+                         << (place ? " (put there)" : "") << "; the furniture is at " << static_cast<int>(at.x()) << ","
+                         << static_cast<int>(at.y()) << "," << static_cast<int>(at.z()) << ", "
+                         << (furniture.getRefData().isEnabled() ? "enabled" : "disabled") << ", "
+                         << (furniture.getRefData().getBaseNode() != nullptr ? "in the scene" : "not in the scene")
+                         << ", the character goes to " << static_cast<int>(where.x()) << ","
+                         << static_cast<int>(where.y()) << "," << static_cast<int>(where.z());
         return true;
     }
 

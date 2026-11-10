@@ -117,6 +117,9 @@ namespace Nif
     enum BSShaderFlags2
     {
         BSSFlag2_DepthWrite = 0x00000001,
+        // Fallout 3 and New Vegas: the shape is a block of distant objects (the buildings, trees and rocks of a
+        // distant cell merged into one shape that draws them from an atlas)
+        BSSFlag2_LODBuilding = 0x00000004,
     };
 
     struct BSSPParallaxParams
@@ -173,6 +176,8 @@ namespace Nif
 
         void read(NIFStream* nif) override;
         void post(Reader& nif) override;
+
+        bool lodBuilding() const { return mShaderFlags2 & BSSFlag2_LODBuilding; }
     };
 
     struct BSShaderNoLightingProperty : BSShaderLightingProperty

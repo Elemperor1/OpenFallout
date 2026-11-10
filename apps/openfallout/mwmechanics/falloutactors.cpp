@@ -83,6 +83,8 @@ namespace OFMechanics
         constexpr int failuresBeforeJump = 2;
         // The navigator is asked for paths that end at the nearest place within this distance of the target
         constexpr float endTolerance = 96.f;
+        /// How near to a door a character that goes through it has arrived
+        constexpr float doorArrival = 96.f;
         // A follower asks for a new path when the one it follows has gone this far from where its path ends
         constexpr float repathDistance = 150.f;
         // A follower that runs does so at this speed when its animation does not say, units a second
@@ -878,11 +880,22 @@ namespace OFMechanics
                 {
                     const ESM::RefNum target = ESM::FormId::fromUint32(package.mLocation.location);
                     const OFWorld::Ptr reference = OFBase::Environment::get().getWorldModel()->getPtr(target);
-                    if (reference.isEmpty() || !reference.getRefData().isEnabled())
+                    if (!reference.isEmpty() && !reference.getRefData().isEnabled())
                         return false;
-                    // Only where it can go from where it is
-                    if (!sharesSpace(mind.mPtr, reference))
-                        return false;
+                    // Only where it can go from where it is: a place in another space (a building and the world outside
+                    // it) is gone to through the door that leads there, as the characters of the games leave a building
+                    // by its door (the place may be in a cell that is not loaded)
+                    if (reference.isEmpty() || !sharesSpace(mind.mPtr, reference))
+                    {
+                        osg::Vec3f door;
+                        if (frame.mScripts == nullptr
+                            || !frame.mScripts->doorTowards(mind.mPtr, target.toUint32(), door))
+                            return false;
+                        goal.mCenter = door;
+                        goal.mThrough = target;
+                        goal.mRadius = std::max(goal.mRadius, doorArrival);
+                        return true;
+                    }
                     goal.mCenter = reference.getRefData().getPosition().asVec3();
                     // A character that goes to a piece of furniture goes to the place of its marker where it sits down,
                     // which is beside the furniture, not to the middle of it
@@ -1170,11 +1183,13 @@ namespace OFMechanics
                 {
                     mind.mHasFacing = chosen.mHasFacing;
                     mind.mFacing = chosen.mFacing;
-                    if (!(chosen.mGoal.mTarget == mind.mGoal.mTarget)
+                    if (!(chosen.mGoal.mTarget == mind.mGoal.mTarget) || !(chosen.mGoal.mThrough == mind.mGoal.mThrough)
                         || (chosen.mGoal.mCenter - mind.mGoal.mCenter).length() > waypointDistance)
                     {
                         mind.mGoal.mTarget = chosen.mGoal.mTarget;
+                        mind.mGoal.mThrough = chosen.mGoal.mThrough;
                         mind.mGoal.mCenter = chosen.mGoal.mCenter;
+                        mind.mGoal.mRadius = chosen.mGoal.mRadius;
                         mind.mAtGoal = false;
                         mind.mPathRetry = 0.f;
                         stopWalking(mind);
@@ -1253,6 +1268,10 @@ namespace OFMechanics
             if (package == nullptr)
                 return;
             const bool done = mind.mDone.count(package) != 0;
+            // A character that has got to the door that leads to its place goes through it: it is at the place, in the
+            // cell of it, the next frame
+            if (!mind.mGoal.mThrough.isZeroOrUnset() && !done && frame.mScripts != nullptr)
+                frame.mScripts->goThrough(mind.mPtr, mind.mGoal.mThrough.toUint32());
             const bool uses = mind.mGoal.mBehaviour == ESM4::PackageBehaviour::Use;
             // Eating and sleeping are done on furniture: they are never done as such, the character stays on it
             const bool beds = package->mData.type == ESM4::Package_Eat || package->mData.type == ESM4::Package_Sleep;
@@ -1323,7 +1342,9 @@ namespace OFMechanics
         {
             const ESM4::AIPackage& package = *mind.mPackage;
             ++mind.mFailures;
-            const bool jump = mind.mFailures >= failuresBeforeJump && jumpsToPlace(package);
+            // The way to a door is the one that is not known: the character goes through it as well
+            const bool jump = mind.mFailures >= failuresBeforeJump
+                && (jumpsToPlace(package) || !mind.mGoal.mThrough.isZeroOrUnset());
             Log(Debug::Info) << "Package " << package.mEditorId << " of " << mind.mPtr.getCellRef().getRefId()
                              << ": no way to get there ("
                              << (walker(frame.mWorld, mind.mPtr) == nullptr ? "it cannot walk"
@@ -1363,7 +1384,8 @@ namespace OFMechanics
                     // A character that cannot walk to a piece of furniture is put on it whatever the package tells
                     // scripts: they read whether it sits
                     if (mind.mPackage != nullptr
-                        && (hasEvents(*mind.mPackage) || mind.mGoal.mBehaviour == ESM4::PackageBehaviour::Use))
+                        && (hasEvents(*mind.mPackage) || mind.mGoal.mBehaviour == ESM4::PackageBehaviour::Use
+                            || !mind.mGoal.mThrough.isZeroOrUnset()))
                         failToGetThere(frame, mind);
                     else
                         ++mind.mFailures;
@@ -1860,6 +1882,9 @@ namespace OFMechanics
         duration = std::min(duration, longestStep);
         const float range = static_cast<float>(Settings::game().mActorsProcessingRange);
 
+        // The character that the player talks with
+        const OFWorld::Ptr speaker = frame.mScripts != nullptr ? frame.mScripts->conversationSpeaker() : OFWorld::Ptr();
+
         // An actor that moves to another cell is another reference, and it is added to the map as it is moved
         std::vector<const OFWorld::LiveCellRefBase*> keys;
         keys.reserve(mMinds.size());
@@ -1889,6 +1914,19 @@ namespace OFMechanics
                 continue;
             }
             mind.mSeenAlive = true;
+
+            // The character that the player talks with stands still and turns to the player, as the games have it face
+            // the one it talks with (the camera of the conversation looks at its face); one in a piece of furniture
+            // stays in it
+            if (!speaker.isEmpty() && mind.mPtr == speaker && frame.mScripts != nullptr
+                && sharesSpace(mind.mPtr, frame.mWorld.getPlayerPtr()) && !frame.mScripts->usesFurniture(mind.mPtr))
+            {
+                stopWalking(mind);
+                faceToward(frame, mind,
+                    std::atan2(frame.mPlayer.x() - mind.position().x(), frame.mPlayer.y() - mind.position().y()),
+                    duration);
+                continue;
+            }
 
             // A character in a piece of furniture holds the pose of its entry
             if (frame.mScripts != nullptr)
