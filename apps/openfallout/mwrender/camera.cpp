@@ -1,7 +1,5 @@
 #include "camera.hpp"
 
-#include <algorithm>
-
 #include <osg/Camera>
 
 #include <components/misc/mathutil.hpp>
@@ -126,16 +124,6 @@ namespace OFRender
             osg::Vec3d recalculatedTrackedPosition = calculateTrackedPosition();
             pos = calculateFirstPersonPosition(recalculatedTrackedPosition);
         }
-        if (mShotBlend > 0.f)
-        {
-            // Smoothly from the view of the player to the shot, and back
-            const double t = mShotBlend * mShotBlend * (3.0 - 2.0 * mShotBlend);
-            pos = pos * (1.0 - t) + mShotPosition * t;
-            osg::Quat blended;
-            blended.slerp(t, orient, mShotOrientation);
-            forward = blended * osg::Vec3d(0, 1, 0);
-            up = blended * osg::Vec3d(0, 0, 1);
-        }
         cam->setViewMatrixAsLookAt(pos, pos + forward, up);
         mViewMatrix = cam->getViewMatrix();
         mProjectionMatrix = cam->getProjectionMatrix();
@@ -156,20 +144,6 @@ namespace OFRender
         if (!paused)
             updateFocalPointOffset(duration);
         updatePosition();
-
-        // The shot of a conversation is blended in the time of the frames, whether the world is stopped or not
-        if (mShotWanted || mShotBlend > 0.f)
-        {
-            const float step = mShotSeconds > 0.f ? duration / mShotSeconds : 1.f;
-            mShotBlend = std::clamp(mShotBlend + (mShotWanted ? step : -step), 0.f, 1.f);
-        }
-    }
-
-    void Camera::setShot(const osg::Vec3d& position, const osg::Quat& orientation)
-    {
-        mShotWanted = true;
-        mShotPosition = position;
-        mShotOrientation = orientation;
     }
 
     osg::Vec3d Camera::calculateFirstPersonPosition(const osg::Vec3d& trackedPosition) const

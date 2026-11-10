@@ -47,6 +47,7 @@
 #include <components/sceneutil/writescene.hpp>
 
 #include <components/misc/constants.hpp>
+#include <components/misc/mathutil.hpp>
 
 #include <components/terrain/lodindex.hpp>
 #include <components/terrain/quadtreeworld.hpp>
@@ -62,7 +63,6 @@
 #include <components/detournavigator/navigator.hpp>
 #include <components/detournavigator/navmeshcacheitem.hpp>
 
-#include "../mwphysics/raycasting.hpp"
 #include "../mwscript/falloutscripts.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
@@ -171,11 +171,20 @@ namespace OFRender
 {
     namespace
     {
-        /// The shot of a conversation (Fallout 3 and New Vegas): the camera stands this far from the head of the
-        /// character that the player talks with, on the side of the player, and takes this long to get there and back.
-        /// Stand-ins until the executables' numbers are read (Mac round 13A, part C).
-        constexpr double dialogueShotDistance = 90.0;
-        constexpr float dialogueShotSeconds = 0.5f;
+        /// The view of a conversation (Fallout 3 and New Vegas): the numbers that the executables use for it (M13
+        /// executable reads: FalloutNV.exe 0x762950 and 0x953060, Fallout3.exe 0x775D80). The camera stays at the
+        /// eyes of the player in the first person; the player turns to the head of the speaker and the field of view
+        /// narrows on it. The GMSTs fDialogZoomInSeconds and fDialogZoomOutSeconds are in neither master, so the
+        /// executables' defaults are used.
+        constexpr float dialogueZoomInSeconds = 1.5f; // fDialogZoomInSeconds
+        constexpr float dialogueZoomOutSeconds = 0.5f; // fDialogZoomOutSeconds
+        constexpr float dialogueFocus = 3.2f; // fDlgFocus:Interface: the tangent of the head's radius is scaled by it
+        constexpr float dialogueLookAdjust = -5.f; // fDlgLookAdj:Interface: units added to the height of the look point
+        constexpr float dialogueLookMult = 2.f; // fDlgLookMult:Interface: the share of the turn left that is made each second
+        constexpr float dialogueStartDegrees = 13.f; // fDlgLookDegStart and fDlgHeadingDegStart:Interface
+        constexpr float dialogueStopDegrees = 0.2f; // fDlgLookDegStop and fDlgHeadingDegStop:Interface
+        constexpr float dialogueDefaultFov = 75.f; // fDefaultFOV:Display
+        constexpr double dialogueFallbackRadius = 32.0; // the radius of the sphere of a node that carries no head
     }
 
     class PreloadCommonAssetsWorkItem : public SceneUtil::WorkItem
@@ -797,7 +806,7 @@ namespace OFRender
             mUpdateProjectionMatrix = false;
             updateProjectionMatrix();
         }
-        updateDialogueCamera();
+        updateDialogueCamera(dt);
         mCamera->update(dt, paused);
         updatePlayerBody();
 
@@ -844,72 +853,177 @@ namespace OFRender
         mPostProcessor->setUnderwaterFlag(isUnderwater);
     }
 
-    void RenderingManager::updateDialogueCamera()
+    void RenderingManager::updateDialogueCamera(float dt)
     {
-        if (mPlayerAnimation == nullptr || !OFBase::Environment::get().hasFalloutScripts())
-            return;
-        const OFWorld::Ptr speaker = OFBase::Environment::get().getFalloutScripts()->conversationSpeaker();
-        const OFWorld::Ptr& player = mPlayerAnimation->getPtr();
-        if (speaker.isEmpty() || speaker == player || !speaker.isInCell() || speaker.getRefData().getBaseNode() == nullptr
-            || !player.isInCell())
+        DialogueView& view = mDialogueView;
+        // The character that the player talks with, when it stands in the place of the player (one cell, or the
+        // exterior cells of one worldspace: the line of a cell is not seen in a conversation across it)
+        OFWorld::Ptr speaker;
+        if (mPlayerAnimation != nullptr && OFBase::Environment::get().hasFalloutScripts())
         {
-            mCamera->clearShot();
-            return;
-        }
-        // The two stand in one place when they are in one cell, or in exterior cells of one worldspace (the line of a
-        // cell is not seen in a conversation across it)
-        const OFWorld::CellStore* speakerCell = speaker.getCell();
-        const OFWorld::CellStore* playerCell = player.getCell();
-        if (speakerCell != playerCell
-            && !(speakerCell->isExterior() && playerCell->isExterior()
-                && speakerCell->getCell()->getWorldSpace() == playerCell->getCell()->getWorldSpace()))
-        {
-            mCamera->clearShot();
-            return;
-        }
-        // What the camera looks at: the head of the character, or the middle of what has no head (a talking activator)
-        osg::Vec3d head;
-        bool found = false;
-        if (const Animation* animation = mObjects->getAnimation(speaker))
-        {
-            if (const osg::Node* bone = animation->getNode("Bip01 Head"))
+            const OFWorld::Ptr candidate = OFBase::Environment::get().getFalloutScripts()->conversationSpeaker();
+            const OFWorld::Ptr& player = mPlayerAnimation->getPtr();
+            if (!candidate.isEmpty() && candidate != player && candidate.isInCell()
+                && candidate.getRefData().getBaseNode() != nullptr && player.isInCell())
             {
-                const osg::NodePathList paths = bone->getParentalNodePaths();
-                if (!paths.empty())
-                {
-                    head = osg::computeLocalToWorld(paths.front()).getTrans();
-                    found = true;
-                }
+                const OFWorld::CellStore* speakerCell = candidate.getCell();
+                const OFWorld::CellStore* playerCell = player.getCell();
+                if (speakerCell == playerCell
+                    || (speakerCell->isExterior() && playerCell->isExterior()
+                        && speakerCell->getCell()->getWorldSpace() == playerCell->getCell()->getWorldSpace()))
+                    speaker = candidate;
             }
         }
-        if (!found)
+        // A camera that a script has put in a place of its own is not the conversation's to move
+        const bool talking = !speaker.isEmpty() && (view.mHeld || mCamera->getMode() != Camera::Mode::Static);
+
+        if (talking)
         {
-            head = osg::Vec3d(speaker.getRefData().getPosition().asVec3());
-            head.z() += OFBase::Environment::get().getWorld()->getHalfExtents(speaker).z();
+            if (!view.mOpen)
+            {
+                // The conversation opens: the view is the first person's, and it is given back when the view has zoomed
+                // out again (a conversation that opens as one is closing goes on from where the zoom is)
+                view.mOpen = true;
+                view.mSeconds = 0;
+                view.mProgress = 0;
+                view.mTurning = false;
+                if (!view.mHeld)
+                {
+                    view.mHeld = true;
+                    view.mSavedMode = static_cast<int>(mCamera->getMode());
+                    view.mModeChanged = mCamera->getMode() != Camera::Mode::FirstPerson;
+                    if (view.mModeChanged)
+                        mCamera->setMode(Camera::Mode::FirstPerson);
+                }
+            }
+            const float previous = view.mProgress;
+            view.mSeconds += dt;
+            view.mProgress = std::min(view.mSeconds / dialogueZoomInSeconds, 1.f);
+            // The share of what is left that the view goes in this frame: all of it at the end of the time it takes
+            const float step
+                = previous >= 1.f ? 1.f : std::min(dt / ((1.f - previous) * dialogueZoomInSeconds), 1.f);
+
+            // What the camera looks at: the head of the character (a character with none, as the intercom of a vault,
+            // is not looked at: the view stays where it is), a little below the middle of the head
+            osg::Vec3d look;
+            double radius = dialogueFallbackRadius;
+            bool found = false;
+            if (const Animation* animation = mObjects->getAnimation(speaker))
+            {
+                for (const char* name : { "Bip01 Head", "Bip01 Speaker" })
+                {
+                    const osg::Node* bone = animation->getNode(name);
+                    if (bone == nullptr)
+                        continue;
+                    const osg::NodePathList paths = bone->getParentalNodePaths();
+                    if (paths.empty())
+                        continue;
+                    look = osg::computeLocalToWorld(paths.front()).getTrans();
+                    // The head that the bone carries has the sphere that the view frames; a bone with nothing on it is
+                    // framed by the sphere of the fallback
+                    const double bound = bone->getBound().valid() ? bone->getBound().radius() : 0.0;
+                    if (bound > 0.0 && bound < 4.0 * dialogueFallbackRadius)
+                        radius = bound;
+                    found = true;
+                    break;
+                }
+            }
+            if (found)
+            {
+                look.z() += dialogueLookAdjust;
+                const osg::Vec3d eye = mCamera->getPosition();
+                const osg::Vec3d toLook = look - eye;
+                const double distance = std::max(toLook.length(), 1.0);
+                // The field of view that shows the head: the radius of the head seen from the distance through the
+                // tangent, never wider than the one of the view
+                const double wanted
+                    = std::min(100.0 * std::atan(radius * dialogueFocus / distance), double(dialogueDefaultFov));
+                const float targetZoom = static_cast<float>(wanted / dialogueDefaultFov);
+                view.mZoom += (targetZoom - view.mZoom) * step;
+
+                // The player turns to the head: the opening turns by the same share as the zoom, and after it the
+                // correction is a fraction of what is left in each second, once the head is further off than a few
+                // degrees of the view (the less, the more it has zoomed) and until it is nearly on it again
+                const OFWorld::Ptr& player = mPlayerAnimation->getPtr();
+                const double forward = toLook.length() > 0.0 ? toLook.z() / toLook.length() : 0.0;
+                const double wantedPitch = std::asin(std::clamp(forward, -1.0, 1.0));
+                const double wantedYaw = std::atan2(-toLook.x(), toLook.y());
+                const ESM::Position& position = player.getRefData().getPosition();
+                const double pitch = -position.rot[0];
+                const double yaw = -position.rot[2];
+                const double remainingPitch = wantedPitch - pitch;
+                const double remainingYaw = Misc::normalizeAngle(wantedYaw - yaw);
+                double turnPitch = 0;
+                double turnYaw = 0;
+                if (previous < 1.f)
+                {
+                    turnPitch = remainingPitch * step;
+                    turnYaw = remainingYaw * step;
+                }
+                else
+                {
+                    const double scale = view.mZoom;
+                    const double start = osg::DegreesToRadians(static_cast<double>(dialogueStartDegrees)) * scale;
+                    const double stop = osg::DegreesToRadians(static_cast<double>(dialogueStopDegrees)) * scale;
+                    if (std::abs(remainingPitch) > start || std::abs(remainingYaw) > start)
+                        view.mTurning = true;
+                    else if (std::abs(remainingPitch) < stop && std::abs(remainingYaw) < stop)
+                        view.mTurning = false;
+                    if (view.mTurning)
+                    {
+                        const double share = std::min(static_cast<double>(dialogueLookMult * dt), 1.0);
+                        turnPitch = remainingPitch * share;
+                        turnYaw = remainingYaw * share;
+                    }
+                }
+                if (turnPitch != 0.0 || turnYaw != 0.0)
+                    OFBase::Environment::get().getWorld()->rotateObject(player,
+                        osg::Vec3f(static_cast<float>(-(pitch + turnPitch)), position.rot[1],
+                            static_cast<float>(-(yaw + turnYaw))),
+                        OFBase::RotationFlag_inverseOrder);
+            }
+            else
+                view.mZoom += (1.f - view.mZoom) * step;
         }
-        // On the side of the player, as far from the head as the shot is
-        const osg::Vec3f playerPosition = player.getRefData().getPosition().asVec3();
-        osg::Vec3d toPlayer(playerPosition.x() - head.x(), playerPosition.y() - head.y(), 0);
-        if (toPlayer.length2() < 1.0)
-            toPlayer = osg::Vec3d(0, -1, 0);
-        toPlayer.normalize();
-        osg::Vec3d position = head + toPlayer * dialogueShotDistance;
-        // A wall between the head and the shot pulls the camera in front of it, as it does the camera of the player
-        constexpr float obstacleLimit = 5.f;
-        constexpr double nearestShot = 20.0;
-        const OFPhysics::RayCastingResult hit = OFBase::Environment::get().getWorld()->getRayCasting()->castSphere(
-            head, position, obstacleLimit, mCamera->getCollisionType());
-        if (hit.mHit)
+        else if (view.mHeld)
         {
-            const osg::Vec3d pulled = osg::Vec3d(hit.mHitPos) + osg::Vec3d(hit.mHitNormal) * obstacleLimit;
-            position = head + toPlayer * std::clamp((pulled - head).length(), nearestShot, dialogueShotDistance);
+            if (view.mOpen)
+            {
+                // The conversation ends: the view zooms out in half a second
+                view.mOpen = false;
+                view.mSeconds = 0;
+                view.mZoomAtClose = view.mZoom;
+            }
+            view.mSeconds += dt;
+            const float done = std::min(view.mSeconds / dialogueZoomOutSeconds, 1.f);
+            view.mZoom = view.mZoomAtClose + (1.f - view.mZoomAtClose) * done;
+            if (done >= 1.f)
+            {
+                if (view.mModeChanged)
+                    mCamera->setMode(static_cast<Camera::Mode>(view.mSavedMode));
+                view = DialogueView();
+                if (mDialogueFieldOfView)
+                {
+                    mDialogueFieldOfView = false;
+                    resetFieldOfView();
+                }
+                return;
+            }
         }
-        osg::Vec3d forward = head - position;
-        forward.normalize();
-        const double pitch = std::asin(std::clamp(forward.z(), -1.0, 1.0));
-        const double yaw = std::atan2(-forward.x(), forward.y());
-        mCamera->setShotSeconds(dialogueShotSeconds);
-        mCamera->setShot(position, osg::Quat(pitch, osg::Vec3d(1, 0, 0)) * osg::Quat(yaw, osg::Vec3d(0, 0, 1)));
+        else
+            return;
+
+        // The field of view of the view is the share of the one of the settings
+        if (view.mZoom < 0.9999f)
+        {
+            mDialogueFieldOfView = true;
+            overrideFieldOfView(mFieldOfView * view.mZoom);
+        }
+        else if (mDialogueFieldOfView)
+        {
+            mDialogueFieldOfView = false;
+            resetFieldOfView();
+        }
     }
 
     void RenderingManager::updatePlayerBody()

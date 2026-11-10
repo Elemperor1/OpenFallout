@@ -1879,6 +1879,12 @@ namespace OFScript
         /// the player wears (the pieces of the record that the player's items stand for). False when the player has no
         /// look to draw (no plugin of Fallout is loaded).
         bool playerBody(LookPreview& preview, std::vector<const ESM4::Armor*>& armor);
+        /// The player lands after a fall that lost that much height (the actor that is falling is the player's: the
+        /// caller is its character controller): the games' rule hurts it (the damage of the fall by the exponent of its
+        /// height, the legs, the sound of a hard landing, the red flash) and it dies of what is left of none, so the
+        /// rule of Morrowind that the controller has is not used. False for a character that is not the player, whose
+        /// falls the rule does not read yet.
+        bool landed(const OFWorld::Ptr& ptr, float heightLost);
         /// A number that changes when what `playerBody` gives changes (the sex, race or look, armor put on or taken
         /// off), cheap enough to ask every frame
         std::uint64_t playerBodyRevision();

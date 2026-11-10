@@ -110,15 +110,6 @@ namespace OFRender
         int getCollisionType() const { return mCollisionType; }
         void setCollisionType(int collisionType) { mCollisionType = collisionType; }
 
-        /// A view for the camera to be blended to, for the conversations: while one is wanted the view comes from
-        /// `position` along `orientation` instead of from the player's eyes, getting there and back in the time given
-        /// by setShotSeconds. Asked for every frame it lasts.
-        void setShot(const osg::Vec3d& position, const osg::Quat& orientation);
-        void clearShot() { mShotWanted = false; }
-        void setShotSeconds(float seconds) { mShotSeconds = seconds; }
-        /// How far the view is from the player's (0) to the shot (1)
-        float getShotBlend() const { return mShotBlend; }
-
         const osg::Matrixf& getViewMatrix() const { return mViewMatrix; }
         const osg::Matrixf& getProjectionMatrix() const { return mProjectionMatrix; }
 
@@ -155,12 +146,6 @@ namespace OFRender
         float mCameraDistance, mPreferredCameraDistance;
 
         osg::Vec3f mFirstPersonOffset{ 0, 0, 0 };
-
-        bool mShotWanted = false;
-        float mShotBlend = 0.f;
-        float mShotSeconds = 0.5f;
-        osg::Vec3d mShotPosition;
-        osg::Quat mShotOrientation;
 
         osg::Vec2d mFocalPointCurrentOffset;
         osg::Vec2d mFocalPointTargetOffset;

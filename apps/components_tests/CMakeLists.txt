@@ -210,6 +210,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testhotkeys.cpp
     falloutscript/testinteraction.cpp
     falloutscript/testderivedstats.cpp
+    falloutscript/testfalldamage.cpp
     falloutscript/testequipment.cpp
     falloutscript/testfightai.cpp
     falloutscript/testformlists.cpp
