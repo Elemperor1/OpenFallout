@@ -84,6 +84,17 @@ namespace OFRender
             mRoot->setNodeMask(visible ? ~0u : 0u);
     }
 
+    void FalloutPlayerBody::die()
+    {
+        if (mAnimation != nullptr)
+            mAnimation->die(false);
+    }
+
+    bool FalloutPlayerBody::isDown() const
+    {
+        return mAnimation != nullptr && mAnimation->isDown();
+    }
+
     void FalloutPlayerBody::setPose(int entryKind)
     {
         // Asked for every frame, as it is for the characters of the world: the animation keeps what it has, and asks

@@ -1644,6 +1644,8 @@ namespace OFScript
         /// Whether the player is sleeping on a bed now (the hours pass behind a fade: the games do not lie the player
         /// down)
         bool isPlayerSleeping() const { return mPlayerSleeping; }
+        /// Whether the player is dead (the third person body falls, and stands again when the player is revived)
+        bool isPlayerDead() const { return mPlayer != 0 && mActors.isDead(mPlayer); }
         /// How many more characters can use the furniture: the entries of its marker that the record enables and that
         /// no one uses (0 when the model has none)
         int freeFurniturePlaces(const OFWorld::Ptr& furniture);

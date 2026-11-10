@@ -69,6 +69,11 @@ namespace OFRender
         /// The body sits, lies or leans in furniture whose entry is of this kind (0: it does not); said every frame
         void setPose(int entryKind);
 
+        /// The player has died: the body falls as a character of the world does, and lies there until it is made again
+        void die();
+        /// Whether the body has fallen
+        bool isDown() const;
+
         /// Takes the body out of the scene
         void clear();
 

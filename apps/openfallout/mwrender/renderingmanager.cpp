@@ -1044,6 +1044,10 @@ namespace OFRender
         OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
         const OFWorld::Ptr& player = mPlayerAnimation->getPtr();
         const std::uint64_t revision = scripts->playerBodyRevision();
+        const bool dead = scripts->isPlayerDead();
+        // A player who is alive again (revived, or a game loaded) stands: the body that fell is made again
+        if (!dead && mPlayerBody->isDown())
+            mPlayerBodyTried.reset();
         if (!mPlayerBodyTried || *mPlayerBodyTried != revision)
         {
             mPlayerBodyTried = revision;
@@ -1054,6 +1058,9 @@ namespace OFRender
             else
                 mPlayerBody->clear();
         }
+        // The body of a player who has died (by a fall, or a blow) falls, as the death camera looks at it
+        if (dead && !mPlayerBody->isDown())
+            mPlayerBody->die();
         // The games do not lie the player down to sleep: the screen fades and the hours pass
         mPlayerBody->setPose(scripts->isPlayerSleeping() ? 0 : scripts->furnitureKindOf(player));
     }
