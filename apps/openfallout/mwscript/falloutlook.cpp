@@ -435,7 +435,7 @@ namespace OFScript
 
     std::uint64_t FalloutScripts::playerBodyRevision()
     {
-        return (static_cast<std::uint64_t>(mChargen.revision()) << 32) | mEquipment.revision();
+        return (static_cast<std::uint64_t>(mChargen.revision()) << 32) | mEquipment.revision(mPlayer);
     }
 
     const FalloutScript::FaceControlFile& FalloutScripts::faceControls()

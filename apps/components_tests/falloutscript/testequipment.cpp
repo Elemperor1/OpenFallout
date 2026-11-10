@@ -127,26 +127,46 @@ namespace
         EXPECT_TRUE(setup.mEquipment.isEquipped(guard, rifle));
     }
 
-    TEST(FalloutScriptEquipmentTest, the_revision_changes_when_something_goes_on_or_off_and_not_when_nothing_changes)
+    TEST(FalloutScriptEquipmentTest, the_revision_changes_when_armor_goes_on_or_off_and_not_when_nothing_changes)
     {
         Wardrobe setup;
-        const std::uint32_t start = setup.mEquipment.revision();
-        EXPECT_EQ(setup.mEquipment.revision(), start);
+        const std::uint32_t start = setup.mEquipment.revision(guard);
+        EXPECT_EQ(setup.mEquipment.revision(guard), start);
 
         ASSERT_EQ(setup.mEquipment.equip(guard, vest), Equipment::Outcome::Equipped);
-        const std::uint32_t worn = setup.mEquipment.revision();
+        const std::uint32_t worn = setup.mEquipment.revision(guard);
         EXPECT_NE(worn, start);
 
         // what is worn already does not change what is drawn
         EXPECT_EQ(setup.mEquipment.equip(guard, vest), Equipment::Outcome::AlreadyEquipped);
-        EXPECT_EQ(setup.mEquipment.revision(), worn);
+        EXPECT_EQ(setup.mEquipment.revision(guard), worn);
 
         ASSERT_TRUE(setup.mEquipment.unequip(guard, vest));
-        const std::uint32_t off = setup.mEquipment.revision();
+        const std::uint32_t off = setup.mEquipment.revision(guard);
         EXPECT_NE(off, worn);
 
         setup.mEquipment.clear();
-        EXPECT_NE(setup.mEquipment.revision(), off);
+        EXPECT_NE(setup.mEquipment.revision(guard), off);
+    }
+
+    TEST(FalloutScriptEquipmentTest, the_revision_of_a_character_ignores_weapons_and_the_clothes_of_others)
+    {
+        Wardrobe setup;
+        constexpr FormId visitor = 0x01000101;
+        setup.mState.addItem(visitor, vest, 1);
+        setup.mState.addItem(visitor, pistol, 1);
+        const std::uint32_t start = setup.mEquipment.revision(guard);
+
+        // a weapon, in the hands of the character or of another, is no change of what the character wears
+        ASSERT_EQ(setup.mEquipment.equip(guard, pistol), Equipment::Outcome::Equipped);
+        ASSERT_EQ(setup.mEquipment.equip(visitor, pistol), Equipment::Outcome::Equipped);
+        // the clothes of another character are no change either
+        ASSERT_EQ(setup.mEquipment.equip(visitor, vest), Equipment::Outcome::Equipped);
+        EXPECT_EQ(setup.mEquipment.revision(guard), start);
+        EXPECT_NE(setup.mEquipment.revision(visitor), setup.mEquipment.revision(0x01000102));
+
+        ASSERT_EQ(setup.mEquipment.equip(guard, helmet), Equipment::Outcome::Equipped);
+        EXPECT_NE(setup.mEquipment.revision(guard), start);
     }
 
     TEST(FalloutScriptEquipmentTest, a_weapon_that_goes_on_is_the_best_copy_unless_a_copy_is_asked_for)

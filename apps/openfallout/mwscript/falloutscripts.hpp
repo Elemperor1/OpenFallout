@@ -1879,7 +1879,7 @@ namespace OFScript
         /// the player wears (the pieces of the record that the player's items stand for). False when the player has no
         /// look to draw (no plugin of Fallout is loaded).
         bool playerBody(LookPreview& preview, std::vector<const ESM4::Armor*>& armor);
-        /// A number that changes when what `playerBody` gives changes (the sex, race or look, an item put on or taken
+        /// A number that changes when what `playerBody` gives changes (the sex, race or look, armor put on or taken
         /// off), cheap enough to ask every frame
         std::uint64_t playerBodyRevision();
         /// The traits of the data (New Vegas), by name; the picture is the `ICON` of the perk, which the trait menu of
