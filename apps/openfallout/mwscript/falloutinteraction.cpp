@@ -45,6 +45,7 @@
 #include "../mwbase/inputmanager.hpp"
 #include "../mwbase/luamanager.hpp"
 #include "../mwbase/mechanicsmanager.hpp"
+#include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
@@ -1302,6 +1303,7 @@ namespace OFScript
         FalloutScript::FormId bed = 0;
         double step = 0;
         bool finish = false;
+        bool fadeOut = false;
         {
             const std::lock_guard lock(mInteractionMutex);
             if (!mRest.mActive)
@@ -1309,7 +1311,24 @@ namespace OFScript
             sleeping = mRest.mSleeping;
             bed = mRest.mBed;
             finish = mRest.mFinish;
-            step = std::min(mRest.mTotal - mRest.mDone, static_cast<double>(frametime) * sRestHoursPerSecond);
+            if (sleeping && !mRest.mFaded)
+            {
+                // The screen goes dark as the player lies down, and the time does not pass until it is dark
+                mRest.mFaded = true;
+                mRest.mFadeHold = sRestFadeSeconds;
+                fadeOut = true;
+            }
+            if (mRest.mFadeHold > 0)
+                mRest.mFadeHold = std::max(0.0, mRest.mFadeHold - frametime);
+            else
+                step = std::min(mRest.mTotal - mRest.mDone, static_cast<double>(frametime) * sRestHoursPerSecond);
+        }
+        if (fadeOut)
+        {
+            runOnMainThread([] {
+                if (OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager())
+                    windows->fadeScreenOut(sRestFadeSeconds);
+            });
         }
         std::string stopped;
         // Characters that come for the player end it
@@ -1359,6 +1378,21 @@ namespace OFScript
         if (stopped.empty() && hours > 0)
             tellPlayer(std::string(sleeping ? "You slept " : "You waited ") + std::to_string(hours)
                 + (hours == 1 ? " hour." : " hours."));
+        bool faded = false;
+        {
+            const std::lock_guard lock(mInteractionMutex);
+            faded = mRest.mFaded;
+            mRest.mFaded = false;
+            mRest.mFadeHold = 0;
+        }
+        if (faded)
+        {
+            // Whatever ended the sleep, the screen gets light again
+            runOnMainThread([] {
+                if (OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager())
+                    windows->fadeScreenIn(sRestFadeSeconds);
+            });
+        }
         const std::lock_guard lock(mInteractionMutex);
         mRest.mActive = false;
         mRest.mOpen = false;

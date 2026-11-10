@@ -2761,6 +2761,10 @@ namespace OFScript
             int mEnded = 0;
             /// The player stopped it: it ends where it is, in the next frame
             bool mFinish = false;
+            /// The screen of a sleep was made dark (it is made light again when the sleep ends)
+            bool mFaded = false;
+            /// The seconds that the sleeper still lies in the dark before the time starts to pass
+            double mFadeHold = 0;
         };
         RestState mRest;
         /// A door or container whose lock was just opened, and the seconds before it is activated again
@@ -2773,6 +2777,9 @@ namespace OFScript
         float mDiscoveryTimer = 0;
         /// The hours of waiting that pass for each second of play while the player waits or sleeps
         static constexpr double sRestHoursPerSecond = 4.0;
+        /// The seconds that the screen takes to go dark when the player lies down to sleep, and to get light again when
+        /// it gets up (a stand-in: the games' own times are not read)
+        static constexpr float sRestFadeSeconds = 1.0f;
         /// Moves the game of hacking, waiting and sleeping on; every frame, even while a screen stops the world
         void updateInteraction(float frametime);
         /// Makes the save that a script asked for, when the interface allows one
