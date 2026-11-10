@@ -830,6 +830,19 @@ namespace EsmTool
         return survey.getFatalErrors().empty() ? result : -1;
     }
 
+    /// Whether `path` is the same file as one of `inputs` (the same name, or a link or hard link to it: opening it to
+    /// write would empty the input).
+    bool refersToAnyOf(const std::filesystem::path& path, const std::vector<std::filesystem::path>& inputs)
+    {
+        for (const std::filesystem::path& input : inputs)
+        {
+            std::error_code error;
+            if (std::filesystem::equivalent(path, input, error) && !error)
+                return true;
+        }
+        return false;
+    }
+
     /// Read every file named on the command line in the order given, with its mod index and the indices of its
     /// masters, into a census that has collect(Reader&), write(std::ostream&) and getFatalErrors(), and print what the
     /// census counted. `mode` names the mode in the message for a file that is not TES4-format and `counted` what the
@@ -891,6 +904,13 @@ namespace EsmTool
                     // Counts of some of the files would read as the counts of all of them, and replace a good file
                     std::cout << "\nThe CSV file " << Files::pathToUnicodeString(info.csvFile)
                               << " was not written: the census is incomplete\n";
+                }
+                else if (refersToAnyOf(info.csvFile, info.inputFiles))
+                {
+                    // Opening it would empty the plugin that was just counted
+                    std::cout << "\nThe CSV file " << Files::pathToUnicodeString(info.csvFile)
+                              << " was not written: it is one of the files counted\n";
+                    result = -1;
                 }
                 else
                 {

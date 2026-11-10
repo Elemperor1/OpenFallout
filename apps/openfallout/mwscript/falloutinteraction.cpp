@@ -1468,6 +1468,12 @@ namespace OFScript
         {
             const auto world = OFBase::Environment::get().getWorld();
             world->advanceTime(1.0);
+            {
+                // The hour has gone by before the scripts of the effects run in it, so the hours that one of them asks
+                // for (SetPCSleepHours, WakeUpPC) are the ones after it
+                const std::lock_guard lock(mInteractionMutex);
+                mRest.mDone += 1.0;
+            }
             // The needs of the hardcore mode count the hour that went by, as one slept when this is a sleep (the hour
             // that ends the rest included: it is not left to the frames after it, which count awake time)
             updateHardcore(sleeping);
@@ -1500,8 +1506,6 @@ namespace OFScript
         bool completed = false;
         {
             const std::lock_guard lock(mInteractionMutex);
-            if (hour)
-                mRest.mDone += 1.0;
             done = mRest.mDone;
             // A script that ran in the hour (that of a running effect) can have asked to wake up, or left no hours:
             // the rest ends here, and is not a completed sleep

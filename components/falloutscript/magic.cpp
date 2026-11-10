@@ -118,7 +118,11 @@ namespace FalloutScript
                 modifier(actor, actorValue, amount);
         if (scripts)
             for (const auto& [script, id] : started)
-                scripts(actor, script, ScriptStage::Start, id, 0.0);
+            {
+                // A script that an earlier start took away with its spell has ended already: it does not begin
+                if (still(id))
+                    scripts(actor, script, ScriptStage::Start, id, 0.0);
+            }
         return true;
     }
 
@@ -243,6 +247,10 @@ namespace FalloutScript
                 scripts(actor, script, ScriptStage::Finish, id, 0.0);
             for (const Started& one : started)
             {
+                // The effect of a script that an earlier start took away or renewed (a cast of the same spell from it)
+                // has ended already: it does not begin
+                if (!one.mAtOnce && !still(one.mId))
+                    continue;
                 scripts(actor, one.mScript, ScriptStage::Start, one.mId, 0.0);
                 if (one.mAtOnce)
                     scripts(actor, one.mScript, ScriptStage::Finish, one.mId, 0.0);
