@@ -2821,6 +2821,8 @@ namespace OFScript
         std::string terminalFormat(const std::string& text);
         /// The things that make fast travel and waiting impossible, as far as the host can tell
         bool hostilesNearPlayer();
+        /// Whether an effect that is running on the player takes health from it (poison), which stops a rest and a trip
+        bool playerTakingHealthDamage();
         /// Whether the player is in the air: not on the ground, not in water, not held up by flight
         bool playerInAir();
         /// Whether two cells are the same place for eyes, for the compass and for a fight: one cell, or two exterior

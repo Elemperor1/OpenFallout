@@ -949,6 +949,11 @@ namespace OFScript
         const OFWorld::Ptr player = OFBase::Environment::get().getWorld()->getPlayerPtr();
         if (player.isEmpty() || !player.isInCell())
             return false;
+        // The reach of the check: the executables look as far as fHostileActorInteriorDistance (2000) in an interior and
+        // fHostileActorExteriorDistance (3000) outside, both absent from the master files (the reads of M13)
+        const double reach = player.getCell()->isExterior() ? gameSetting("fHostileActorExteriorDistance", 3000)
+                                                            : gameSetting("fHostileActorInteriorDistance", 2000);
+        const osg::Vec3f here = player.getRefData().getPosition().asVec3();
         for (const FalloutScript::FormId attacker : mCombat.attackersOf(mPlayer))
         {
             if (mActors.isDead(attacker))
@@ -956,9 +961,19 @@ namespace OFScript
             // One that was removed or disabled is no threat, whatever it was doing
             const OFWorld::Ptr enemy = findReference(attacker);
             if (!enemy.isEmpty() && enemy.isInCell() && sharesSpace(enemy.getCell(), player.getCell())
-                && enemy.getRefData().isEnabled() && enemy.getCellRef().getCount() > 0)
+                && enemy.getRefData().isEnabled() && enemy.getCellRef().getCount() > 0
+                && (enemy.getRefData().getPosition().asVec3() - here).length() <= reach)
                 return true;
         }
+        return false;
+    }
+
+    bool FalloutScripts::playerTakingHealthDamage()
+    {
+        // The executables look for a running effect that changes health and is harmful, whatever its size
+        for (const FalloutScript::ItemUse::Active& active : mItemUse.active(mPlayer))
+            if (active.mActorValue == FalloutScript::ActorValue::health && active.mMagnitude < 0 && active.mRemaining > 0)
+                return true;
         return false;
     }
 
@@ -981,8 +996,24 @@ namespace OFScript
         Interaction::RestConditions conditions;
         conditions.mSleeping = sleeping;
         conditions.mHostilesNear = hostilesNearPlayer();
+        conditions.mTakingHealthDamage = playerTakingHealthDamage();
         conditions.mUnderwater = world.isSwimming(player);
         conditions.mInAir = playerInAir();
+        if (!sleeping)
+        {
+            // A place can forbid waiting by a flag of its record: the cell of an interior, the worldspace outside
+            if (inOpenWorld(mPlayer))
+            {
+                const ESM4::World* space
+                    = mStore.get<ESM4::World>().search(ESM::FormId::fromUint32(worldspaceOf(mPlayer)));
+                conditions.mPlaceForbidsWaiting = space != nullptr && (space->mFlags & ESM4::Rec_CanNotWait) != 0;
+            }
+            else if (const FalloutScript::FormId cell = parentCell(mPlayer); cell != 0)
+            {
+                const ESM4::Cell* record = mStore.get<ESM4::Cell>().search(ESM::FormId::fromUint32(cell));
+                conditions.mPlaceForbidsWaiting = record != nullptr && (record->mFlags & ESM4::Rec_CanNotWait) != 0;
+            }
+        }
         if (sleeping && bed != 0)
         {
             // What a script made of the bed counts, so the owner is not the one the record names
@@ -1213,6 +1244,7 @@ namespace OFScript
         Interaction::TravelConditions conditions;
         conditions.mUndiscovered = mMapMarkers.state(marker) != 2;
         conditions.mHostilesNear = hostilesNearPlayer();
+        conditions.mTakingHealthDamage = playerTakingHealthDamage();
         conditions.mScriptBlocked = !mMapMarkers.fastTravelAllowed();
         const PipboyStats stats = pipboyStats();
         conditions.mOverencumbered = stats.mWeight > stats.mMaxWeight;

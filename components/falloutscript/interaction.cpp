@@ -123,6 +123,8 @@ namespace FalloutScript::Interaction
         for (const auto& refusal : {
                  refuse(conditions.mSleeping && conditions.mOwnedBed, "InOwnedBed"),
                  refuse(conditions.mTrespassing, "Trespass"),
+                 // (where this check stands among the others was not traced)
+                 refuse(!conditions.mSleeping && conditions.mPlaceForbidsWaiting, "InCell"),
                  refuse(!conditions.mSleeping && conditions.mAlarmSounding, "WhileAlarmSounding"),
                  refuse(!conditions.mSleeping && conditions.mUnderwater, "UnderWater"),
                  refuse(conditions.mHostilesNear, "HostileActorsNear"),

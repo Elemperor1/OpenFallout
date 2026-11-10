@@ -123,6 +123,17 @@ namespace
         EXPECT_FALSE(restRefusal(sleeping));
     }
 
+    TEST(FalloutScriptInteractionTest, a_place_that_forbids_waiting_stops_the_wait_and_not_the_sleep)
+    {
+        RestConditions waiting;
+        waiting.mPlaceForbidsWaiting = true;
+        EXPECT_EQ(restRefusal(waiting), "sNoWaitInCell");
+        RestConditions sleeping;
+        sleeping.mSleeping = true;
+        sleeping.mPlaceForbidsWaiting = true;
+        EXPECT_FALSE(restRefusal(sleeping));
+    }
+
     TEST(FalloutScriptInteractionTest, the_first_check_of_the_executable_that_fails_is_the_refusal)
     {
         RestConditions waiting;
