@@ -1607,14 +1607,15 @@ namespace OFMechanics
                 if (distanceAcross(mind.position(), frame.mPlayer)
                     > scripts.gameSetting("fAIUseWeaponDistance").value_or(5000.0))
                     return true;
-                // It aims at the place the order names when there is one, and the shot is still at the target
-                const osg::Vec3f aim
-                    = (order.mAim.isEmpty() ? order.mTarget : order.mAim).getRefData().getPosition().asVec3();
+                // It turns toward the place the order names when there is one, and the shot is still at the target
+                const osg::Vec3f victim = order.mTarget.getRefData().getPosition().asVec3();
+                const osg::Vec3f aim = order.mAim.isEmpty() ? victim : order.mAim.getRefData().getPosition().asVec3();
                 faceToward(
                     frame, mind, std::atan2(aim.x() - mind.position().x(), aim.y() - mind.position().y()), duration);
                 // With HoldFire it does not shoot while another character stands in the way, nearer than the target
                 // and within 30 degrees of the line to it (FalloutNV.exe 0x8f8966; what the list of the executable
-                // holds is not known, the characters of the cell stand for it)
+                // holds is not known, the characters of the cell stand for it). The line and the distance are those
+                // of the victim, because the shot lands on the victim whatever place the character turns toward
                 if (order.mOrder.mHoldFire && mind.mPtr.getCell() != nullptr)
                 {
                     // Characters that have no mind stand in the way as well: they are all the characters of the cell
@@ -1630,7 +1631,7 @@ namespace OFMechanics
                         return true;
                     });
                     if (FalloutScript::FightAI::lineOfFireBlocked(
-                            { mind.position().x(), mind.position().y() }, { aim.x(), aim.y() }, others))
+                            { mind.position().x(), mind.position().y() }, { victim.x(), victim.y() }, others))
                     {
                         if ((mind.mHeld += duration) >= holdFireReportAfter)
                         {
