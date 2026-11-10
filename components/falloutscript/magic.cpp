@@ -183,6 +183,7 @@ namespace FalloutScript
         Caster caster;
         ScriptRunner scripts;
         std::vector<std::pair<FormId, bool>> started;
+        std::vector<FormId> replaced;
         {
             const std::lock_guard lock(mMutex);
             caster = mCaster;
@@ -198,6 +199,23 @@ namespace FalloutScript
                         started.emplace_back(script, true);
                     continue;
                 }
+                if (script != 0)
+                {
+                    // A spell cast again while it runs renews its script effect: the earlier one ends before the new
+                    // one begins, so that its end does not undo what the new start did (the bed takes the perk away at
+                    // the end of the effect that gave it)
+                    for (auto it = mRunning.begin(); it != mRunning.end();)
+                    {
+                        if (it->mActor == actor && it->mSource == spell && it->mEffect == effect.mEffect
+                            && it->mScript != 0 && it->mRemaining > 0)
+                        {
+                            replaced.push_back(it->mScript);
+                            it = mRunning.erase(it);
+                        }
+                        else
+                            ++it;
+                    }
+                }
                 Running running;
                 running.mActor = actor;
                 running.mEffect = effect.mEffect;
@@ -212,12 +230,16 @@ namespace FalloutScript
         if (caster)
             caster(actor, spell, info.mEffects);
         if (scripts)
+        {
+            for (const FormId script : replaced)
+                scripts(actor, script, ScriptStage::Finish);
             for (const auto& [script, atOnce] : started)
             {
                 scripts(actor, script, ScriptStage::Start);
                 if (atOnce)
                     scripts(actor, script, ScriptStage::Finish);
             }
+        }
     }
 
     void Magic::noteEffect(FormId actor, FormId effect, FormId source, double seconds)

@@ -104,8 +104,8 @@ namespace
         bool isActor(FormId reference) override { return reference == courier; }
         FormId effectScript(FormId effect) override
         {
-            return effect == restEffect ? restScript
-                : effect == flashEffect ? flashScript
+            return effect == restEffect           ? restScript
+                : effect == flashEffect           ? flashScript
                 : effect == scriptedAbilityEffect ? scriptedAbilityScript
                                                   : 0;
         }
@@ -342,6 +342,31 @@ namespace
         run.mStages.clear();
         run.mMagic.update(50);
         EXPECT_TRUE(run.mStages.empty());
+    }
+
+    TEST(FalloutScriptMagicTest, a_spell_cast_again_renews_its_script_effect_and_the_old_one_does_not_end_the_new)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { restSpell });
+        run.mMagic.update(60);
+        run.mStages.clear();
+
+        // The earlier effect ends before the new one begins
+        run.call(OpCastImmediateOnSelf, courier, { restSpell });
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Finish), Pair(restScript, Stage::Start)));
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { restEffect }), 1.0);
+
+        // The time the earlier effect had left (40) passes without it ending anything: the new one has its whole time
+        run.mStages.clear();
+        run.mMagic.update(50);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Update)));
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { restEffect }), 1.0);
+
+        run.mStages.clear();
+        run.mMagic.update(50);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Finish)));
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { restEffect }), 0.0);
     }
 
     TEST(FalloutScriptMagicTest, an_effect_without_a_script_runs_none_and_the_scripts_wait_for_a_runner)

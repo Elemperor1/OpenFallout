@@ -671,6 +671,10 @@ namespace OFScript
         mPresentation.clear();
         mSwitches.clear();
         mMagic.clear();
+        // The needs of the hardcore mode count from the game that is loaded or started, not from the one that is left:
+        // the days between two saves are not time the player lived through
+        mHardcore.clear();
+        mHardcoreOn.store(false);
         {
             // A new game and a loaded game are both told to the scripts once; the program was started only once
             const std::lock_guard lock(mSessionMutex);
