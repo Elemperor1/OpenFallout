@@ -1354,9 +1354,13 @@ namespace OFScript
                 mActorValues.restore(mPlayer, AV::health, std::max(mActorValues.current(mPlayer, AV::healRate), 0.0));
             // The effects that are running age by the hour as well: the game runs them by the seconds of its own clock,
             // which is 3600 over the time scale for each hour that goes by (12 hours of rest is 1440 of them at the
-            // scale of 30, the lifetime of the effect of a good night's sleep in the reads)
+            // scale of 30, the lifetime of the effect of a good night's sleep in the reads). Both halves of an effect
+            // go on together, what it does to the actor values (the item use: boosts that end, points over time) and
+            // the record that it is running (the magic), as the frames of the game do when it is not paused
             const double timeScale = std::max(static_cast<double>(world->getTimeManager()->getGameTimeScale()), 1.0);
-            mMagic.update(3600.0 / timeScale);
+            const double seconds = 3600.0 / timeScale;
+            mItemUse.update(seconds);
+            mMagic.update(seconds);
         }
 
         double done = 0;
