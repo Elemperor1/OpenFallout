@@ -6,6 +6,11 @@ Read from the plugin files only (Fallout3.esm and FalloutNV.esm, and the five ad
 - Dialogue camera: no GMST names a conversation camera distance, height, offset, blend or field of view (the 35 names found are AI timers, combat barks, V.A.T.S. cameras and the `fOverShoulder*` offset, position and blend settings of the player's over-the-shoulder view, none of which is a conversation camera), so those numbers are not in the data either.
 - Sleep: no GMST names a heal rate per hour or a limit of hours. New Vegas adds `fHCSleepDeprivationRate` = 50 (hardcore mode).
 
+Two things in the message below are wrong as it was sent (it is kept as received; the numbers here are the ones to use):
+
+- The names it leaves out of the sound list because they only contain "Wasteland" or "Falls" are 12 in Fallout 3 and 9 in New Vegas, not the 10 and 7 it says. Counting the names it lists: Fallout 3 has 4 `AMBRWindWasteland`, 6 `AMBRInsectsWasteland` and 2 `DRSParadiseFalls` (12); New Vegas has the 6 insects, `UIWildWasteland` and the 2 `DRSParadiseFalls` (9). With them the totals reconcile: 23 records both games share plus 12 for New Vegas alone plus 9 left out is 44, and 23 plus the 12 left out is 35 for Fallout 3.
+- The heading of its camera section (section 2) names seven search terms, but six of the 33 records it lists hold none of them: `fOverShoulderOffsetPointX`, `fOverShoulderOffsetPointZ`, `fOverShoulderPosX`, `fOverShoulderPosZ`, `fOverShoulderRotMult` and `fOverShoulderStartBlendDist`. Its scan matched on something more than the terms it names (the message does not say what), so the list is the scan's result and not what those seven terms alone give. The reading of it does not change: none of these is a conversation camera.
+
 ---
 
 Message as received (round 13B):
