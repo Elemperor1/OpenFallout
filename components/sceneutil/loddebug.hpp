@@ -33,6 +33,9 @@ namespace SceneUtil
         /// "no-records": draws the tiles but not the land of the records, whatever the size of the node, so the loaded
         /// cells have none and the places no tile covers are empty
         bool mNoRecords = false;
+        /// "nodes": writes a line to the log for each node of the quad tree near the eye that is made: its size and
+        /// centre in cells and what each chunk manager made for it, to tell which of them draws a place
+        bool mNodes = false;
 
         bool changesFiles() const { return mFlat || mWireframe || mNoSkirt; }
     };

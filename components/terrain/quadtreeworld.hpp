@@ -94,6 +94,10 @@ namespace Terrain
         void setTerrainReplaced(
             std::function<bool(float, const osg::Vec2f&)> replaced, std::function<bool(float, const osg::Vec2f&)> split);
 
+        /// Writes a line to the log for each of the first nodes near the eye that is made, with what each chunk manager
+        /// made for it (to find out which of them draws a place)
+        void setReportNodes(bool report) { mReportNodes = report; }
+
     private:
         void ensureQuadTreeBuilt();
         void loadRenderingNode(
@@ -114,6 +118,8 @@ namespace Terrain
         float mMinSize;
         bool mDebugTerrainChunks;
         std::unique_ptr<DebugChunkManager> mDebugChunkManager;
+        bool mReportNodes = false;
+        std::atomic<int> mReportedNodes{ 0 };
     };
 
 }

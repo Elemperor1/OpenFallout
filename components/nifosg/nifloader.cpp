@@ -2643,8 +2643,7 @@ namespace NifOsg
                 Log(Debug::Info) << "Distant objects " << mFilename << ": the picture " << image->getFileName()
                                  << " is " << image->s() << "x" << image->t() << " with pixel format " << before
                                  << (changed ? " (made one with alpha)" : "")
-                                 << ", has see-through texels: " << (image->isImageTranslucent() ? "yes" : "no")
-                                 << ", alpha test is on";
+                                 << ", has see-through texels: " << (image->isImageTranslucent() ? "yes" : "no");
         }
 
         void handleTextureSet(const Nif::BSShaderTextureSet* textureSet, bool wrapS, bool wrapT,
@@ -3096,7 +3095,14 @@ namespace NifOsg
                         // from one atlas, and no alpha property asks for the test: the games test the alpha of what the
                         // flag marks, and without it each tree is a dark rectangle
                         if (shaderprop->lodBuilding())
+                        {
                             handleAlphaTesting(true, osg::AlphaFunc::GREATER, sLodBuildingAlphaThreshold, *node);
+                            static std::atomic<int> sReported{ 0 };
+                            if (sReported.fetch_add(1) < 4)
+                                Log(Debug::Info) << "Distant objects " << mFilename << ": alpha test of "
+                                                 << sLodBuildingAlphaThreshold << " of 255 set on the node '"
+                                                 << node->getName() << "' with " << properties.size() << " properties";
+                        }
                         break;
                     }
                     case Nif::RC_BSLightingShaderProperty:

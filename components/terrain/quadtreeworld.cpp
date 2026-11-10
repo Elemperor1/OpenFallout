@@ -5,7 +5,9 @@
 #include <osgUtil/CullVisitor>
 
 #include <limits>
+#include <sstream>
 
+#include <components/debug/debuglog.hpp>
 #include <components/esm/util.hpp>
 #include <components/loadinglistener/reporter.hpp>
 #include <components/misc/constants.hpp>
@@ -398,6 +400,19 @@ namespace Terrain
             bool activeGrid = (center.x() > gridbounds.x() && center.y() > gridbounds.y() && center.x() < gridbounds.z()
                 && center.y() < gridbounds.w());
 
+            // The nodes near the eye are told to the log when they are asked for
+            constexpr float reportedDistanceInCells = 10.f;
+            constexpr int reportedNodes = 400;
+            const osg::Vec3f eye = vd->getViewPoint();
+            const float distanceInCells
+                = (osg::Vec2f(center.x() * cellWorldSize, center.y() * cellWorldSize) - osg::Vec2f(eye.x(), eye.y()))
+                      .length()
+                / cellWorldSize;
+            const bool report = mReportNodes && distanceInCells <= reportedDistanceInCells
+                && mReportedNodes.fetch_add(1) < reportedNodes;
+            std::ostringstream made;
+
+            int managerIndex = 0;
             for (QuadTreeWorld::ChunkManager* m : mChunkManagers)
             {
                 osg::ref_ptr<osg::Node> n = m->getChunk(entry.mNode->getSize(), entry.mNode->getCenter(),
@@ -405,7 +420,27 @@ namespace Terrain
                     entry.mLodFlags, activeGrid, vd->getViewPoint(), compile);
                 if (n)
                     pat->addChild(n);
+                if (report)
+                {
+                    made << " [manager " << managerIndex << ": ";
+                    if (n)
+                    {
+                        const osg::BoundingSphere bound = n->getBound();
+                        const osg::Group* group = n->asGroup();
+                        made << n->className() << " with " << (group ? group->getNumChildren() : 0)
+                             << " children, mask " << n->getNodeMask() << ", height of the bound "
+                             << bound.center().z() - bound.radius() << " to " << bound.center().z() + bound.radius();
+                    }
+                    else
+                        made << "nothing";
+                    made << "]";
+                }
+                ++managerIndex;
             }
+            if (report)
+                Log(Debug::Info) << "Quad tree node of " << entry.mNode->getSize() << " cells at " << center.x() << ","
+                                 << center.y() << (activeGrid ? " in the loaded cells" : "") << ", " << distanceInCells
+                                 << " cells from the eye:" << made.str();
             entry.mRenderingNode = pat;
         }
     }
