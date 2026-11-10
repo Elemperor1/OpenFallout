@@ -830,6 +830,15 @@ namespace EsmTool
         return survey.getFatalErrors().empty() ? result : -1;
     }
 
+    /// The files that a census reads: the plugins named and the file of the commands, if one is given.
+    std::vector<std::filesystem::path> readFiles(const Arguments& info)
+    {
+        std::vector<std::filesystem::path> files = info.inputFiles;
+        if (!info.commandsFile.empty())
+            files.push_back(info.commandsFile);
+        return files;
+    }
+
     /// Whether `path` is the same file as one of `inputs` (the same name, or a link or hard link to it: opening it to
     /// write would empty the input).
     bool refersToAnyOf(const std::filesystem::path& path, const std::vector<std::filesystem::path>& inputs)
@@ -905,11 +914,11 @@ namespace EsmTool
                     std::cout << "\nThe CSV file " << Files::pathToUnicodeString(info.csvFile)
                               << " was not written: the census is incomplete\n";
                 }
-                else if (refersToAnyOf(info.csvFile, info.inputFiles))
+                else if (refersToAnyOf(info.csvFile, readFiles(info)))
                 {
-                    // Opening it would empty the plugin that was just counted
+                    // Opening it would empty a plugin that was just counted, or the commands file that was read
                     std::cout << "\nThe CSV file " << Files::pathToUnicodeString(info.csvFile)
-                              << " was not written: it is one of the files counted\n";
+                              << " was not written: it is one of the files read\n";
                     result = -1;
                 }
                 else
