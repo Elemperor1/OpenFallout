@@ -248,7 +248,15 @@ namespace OFInput
                 // on by itself when the window is gone. The bindings are told of the rest.
                 const bool stick = arg.axis == SDL_CONTROLLER_AXIS_LEFTX || arg.axis == SDL_CONTROLLER_AXIS_LEFTY
                     || arg.axis == SDL_CONTROLLER_AXIS_RIGHTX || arg.axis == SDL_CONTROLLER_AXIS_RIGHTY;
-                if (stick && std::abs(arg.value) < stickNeutralValue)
+                // A trigger that is let go under a window is told to the bindings the same way: one that was pressed
+                // while a message was open would stay pressed
+                const bool trigger
+                    = arg.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT || arg.axis == SDL_CONTROLLER_AXIS_TRIGGERRIGHT;
+                const int triggerPressThreshold = Settings::gui().mControllerTriggerPressThreshold;
+                const int triggerReleaseThreshold
+                    = std::clamp<int>(Settings::gui().mControllerTriggerReleaseThreshold, 0, triggerPressThreshold - 1);
+                if ((stick && std::abs(arg.value) < stickNeutralValue)
+                    || (trigger && arg.value <= triggerReleaseThreshold))
                     mBindingsManager->controllerAxisMoved(deviceID, arg);
                 return;
             }

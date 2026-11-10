@@ -5143,8 +5143,10 @@ namespace OFScript
                 else
                 {
                     const std::size_t changed = OFRender::replaceDiffuseMapOfShape(*model, swap.mShape, image);
-                    Log(Debug::Info) << "SwapTexture: " << FalloutScript::hex(reference) << " shows " << path << " on "
-                                     << swap.mShape << " (" << changed << " shapes)";
+                    // A swap that changes no shape is a fault in the data or in the model: told as a warning
+                    Log(changed == 0 ? Debug::Warning : Debug::Info)
+                        << "SwapTexture: " << FalloutScript::hex(reference) << " shows " << path << " on "
+                        << swap.mShape << " (" << changed << " shapes)";
                     swap.mGivenTo = model;
                     swap.mGiven = swap.mTexture;
                 }
