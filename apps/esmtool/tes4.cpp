@@ -896,7 +896,11 @@ namespace EsmTool
                 {
                     std::ofstream csv(info.csvFile);
                     if (csv)
+                    {
                         census.writeCsv(csv);
+                        // Closing writes what is still held back, so a failure of that is seen below
+                        csv.close();
+                    }
                     if (!csv)
                     {
                         std::cout << "\nFailed to write the CSV file " << Files::pathToUnicodeString(info.csvFile)
