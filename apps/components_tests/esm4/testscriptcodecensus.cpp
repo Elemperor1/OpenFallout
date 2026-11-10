@@ -624,6 +624,51 @@ namespace
         EXPECT_THAT(out.str(), HasSubstr("(not in the table)"));
     }
 
+    TEST(ESM4ScriptCodeCensusTest, writesTheCountsOfCommandsAndConditionsAsCsv)
+    {
+        // two scripts call 58 (once each, one of them twice), and a quest has two conditions that name it
+        std::string code = statement(0x1D) + statement(0x1000 + 58, std::string(4, '\0'));
+        code += statement(0x1000 + 58, std::string(2, '\0'));
+        const std::string questData = zString("EDID", "OFTestQuest") + condition(58, 0x1234, 0, 0) + condition(58, 0, 0, 0);
+
+        ESM4::ScriptCodeCensus census;
+        census.setCommandLookup([](std::uint16_t opcode) {
+            static const std::vector<ESM4::ScriptCode::Parameter> parameters{ { 14, false } };
+            ESM4::ScriptCodeCensus::CommandSignature signature;
+            if (opcode == 0x103A)
+            {
+                signature.mName = "GetStage";
+                signature.mParameters = &parameters;
+            }
+            return signature;
+        });
+        collect(census, scriptRecord(0x1001, code) + scriptRecord(0x1002, code));
+        collect(census, record("QUST", 0x2001, questData), "QUST");
+
+        std::ostringstream out;
+        census.writeCsv(out);
+        const std::string csv = out.str();
+        EXPECT_THAT(csv, StartsWith("kind,code,name,measure,count\n"));
+        EXPECT_THAT(csv, HasSubstr("call,0x103A,GetStage,statements,4\n"));
+        EXPECT_THAT(csv, HasSubstr("call,0x103A,GetStage,scripts,2\n"));
+        EXPECT_THAT(csv, HasSubstr("call,0x103A,GetStage,scripts_scpt,2\n"));
+        EXPECT_THAT(csv, HasSubstr("condition,0x103A,GetStage,uses,2\n"));
+        EXPECT_THAT(csv, HasSubstr("condition,0x103A,GetStage,first_parameter,1\n"));
+        // a count of 0 is not written
+        EXPECT_THAT(csv, Not(HasSubstr("expressions")));
+        EXPECT_THAT(csv, Not(HasSubstr("on_reference")));
+    }
+
+    TEST(ESM4ScriptCodeCensusTest, writesCsvWithNoNamesWithoutATableOfCommands)
+    {
+        ESM4::ScriptCodeCensus census;
+        collect(census, scriptRecord(0x1001, statement(0x1D) + statement(0x1000 + 58, std::string(2, '\0'))));
+
+        std::ostringstream out;
+        census.writeCsv(out);
+        EXPECT_THAT(out.str(), HasSubstr("call,0x103A,,statements,1\n"));
+    }
+
     TEST(ESM4ScriptCodeCensusTest, readsNoArgumentsWithoutATableOfCommands)
     {
         std::string none;

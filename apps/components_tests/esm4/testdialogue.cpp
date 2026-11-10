@@ -570,6 +570,30 @@ namespace
         EXPECT_THAT(out.str(), Not(HasSubstr("could not read")));
     }
 
+    TEST(ESM4DialogueCensusTest, writesTheCountsOfTheFunctionsAsCsv)
+    {
+        // two conditions name function 14 (one on the player, one on a reference) and one names function 72
+        const std::string info = fallout("INFO", 0x200,
+            infoData(0, 0, 0) + valueSubRecord<std::uint32_t>("QSTI", 0x500)
+                + subRecord("CTDA", conditionData(0x40, 1.f, 14, 0)) + subRecord("CTDA", conditionData(0x00, 1.f, 14, 0x700))
+                + subRecord("CTDA", conditionData(0x00, 2.f, 72, 0)));
+        const std::string plugin = falloutHeader()
+            + falloutTopGroup(
+                "DIAL", fallout("DIAL", 0x100, subRecord("DATA", std::string(2, '\0'))) + topicGroup(0x100, info));
+
+        ESM4::DialogueCensus counted = census(plugin);
+        counted.setFunctionNames([](std::uint32_t function) { return function == 14 ? "GetQuestVariable" : ""; });
+        std::ostringstream out;
+        counted.writeCsv(out);
+        const std::string csv = out.str();
+
+        EXPECT_THAT(csv, StartsWith("kind,code,name,measure,count\n"));
+        EXPECT_THAT(csv, HasSubstr("dialogue_condition,0x100E,GetQuestVariable,uses,2\n"));
+        EXPECT_THAT(csv, HasSubstr("dialogue_condition,0x1048,,uses,1\n"));
+        // a count of 0 is not written
+        EXPECT_THAT(csv, Not(HasSubstr(",on_other,")));
+    }
+
     TEST(ESM4DialogueCensusTest, countsARecordTheLoaderRejectsAsUnreadableAndSkipsDeletedOnes)
     {
         const std::string good = fallout("INFO", 0x200, infoData(0, 0, 0));

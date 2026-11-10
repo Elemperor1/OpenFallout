@@ -1,6 +1,7 @@
 #include "scriptcodecensus.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <exception>
 #include <iomanip>
@@ -948,6 +949,46 @@ namespace ESM4
         }
         if (rows.size() > listed)
             stream << "  and " << rows.size() - listed << " more functions\n";
+    }
+
+    void ScriptCodeCensus::writeCsv(std::ostream& stream) const
+    {
+        stream << "kind,code,name,measure,count\n";
+        const auto nameOf = [this](std::uint16_t code) {
+            if (!mLookup)
+                return std::string();
+            const CommandSignature signature = mLookup(code);
+            return signature.mParameters != nullptr ? std::string(signature.mName) : std::string();
+        };
+        const auto line = [&stream](std::string_view kind, std::uint16_t code, const std::string& name,
+                              const std::string& measure, std::size_t count) {
+            if (count != 0)
+                stream << kind << ',' << hex(code, 4) << ',' << name << ',' << measure << ',' << count << '\n';
+        };
+        for (const auto& [opcode, use] : mCommands)
+        {
+            const std::string name = nameOf(opcode);
+            line("call", opcode, name, "statements", use.mStatements);
+            line("call", opcode, name, "expressions", use.mExpressions);
+            line("call", opcode, name, "on_reference", use.mOnReference);
+            line("call", opcode, name, "scripts", use.mScripts);
+            for (const auto& [holder, scripts] : use.mByHolder)
+            {
+                std::string measure = "scripts_";
+                for (const char c : holder)
+                    measure += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                line("call", opcode, name, measure, scripts);
+            }
+        }
+        for (const auto& [function, use] : mConditionFunctions)
+        {
+            const auto code = static_cast<std::uint16_t>(ScriptCode::firstCommand + function);
+            const std::string name = nameOf(code);
+            line("condition", code, name, "uses", use.mUses);
+            line("condition", code, name, "first_parameter", use.mFirstParameter);
+            line("condition", code, name, "second_parameter", use.mSecondParameter);
+            line("condition", code, name, "on_reference", use.mOnReference);
+        }
     }
 
     void ScriptCodeCensus::write(std::ostream& stream) const

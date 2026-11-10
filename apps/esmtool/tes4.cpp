@@ -882,6 +882,20 @@ namespace EsmTool
 
         std::cout << "Counted the " << counted << " of " << info.inputFiles.size() << " files\n\n";
         census.write(std::cout);
+        if constexpr (requires { census.writeCsv(std::cout); })
+        {
+            if (!info.csvFile.empty())
+            {
+                std::ofstream csv(info.csvFile);
+                if (csv)
+                    census.writeCsv(csv);
+                if (!csv)
+                {
+                    std::cout << "\nFailed to write the CSV file " << Files::pathToUnicodeString(info.csvFile) << '\n';
+                    result = -1;
+                }
+            }
+        }
         return census.getFatalErrors().empty() ? result : -1;
     }
 

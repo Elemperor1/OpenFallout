@@ -175,6 +175,16 @@ namespace ESM4
 
         void write(std::ostream& stream) const;
 
+        /// The counts of every command that scripts call and every function that conditions name, as a CSV that other
+        /// tools read (scripts/openfallout/command_census.py): one line for each count, `kind,code,name,measure,count`.
+        /// `kind` is `call` (a command in a script) or `condition` (a function in a condition of a quest, terminal,
+        /// package or perk); `code` is the code of the command, as the table of the game gives it (0x1000 and up); `name`
+        /// is empty when no table of commands was given. A count of 0 is left out. The measures of `call` are
+        /// `statements`, `expressions`, `on_reference`, `scripts` and `scripts_<record type in lower case>` (the scripts
+        /// that call it, by the record that holds them); those of `condition` are `uses`, `first_parameter`,
+        /// `second_parameter` and `on_reference`.
+        void writeCsv(std::ostream& stream) const;
+
     private:
         void addScript(const std::string& holder, ESM::FormId record, const ScriptDefinition& script);
         void checkStructure(const ScriptCode::Program& program, const std::string& holder, ESM::FormId record,
