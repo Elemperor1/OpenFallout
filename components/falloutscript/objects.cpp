@@ -131,6 +131,46 @@ namespace FalloutScript
         return true;
     }
 
+    bool ObjectScripts::runEffect(FormId character, FormId script, std::uint16_t blockType)
+    {
+        if (character == 0 || script == 0)
+            return false;
+        const std::pair<FormId, FormId> key(character, script);
+        std::shared_ptr<Instance> instance;
+        if (const auto found = mEffects.find(key); found != mEffects.end() && blockType != BlockType::ScriptEffectStart)
+            instance = found->second;
+        else
+        {
+            const ESM4::Script* record = mFinder ? mFinder(script) : nullptr;
+            if (record == nullptr)
+            {
+                if (mReported.insert(script).second)
+                    mInterpreter.host().log("The script " + hex(script) + " of a magic effect is not known");
+                return false;
+            }
+            std::shared_ptr<const Script> prepared = this->prepared(record->mScript, script);
+            if (!prepared->usable())
+            {
+                if (mReported.insert(script).second)
+                    mInterpreter.host().log(
+                        "The script " + hex(script) + " of a magic effect cannot be run: " + prepared->problemText());
+                return false;
+            }
+            instance = std::make_shared<Instance>(std::move(prepared), character);
+            mEffects[key] = instance;
+        }
+        const bool has = hasBlockOfType(instance->script(), blockType);
+        if (has)
+        {
+            const ActionScope scope(mActionReference, 0);
+            mInterpreter.run(*instance, blockType);
+        }
+        // The script lives as long as its effect; one without such blocks has nothing to keep
+        if (blockType == BlockType::ScriptEffectFinish)
+            mEffects.erase(key);
+        return has;
+    }
+
     bool ObjectScripts::runResult(const ESM4::ScriptDefinition& definition, FormId reference)
     {
         if (reference == 0 || definition.compiledScript.empty())
@@ -181,6 +221,7 @@ namespace FalloutScript
     void ObjectScripts::clear()
     {
         mObjects.clear();
+        mEffects.clear();
         mSaved.clear();
         mUpdating.clear();
         mMenuUpdating.clear();

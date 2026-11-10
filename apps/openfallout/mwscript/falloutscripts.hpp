@@ -2206,6 +2206,7 @@ namespace OFScript
         bool abilityEffects(FalloutScript::FormId ability, std::vector<FalloutScript::AbilityEffect>& effects) override;
         bool consumable(FalloutScript::FormId item, FalloutScript::Consumable& result) override;
         bool spell(FalloutScript::FormId spell, FalloutScript::SpellInfo& info) override;
+        FalloutScript::FormId effectScript(FalloutScript::FormId effect) override;
         /// What one effect of an item or a spell is, false for one that is of no use
         bool effectOf(const ESM4::EffectEntry& entry, FalloutScript::ConsumableEffect& made);
         /// The character takes the effects of a spell it cast on itself

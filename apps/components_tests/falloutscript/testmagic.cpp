@@ -31,6 +31,15 @@ namespace
     constexpr FormId fire = 0x00200003;
     constexpr FormId gatedBoost = 0x00200004;
     constexpr FormId gatedFire = 0x00200005;
+    constexpr FormId restSpell = 0x00100006;
+    constexpr FormId restEffect = 0x00200006;
+    constexpr FormId restScript = 0x00300001;
+    constexpr FormId flashSpell = 0x00100007;
+    constexpr FormId flashEffect = 0x00200007;
+    constexpr FormId flashScript = 0x00300002;
+    constexpr FormId scriptedAbility = 0x00100008;
+    constexpr FormId scriptedAbilityEffect = 0x00200008;
+    constexpr FormId scriptedAbilityScript = 0x00300003;
 
     constexpr std::uint16_t OpAddSpell = 0x101C;
     constexpr std::uint16_t OpRemoveSpell = 0x101D;
@@ -69,6 +78,19 @@ namespace
             gatedFlame.mEffects.push_back({ gatedFire, 0, FalloutScript::ActorValue::health, 5, 10, true });
             gatedFlame.mEffects.back().mConditions.emplace_back();
             mSpells[gatedBlast] = gatedFlame;
+            // Effects of the script archetype (1): one that lasts, one that happens at once, one an ability keeps
+            SpellInfo rest;
+            rest.mType = 0;
+            rest.mEffects.push_back({ restEffect, 1, -1, 0, 100, false });
+            mSpells[restSpell] = rest;
+            SpellInfo flash;
+            flash.mType = 0;
+            flash.mEffects.push_back({ flashEffect, 1, -1, 0, 0, false });
+            mSpells[flashSpell] = flash;
+            SpellInfo kept;
+            kept.mType = 4;
+            kept.mEffects.push_back({ scriptedAbilityEffect, 1, -1, 0, 0, false });
+            mSpells[scriptedAbility] = kept;
         }
 
         bool spell(FormId spell, SpellInfo& info) override
@@ -80,6 +102,13 @@ namespace
             return true;
         }
         bool isActor(FormId reference) override { return reference == courier; }
+        FormId effectScript(FormId effect) override
+        {
+            return effect == restEffect ? restScript
+                : effect == flashEffect ? flashScript
+                : effect == scriptedAbilityEffect ? scriptedAbilityScript
+                                                  : 0;
+        }
     };
 
     struct Runner
@@ -92,9 +121,15 @@ namespace
         std::vector<std::pair<int, double>> mChanges;
         std::vector<FormId> mCast;
         std::vector<std::size_t> mCastEffects;
+        /// The scripts of effects that ran: the script and its stage, in order
+        std::vector<std::pair<FormId, Magic::ScriptStage>> mStages;
 
         Runner()
         {
+            mMagic.setScriptRunner([this](FormId actor, FormId script, Magic::ScriptStage stage) {
+                EXPECT_EQ(actor, courier);
+                mStages.emplace_back(script, stage);
+            });
             mMagic.setModifier(
                 [this](FormId, int actorValue, double amount) { mChanges.emplace_back(actorValue, amount); });
             mMagic.setCaster([this](FormId, FormId spell, const std::vector<FalloutScript::SpellEffect>& effects) {
@@ -283,5 +318,104 @@ namespace
         other.mMagic.clear();
         EXPECT_FALSE(other.mMagic.hasSpell(courier, ability));
         EXPECT_EQ(other.call(OpHasMagicEffect, courier, { fire }), 0.0);
+    }
+
+    TEST(FalloutScriptMagicTest, the_script_of_an_effect_starts_runs_each_frame_and_finishes_with_it)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { restSpell });
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Start)));
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { restEffect }), 1.0);
+
+        run.mStages.clear();
+        run.mMagic.update(30);
+        run.mMagic.update(30);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Update), Pair(restScript, Stage::Update)));
+
+        // The frame in which it runs out finishes it: there is no update for it
+        run.mStages.clear();
+        run.mMagic.update(50);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Finish)));
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { restEffect }), 0.0);
+
+        run.mStages.clear();
+        run.mMagic.update(50);
+        EXPECT_TRUE(run.mStages.empty());
+    }
+
+    TEST(FalloutScriptMagicTest, an_effect_without_a_script_runs_none_and_the_scripts_wait_for_a_runner)
+    {
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { blast });
+        run.mMagic.update(3);
+        run.mMagic.update(30);
+        EXPECT_TRUE(run.mStages.empty());
+
+        // Nothing runs, and nothing breaks, without a host that runs scripts
+        Runner quiet;
+        quiet.mMagic.setScriptRunner(nullptr);
+        quiet.call(OpCastImmediateOnSelf, courier, { restSpell });
+        quiet.mMagic.update(500);
+        EXPECT_TRUE(quiet.mStages.empty());
+        EXPECT_EQ(quiet.call(OpHasMagicEffect, courier, { restEffect }), 0.0);
+    }
+
+    TEST(FalloutScriptMagicTest, an_effect_that_happens_at_once_runs_its_script_from_start_to_finish)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { flashSpell });
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(flashScript, Stage::Start), Pair(flashScript, Stage::Finish)));
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { flashEffect }), 0.0);
+    }
+
+    TEST(FalloutScriptMagicTest, an_ability_with_a_script_finishes_it_when_it_is_taken_away)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.call(OpAddSpell, courier, { scriptedAbility });
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(scriptedAbilityScript, Stage::Start)));
+
+        // It has no time to run out: it goes on each frame until the spell goes
+        run.mStages.clear();
+        run.mMagic.update(1000);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(scriptedAbilityScript, Stage::Update)));
+
+        run.mStages.clear();
+        run.call(OpRemoveSpell, courier, { scriptedAbility });
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(scriptedAbilityScript, Stage::Finish)));
+    }
+
+    TEST(FalloutScriptMagicTest, the_script_of_the_effect_of_an_item_runs_for_the_time_it_lasts)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.mMagic.noteEffect(courier, restEffect, crate, 3);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Start)));
+        run.mMagic.update(4);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Start), Pair(restScript, Stage::Finish)));
+    }
+
+    TEST(FalloutScriptMagicTest, an_effect_that_was_running_when_the_game_was_saved_finishes_its_script_after_a_load)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { restSpell });
+        run.mMagic.update(40);
+        FalloutScript::SaveWriter out;
+        FalloutScript::writeMagic(run.mMagic, out);
+
+        Runner other;
+        const std::string bytes = out.take();
+        FalloutScript::SaveReader in(bytes);
+        FalloutScript::readMagic(other.mMagic, in, FalloutScript::magicSectionVersion);
+        // The start is not run again: the effect was begun before the save
+        EXPECT_TRUE(other.mStages.empty());
+        other.mMagic.update(30);
+        EXPECT_THAT(other.mStages, ElementsAre(Pair(restScript, Stage::Update)));
+        other.mStages.clear();
+        other.mMagic.update(40);
+        EXPECT_THAT(other.mStages, ElementsAre(Pair(restScript, Stage::Finish)));
     }
 }

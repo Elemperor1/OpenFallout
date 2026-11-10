@@ -91,6 +91,8 @@ namespace OFScript
         constexpr std::uint32_t effectHostile = 0x1;
         constexpr std::uint32_t effectRecovers = 0x2;
         constexpr std::uint32_t effectDetrimental = 0x4;
+        /// The archetype of a magic effect that runs a script (the associated item of its data)
+        constexpr std::uint32_t archetypeScript = 1;
 
         /// The effect that the executables make for the engine's own healing
         constexpr std::uint32_t engineRestoreHealth = 0x14E;
@@ -262,6 +264,14 @@ namespace OFScript
             effects.push_back(std::move(made));
         }
         mItemUse.cast(actor, effects);
+    }
+
+    FalloutScript::FormId FalloutScripts::effectScript(FalloutScript::FormId effect)
+    {
+        const ESM4::MagicEffect* record = mStore.get<ESM4::MagicEffect>().search(refId(effect));
+        if (record == nullptr || record->mData.mArchetype != archetypeScript)
+            return 0;
+        return record->mData.mAssociatedItem;
     }
 
     bool FalloutScripts::spell(FalloutScript::FormId spell, FalloutScript::SpellInfo& info)

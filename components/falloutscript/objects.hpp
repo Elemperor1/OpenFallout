@@ -7,6 +7,7 @@
 #include <map>
 #include <memory>
 #include <set>
+#include <utility>
 #include <vector>
 
 #include <components/esm4/loadscpt.hpp>
@@ -58,6 +59,13 @@ namespace FalloutScript
         /// topic that was said): the blocks it refuses are not run, and do not count as blocks of the script.
         bool trigger(
             FormId reference, std::uint16_t blockType, FormId actionReference = 0, const BlockFilter& filter = {});
+
+        /// Runs a block of the script of a magic effect that works on the character: ScriptEffectStart when the effect
+        /// begins (the script starts over, with its variables), ScriptEffectUpdate while it runs, and ScriptEffectFinish
+        /// when it ends (the script is forgotten after it). The character is the object of the script, which the
+        /// commands in it that name none act on. Returns whether the script has such a block. The variables of a script
+        /// that was running when the game was saved start over when the game is loaded.
+        bool runEffect(FormId character, FormId script, std::uint16_t blockType);
 
         /// Runs a script that is a list of statements, such as the one a package runs when it begins, ends or changes,
         /// with the reference as its object: the commands in it that name none act on the reference. Returns whether
@@ -135,6 +143,8 @@ namespace FalloutScript
         std::set<FormId> mMenuUpdating;
         /// The references that are loaded
         std::set<FormId> mLoaded;
+        /// The scripts of the magic effects that work on a character: by the character and the script
+        std::map<std::pair<FormId, FormId>, std::shared_ptr<Instance>> mEffects;
         std::map<const ESM4::ScriptDefinition*, std::shared_ptr<const Script>> mPrepared;
         /// The scripts that were reported as not runnable, so that they are reported once
         std::set<FormId> mReported;

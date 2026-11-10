@@ -43,6 +43,12 @@ namespace FalloutScript
         mConditions = std::move(check);
     }
 
+    void Magic::setScriptRunner(ScriptRunner runner)
+    {
+        const std::lock_guard lock(mMutex);
+        mScripts = std::move(runner);
+    }
+
     void Magic::dropFailing(FormId actor, SpellInfo& info)
     {
         ConditionCheck check;
@@ -77,7 +83,9 @@ namespace FalloutScript
         if (appliedWhenAdded(info.mType))
             dropFailing(actor, info);
         Modifier modifier;
+        ScriptRunner scripts;
         std::vector<std::pair<int, double>> changes;
+        std::vector<FormId> started;
         {
             const std::lock_guard lock(mMutex);
             if (!mSpells[actor].insert(spell).second)
@@ -85,12 +93,16 @@ namespace FalloutScript
             if (!appliedWhenAdded(info.mType))
                 return true;
             modifier = mModifier;
+            scripts = mScripts;
             for (const SpellEffect& effect : info.mEffects)
             {
                 Running running;
                 running.mActor = actor;
                 running.mEffect = effect.mEffect;
                 running.mSource = spell;
+                running.mScript = mRecords.effectScript(effect.mEffect);
+                if (running.mScript != 0)
+                    started.push_back(running.mScript);
                 if (effect.mArchetype == 0 && ActorValues::isValid(effect.mActorValue))
                 {
                     running.mActorValue = effect.mActorValue;
@@ -103,19 +115,25 @@ namespace FalloutScript
         if (modifier)
             for (const auto& [actorValue, amount] : changes)
                 modifier(actor, actorValue, amount);
+        if (scripts)
+            for (const FormId script : started)
+                scripts(actor, script, ScriptStage::Start);
         return true;
     }
 
     bool Magic::removeSpell(FormId actor, FormId spell)
     {
         Modifier modifier;
+        ScriptRunner scripts;
         std::vector<std::pair<int, double>> changes;
+        std::vector<FormId> finished;
         {
             const std::lock_guard lock(mMutex);
             const auto found = mSpells.find(actor);
             if (found == mSpells.end() || found->second.erase(spell) == 0)
                 return false;
             modifier = mModifier;
+            scripts = mScripts;
             for (auto it = mRunning.begin(); it != mRunning.end();)
             {
                 // What a cast of the spell started runs out on its own; only what the spell itself keeps goes now
@@ -123,6 +141,8 @@ namespace FalloutScript
                 {
                     if (it->mActorValue >= 0)
                         changes.emplace_back(it->mActorValue, -it->mDelta);
+                    if (it->mScript != 0)
+                        finished.push_back(it->mScript);
                     it = mRunning.erase(it);
                 }
                 else
@@ -132,6 +152,9 @@ namespace FalloutScript
         if (modifier)
             for (const auto& [actorValue, amount] : changes)
                 modifier(actor, actorValue, amount);
+        if (scripts)
+            for (const FormId script : finished)
+                scripts(actor, script, ScriptStage::Finish);
         return true;
     }
 
@@ -158,24 +181,43 @@ namespace FalloutScript
         // An effect whose conditions do not hold is not on the character, and the caster leaves it out as well
         dropFailing(actor, info);
         Caster caster;
+        ScriptRunner scripts;
+        std::vector<std::pair<FormId, bool>> started;
         {
             const std::lock_guard lock(mMutex);
             caster = mCaster;
-            // An effect that happens at once is over as it is cast
+            scripts = mScripts;
             for (const SpellEffect& effect : info.mEffects)
             {
+                const FormId script = mRecords.effectScript(effect.mEffect);
+                // An effect that happens at once is over as it is cast (a script of one is run from its start to its
+                // end: not traced in the executables)
                 if (effect.mDuration <= 0)
+                {
+                    if (script != 0)
+                        started.emplace_back(script, true);
                     continue;
+                }
                 Running running;
                 running.mActor = actor;
                 running.mEffect = effect.mEffect;
                 running.mSource = spell;
                 running.mRemaining = effect.mDuration;
+                running.mScript = script;
                 mRunning.push_back(running);
+                if (script != 0)
+                    started.emplace_back(script, false);
             }
         }
         if (caster)
             caster(actor, spell, info.mEffects);
+        if (scripts)
+            for (const auto& [script, atOnce] : started)
+            {
+                scripts(actor, script, ScriptStage::Start);
+                if (atOnce)
+                    scripts(actor, script, ScriptStage::Finish);
+            }
     }
 
     void Magic::noteEffect(FormId actor, FormId effect, FormId source, double seconds)
@@ -187,8 +229,15 @@ namespace FalloutScript
         running.mEffect = effect;
         running.mSource = source;
         running.mRemaining = seconds;
-        const std::lock_guard lock(mMutex);
-        mRunning.push_back(running);
+        running.mScript = mRecords.effectScript(effect);
+        ScriptRunner scripts;
+        {
+            const std::lock_guard lock(mMutex);
+            mRunning.push_back(running);
+            scripts = mScripts;
+        }
+        if (scripts && running.mScript != 0)
+            scripts(actor, running.mScript, ScriptStage::Start);
     }
 
     bool Magic::hasEffect(FormId actor, FormId effect)
@@ -207,14 +256,36 @@ namespace FalloutScript
 
     void Magic::update(double seconds)
     {
-        const std::lock_guard lock(mMutex);
-        for (auto it = mRunning.begin(); it != mRunning.end();)
+        ScriptRunner scripts;
+        std::vector<std::pair<FormId, FormId>> running;
+        std::vector<std::pair<FormId, FormId>> finished;
         {
-            // An effect that lasts until its spell is removed has no seconds left to count
-            if (it->mRemaining > 0 && (it->mRemaining -= seconds) <= 0)
-                it = mRunning.erase(it);
-            else
-                ++it;
+            const std::lock_guard lock(mMutex);
+            scripts = mScripts;
+            for (auto it = mRunning.begin(); it != mRunning.end();)
+            {
+                // An effect that lasts until its spell is removed has no seconds left to count
+                if (it->mRemaining > 0 && (it->mRemaining -= seconds) <= 0)
+                {
+                    if (it->mScript != 0)
+                        finished.emplace_back(it->mActor, it->mScript);
+                    it = mRunning.erase(it);
+                }
+                else
+                {
+                    if (it->mScript != 0)
+                        running.emplace_back(it->mActor, it->mScript);
+                    ++it;
+                }
+            }
+        }
+        // The scripts run outside the lock: they cast, give and take away like any other
+        if (scripts)
+        {
+            for (const auto& [actor, script] : running)
+                scripts(actor, script, ScriptStage::Update);
+            for (const auto& [actor, script] : finished)
+                scripts(actor, script, ScriptStage::Finish);
         }
     }
 
@@ -276,6 +347,7 @@ namespace FalloutScript
                     entry.mActor = *actor;
                     entry.mEffect = *effect;
                     entry.mSource = *source;
+                    entry.mScript = magic.mRecords.effectScript(*effect);
                     running.push_back(entry);
                 }
             }

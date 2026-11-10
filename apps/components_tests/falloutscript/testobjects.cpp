@@ -351,6 +351,90 @@ namespace
         EXPECT_EQ(setup.variable(crate, 4), 1);
     }
 
+    TEST(FalloutScriptObjectsTest, the_script_of_a_magic_effect_runs_its_blocks_for_the_character_it_works_on)
+    {
+        constexpr FormId effectScript = 0x01002100;
+        constexpr FormId updates = 0x01000901;
+        constexpr FormId finished = 0x01000902;
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t updatesGlobal = builder.form(updates);
+        const std::uint16_t finishedGlobal = builder.form(finished);
+        // The start gives a variable a value, which the update and the finish tell: the script is the one that began
+        builder.code(scriptName() + begin(BlockType::ScriptEffectStart) + setTo(var('s', 1), number("5"))
+            + command(OpDisable, arguments(0)) + end() + begin(BlockType::ScriptEffectUpdate)
+            + setTo(Bytes().u8('G').u16(updatesGlobal), var('s', 1)) + end() + begin(BlockType::ScriptEffectFinish)
+            + setTo(Bytes().u8('G').u16(finishedGlobal), var('s', 1)) + end());
+        builder.variable(1, integerVariable, "remembered");
+        setup.addScript(effectScript, builder);
+        setup.mHost.mGlobals[updates] = -1;
+        setup.mHost.mGlobals[finished] = -1;
+
+        EXPECT_TRUE(setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectStart));
+        // The command that names no object acts on the character the effect works on
+        EXPECT_EQ(setup.mWorld.mDisabled, std::set<FormId>{ player });
+        EXPECT_TRUE(setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate));
+        EXPECT_EQ(setup.mHost.mGlobals[updates], 5);
+        EXPECT_TRUE(setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectFinish));
+        EXPECT_EQ(setup.mHost.mGlobals[finished], 5);
+
+        // It is forgotten when it ends: the next one starts with fresh variables
+        EXPECT_TRUE(setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate));
+        EXPECT_EQ(setup.mHost.mGlobals[updates], 0);
+        // The effect is not an object of the game: it has no instance of its own among them
+        EXPECT_FALSE(setup.mObjects.has(player));
+    }
+
+    TEST(FalloutScriptObjectsTest, a_second_start_of_an_effect_begins_its_script_over_for_each_character)
+    {
+        constexpr FormId effectScript = 0x01002100;
+        constexpr FormId seen = 0x01000901;
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t seenGlobal = builder.form(seen);
+        builder.code(scriptName() + begin(BlockType::ScriptEffectStart)
+            + setTo(var('s', 1), var('s', 1) + number("1") + op("+")) + end() + begin(BlockType::ScriptEffectUpdate)
+            + setTo(Bytes().u8('G').u16(seenGlobal), var('s', 1)) + end());
+        builder.variable(1, integerVariable, "starts");
+        setup.addScript(effectScript, builder);
+        setup.mHost.mGlobals[seen] = -1;
+
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectStart);
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectStart);
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate);
+        EXPECT_EQ(setup.mHost.mGlobals[seen], 1);
+
+        // Another character has the effect with variables of its own
+        setup.mObjects.runEffect(crate, effectScript, BlockType::ScriptEffectUpdate);
+        EXPECT_EQ(setup.mHost.mGlobals[seen], 0);
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate);
+        EXPECT_EQ(setup.mHost.mGlobals[seen], 1);
+
+        setup.mObjects.clear();
+        setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate);
+        EXPECT_EQ(setup.mHost.mGlobals[seen], 0);
+    }
+
+    TEST(FalloutScriptObjectsTest, a_script_of_an_effect_that_is_unknown_or_has_no_such_block_runs_nothing)
+    {
+        constexpr FormId effectScript = 0x01002100;
+        Runner setup;
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::ScriptEffectStart) + command(OpDisable, arguments(0)) + end());
+        setup.addScript(effectScript, builder);
+
+        EXPECT_FALSE(setup.mObjects.runEffect(player, 0x01002101, BlockType::ScriptEffectStart));
+        EXPECT_FALSE(setup.mObjects.runEffect(0, effectScript, BlockType::ScriptEffectStart));
+        EXPECT_FALSE(setup.mObjects.runEffect(player, 0, BlockType::ScriptEffectStart));
+        EXPECT_TRUE(setup.mWorld.mDisabled.empty());
+        // It has a start and nothing else: the other blocks are not there to run
+        EXPECT_FALSE(setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate));
+        EXPECT_FALSE(setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectFinish));
+        EXPECT_TRUE(setup.mWorld.mDisabled.empty());
+        EXPECT_TRUE(setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectStart));
+        EXPECT_EQ(setup.mWorld.mDisabled, std::set<FormId>{ player });
+    }
+
     TEST(FalloutScriptObjectsTest, a_reference_that_is_loaded_runs_its_menu_mode_while_a_menu_is_open)
     {
         Runner setup;
