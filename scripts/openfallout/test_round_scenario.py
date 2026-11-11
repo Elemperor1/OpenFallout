@@ -192,35 +192,56 @@ class ScenarioPlayer(unittest.TestCase):
             self.tick(13)
         return self.lines()
 
+    INSIDE = "require('openfallout.world').players[1].cell = { isExterior = false, id = 'inside', worldSpaceId = 'inside' }\n"
+
     def test_the_mountain_scenario_goes_to_the_mojave_from_an_interior(self):
-        # the save is in an interior; a reference of the Mojave names the worldspace
+        # the save is in an interior; a cell of the Mojave in the record store names the worldspace
         lines = self.run_mountains(
-            "require('openfallout.world').players[1].cell = { isExterior = false, id = 'inside', worldSpaceId = 'inside' }\n"
-            "object_cells['FormId:FalloutNV.esm:' .. 0xcdf51] = { isExterior = true, worldSpaceId = 'mojave', gridX = 1, gridY = 2 }")
+            self.INSIDE +
+            "require('openfallout.world').getCellById = function(id) return { id = id, isExterior = true, worldSpaceId = 'mojave' } end")
         self.assertFalse(any(line.startswith("ROUND\terror") for line in lines), lines)
-        self.assertIn("ROUND\tnote\tanchor\t0xcdf51\tworldspace=mojave exterior=true", lines)
+        self.assertIn("ROUND\tnote\tanchor\tcell 0xdaeb9\tworldspace=mojave exterior=true", lines)
         self.assertEqual(self.lua.eval("#teleports"), 2)
         self.assertEqual(self.lua.eval("teleports[1].cell.via.worldSpaceId"), "mojave")
         self.assertEqual(self.lua.eval("teleports[2].cell.via.worldSpaceId"), "mojave")
         self.assertEqual((self.lua.eval("teleports[1].pos.x"), self.lua.eval("teleports[1].pos.z")), (-69319, 8381))
 
-    def test_the_mountain_scenario_tries_the_next_reference_and_then_the_cell_of_the_player(self):
+    def test_the_mountain_scenario_goes_on_to_the_next_cell_and_to_the_references(self):
+        # a cell that cannot be read, then one that is an interior, then a reference whose cell is not loaded (reading its cell
+        # raises an error, as the engine does) and one that is
         lines = self.run_mountains(
-            "object_cells['FormId:FalloutNV.esm:' .. 0xcdf51] = { isExterior = false, id = 'a house' }\n"
-            "object_cells['FormId:FalloutNV.esm:' .. 0x10a201] = { isExterior = true, worldSpaceId = 'second' }")
-        self.assertIn("ROUND\tnote\tanchor\t0xcdf51\tworldspace=nil exterior=false", lines)
+            self.INSIDE +
+            "local world = require('openfallout.world')\n"
+            "local cells = { [0xdaeb9] = function() error('Cell is not available') end,\n"
+            "               [0xdaeb8] = function() return { isExterior = false, id = 'a house' } end }\n"
+            "world.getCellById = function(id) local f = cells[tonumber(id:match(':(%d+)$'))] if f then return f() end end\n"
+            "local refs = { [0xcdf51] = function() error('Object is not available: 0x10cdf51') end,\n"
+            "              [0x10a201] = function() return { isExterior = true, worldSpaceId = 'second' } end }\n"
+            "world.getObjectByFormId = function(id) local n = tonumber(id:match(':(%d+)$'))\n"
+            "    return setmetatable({}, { __index = function(_, key) if key == 'cell' then return refs[n]() end end }) end")
+        self.assertFalse(any(line.startswith("ROUND\terror") for line in lines), lines)
+        self.assertTrue(any(line.startswith("ROUND\tnote\tanchor\tcell 0xdaeb9\terror ") for line in lines), lines)
+        self.assertIn("ROUND\tnote\tanchor\tcell 0xdaeb8\tworldspace=nil exterior=false", lines)
+        self.assertTrue(any(line.startswith("ROUND\tnote\tanchor\tref 0xcdf51\terror ") and "Object is not available" in line
+                            for line in lines), lines)
+        self.assertIn("ROUND\tnote\tanchor\tref 0x10a201\tworldspace=second exterior=true", lines)
         self.assertEqual(self.lua.eval("teleports[1].cell.via.worldSpaceId"), "second")
-        # no reference found: the player is in the open, so its own cell names the worldspace
-        lines = self.run_mountains("require('openfallout.world').getObjectByFormId = function() return nil end")
-        self.assertIn("ROUND\tnote\tanchor\t0xcdf51\tnot found", lines)
+        self.assertEqual(self.lua.eval("#teleports"), 2)
+
+    def test_the_mountain_scenario_falls_back_to_the_cell_of_a_player_in_the_open(self):
+        lines = self.run_mountains(
+            "local world = require('openfallout.world')\n"
+            "world.getCellById = function() return nil end\n"
+            "world.getObjectByFormId = function() return nil end")
+        self.assertIn("ROUND\tnote\tanchor\tcell 0xdaeb9\tnot found", lines)
         self.assertIn("ROUND\tnote\tanchor\tplayer cell\tworldspace=w", lines)
         self.assertFalse(any(line.startswith("ROUND\terror") for line in lines), lines)
         self.assertEqual(self.lua.eval("#teleports"), 2)
 
     def test_the_mountain_scenario_stops_when_the_worldspace_cannot_be_found(self):
         lines = self.run_mountains(
-            "require('openfallout.world').getObjectByFormId = function() return nil end\n"
-            "require('openfallout.world').players[1].cell = { isExterior = false, id = 'inside' }")
+            self.INSIDE +
+            "require('openfallout.world').getObjectByFormId = function() return nil end")
         self.assertTrue(any(line.startswith("ROUND\terror\tscenario") and "worldspace" in line for line in lines), lines)
         self.assertEqual(self.lua.eval("#teleports"), 0)
 
