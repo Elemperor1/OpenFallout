@@ -4,6 +4,7 @@
 
 #include <SDL_keyboard.h>
 
+#include <components/debug/debuglog.hpp>
 #include <components/settings/values.hpp>
 
 #include "../mwbase/environment.hpp"
@@ -60,6 +61,13 @@ namespace OFInput
     void ActionManager::executeAction(int action)
     {
         OFBase::Environment::get().getLuaManager()->inputEvent({ OFBase::LuaManager::InputEvent::Action, action });
+        // A screenshot shows what is drawn, a message box a script opened included, and it changes nothing: it is taken
+        // under the box as well (a scripted round asks for its pictures while the game's own messages are up)
+        if (action == A_Screenshot)
+        {
+            screenshot();
+            return;
+        }
         // A message box that a script draws is modal (as the window of the engine's own was): the actions of the keys
         // and buttons are not carried out under it, so that Escape does not close the screen the box is over; the
         // script gets the keys itself
@@ -176,6 +184,7 @@ namespace OFInput
 
     void ActionManager::screenshot()
     {
+        Log(Debug::Info) << "Screenshot requested";
         mScreenCaptureHandler->setFramesToCapture(1);
         mScreenCaptureHandler->captureNextFrame(*mViewer);
     }
