@@ -319,6 +319,58 @@ class Commands(unittest.TestCase):
             round_runner.load_round(self.round_file, self.Args())
 
 
+class Pictures(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: __import__("shutil").rmtree(self.tmp, ignore_errors=True))
+
+    def test_a_file_the_engine_did_not_finish_is_not_a_picture(self):
+        whole = self.tmp / "screenshot000.png"
+        tiny_png(whole)
+        self.assertTrue(round_runner.picture_is_complete(whole))
+        empty = self.tmp / "screenshot001.png"
+        empty.write_bytes(b"")
+        cut = self.tmp / "screenshot002.png"
+        cut.write_bytes(whole.read_bytes()[:-12])
+        junk = self.tmp / "screenshot003.png"
+        junk.write_bytes(b"not a png at all, but long enough to read")
+        jpeg_cut = self.tmp / "screenshot004.jpg"
+        jpeg_cut.write_bytes(b"\xff\xd8\xff\xe0 and no end")
+        jpeg = self.tmp / "screenshot005.jpg"
+        jpeg.write_bytes(b"\xff\xd8\xff\xe0 and an end\xff\xd9")
+        self.assertEqual([round_runner.picture_is_complete(path) for path in (empty, cut, junk, jpeg_cut, jpeg)],
+                         [False, False, False, False, True])
+        missing = self.tmp / "nothing.png"
+        self.assertFalse(round_runner.picture_is_complete(missing))
+
+    def test_an_unfinished_screenshot_is_a_missing_shot_whichever_converter_is_there(self):
+        userdata = self.tmp / "userdata"
+        (userdata / "screenshots").mkdir(parents=True)
+        tiny_png(userdata / "screenshots" / "screenshot000.png")
+        (userdata / "screenshots" / "screenshot001.png").write_bytes(b"")
+        # no Pillow and no sips: the copy of the file as it is must not take an unfinished one
+        with mock.patch.dict(sys.modules, {"PIL": None}), mock.patch.object(round_runner, "IS_MAC", False):
+            written, extra = round_runner.collect_shots(userdata, self.tmp / "shots", [(1, "a"), (2, "b")])
+        self.assertEqual(extra, 0)
+        self.assertTrue(written[0][2] is not None and written[0][2].exists())
+        self.assertIsNone(written[1][2])
+
+    def test_a_damaged_picture_is_a_missing_shot_where_pillow_reads_it(self):
+        try:
+            import PIL  # noqa: F401
+        except ImportError:
+            self.skipTest("needs Pillow")
+        good = self.tmp / "good.png"
+        tiny_png(good)
+        data = bytearray(good.read_bytes())
+        data[40:44] = b"\x00\x00\x00\x00"  # damage the compressed data, keep the signature and the end chunk
+        bad = self.tmp / "bad.png"
+        bad.write_bytes(bytes(data))
+        self.assertTrue(round_runner.picture_is_complete(bad))
+        self.assertIsNone(round_runner.convert_picture(bad, self.tmp / "bad.jpg"))
+        self.assertEqual(round_runner.convert_picture(good, self.tmp / "good.jpg"), self.tmp / "good.jpg")
+
+
 class WholeRun(unittest.TestCase):
     """A run against a script that behaves like the engine: it reads --config and --user-data, writes the log there and
     one screenshot per `shot` line, and exits."""

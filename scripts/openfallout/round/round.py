@@ -193,9 +193,32 @@ class FocusSampler(threading.Thread):
 
 # ---------------------------------------------------------------------------------------------------------------- screenshots
 
+def picture_is_complete(path):
+    """False for a file the engine began to write and did not finish (empty, a PNG with no end chunk, a JPEG with no end marker): it is
+    not a picture and must not count as evidence."""
+    try:
+        if path.stat().st_size == 0:
+            return False
+        suffix = path.suffix.lower()
+        with path.open("rb") as stream:
+            if suffix == ".png":
+                if stream.read(8) != b"\x89PNG\r\n\x1a\n":
+                    return False
+                stream.seek(-12, os.SEEK_END)
+                return stream.read(12)[4:8] == b"IEND"
+            if suffix in (".jpg", ".jpeg"):
+                stream.seek(-2, os.SEEK_END)
+                return stream.read(2) == b"\xff\xd9"
+        return True
+    except OSError:
+        return False
+
+
 def convert_picture(source, target, width=1280):
     """Writes `source` as a JPEG of quality 85 at most `width` pixels wide (Pillow when it is there, `sips` on macOS, else the
-    file is copied as it is). Gives the path written."""
+    file is copied as it is). Gives the path written, or None where the file is not a whole picture (the shot is then missing)."""
+    if not picture_is_complete(source):
+        return None
     try:
         from PIL import Image
         with Image.open(source) as image:
@@ -206,6 +229,9 @@ def convert_picture(source, target, width=1280):
         return target
     except ImportError:
         pass
+    except (OSError, ValueError):
+        # Pillow cannot read it (truncated or damaged)
+        return None
     if IS_MAC and shutil.which("sips"):
         result = subprocess.run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", "85", "--resampleWidth", str(width),
                                  str(source), "--out", str(target)], capture_output=True, check=False)
