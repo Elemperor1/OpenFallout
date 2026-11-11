@@ -635,7 +635,8 @@ def command_profile(args):
     if IS_MAC:
         userdata = home / "Library" / "Application Support" / "openfallout"
     else:
-        userdata = home / ".local" / "share" / "openfallout"
+        # the engine's own default honours XDG_DATA_HOME (components/files/linuxpath.cpp)
+        userdata = Path(os.environ.get("XDG_DATA_HOME") or home / ".local" / "share") / "openfallout"
     # The settings.cfg of the player's own configuration folder is laid under the run's by `prepare_run`, so the profile needs no
     # `settings` unless a file over that one is wanted
     saves = absolute(args.saves) if args.saves else userdata / "saves"

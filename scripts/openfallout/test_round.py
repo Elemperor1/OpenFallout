@@ -220,6 +220,24 @@ class Commands(unittest.TestCase):
             if saves:
                 self.assertEqual(written["saves"]["nv"], saves)
 
+    @unittest.skipIf(round_runner.IS_MAC, "the saves folder of macOS does not follow XDG_DATA_HOME")
+    def test_the_default_saves_folder_follows_xdg_data_home(self):
+        class Given:
+            engine = str(self.tmp / "bin" / "openfallout")
+            out = None
+            saves = None
+            profile = str(self.tmp / "xdg-profile.json")
+
+        (self.tmp / "bin").mkdir(exist_ok=True)
+        (self.tmp / "bin" / "openfallout").write_text("x")
+        (self.tmp / "Games" / "Fallout New Vegas").mkdir(parents=True, exist_ok=True)
+        (self.tmp / "Games" / "Fallout New Vegas" / "FalloutNV.esm").write_text("x")
+        with mock.patch.object(Path, "home", return_value=self.tmp), \
+                mock.patch.dict(os.environ, {"XDG_DATA_HOME": str(self.tmp / "xdg")}), \
+                contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            round_runner.command_profile(Given)
+        self.assertEqual(json.loads(Path(Given.profile).read_text())["saves"]["nv"], str(self.tmp / "xdg" / "openfallout" / "saves"))
+
     def test_command_is_headless_and_private(self):
         config = round_runner.load_round(self.round_file, self.Args())
         save = self.tmp / "saves" / "q.fos"
