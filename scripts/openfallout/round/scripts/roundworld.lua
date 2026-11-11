@@ -195,7 +195,13 @@ function r.quest(name, stage)
             if stage ~= nil then error('no such quest') end
             return 'missing'
         end
-        if stage ~= nil then quest:setStage(stage) end
+        if stage ~= nil then
+            -- setStage answers false (it does not throw) when the quest has no such stage, or the stage was done already and
+            -- may not repeat: the stage the quest is at then says whether the setup the scenario asked for is there
+            if quest:setStage(stage) == false and quest.stage ~= stage then
+                error(string.format('the quest could not be set to stage %s (it is at stage %s)', tostring(stage), tostring(quest.stage)))
+            end
+        end
         return string.format('stage=%d running=%s', quest.stage, tostring(quest.running))
     end)
     if ok then log('quest', name, result) else log('error', 'quest', name, tostring(result)) end

@@ -52,7 +52,12 @@ package.preload['openfallout.world'] = function()
     return {
         players = { player },
         globals = globals_table,
-        quests = { find = function(name) if name == 'Q' then return { stage = 5, running = true, setStage = function(self, s) self.stage = s end } end end },
+        quests = { find = function(name)
+            if name == 'Q' then return { stage = 5, running = true, setStage = function(self, s) self.stage = s end } end
+            -- setStage answers false for a stage the quest does not have, and false for a stage that was done already
+            if name == 'NoStage' then return { stage = 5, running = true, setStage = function(self, s) return false end } end
+            if name == 'Done' then return { stage = 20, running = true, setStage = function(self, s) return false end } end
+        end },
         getExteriorCell = function(gx, gy, ref) return { grid = gx .. ',' .. gy, via = ref } end,
         getCellByName = function(name) return { name = name } end,
         getCellById = function(id) return { id = id } end,
@@ -307,6 +312,17 @@ class ScenarioPlayer(unittest.TestCase):
         self.assertIn("ROUND\tquest\tQ\tstage=9 running=true", lines)
         self.assertIn("ROUND\tquest\tmissing\tmissing", lines)
         self.assertTrue(any(line.startswith("ROUND\tobject\tthing\t") and "record=rec" in line for line in lines))
+
+    def test_a_quest_stage_that_is_not_applied_is_an_error_line(self):
+        self.start("return function(r) r.quest('NoStage', 7) r.quest('Done', 20) r.log('after') end")
+        self.tick(4)
+        lines = self.lines()
+        # setStage answers false (it does not throw) for a stage the quest does not have: a failed step, and the scenario goes on
+        self.assertTrue(any(line.startswith("ROUND\terror\tquest\tNoStage\t") and "stage 7" in line and "at stage 5" in line
+                            for line in lines))
+        # a stage that is done already and the quest stands at it: nothing to apply, no error
+        self.assertIn("ROUND\tquest\tDone\tstage=20 running=true", lines)
+        self.assertIn("ROUND\tnote\tafter", lines)
 
     def test_wait_for_a_condition(self):
         self.start("return function(r) local ok = r.waitFor(function() return globals_table.Done end, 10, 'cond') r.log(tostring(ok)) end")
