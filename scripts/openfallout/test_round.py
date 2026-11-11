@@ -12,6 +12,7 @@ import textwrap
 import unittest
 import zlib
 from pathlib import Path
+from unittest import mock
 
 HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location("round_runner", HERE / "round" / "round.py")
@@ -274,6 +275,16 @@ class WholeRun(unittest.TestCase):
         self.assertEqual(report["missing_shots"], ["second"])
         text = (run / "one" / "report.md").read_text()
         self.assertIn("MISSING, so the round fails: second", text)
+
+    def test_on_a_mac_a_round_that_could_not_measure_the_focus_does_not_pass(self):
+        # no `lsappinfo` here, so every sample is empty: the round is not a proof of anything
+        with mock.patch.object(round_runner, "IS_MAC", True), mock.patch.object(round_runner.shutil, "which", return_value=None):
+            tmp, code = self.run_round(0)
+        self.assertEqual(code, 1)
+        (run,) = list((tmp / "out").iterdir())
+        report = json.loads((run / "one" / "report.json").read_text())
+        self.assertEqual(report["verdict"], "FAIL")
+        self.assertIn("NOT MEASURED", (run / "one" / "report.md").read_text())
 
     def test_a_variant_filter_that_matches_nothing_is_an_error(self):
         with self.assertRaises(SystemExit) as raised:

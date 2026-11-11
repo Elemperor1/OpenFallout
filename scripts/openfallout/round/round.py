@@ -204,7 +204,7 @@ def convert_picture(source, target, width=1280):
         pass
     if IS_MAC and shutil.which("sips"):
         result = subprocess.run(["sips", "-s", "format", "jpeg", "-s", "formatOptions", "85", "--resampleWidth", str(width),
-                                 str(source), "--out", str(target)], capture_output=True)
+                                 str(source), "--out", str(target)], capture_output=True, check=False)
         if result.returncode == 0:
             return target
     fallback = target.with_suffix(source.suffix)
@@ -389,9 +389,12 @@ def write_report(run_dir, config, variant, status, seconds, sampler, timed_out, 
     exit_note = ("" if status == 0 else
                  f"; the engine ended with status {status} after the scenario had finished (a crash while quitting)" if finished
                  else f"; the engine ended with status {status} before the scenario finished")
-    focus = ("not measured (macOS only)" if not sampler.available else
+    focus = ("not measured (macOS only)" if not sampler.available and not IS_MAC else
+             "NOT MEASURED: `lsappinfo` gave no answer, so this round cannot show that the engine stayed in the background"
+             if not sampler.available else
              f"engine was frontmost in {sampler.front} of {sampler.samples} samples")
-    if sampler.available and sampler.front:
+    # On a Mac the focus is the point of a headless run: a run that could not measure it proves nothing, so it does not pass
+    if (sampler.available and sampler.front) or (IS_MAC and not sampler.available):
         verdict = "FAIL"
     report = {"round": config["name"], "variant": name, "verdict": verdict, "exit_status": status, "exit_note": exit_note.lstrip("; "), "finished": finished,
               "seconds": round(seconds, 1),

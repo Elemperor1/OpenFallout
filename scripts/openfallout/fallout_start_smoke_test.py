@@ -5268,7 +5268,7 @@ def check_round(work, program, build, data, seconds):
     env = dict(os.environ, HOME=str(home), LIBGL_ALWAYS_SOFTWARE="1")
     result = subprocess.run([sys.executable, str(ROOT / "scripts" / "openfallout" / "round" / "round.py"), "--profile",
                              str(folder / "profile.json"), "run", str(folder / "round.json"), "--parallel", "2"],
-                            capture_output=True, text=True, env=env, timeout=seconds * 2 + 120)
+                            capture_output=True, text=True, env=env, timeout=seconds * 2 + 120, check=False)
     print(result.stdout[-1500:])
     if result.returncode != 0:
         found.append(f"round.py ended with status {result.returncode}: {result.stderr[-400:]}")
