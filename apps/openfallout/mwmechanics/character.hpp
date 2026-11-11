@@ -150,6 +150,10 @@ namespace OFMechanics
         std::string mCurrentIdle;
 
         CharacterState mMovementState{ CharState_None };
+        /// What the actor was asked to do last (walk, run, ...), whether or not there is an animation to play for it:
+        /// mMovementState is reset when there is none (the games' animations have other names than the ones of
+        /// Morrowind), and an actor that runs would then walk
+        CharacterState mMovementIntent{ CharState_None };
         std::string mCurrentMovement;
         float mMovementAnimSpeed{ 0.f };
         bool mAdjustMovementAnimSpeed{ false };
