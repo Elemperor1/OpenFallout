@@ -887,8 +887,11 @@ end
 -- attack"); Y queues too and X carries the queue out, which were the port's first buttons. The left bumper opens the screen
 -- and picks the part while it is open, the right bumper picks the character (A clicks where the pointer is while the
 -- pad holds no pick, and where nothing takes the click it queues the attack as the attack control does)
-local handlePad = pad.handler('vats',
-    function() return isOpen() and I.UI.getMode() == 'Interface' and not messageOpen() end, press,
+local function padActive()
+    return isOpen() and I.UI.getMode() == 'Interface' and not messageOpen()
+end
+
+local handlePad = pad.handler('vats', padActive, press,
     { [input.CONTROLLER_BUTTON.Y] = input.KEY.Space, [input.CONTROLLER_BUTTON.X] = input.KEY.Enter,
       [input.CONTROLLER_BUTTON.RightTrigger] = input.KEY.Space,
       [input.CONTROLLER_BUTTON.LeftShoulder] = input.KEY.W })
@@ -906,8 +909,8 @@ local function onPad(button)
     end
     handlePad(button)
     -- The left bumper picks the part (the key W), which is no key that moves the pick by itself: it holds the pick like
-    -- the arrows do, so A accepts after it
-    if button == input.CONTROLLER_BUTTON.LeftShoulder and isOpen() then
+    -- the arrows do, so A accepts after it (only while the screen has the pad: a menu over it leaves the pick alone)
+    if button == input.CONTROLLER_BUTTON.LeftShoulder and padActive() then
         pad.holdPick()
     end
 end

@@ -859,9 +859,10 @@ local function onPad(button)
             stepOption(at, button == PAD.LeftShoulder and -jump or jump)
         end
     elseif button == PAD.A then
-        -- Enter on the lit row, unless the stick moved the pointer last: the engine clicks at the pointer then, and the
-        -- row would be acted on twice
-        if pad.holdsPick() then onKey({ code = input.KEY.Enter }) end
+        -- Enter on the lit row, whether or not the pad holds the pick: the menu that a script draws takes the buttons
+        -- before the engine's pointer click (ControllerManager::gamepadToGuiControl), so A is never a click here and
+        -- the row is acted on once; A that waited for the pick would do nothing after the stick moved the pointer
+        onKey({ code = input.KEY.Enter })
     elseif button == PAD.Y then
         -- the Delete button of a list of saves has the Y button of the pad on it (the file's `_xbox_button`)
         askDelete()

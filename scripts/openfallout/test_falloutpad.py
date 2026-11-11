@@ -305,14 +305,19 @@ class ScriptsTest(unittest.TestCase):
         text = (SCRIPTS / "falloutpipboy.lua").read_text(encoding="utf-8")
         self.assertIn("if view == 'pipboy' and tab == 'stat' then pad.releasePick() end", text)
 
-    def test_the_start_menu_takes_a_as_enter_only_while_the_pad_holds_the_pick(self):
-        # Else a press after the stick moved the pointer acts twice: the engine clicks at the pointer and the row is entered
+    def test_the_start_menu_takes_a_as_enter_whether_or_not_the_pad_holds_the_pick(self):
+        # The menu that a script draws takes the buttons before the engine's pointer click, so A is never a click there:
+        # waiting for the pick would leave A dead after the stick moved the pointer
         text = (SCRIPTS / "falloutstart.lua").read_text(encoding="utf-8")
-        self.assertIn("if pad.holdsPick() then onKey({ code = input.KEY.Enter }) end", text)
+        self.assertIn("    elseif button == PAD.A then", text)
+        self.assertNotIn("if pad.holdsPick() then onKey({ code = input.KEY.Enter }) end", text)
+        self.assertRegex(text, r"elseif button == PAD\.A then\n(?:\s*--[^\n]*\n)+\s*onKey\(\{ code = input\.KEY\.Enter \}\)")
 
-    def test_the_vats_bumper_that_picks_the_part_holds_the_pick(self):
+    def test_the_vats_bumper_that_picks_the_part_holds_the_pick_only_while_the_screen_has_the_pad(self):
         text = (SCRIPTS / "falloutvats.lua").read_text(encoding="utf-8")
-        self.assertIn("button == input.CONTROLLER_BUTTON.LeftShoulder and isOpen() then\n        pad.holdPick()", text)
+        self.assertIn("button == input.CONTROLLER_BUTTON.LeftShoulder and padActive() then\n        pad.holdPick()", text)
+        # the same guard is the one the handler uses, so a menu over the screen is left alone
+        self.assertIn("pad.handler('vats', padActive, press,", text)
 
     def test_a_screen_with_no_pick_of_its_own_gives_a_back_to_the_pointer(self):
         for name in ("blackjack", "roulette", "slots", "caravan", "specialscreen"):
