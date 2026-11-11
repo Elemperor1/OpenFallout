@@ -346,6 +346,11 @@ def engine_command(profile, config, run_dir, save, extra=()):
     for data in game.get("data", []):
         command += ["--data", str(absolute(data))]
     command += ["--data", str(HERE), "--data", str(run_dir / "data")]
+    if game.get("content"):
+        # a list of plugins in the profile is the whole list: it replaces the `content=` lines of the player's own configuration
+        # (which the engine reads under the run's), as appended to them the same master would be named twice and the engine
+        # refuses to start
+        command += ["--replace", "content"]
     for content in game.get("content", []):
         command += ["--content", content]
     command += ["--content", "round.omwscripts"]
