@@ -477,7 +477,8 @@ def run_engine(command, run_dir, limit, env_extra=None, priority="low"):
 
 def missing_content(text):
     """The content files that the save wanted and the run did not load (the engine warns once for each)."""
-    return re.findall(r"Saved game dependency (\S+) is missing", text)
+    # a file name can hold spaces ("My Terrain Mod.esp"): take everything up to the " is missing" of the engine's message
+    return re.findall(r"Saved game dependency (.+?) is missing\.?[ \t]*$", text, re.MULTILINE)
 
 
 def log_tail(text, count=8):

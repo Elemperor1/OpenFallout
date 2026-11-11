@@ -419,6 +419,8 @@ class WholeRun(unittest.TestCase):
     def test_missing_content_is_read_from_the_log(self):
         self.assertEqual(round_runner.missing_content("a\nWarning: Saved game dependency X.esm is missing.\n"
                                                       "Warning: Saved game dependency Y is missing.\n"), ["X.esm", "Y"])
+        self.assertEqual(round_runner.missing_content("[10:00:01.500 W] Warning: Saved game dependency My Terrain Mod.esp "
+                                                      "is missing.\nnext line\n"), ["My Terrain Mod.esp"])
 
     def test_the_runner_stops_an_engine_that_stays_up_once_the_pictures_are_written(self):
         # the engine waits out a long delay before it quits; the runner sees the end of the scenario and both pictures
