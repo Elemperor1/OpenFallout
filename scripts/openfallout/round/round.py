@@ -364,17 +364,34 @@ def engine_command(profile, config, run_dir, save, extra=()):
     return command
 
 
+def player_config_dir():
+    """The folder of the player's own configuration (where the engine keeps its openfallout.cfg and settings.cfg)."""
+    home = Path.home()
+    if IS_MAC:
+        return home / "Library" / "Preferences" / "openfallout"
+    if os.name == "nt":
+        return home / "Documents" / "My Games" / "OpenFallout"
+    return Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config") / "openfallout"
+
+
 def prepare_run(profile, config, variant, run_dir, save):
     """Makes the private folders of one start: config (settings), userdata (a copy of the save) and data (the scenario)."""
     for sub in ("config", "userdata/saves", "data/scripts", "shots"):
         (run_dir / sub).mkdir(parents=True, exist_ok=True)
+    # The settings of the player (view distance, field of view, terrain and the rest) are the bottom layer of the run's, then the
+    # settings file of the profile if it has one. The run's `openfallout.cfg` says `replace=config`, which also takes the player's
+    # settings.cfg out of the engine's own chain of defaults, so they are laid here
     base = ""
+    mine = player_config_dir() / "settings.cfg"
+    if mine.exists():
+        base = mine.read_text(encoding="utf-8", errors="replace")
+    profile_layer = {}
     if profile.get("settings") and Path(profile["settings"]).expanduser().exists():
-        base = Path(profile["settings"]).expanduser().read_text(encoding="utf-8", errors="replace")
+        profile_layer = parse_settings(Path(profile["settings"]).expanduser().read_text(encoding="utf-8", errors="replace"))
     video = {"resolution x": str(config["resolution"][0]), "resolution y": str(config["resolution"][1])} if config.get("resolution") else {}
     if config.get("framerate"):
         video["framerate limit"] = str(config["framerate"])
-    layers = [DEFAULT_SETTINGS, {"Video": video}, config.get("settings"), variant.get("settings")]
+    layers = [profile_layer, DEFAULT_SETTINGS, {"Video": video}, config.get("settings"), variant.get("settings")]
     (run_dir / "config" / "settings.cfg").write_text(merge_settings(base, *layers), encoding="utf-8")
     # an empty configuration file, so that this folder is a configuration folder of its own (the log and the settings of the run
     # are written here, not into the player's own)
@@ -619,8 +636,8 @@ def command_profile(args):
         userdata = home / "Library" / "Application Support" / "openfallout"
     else:
         userdata = home / ".local" / "share" / "openfallout"
-    # The settings of the player's own configuration folder are read by the engine as the defaults under the run's own, so
-    # the profile needs no `settings` unless a file other than that one is wanted
+    # The settings.cfg of the player's own configuration folder is laid under the run's by `prepare_run`, so the profile needs no
+    # `settings` unless a file over that one is wanted
     saves = absolute(args.saves) if args.saves else userdata / "saves"
     profile = {"engine": str(engine), "games": games, "saves": {key: str(saves) for key in games},
                "out": str(absolute(args.out)) if args.out else None}

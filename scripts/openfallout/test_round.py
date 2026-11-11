@@ -267,6 +267,25 @@ class Commands(unittest.TestCase):
         self.assertTrue((run / "data" / "scripts" / "roundscenario.lua").exists())
         self.assertEqual(save.read_bytes(), b"x")
 
+    def test_the_players_settings_are_the_bottom_layer_of_the_run(self):
+        # `replace=config` takes the player's settings.cfg out of the engine's own chain of defaults, so the runner lays it under
+        # the settings of the profile, the round and the variant
+        player = self.tmp / "player"
+        player.mkdir()
+        (player / "settings.cfg").write_text("[Terrain]\nviewing distance = 77777\n[Video]\nresolution x = 10\n[X]\ny = player\n")
+        profile_settings = self.tmp / "profile-settings.cfg"
+        profile_settings.write_text("[Terrain]\nobject paging = false\n")
+        profile = dict(self.profile, settings=str(profile_settings))
+        config = round_runner.load_round(self.round_file, self.Args())
+        config["resolution"] = [800, 600]
+        run = self.tmp / "run-player"
+        with mock.patch.object(round_runner, "player_config_dir", return_value=player):
+            round_runner.prepare_run(profile, config, config["variants"][1], run, None)
+        settings = round_runner.parse_settings((run / "config" / "settings.cfg").read_text())
+        self.assertEqual(settings["Terrain"], {"viewing distance": "77777", "object paging": "false"})
+        self.assertEqual(settings["Video"]["resolution x"], "800")      # the round over the player
+        self.assertEqual(settings["X"], {"y": "1"})                     # the variant over the player
+
     def test_missing_scenario_is_an_error(self):
         self.round_file.write_text(json.dumps({"name": "t"}))
         with self.assertRaises(SystemExit):
