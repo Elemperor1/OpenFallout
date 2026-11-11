@@ -35,14 +35,12 @@ namespace
     TEST(SceneUtilLodDebug, readsTheWordsSeparatedBySpacesAndCommas)
     {
         std::vector<std::string> unknown;
-        const LodDebug debug = parseLodDebug(
-            " flat,no-skirt  objects-only, no-land no-records nodes fine-land,no-cluster sparkle", &unknown);
+        const LodDebug debug
+            = parseLodDebug(" flat,no-skirt  objects-only, no-land no-records nodes sparkle", &unknown);
         EXPECT_TRUE(debug.mFlat);
         EXPECT_TRUE(debug.mNoLand);
         EXPECT_TRUE(debug.mNoRecords);
         EXPECT_TRUE(debug.mNodes);
-        EXPECT_TRUE(debug.mFineLand);
-        EXPECT_TRUE(debug.mNoCluster);
         EXPECT_TRUE(debug.mNoSkirt);
         EXPECT_TRUE(debug.mObjectsOnly);
         EXPECT_FALSE(debug.mWireframe);
@@ -60,10 +58,8 @@ namespace
         EXPECT_FALSE(debug.mNoLand);
         EXPECT_FALSE(debug.mNoRecords);
         EXPECT_FALSE(debug.mNodes);
-        EXPECT_FALSE(debug.mFineLand);
-        EXPECT_FALSE(debug.mNoCluster);
         // What is drawn is not changed by the words that choose what is loaded
-        EXPECT_FALSE(parseLodDebug("objects-only no-high no-land nodes fine-land no-cluster").changesFiles());
+        EXPECT_FALSE(parseLodDebug("objects-only no-high no-land nodes").changesFiles());
     }
 
     TEST(SceneUtilLodDebug, leavesOutTheSkirtOfATile)

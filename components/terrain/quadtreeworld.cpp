@@ -316,11 +316,6 @@ namespace Terrain
 
     QuadTreeWorld::~QuadTreeWorld() {}
 
-    void QuadTreeWorld::setClusterCulling(bool enabled, bool report)
-    {
-        TerrainDrawable::setClusterCulling(enabled, report);
-    }
-
     /// get the level of vertex detail to render this node at, expressed relative to the native resolution of the vertex
     /// data set, NOT relative to mMinSize as is the case with node LODs.
     unsigned int getVertexLod(QuadTreeNode* node, int vertexLodMod)
@@ -424,17 +419,12 @@ namespace Terrain
             }
             std::ostringstream made;
 
-            unsigned int chunkLod = DefaultLodCallback::getNativeLodLevel(entry.mNode, mMinSize);
-            // The chunks of up to 2 cells get as many vertices per cell as the smallest (the stitching to the
-            // neighbours is not changed, so the edges of the chunks of the debug view can have cracks)
-            if (mFineLand && entry.mNode->getSize() <= 2.f)
-                chunkLod = 0;
-
             int managerIndex = 0;
             for (QuadTreeWorld::ChunkManager* m : mChunkManagers)
             {
                 osg::ref_ptr<osg::Node> n = m->getChunk(entry.mNode->getSize(), entry.mNode->getCenter(),
-                    static_cast<unsigned char>(chunkLod), entry.mLodFlags, activeGrid, vd->getViewPoint(), compile);
+                    static_cast<unsigned char>(DefaultLodCallback::getNativeLodLevel(entry.mNode, mMinSize)),
+                    entry.mLodFlags, activeGrid, vd->getViewPoint(), compile);
                 if (n)
                     pat->addChild(n);
                 if (report)

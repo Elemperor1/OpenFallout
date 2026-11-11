@@ -100,13 +100,6 @@ namespace Terrain
         /// manager made for it (to find out which of them draws a place)
         void setReportNodes(bool report) { mReportNodes = report; }
 
-        /// Makes the land of the records with the most vertices that its chunks have (debug)
-        void setFineLand(bool fine) { mFineLand = fine; }
-
-        /// Whether the land of the records is left out when its chunk faces away from the eye (it is, unless a debug
-        /// word says otherwise); `report` tells the first time each chunk is left out to the log
-        void setClusterCulling(bool enabled, bool report);
-
     private:
         void ensureQuadTreeBuilt();
         void loadRenderingNode(
@@ -128,7 +121,6 @@ namespace Terrain
         bool mDebugTerrainChunks;
         std::unique_ptr<DebugChunkManager> mDebugChunkManager;
         bool mReportNodes = false;
-        bool mFineLand = false;
         std::mutex mReportMutex;
         std::set<std::tuple<float, float, float>> mReportedNodes;
     };

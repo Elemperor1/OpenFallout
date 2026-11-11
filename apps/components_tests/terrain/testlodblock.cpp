@@ -151,6 +151,118 @@ namespace Terrain
             EXPECT_LT(sphere.center().y(), (4 + 2) * cellSize);
         }
 
+        // One square drawn as a pair of triangles that share two vertices, from left to left + size across and from
+        // bottom to bottom + size up
+        void addSquare(osg::Vec3Array& vertices, osg::DrawElementsUInt& indices, float left, float bottom, float size)
+        {
+            const unsigned int first = static_cast<unsigned int>(vertices.size());
+            vertices.push_back(osg::Vec3f(left, bottom, 0.f));
+            vertices.push_back(osg::Vec3f(left + size, bottom, 0.f));
+            vertices.push_back(osg::Vec3f(left, bottom + size, 0.f));
+            vertices.push_back(osg::Vec3f(left + size, bottom + size, 0.f));
+            for (const unsigned int index : { 0u, 1u, 2u, 1u, 3u, 2u })
+                indices.push_back(first + index);
+        }
+
+        TEST(TerrainLodBlock, shouldKeepAnObjectThatStandsOnThreeCellsInTheCellOfItsMiddle)
+        {
+            // One object from x 80 to 260: the middle, 170, is in the cell 1, and no triangle may be in the cell 0 or
+            // the cell 2 on its own
+            osg::ref_ptr<osg::Vec3Array> vertices(new osg::Vec3Array);
+            osg::ref_ptr<osg::DrawElementsUInt> indices(new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES));
+            vertices->push_back(osg::Vec3f(80.f, 10.f, 0.f));
+            vertices->push_back(osg::Vec3f(170.f, 10.f, 0.f));
+            vertices->push_back(osg::Vec3f(260.f, 10.f, 0.f));
+            vertices->push_back(osg::Vec3f(170.f, 60.f, 40.f));
+            for (const unsigned int index : { 0u, 1u, 3u, 1u, 2u, 3u })
+                indices->push_back(index);
+            osg::ref_ptr<osg::Geometry> geometry(new osg::Geometry);
+            geometry->setVertexArray(vertices);
+            geometry->addPrimitiveSet(indices);
+
+            const auto cells = splitBlockByCell(*geometry, 0, 0, cellSize);
+            for (int cell = 0; cell < 16; ++cell)
+                EXPECT_EQ(cells[cell] != nullptr, cell == 1) << cell;
+            ASSERT_NE(cells[1], nullptr);
+            EXPECT_EQ(countTriangles(*cells[1]), 2u);
+        }
+
+        TEST(TerrainLodBlock, shouldSeparateObjectsThatDoNotShareVertices)
+        {
+            osg::ref_ptr<osg::Vec3Array> vertices(new osg::Vec3Array);
+            osg::ref_ptr<osg::DrawElementsUInt> indices(new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES));
+            addSquare(*vertices, *indices, 20.f, 20.f, 60.f);
+            addSquare(*vertices, *indices, 120.f, 20.f, 60.f);
+            addSquare(*vertices, *indices, 320.f, 320.f, 60.f);
+            osg::ref_ptr<osg::Geometry> geometry(new osg::Geometry);
+            geometry->setVertexArray(vertices);
+            geometry->addPrimitiveSet(indices);
+
+            const auto cells = splitBlockByCell(*geometry, 0, 0, cellSize);
+            for (int cell = 0; cell < 16; ++cell)
+                EXPECT_EQ(cells[cell] != nullptr, cell == 0 || cell == 1 || cell == 15) << cell;
+            EXPECT_EQ(countTriangles(*cells[0]), 2u);
+            EXPECT_EQ(countTriangles(*cells[1]), 2u);
+            EXPECT_EQ(countTriangles(*cells[15]), 2u);
+        }
+
+        TEST(TerrainLodBlock, shouldGoByTrianglesWhenAnObjectIsWiderThanTheBlock)
+        {
+            // Triangles one cell after the other along six cells, tied together by thin triangles that share a vertex
+            // with each neighbour: one connected mesh that is wider than the block
+            osg::ref_ptr<osg::Vec3Array> vertices(new osg::Vec3Array);
+            osg::ref_ptr<osg::DrawElementsUInt> indices(new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES));
+            for (int i = 0; i < 6; ++i)
+            {
+                const unsigned int first = static_cast<unsigned int>(vertices->size());
+                vertices->push_back(osg::Vec3f(i * cellSize + 10.f, 10.f, 0.f));
+                vertices->push_back(osg::Vec3f(i * cellSize + 90.f, 10.f, 0.f));
+                vertices->push_back(osg::Vec3f(i * cellSize + 50.f, 50.f, 0.f));
+                indices->push_back(first);
+                indices->push_back(first + 1);
+                indices->push_back(first + 2);
+            }
+            for (unsigned int i = 0; i + 1 < 6; ++i)
+            {
+                indices->push_back(i * 3 + 1);
+                indices->push_back(i * 3 + 2);
+                indices->push_back((i + 1) * 3);
+            }
+            osg::ref_ptr<osg::Geometry> geometry(new osg::Geometry);
+            geometry->setVertexArray(vertices);
+            geometry->addPrimitiveSet(indices);
+
+            const auto cells = splitBlockByCell(*geometry, 0, 0, cellSize);
+            // Every cell of the first row has triangles of its own, and what is past the block is put in its last cell
+            for (int cell = 0; cell < 16; ++cell)
+                EXPECT_EQ(cells[cell] != nullptr, cell < 4) << cell;
+            std::size_t triangles = 0;
+            for (int cell = 0; cell < 4; ++cell)
+            {
+                ASSERT_NE(cells[cell], nullptr) << cell;
+                EXPECT_GE(countTriangles(*cells[cell]), 2u) << cell;
+                triangles += countTriangles(*cells[cell]);
+            }
+            EXPECT_EQ(triangles, 11u);
+        }
+
+        TEST(TerrainLodBlock, shouldDropAnObjectWhoseCellIsNotWantedWhole)
+        {
+            osg::ref_ptr<osg::Vec3Array> vertices(new osg::Vec3Array);
+            osg::ref_ptr<osg::DrawElementsUInt> indices(new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES));
+            // x 30 to 270: the middle is in the cell 1
+            addSquare(*vertices, *indices, 30.f, 20.f, 240.f);
+            osg::ref_ptr<osg::Geometry> geometry(new osg::Geometry);
+            geometry->setVertexArray(vertices);
+            geometry->addPrimitiveSet(indices);
+
+            // The cells 0 and 2 are wanted and the cell 1 is loaded: the real objects of the cell 1 are drawn there
+            // and none of this one is, not even its part in the cells 0 and 2
+            const auto cells = splitBlockByCell(*geometry, 0, 0, cellSize, (1u << 0) | (1u << 2));
+            for (int cell = 0; cell < 16; ++cell)
+                EXPECT_EQ(cells[cell], nullptr) << cell;
+        }
+
         // Counts the geometries that have a given state set on one of the nodes above them
         struct CountUnderStateSet : public osg::NodeVisitor
         {

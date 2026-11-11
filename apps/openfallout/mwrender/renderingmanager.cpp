@@ -1645,8 +1645,6 @@ namespace OFRender
                         return falloutLod->splitsTerrain(size, center);
                     });
                 quadTreeWorld->setReportNodes(lodOptions.mDebug.mNodes);
-                quadTreeWorld->setFineLand(lodOptions.mDebug.mFineLand);
-                quadTreeWorld->setClusterCulling(!lodOptions.mDebug.mNoCluster, lodOptions.mDebug.mNodes);
                 quadTreeWorld->addChunkManager(newChunkMgr.mFalloutLod.get());
                 mResourceSystem->addResourceManager(newChunkMgr.mFalloutLod.get());
                 newChunkMgr.mGameLodDistance = Settings::terrain().mGameLodDistance;
