@@ -165,6 +165,22 @@ class ScenarioPlayer(unittest.TestCase):
         self.assertEqual(self.lua.eval("teleports[2].cell.name"), "Vault")
         self.assertFalse(self.lua.eval("teleports[2].options.onGround"))
 
+    def test_a_step_that_fails_is_an_error_line(self):
+        # round.py fails the round on a line that starts with `error`
+        self.start("return function(r) "
+                   "r.world.getCellByName = function() error('no such cell') end "
+                   "local ok = r.teleport{ cell = 'Nowhere', pos = { 1, 2, 3 }, label = 'there' } "
+                   "r.world.globals = nil r.hour(14) "
+                   "r.quest('missing', 3) r.log(tostring(ok)) end")
+        self.tick(4)
+        lines = self.lines()
+        self.assertTrue(any(line.startswith("ROUND\terror\tteleport\t") and "no such cell" in line and "\tthere\t" in line
+                            for line in lines))
+        self.assertTrue(any(line.startswith("ROUND\terror\thour\t") for line in lines))
+        self.assertTrue(any(line.startswith("ROUND\terror\tquest\tmissing\t") for line in lines))
+        self.assertIn("ROUND\tnote\tfalse", lines)
+        self.assertFalse(any(line.startswith("ROUND\tteleport\t") for line in lines))
+
     def test_hour_global_and_quest(self):
         self.start("return function(r) r.hour(14) r.global('GameHour') r.quest('Q', 9) r.quest('missing') "
                    "r.object('FormId:0x1', 'thing') end")

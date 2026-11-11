@@ -382,7 +382,10 @@ def write_report(run_dir, config, variant, status, seconds, sampler, timed_out, 
     # The scenario ended (`done end`): what the round asked is answered, so a crash while the engine quits (a known fault of
     # the Linux builds: the Lua state is closed with references left in it) is a note, not a failed round
     finished = any(line.startswith("done\tend") for line in lines)
-    verdict = "PASS" if finished and not timed_out and not errors else "FAIL"
+    # A screenshot that was asked for and never written is no evidence: the round fails (the engine writes the picture in the
+    # background, so a crash while quitting can lose the last ones)
+    missing = [shot for _, shot, path in shots if path is None]
+    verdict = "PASS" if finished and not timed_out and not errors and not missing else "FAIL"
     exit_note = ("" if status == 0 else
                  f"; the engine ended with status {status} after the scenario had finished (a crash while quitting)" if finished
                  else f"; the engine ended with status {status} before the scenario finished")
@@ -393,7 +396,7 @@ def write_report(run_dir, config, variant, status, seconds, sampler, timed_out, 
     report = {"round": config["name"], "variant": name, "verdict": verdict, "exit_status": status, "exit_note": exit_note.lstrip("; "), "finished": finished,
               "seconds": round(seconds, 1),
               "timed_out": timed_out, "focus_samples": sampler.samples, "focus_front": sampler.front,
-              "warnings": levels["W"], "errors": levels["E"], "scenario_errors": errors,
+              "warnings": levels["W"], "errors": levels["E"], "scenario_errors": errors, "missing_shots": missing,
               "shots": [{"n": n, "name": shot, "file": str(path) if path else None} for n, shot, path in shots],
               "round_lines": lines, "command": command}
     (run_dir / "report.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
@@ -402,7 +405,8 @@ def write_report(run_dir, config, variant, status, seconds, sampler, timed_out, 
            f"scenario {'finished' if finished else 'NOT finished'}",
            f"- focus: {focus}",
            f"- log: {levels['W']} warnings, {levels['E']} errors; scenario errors: {len(errors)}" + exit_note,
-           f"- screenshots: {sum(1 for s in shots if s[2])} of {len(shots)}" + (f" ({extra_shots} more than the scenario took)" if extra_shots else ""),
+           f"- screenshots: {sum(1 for s in shots if s[2])} of {len(shots)}" + (f" ({extra_shots} more than the scenario took)" if extra_shots else "") +
+           (f"; MISSING, so the round fails: {', '.join(missing)}" if missing else ""),
            "", "## Scenario lines", "", "```"] + lines[:400] + ["```", ""]
     if problems:
         out += ["## First warnings and errors", ""] + [f"- {level} x{count}: {message}" for level, message, count in problems] + [""]

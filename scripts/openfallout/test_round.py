@@ -222,16 +222,18 @@ class WholeRun(unittest.TestCase):
         lines = ["[10:00:00.000 I] start", "[10:00:01.000 W] Cannot read 0x1234"]
         for n, name in enumerate(("first", "second"), 1):
             lines.append("[10:00:02.000 I] ROUND\\tshot\\t%s\\tn=%d" % (name, n))
-            png(shots / ("screenshot%03d.png" % (n - 1)))
+            if n <= @WRITTEN@:
+                png(shots / ("screenshot%03d.png" % (n - 1)))
         if @DONE@:
             lines.append("[10:00:03.000 I] ROUND\\tdone\\tend")
         (config / "openfallout.log").write_text("\\n".join(lines) + "\\n")
         sys.exit(@STATUS@)
     """
 
-    def run_round(self, status, done=True):
+    def run_round(self, status, done=True, written=2):
         tmp = Path(tempfile.mkdtemp(prefix="round-run-"))
-        engine = self.make_engine(tmp, self.ENGINE.replace("@STATUS@", str(status)).replace("@DONE@", str(done)))
+        engine = self.make_engine(tmp, self.ENGINE.replace("@STATUS@", str(status)).replace("@DONE@", str(done))
+                                  .replace("@WRITTEN@", str(written)))
         (tmp / "s.lua").write_text("return function(r) end")
         profile = {"engine": str(engine), "resources": str(tmp),
                    "games": {"nv": {"data": [str(tmp)], "content": ["FalloutNV.esm"]}}, "out": str(tmp / "out")}
@@ -262,6 +264,16 @@ class WholeRun(unittest.TestCase):
         self.assertEqual(report["exit_status"], 3)
         self.assertIn("after the scenario had finished", report["exit_note"])
         self.assertIn("after the scenario had finished", (run / "one" / "report.md").read_text())
+
+    def test_a_screenshot_that_was_asked_for_and_never_written_fails_the_round(self):
+        tmp, code = self.run_round(0, written=1)
+        self.assertEqual(code, 1)
+        (run,) = list((tmp / "out").iterdir())
+        report = json.loads((run / "one" / "report.json").read_text())
+        self.assertEqual(report["verdict"], "FAIL")
+        self.assertEqual(report["missing_shots"], ["second"])
+        text = (run / "one" / "report.md").read_text()
+        self.assertIn("MISSING, so the round fails: second", text)
 
     def test_an_engine_that_ends_before_the_scenario_fails(self):
         tmp, code = self.run_round(3, done=False)

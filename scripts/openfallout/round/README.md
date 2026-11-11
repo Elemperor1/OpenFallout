@@ -60,8 +60,10 @@ round's). Edit it by hand for Tale of Two Wastelands (`data` = the New Vegas fol
 `scripts/roundscenario.lua` returns a function that is given `r` and runs as a coroutine, or a table `{ run = function(r) ...
 end, limit = <seconds>, delay = <seconds before the first step> }`. Steps that wait (`wait`, `waitFor`, `shot` and all that ask
 the player script) must be called from the function itself, not from inside a `pcall`. Every step logs a line that starts with
-`ROUND`; a step that fails logs it and the scenario goes on, except an error in the scenario's own code, which ends it (`ROUND
-error scenario`) and makes the round fail.
+`ROUND`; a step that fails (a teleport to a place that is not there, a quest that does not exist) logs a `ROUND error ...` line and the
+scenario goes on, so that the report shows everything that went wrong, but the round fails; an error in the scenario's own code
+ends it (`ROUND error scenario`) and makes the round fail too. A screenshot that was asked for and never written fails the round
+as well.
 
 | step | does |
 |---|---|

@@ -14,6 +14,13 @@ local world = require('openfallout.world')
 
 local function log(...) print('ROUND', ...) end
 
+-- A step that fails logs a line that starts with `error`: round.py fails the round on it (the scenario goes on, so that the
+-- report shows everything that went wrong, but a round that asked for a place it did not get is not a pass)
+local function outcome(step, ok, err, ...)
+    if ok then log(step, 'ok', ...) else log('error', step, tostring(err), ...) end
+    return ok
+end
+
 local loaded, scenario = pcall(require, 'scripts.roundscenario')
 if not loaded then
     log('error', 'no scenario', tostring(scenario))
@@ -126,16 +133,14 @@ function r.teleport(o)
         if o.yaw then options.rotation = util.transform.rotateZ(o.yaw) end
         p:teleport(cell, pos, options)
     end)
-    log('teleport', ok and 'ok' or tostring(err), o.label or '-',
+    return outcome('teleport', ok, err, o.label or '-',
         o.pos and string.format('pos=%.0f,%.0f,%s', o.pos[1], o.pos[2], o.pos[3] and string.format('%.0f', o.pos[3]) or '-') or '-')
-    return ok
 end
 
 -- The hour of the day (the game's global GameHour)
 function r.hour(hour)
     local ok, err = pcall(function() world.globals.GameHour = hour end)
-    log('hour', ok and 'ok' or tostring(err), string.format('%.2f', hour))
-    return ok
+    return outcome('hour', ok, err, string.format('%.2f', hour))
 end
 
 -- Reads a global variable, or sets it too when a value is given
@@ -144,7 +149,7 @@ function r.global(name, value)
         if value ~= nil then world.globals[name] = value end
         return world.globals[name]
     end)
-    log('global', name, ok and tostring(result) or ('error ' .. tostring(result)))
+    if ok then log('global', name, tostring(result)) else log('error', 'global', name, tostring(result)) end
     return ok and result or nil
 end
 
@@ -152,31 +157,37 @@ end
 function r.quest(name, stage)
     local ok, result = pcall(function()
         local quest = world.quests.find(name)
-        if quest == nil then return 'missing' end
+        if quest == nil then
+            -- asking for a quest that is not there is an answer; asking to put it at a stage is a failed step
+            if stage ~= nil then error('no such quest') end
+            return 'missing'
+        end
         if stage ~= nil then quest:setStage(stage) end
         return string.format('stage=%d running=%s', quest.stage, tostring(quest.running))
     end)
-    log('quest', name, ok and result or ('error ' .. tostring(result)))
+    if ok then log('quest', name, result) else log('error', 'quest', name, tostring(result)) end
     return ok and result or nil
 end
 
 -- Logs what the world says about an object ("FormId:0x..." or { file, id })
 function r.object(form, label)
     local ok, result = pcall(function() return describe(lookup(form)) end)
-    log('object', tostring(label or (type(form) == 'string' and form or form[2])), ok and result or ('error ' .. tostring(result)))
+    local what = tostring(label or (type(form) == 'string' and form or form[2]))
+    if ok then log('object', what, result) else log('error', 'object', what, tostring(result)) end
     return ok and lookup(form) or nil
 end
 
 function r.activate(form, label)
     local ok, err = pcall(function() lookup(form):activateBy(player()) end)
-    log('activate', tostring(label or (type(form) == 'string' and form or form[2])), ok and 'ok' or tostring(err))
+    local what = tostring(label or (type(form) == 'string' and form or form[2]))
+    if ok then log('activate', what, 'ok') else log('error', 'activate', what, tostring(err)) end
     return ok
 end
 
 -- How fast the game goes relative to the clock (1 is normal; more than about 5 makes the physics step too long)
 function r.speed(scale)
     local ok, err = pcall(function() world.setSimulationTimeScale(scale) end)
-    log('speed', ok and 'ok' or tostring(err), string.format('%.2f', scale))
+    return outcome('speed', ok, err, string.format('%.2f', scale))
 end
 
 r.world = world
