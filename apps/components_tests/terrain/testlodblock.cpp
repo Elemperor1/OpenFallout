@@ -250,15 +250,16 @@ namespace Terrain
         {
             osg::ref_ptr<osg::Vec3Array> vertices(new osg::Vec3Array);
             osg::ref_ptr<osg::DrawElementsUInt> indices(new osg::DrawElementsUInt(osg::PrimitiveSet::TRIANGLES));
-            // x 30 to 270: the middle is in the cell 1
-            addSquare(*vertices, *indices, 30.f, 20.f, 240.f);
+            // x 80 to 260, y 0 to 180: the middle is in the cell 1, and the center of one of the two triangles is in the
+            // cell 6
+            addSquare(*vertices, *indices, 80.f, 0.f, 180.f);
             osg::ref_ptr<osg::Geometry> geometry(new osg::Geometry);
             geometry->setVertexArray(vertices);
             geometry->addPrimitiveSet(indices);
 
-            // The cells 0 and 2 are wanted and the cell 1 is loaded: the real objects of the cell 1 are drawn there
-            // and none of this one is, not even its part in the cells 0 and 2
-            const auto cells = splitBlockByCell(*geometry, 0, 0, cellSize, (1u << 0) | (1u << 2));
+            // The cell 1 is loaded and not wanted, the cells 0, 2 and 6 are wanted: no part of the object is made, not
+            // even the triangle whose center is in the cell 6
+            const auto cells = splitBlockByCell(*geometry, 0, 0, cellSize, (1u << 0) | (1u << 2) | (1u << 6));
             for (int cell = 0; cell < 16; ++cell)
                 EXPECT_EQ(cells[cell], nullptr) << cell;
         }
