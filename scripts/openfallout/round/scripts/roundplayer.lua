@@ -17,6 +17,8 @@ local shots = 0
 local BOX_DELAY = 1.0
 local answerBoxes = true
 local boxSerial, boxSeenAt, boxAnswered = nil, 0, nil
+-- the real time at which a box was last open or answered (the question `quiet` says how long ago)
+local lastBoxAt = nil
 -- the lengths of the last frames, in milliseconds, with the real time at which each one ended
 local frames = {}
 local MAX_FRAMES = 600
@@ -52,6 +54,7 @@ local function answerBox()
     -- an answered box stays in the list until the frame after, and the next one has another serial
     if box.serial == boxAnswered then return end
     local now = core.getRealTime()
+    lastBoxAt = now
     if box.serial ~= boxSerial then
         boxSerial, boxSeenAt = box.serial, now
         log('box', 'serial=' .. tostring(box.serial), 'buttons=' .. #box.buttons, 'form=' .. tostring(box.form),
@@ -60,11 +63,18 @@ local function answerBox()
     if answerBoxes and now - boxSeenAt >= BOX_DELAY then
         local ok, pressed = pcall(core.messageBox.press, 1)
         log('box', 'serial=' .. tostring(box.serial), 'press 1', tostring(ok and pressed))
-        boxAnswered, boxSerial = box.serial, nil
+        boxAnswered, boxSerial, lastBoxAt = box.serial, nil, now
     end
 end
 
 local handlers = {}
+
+-- Whether a box is open and for how many seconds none has been (the add-ons of a save open their notices one after the other
+-- when a place has loaded); boxes that are left open (`boxes` with answer = false) do not count
+function handlers.quiet()
+    if not answerBoxes then return { open = false, quiet = 1e9 } end
+    return { open = openBox() ~= nil, quiet = lastBoxAt and (core.getRealTime() - lastBoxAt) or 1e9 }
+end
 
 function handlers.boxes(args)
     answerBoxes = args.answer ~= false

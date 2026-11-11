@@ -72,7 +72,8 @@ as well.
 | `r.wait(seconds)`, `r.waitFor(fn, timeout, label)` | real seconds go by, or until `fn()` is true |
 | `r.teleport{ pos = {x, y, z}, yaw, onGround, cell, cellId, worldspace, label }` | takes the player to a place (the cell of the position in the worldspace of the cell the player is in, or `cell` by name, `cellId`) |
 | `r.look(yaw, pitch)`, `r.camera('FirstPerson')` | the camera (radians; a positive pitch looks down, as in the rest of the Lua API) |
-| `r.shot(name)` | an engine screenshot (what the game draws, the same as the screenshot key) |
+| `r.shot(name[, false])` | an engine screenshot (what the game draws, the same as the screenshot key); it first waits (`r.settle`) until no message box has been open for 3 s, because the add-ons of a save open their notices one after the other when a place has loaded; `false` takes the picture at once |
+| `r.settle([quiet[, timeout]])` | waits until no message box has been open for `quiet` seconds (3), at most `timeout` seconds (40); a timeout is a note (`ROUND settle timeout`), and the `shot` line then says `box=<number>` if one is open |
 | `r.eye(label)`, `r.ground(label, {{dx, dy}...})`, `r.actors(label, radius, count)`, `r.fps(label, seconds)` | log the player's place and camera, the height of the ground under the eye and offsets, the characters near the player (record id, distance, place), the frame times |
 | `r.hour(h)`, `r.global(name[, value])`, `r.quest(name[, stage])`, `r.speed(scale)` | the game's clock, a global, a quest, the speed of the world |
 | `r.object(form[, label])`, `r.activate(form)` | what the world says about an object (`"FormId:0x..."` or `{file, id}`), activate it |

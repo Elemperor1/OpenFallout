@@ -160,8 +160,45 @@ class ScenarioPlayer(unittest.TestCase):
         self.assertTrue(any("the player script did not answer" in line for line in self.lines()))
         self.assertIn("ROUND\tnote\tafter", self.lines())
 
+    def play_player(self, scenario, reply, ticks=60, step=0.3):
+        """Runs a scenario with a player script played by the test: `reply(what)` gives the result table for each question
+        (a dict); gives the questions in the order they were asked."""
+        self.start(scenario)
+        seen = []
+        self.tick(3.5, answer=False)
+        for _ in range(ticks):
+            sent = self.lua.eval("sent_to_player")
+            events = [sent[index] for index in range(1, len(sent) + 1)]
+            self.lua.execute("sent_to_player = {}")
+            for event in events:
+                seen.append(event.data.what)
+                self.module.eventHandlers.RoundAnswer(
+                    self.lua.table_from({"id": event.data.id, "result": self.lua.table_from(reply(event.data.what))}))
+            self.tick(step, answer=False)
+        return seen
+
+    def test_a_shot_waits_for_the_message_boxes_to_come_to_rest(self):
+        replies = [dict(open=True), dict(open=False, quiet=1.0), dict(open=False, quiet=3.5)]
+        seen = self.play_player("return function(r) r.shot('s') r.log('after') end",
+                                lambda what: replies.pop(0) if what == "quiet" and replies else {})
+        self.assertEqual(seen, ["quiet", "quiet", "quiet", "shot"])
+        self.assertIn("ROUND\tnote\tafter", self.lines())
+
+    def test_settle_gives_up_after_its_timeout_and_the_scenario_goes_on(self):
+        seen = self.play_player("return function(r) r.log(tostring(r.settle(3, 2))) r.log('after') end",
+                                lambda what: dict(open=True), ticks=30)
+        self.assertGreater(len(seen), 3)
+        self.assertTrue(any(line.startswith("ROUND\tsettle\ttimeout") for line in self.lines()))
+        self.assertIn("ROUND\tnote\tfalse", self.lines())
+        self.assertIn("ROUND\tnote\tafter", self.lines())
+        self.assertFalse(any(line.startswith("ROUND\terror") for line in self.lines()))
+
+    def test_a_shot_without_settling_does_not_ask_about_boxes(self):
+        seen = self.play_player("return function(r) r.shot('s', false) end", lambda what: {}, ticks=6)
+        self.assertEqual(seen, ["shot"])
+
     def test_shot_waits_a_little_for_the_file(self):
-        self.start("return function(r) r.shot('s') r.log('after') end")
+        self.start("return function(r) r.shot('s', false) r.log('after') end")
         self.tick(4)
         self.tick(0.1)                     # the answer is taken, the 0.6 s of the file begin
         self.assertNotIn("ROUND\tnote\tafter", self.lines())
@@ -419,6 +456,30 @@ class PlayerScript(unittest.TestCase):
         self.ask("boxes", answer=True)
         self.tick_frames(1.5)
         self.assertEqual(self.lua.eval("#pressed"), 1)
+
+    def quiet(self):
+        self.ask("quiet")
+        answers = self.lua.eval("answers")
+        return answers[len(answers)].data.result
+
+    def test_quiet_says_whether_a_box_is_open_and_how_long_none_has_been(self):
+        self.assertEqual(self.quiet().open, False)
+        self.assertGreater(self.quiet().quiet, 1e8)       # no box was ever open
+        self.open_box(serial=1)
+        self.tick_frames(0.25)
+        self.assertEqual(self.quiet().open, True)
+        self.tick_frames(1.5)                              # answered after a second
+        result = self.quiet()
+        self.assertEqual(result.open, False)
+        self.assertLess(result.quiet, 1.0)
+        self.tick_frames(3)
+        self.assertGreaterEqual(self.quiet().quiet, 3.0)
+
+    def test_quiet_ignores_boxes_that_are_left_open(self):
+        self.ask("boxes", answer=False)
+        self.open_box(serial=1)
+        self.tick_frames(0.5)
+        self.assertEqual(self.quiet().open, False)
 
     def test_unknown_question_is_answered_with_an_error(self):
         self.ask("nonsense")

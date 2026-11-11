@@ -91,9 +91,33 @@ local function ask(what, args)
     return reply
 end
 
+-- Waits until no message box has been open for `quiet` real seconds (3 by default), at most `timeout` seconds (40): the boxes that
+-- the game opens are answered by the player script one second after they open, and the next one can follow at once. Gives whether
+-- it came to rest; a timeout is a note (the `shot` line then says which box was open), not a failed round.
+function r.settle(quiet, timeout)
+    quiet, timeout = quiet or 3, timeout or 40
+    local started_at = now()
+    local deadline = started_at + timeout
+    while true do
+        local reply = ask('quiet', {})
+        if reply == nil then return false end
+        if not reply.open and (reply.quiet or math.huge) >= quiet then
+            if now() - started_at >= 0.5 then log('settle', 'ok', string.format('waited=%.1f', now() - started_at)) end
+            return true
+        end
+        if now() >= deadline then
+            log('settle', 'timeout', string.format('waited=%.1f', now() - started_at))
+            return false
+        end
+        r.wait(0.25)
+    end
+end
+
 -- Takes a screenshot of what the engine draws. The file is `screenshotNNN` in the screenshots folder of the user data; the
 -- line `ROUND shot <name> n=<number>` says which is which, and round.py renames them
-function r.shot(name)
+function r.shot(name, settle)
+    -- a picture with a message box in it shows nothing: the notices of add-ons come one after the other when a place has loaded
+    if settle ~= false then r.settle() end
     local reply = ask('shot', { name = name })
     shotsTaken = shotsTaken + 1
     -- the engine writes the picture on the frame after, in the background
