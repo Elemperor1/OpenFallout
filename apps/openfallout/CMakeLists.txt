@@ -28,7 +28,7 @@ add_openfallout_dir (mwrender
 
 add_openfallout_dir (mwinput
     actions actionmanager bindingsmanager controllermanager controlswitch
-    inputmanagerimp mousemanager keyboardmanager sensormanager gyromanager
+    inputmanagerimp inputlog mousemanager keyboardmanager sensormanager gyromanager
     )
 
 add_openfallout_dir (mwgui

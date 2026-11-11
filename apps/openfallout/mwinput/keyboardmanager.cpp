@@ -13,6 +13,7 @@
 
 #include "actions.hpp"
 #include "bindingsmanager.hpp"
+#include "inputlog.hpp"
 
 namespace OFInput
 {
@@ -31,6 +32,14 @@ namespace OFInput
 
     void KeyboardManager::keyPressed(const SDL_KeyboardEvent& arg)
     {
+        // (what is typed into a text, a name or the console, is not logged)
+        if (arg.repeat == 0)
+            logInput(InputLogKind::Key,
+                SDL_IsTextInputActive()
+                    ? std::string("key=(typing)")
+                    : std::string("key=") + SDL_GetKeyName(arg.keysym.sym) + " gui="
+                        + (OFBase::Environment::get().getWindowManager()->isGuiMode() ? "1" : "0"));
+
         // HACK: to make default keybinding for the console work without printing an extra "^" upon closing
         // This assumes that SDL_TextInput events always come *after* the key event
         // (which is somewhat reasonable, and hopefully true for all SDL platforms)

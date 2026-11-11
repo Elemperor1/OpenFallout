@@ -433,6 +433,8 @@ local function openMenu(view)
     local opened = menuModule.open(FILE)
     if not opened then return false end
     shown = opened
+    -- No row here is picked by the D-pad: A is the click at the pointer, whatever an earlier screen held
+    padModule.releasePick()
     symbols = view.symbols
     shown:onClick('SMM_Spin', onButton(spin))
     shown:onClick('SMM_IncreaseBet', onButton(increase))

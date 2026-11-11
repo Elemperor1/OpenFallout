@@ -42,6 +42,11 @@ namespace FalloutScript::FallDamage
     /// the characters of the world, whose falls are not read yet.
     double damageByPlayerMultiplier(int difficulty);
 
+    /// What the difficulty makes of the damage of a blow to health (the executables' helper that every damage with an
+    /// attacker passes before it reaches the health): the player takes damageToPlayerMultiplier of a blow from another,
+    /// the characters the player hits take damageByPlayerMultiplier, and a blow between two others is as it is.
+    double blowMultiplier(int difficulty, bool attackerIsPlayer, bool victimIsPlayer);
+
     /// Whether the damage is a heavy landing, which has its own sound (above the threshold; the light one otherwise)
     bool isHardLanding(const Settings& settings, double damage);
 

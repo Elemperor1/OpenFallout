@@ -65,6 +65,10 @@ namespace OFBase
         virtual void setDragDrop(bool dragDrop) = 0;
         virtual bool isGamepadGuiCursorEnabled() = 0;
         virtual void setGamepadGuiCursorEnabled(bool enabled) = 0;
+        // A screen of a script holds the pick that the D-pad made: the pad's A acts on it (the script hears it) and is
+        // no click at the pointer. It is let go when the stick moves the pointer, and when the screens are shut.
+        virtual void setPadPick(bool pick) = 0;
+        virtual bool padPick() const = 0;
 
         virtual void toggleControlSwitch(std::string_view sw, bool value) = 0;
         virtual bool getControlSwitch(std::string_view sw) = 0;

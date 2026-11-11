@@ -962,9 +962,18 @@ local function pageKey(code)
     return true
 end
 
--- X drops the item; the other buttons stand for the keys of every screen
-local onPad = pad.handler('pipboy', function() return visible and I.UI.getMode() == 'Interface' and not messageOpen() end, press,
-    { [input.CONTROLLER_BUTTON.X] = input.KEY.D })
+-- The pad on the Pip-Boy (falloutpad.lua has the buttons): over a question (how many) or a screen of its own, and on the
+-- level up, the buttons are the plain arrows and pages of that screen
+local onPad = pad.handler('pipboy', function() return visible and I.UI.getMode() == 'Interface' and not messageOpen() end,
+    function(code)
+        press(code, symbolOf(code))
+        -- The stats page has no row that Enter acts on (its level-up button is a click), so a press that lands there gives
+        -- A back to the pointer; the pages with rows (the items, the data) keep the pick
+        if view == 'pipboy' and tab == 'stat' then pad.releasePick() end
+    end,
+    pad.pipboyOwn(function()
+        return dropPrompt ~= nil or view ~= 'pipboy' or (itemsPage.isOpen() and itemsPage.modalOpen())
+    end))
 
 return {
     engineHandlers = {

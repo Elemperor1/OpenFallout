@@ -13,6 +13,7 @@
 #include "../mwbase/inputmanager.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwinput/actions.hpp"
+#include "../mwinput/controllermanager.hpp"
 
 #include "context.hpp"
 #include "luamanagerimp.hpp"
@@ -238,6 +239,17 @@ namespace OFLua
         api["isAltPressed"] = []() -> bool { return SDL_GetModState() & KMOD_ALT; };
         api["isSuperPressed"] = []() -> bool { return SDL_GetModState() & KMOD_GUI; };
         api["isControllerButtonPressed"] = [input](int button) {
+            // The triggers are axes: they count as pressed past the press threshold of the GUI settings, as a screen
+            // hears them
+            if (button == OFInput::ControllerManager::sLeftTriggerButton
+                || button == OFInput::ControllerManager::sRightTriggerButton)
+            {
+                const SDL_GameControllerAxis axis = button == OFInput::ControllerManager::sLeftTriggerButton
+                    ? SDL_CONTROLLER_AXIS_TRIGGERLEFT
+                    : SDL_CONTROLLER_AXIS_TRIGGERRIGHT;
+                return input->getControllerAxisValue(axis) * 32767.f
+                    >= static_cast<float>(Settings::gui().mControllerTriggerPressThreshold);
+            }
             return input->isControllerButtonPressed(static_cast<SDL_GameControllerButton>(button));
         };
         api["isMouseButtonPressed"]
@@ -248,6 +260,10 @@ namespace OFLua
             input->setGamepadGuiCursorEnabled(v);
             OFBase::Environment::get().getWindowManager()->setCursorActive(v);
         };
+        // The pick that the D-pad made on a screen of a script: A acts on it (and is no click at the pointer) until the
+        // stick moves the pointer. The script says that it holds a pick; the engine lets it go (falloutpad.lua)
+        api["_setPadPick"] = [input](bool pick) { input->setPadPick(pick); };
+        api["_padPick"] = [input]() -> bool { return input->padPick(); };
         api["getMouseMoveX"] = [input]() { return input->getMouseMoveX(); };
         api["getMouseMoveY"] = [input]() { return input->getMouseMoveY(); };
         api["getAxisValue"] = [input](int axis) {
@@ -330,30 +346,33 @@ namespace OFLua
                 }));
 
         api["CONTROLLER_BUTTON"]
-            = LuaUtil::makeStrictReadOnly(LuaUtil::tableFromPairs<std::string_view, SDL_GameControllerButton>(lua,
+            = LuaUtil::makeStrictReadOnly(LuaUtil::tableFromPairs<std::string_view, int>(lua,
                 {
-                    { "A", SDL_CONTROLLER_BUTTON_A },
-                    { "B", SDL_CONTROLLER_BUTTON_B },
-                    { "X", SDL_CONTROLLER_BUTTON_X },
-                    { "Y", SDL_CONTROLLER_BUTTON_Y },
-                    { "Back", SDL_CONTROLLER_BUTTON_BACK },
-                    { "Guide", SDL_CONTROLLER_BUTTON_GUIDE },
-                    { "Start", SDL_CONTROLLER_BUTTON_START },
-                    { "LeftStick", SDL_CONTROLLER_BUTTON_LEFTSTICK },
-                    { "RightStick", SDL_CONTROLLER_BUTTON_RIGHTSTICK },
-                    { "LeftShoulder", SDL_CONTROLLER_BUTTON_LEFTSHOULDER },
-                    { "RightShoulder", SDL_CONTROLLER_BUTTON_RIGHTSHOULDER },
-                    { "DPadUp", SDL_CONTROLLER_BUTTON_DPAD_UP },
-                    { "DPadDown", SDL_CONTROLLER_BUTTON_DPAD_DOWN },
-                    { "DPadLeft", SDL_CONTROLLER_BUTTON_DPAD_LEFT },
-                    { "DPadRight", SDL_CONTROLLER_BUTTON_DPAD_RIGHT },
-                    { "Misc1", SDL_CONTROLLER_BUTTON_MISC1 },
-                    { "Paddle1", SDL_CONTROLLER_BUTTON_PADDLE1 },
-                    { "Paddle2", SDL_CONTROLLER_BUTTON_PADDLE2 },
-                    { "Paddle3", SDL_CONTROLLER_BUTTON_PADDLE3 },
-                    { "Paddle4", SDL_CONTROLLER_BUTTON_PADDLE4 },
-                    { "Touchpad", SDL_CONTROLLER_BUTTON_TOUCHPAD },
-                    { "Max", SDL_CONTROLLER_BUTTON_MAX },
+                    { "A", static_cast<int>(SDL_CONTROLLER_BUTTON_A) },
+                    { "B", static_cast<int>(SDL_CONTROLLER_BUTTON_B) },
+                    { "X", static_cast<int>(SDL_CONTROLLER_BUTTON_X) },
+                    { "Y", static_cast<int>(SDL_CONTROLLER_BUTTON_Y) },
+                    { "Back", static_cast<int>(SDL_CONTROLLER_BUTTON_BACK) },
+                    { "Guide", static_cast<int>(SDL_CONTROLLER_BUTTON_GUIDE) },
+                    { "Start", static_cast<int>(SDL_CONTROLLER_BUTTON_START) },
+                    { "LeftStick", static_cast<int>(SDL_CONTROLLER_BUTTON_LEFTSTICK) },
+                    { "RightStick", static_cast<int>(SDL_CONTROLLER_BUTTON_RIGHTSTICK) },
+                    { "LeftShoulder", static_cast<int>(SDL_CONTROLLER_BUTTON_LEFTSHOULDER) },
+                    { "RightShoulder", static_cast<int>(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER) },
+                    { "DPadUp", static_cast<int>(SDL_CONTROLLER_BUTTON_DPAD_UP) },
+                    { "DPadDown", static_cast<int>(SDL_CONTROLLER_BUTTON_DPAD_DOWN) },
+                    { "DPadLeft", static_cast<int>(SDL_CONTROLLER_BUTTON_DPAD_LEFT) },
+                    { "DPadRight", static_cast<int>(SDL_CONTROLLER_BUTTON_DPAD_RIGHT) },
+                    { "Misc1", static_cast<int>(SDL_CONTROLLER_BUTTON_MISC1) },
+                    { "Paddle1", static_cast<int>(SDL_CONTROLLER_BUTTON_PADDLE1) },
+                    { "Paddle2", static_cast<int>(SDL_CONTROLLER_BUTTON_PADDLE2) },
+                    { "Paddle3", static_cast<int>(SDL_CONTROLLER_BUTTON_PADDLE3) },
+                    { "Paddle4", static_cast<int>(SDL_CONTROLLER_BUTTON_PADDLE4) },
+                    { "Touchpad", static_cast<int>(SDL_CONTROLLER_BUTTON_TOUCHPAD) },
+                    { "Max", static_cast<int>(SDL_CONTROLLER_BUTTON_MAX) },
+                    // The triggers are axes of the pad: a screen hears one as a button when it crosses its threshold
+                    { "LeftTrigger", OFInput::ControllerManager::sLeftTriggerButton },
+                    { "RightTrigger", OFInput::ControllerManager::sRightTriggerButton },
                 }));
 
         api["CONTROLLER_AXIS"] = LuaUtil::makeStrictReadOnly(LuaUtil::tableFromPairs<std::string_view, int>(lua,

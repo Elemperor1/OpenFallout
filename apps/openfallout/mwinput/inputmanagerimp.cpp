@@ -104,6 +104,16 @@ namespace OFInput
         return mControllerManager->gamepadGuiCursorEnabled();
     }
 
+    void InputManager::setPadPick(bool pick)
+    {
+        mControllerManager->setPadPick(pick);
+    }
+
+    bool InputManager::padPick() const
+    {
+        return mControllerManager->padPick();
+    }
+
     void InputManager::changeInputMode(bool guiMode)
     {
         if (guiMode)
