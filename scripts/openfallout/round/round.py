@@ -345,6 +345,10 @@ def engine_command(profile, config, run_dir, save, extra=()):
     resources = profile.get("resources") or (engine.parent / "resources")
     command += ["--resources", str(absolute(resources))]
     command += ["--config", str(run_dir / "config"), "--user-data", str(run_dir / "userdata")]
+    # The engine's own openfallout.cfg (the one `replace=config` keeps) says `data-local=?userdata?data`, and `?userdata?` is the
+    # player's data folder, not the one of `--user-data`: a private, empty one keeps the add-ons the player installed out of the
+    # run (a master of the other game in it would change which game is chosen)
+    command += ["--data-local", str(run_dir / "userdata" / "data")]
     for data in game.get("data", []):
         command += ["--data", str(absolute(data))]
     command += ["--data", str(HERE), "--data", str(run_dir / "data")]
@@ -376,7 +380,7 @@ def player_config_dir():
 
 def prepare_run(profile, config, variant, run_dir, save):
     """Makes the private folders of one start: config (settings), userdata (a copy of the save) and data (the scenario)."""
-    for sub in ("config", "userdata/saves", "data/scripts", "shots"):
+    for sub in ("config", "userdata/saves", "userdata/data", "data/scripts", "shots"):
         (run_dir / sub).mkdir(parents=True, exist_ok=True)
     # The settings of the player (view distance, field of view, terrain and the rest) are the bottom layer of the run's, then the
     # settings file of the profile if it has one. The run's `openfallout.cfg` says `replace=config`, which also takes the player's

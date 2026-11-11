@@ -257,10 +257,13 @@ class Commands(unittest.TestCase):
         config = round_runner.load_round(self.round_file, self.Args())
         command = round_runner.engine_command(self.profile, config, self.tmp / "run", None)
         self.assertNotIn("--replace", command)
+        # `?userdata?` in the engine's own cfg is the player's data folder: the run names an empty one of its own
+        self.assertEqual(command[command.index("--data-local") + 1], str(self.tmp / "run" / "userdata" / "data"))
         self.assertEqual([c for i, c in enumerate(command) if command[i - 1] == "--content"], ["FalloutNV.esm", "round.omwscripts"])
         variant = dict(name="v")
         round_runner.prepare_run(self.profile, config, variant, self.tmp / "run", None)
         self.assertEqual((self.tmp / "run" / "config" / "openfallout.cfg").read_text(), "replace=config\n")
+        self.assertTrue((self.tmp / "run" / "userdata" / "data").is_dir())
 
     def test_start_instead_of_save(self):
         config = round_runner.load_round(self.round_file, self.Args())
