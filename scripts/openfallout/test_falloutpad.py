@@ -305,6 +305,15 @@ class ScriptsTest(unittest.TestCase):
         text = (SCRIPTS / "falloutpipboy.lua").read_text(encoding="utf-8")
         self.assertIn("if view == 'pipboy' and tab == 'stat' then pad.releasePick() end", text)
 
+    def test_the_start_menu_takes_a_as_enter_only_while_the_pad_holds_the_pick(self):
+        # Else a press after the stick moved the pointer acts twice: the engine clicks at the pointer and the row is entered
+        text = (SCRIPTS / "falloutstart.lua").read_text(encoding="utf-8")
+        self.assertIn("if pad.holdsPick() then onKey({ code = input.KEY.Enter }) end", text)
+
+    def test_the_vats_bumper_that_picks_the_part_holds_the_pick(self):
+        text = (SCRIPTS / "falloutvats.lua").read_text(encoding="utf-8")
+        self.assertIn("button == input.CONTROLLER_BUTTON.LeftShoulder and isOpen() then\n        pad.holdPick()", text)
+
     def test_a_screen_with_no_pick_of_its_own_gives_a_back_to_the_pointer(self):
         for name in ("blackjack", "roulette", "slots", "caravan", "specialscreen"):
             text = (SCRIPTS / ("fallout%s.lua" % name)).read_text(encoding="utf-8")

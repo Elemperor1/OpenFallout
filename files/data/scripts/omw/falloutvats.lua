@@ -905,6 +905,11 @@ local function onPad(button)
         return
     end
     handlePad(button)
+    -- The left bumper picks the part (the key W), which is no key that moves the pick by itself: it holds the pick like
+    -- the arrows do, so A accepts after it
+    if button == input.CONTROLLER_BUTTON.LeftShoulder and isOpen() then
+        pad.holdPick()
+    end
 end
 
 -- The screen that was left fades out (the file's seconds), and the one that is up is written from the frame's own time

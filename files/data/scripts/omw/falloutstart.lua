@@ -859,7 +859,9 @@ local function onPad(button)
             stepOption(at, button == PAD.LeftShoulder and -jump or jump)
         end
     elseif button == PAD.A then
-        onKey({ code = input.KEY.Enter })
+        -- Enter on the lit row, unless the stick moved the pointer last: the engine clicks at the pointer then, and the
+        -- row would be acted on twice
+        if pad.holdsPick() then onKey({ code = input.KEY.Enter }) end
     elseif button == PAD.Y then
         -- the Delete button of a list of saves has the Y button of the pad on it (the file's `_xbox_button`)
         askDelete()

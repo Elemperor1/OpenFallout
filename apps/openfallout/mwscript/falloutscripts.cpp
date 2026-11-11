@@ -2796,7 +2796,9 @@ namespace OFScript
                 if (record->mHasGameData && record->mGame.mLimbDamageMultiplier > 0)
                     limbDamage *= record->mGame.mLimbDamageMultiplier;
             limbDamage = mPerks.apply(Entry::limbDamage, victim, limbDamage, towardsAttacker);
-            result.mCrippled = mLimbs.hurt(victim, limb, limbDamage).mCrippled;
+            // (a perk of the limb damage can add to the nothing that a blow with no damage leaves: no hurt then)
+            if (!noDamage)
+                result.mCrippled = mLimbs.hurt(victim, limb, limbDamage).mCrippled;
         }
         // Who did the damage decides whether a kill by someone else pays the player
         if (attacker == mPlayer && attacker != 0)
