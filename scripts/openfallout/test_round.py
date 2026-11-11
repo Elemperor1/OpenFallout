@@ -233,13 +233,17 @@ class Commands(unittest.TestCase):
         self.assertIn("round.omwscripts", command)
         self.assertLess(command.index("FalloutNV.esm"), command.index("round.omwscripts"))
 
-    def test_a_content_list_replaces_the_players_and_an_empty_one_keeps_it(self):
+    def test_the_content_of_the_players_configuration_never_counts(self):
         config = round_runner.load_round(self.round_file, self.Args())
         command = round_runner.engine_command(self.profile, config, self.tmp / "run", None)
         self.assertEqual(command[command.index("--replace") + 1], "content")
         self.assertLess(command.index("--replace"), command.index("--content"))
         profile = dict(self.profile, games={"nv": {"data": [str(self.tmp / "nv" / "Data")], "content": []}})
-        self.assertNotIn("--replace", round_runner.engine_command(profile, config, self.tmp / "run", None))
+        # an empty list: the engine chooses the plugins the game makes active, and the player's `content=` lines (which may name
+        # the plugins of the other game) are dropped too
+        command = round_runner.engine_command(profile, config, self.tmp / "run", None)
+        self.assertEqual(command[command.index("--replace") + 1], "content")
+        self.assertEqual([c for i, c in enumerate(command) if command[i - 1] == "--content"], ["round.omwscripts"])
 
     def test_start_instead_of_save(self):
         config = round_runner.load_round(self.round_file, self.Args())
