@@ -22,6 +22,9 @@ local lastBoxAt = nil
 -- the lengths of the last frames, in milliseconds, with the real time at which each one ended
 local frames = {}
 local MAX_FRAMES = 600
+-- the real time of the last update: a frame is the difference between two of them (core.getRealFrameDuration is clamped to 200 ms
+-- and scaled by the simulation speed, so a slow frame or r.speed() would give false numbers)
+local lastFrameAt = nil
 
 local function cellText()
     local cell = self.cell
@@ -177,11 +180,12 @@ return {
     engineHandlers = {
         onUpdate = function()
             answerBox()
-            local ms = core.getRealFrameDuration() * 1000
-            if ms > 0 then
-                table.insert(frames, { ms = ms, at = core.getRealTime() })
+            local now = core.getRealTime()
+            if lastFrameAt ~= nil and now > lastFrameAt then
+                table.insert(frames, { ms = (now - lastFrameAt) * 1000, at = now })
                 if #frames > MAX_FRAMES then table.remove(frames, 1) end
             end
+            lastFrameAt = now
         end,
     },
     eventHandlers = {

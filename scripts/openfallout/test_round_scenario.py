@@ -375,7 +375,7 @@ local vec = function(x, y, z) return setmetatable({ x = x, y = y, z = z }, { __a
     __sub = function(a, b) return vec(a.x - b.x, a.y - b.y, a.z - b.z) end }) end
 yaw, pitch = 0, 0
 package.preload['openfallout.core'] = function()
-    return { getRealTime = function() return clock end, getRealFrameDuration = function() return 0.02 end,
+    return { getRealTime = function() return clock end, getRealFrameDuration = function() return 0.0001 end,
              sendGlobalEvent = function(name, data) answers[#answers + 1] = { name = name, data = data } end }
 end
 package.preload['openfallout.self'] = function()
@@ -428,11 +428,21 @@ class PlayerScript(unittest.TestCase):
         self.assertIn("ROUND\tground\tg\tdx=64 dy=0\tz=55", self.lines())
 
     def test_fps_reads_the_recent_frames(self):
-        for _ in range(5):
+        for _ in range(6):
             self.lua.execute("clock = clock + 0.02")
             self.module.engineHandlers.onUpdate()
         self.ask("fps", label="f", seconds=1)
         self.assertTrue(any(line.startswith("ROUND\tfps\tf\tframes=5 mean=20.0ms") for line in self.lines()))
+
+    def test_fps_is_measured_from_real_time_and_not_from_the_engine_frame_duration(self):
+        # one frame of 350 ms: the engine's frame duration is clamped (200 ms) and scaled by the world speed, the clock is not
+        for step in (0.02, 0.02, 0.35, 0.02):
+            self.lua.execute("clock = clock + %s" % step)
+            self.module.engineHandlers.onUpdate()
+        self.ask("fps", label="s", seconds=5)
+        line = next(line for line in self.lines() if line.startswith("ROUND\tfps\ts\t"))
+        self.assertIn("frames=3", line)
+        self.assertIn("max=350.0ms", line)
 
     def open_box(self, serial=1, buttons=1):
         self.lua.execute(
