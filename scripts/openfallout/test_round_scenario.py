@@ -118,6 +118,20 @@ class ScenarioPlayer(unittest.TestCase):
         self.tick(1)
         self.assertTrue(self.lua.eval("quit_called"))
 
+    def test_the_game_waits_longer_to_quit_when_pictures_are_to_be_written(self):
+        # two seconds, and two more for each picture: the engine writes them in the background
+        self.start("return function(r) r.shot('a') r.shot('b') end")
+        for _ in range(20):
+            self.tick(1)
+            if any(line.startswith("ROUND\tdone\tend") for line in self.lines()):
+                break
+        self.assertTrue(any(line.startswith("ROUND\tdone\tend") for line in self.lines()))
+        self.assertFalse(self.lua.eval("quit_called"))
+        self.tick(5)
+        self.assertFalse(self.lua.eval("quit_called"))
+        self.tick(1)
+        self.assertTrue(self.lua.eval("quit_called"))
+
     def test_the_world_must_not_be_paused(self):
         self.start("return function(r) r.log('x') end")
         self.lua.execute("paused = true")

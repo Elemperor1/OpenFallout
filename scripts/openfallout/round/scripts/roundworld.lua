@@ -35,6 +35,9 @@ local started, co, waiting = core.getRealTime(), nil, nil
 local answers, asked = {}, 0
 local steps = 0
 local finished = false
+-- how many pictures were asked for: the engine writes each one in the background, which took more than two seconds for a
+-- picture of 1728x1117 on a busy Mac (round R5), so the game waits longer before it quits when there are pictures to write
+local shotsTaken = 0
 
 local function now() return core.getRealTime() end
 
@@ -92,6 +95,7 @@ end
 -- line `ROUND shot <name> n=<number>` says which is which, and round.py renames them
 function r.shot(name)
     local reply = ask('shot', { name = name })
+    shotsTaken = shotsTaken + 1
     -- the engine writes the picture on the frame after, in the background
     r.wait(0.6)
     return reply
@@ -203,7 +207,7 @@ local function finish(reason)
     finished = true
     log('done', reason, string.format('real=%.1f steps=%d', now() - started, steps))
     -- a screenshot that is still being written is lost when the game quits
-    waiting = { at = now() + 1.5, quit = true }
+    waiting = { at = now() + 2 + 2 * shotsTaken, quit = true }
 end
 
 local function resume(value)
