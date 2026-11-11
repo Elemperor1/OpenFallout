@@ -42,6 +42,16 @@ namespace OFInput
         void setGamepadGuiCursorEnabled(bool enabled) { mGamepadGuiCursorEnabled = enabled; }
         bool gamepadGuiCursorEnabled() const { return mGamepadGuiCursorEnabled; }
 
+        // The pad holds a pick on a screen of a script (the D-pad moved it): A then acts on the pick, which the script
+        // does, and is no click at the pointer. The stick moving the pointer lets the pick go (the last of the two
+        // that was used is the one A goes to), and so does the end of the screens.
+        void setPadPick(bool pick) { mPadPick = pick; }
+        bool padPick() const { return mPadPick; }
+
+        // The buttons that a script hears for the two triggers, which are axes of the pad (they are no SDL button)
+        static constexpr int sLeftTriggerButton = 100;
+        static constexpr int sRightTriggerButton = 101;
+
         float getAxisValue(SDL_GameControllerAxis axis) const; // returns value in range [-1, 1]
         bool isButtonPressed(SDL_GameControllerButton button) const;
 
@@ -58,6 +68,12 @@ namespace OFInput
 
         void enableGyroSensor();
 
+        // A trigger that is pressed or let go while a screen is open is told to the scripts as a button
+        void tellTrigger(const SDL_ControllerAxisEvent& arg);
+
+        // The sticks and triggers away from the middle, as a line of the log twice a second
+        void logSticks(float dt);
+
         int getControllerType();
 
         BindingsManager* mBindingsManager;
@@ -70,6 +86,13 @@ namespace OFInput
         bool mGamepadMousePressed;
         bool mLeftTriggerGuiPressed;
         bool mRightTriggerGuiPressed;
+        bool mPadPick = false;
+        bool mPadPickPressed = false;
+        float mSticksLogTime = 0.f;
+        // Whether the scripts were told that the trigger is down (the press is told only while a screen is open, and
+        // the release of a trigger they heard)
+        bool mLeftTriggerTold = false;
+        bool mRightTriggerTold = false;
     };
 }
 #endif

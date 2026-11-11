@@ -5,7 +5,10 @@
 
 #include <SDL.h>
 
+#include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <string>
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm/refid.hpp>
@@ -23,6 +26,7 @@
 
 #include "actions.hpp"
 #include "bindingsmanager.hpp"
+#include "inputlog.hpp"
 #include "mousemanager.hpp"
 
 namespace OFInput
@@ -93,8 +97,37 @@ namespace OFInput
         mBindingsManager->setJoystickDeadZone(Settings::input().mJoystickDeadZone);
     }
 
+    void ControllerManager::logSticks(float dt)
+    {
+        // Twice a second, while a stick or a trigger is away from the middle: where they were, and who had the pointer
+        mSticksLogTime += dt;
+        if (mSticksLogTime < 0.5f)
+            return;
+        mSticksLogTime = 0.f;
+        const float lx = getAxisValue(SDL_CONTROLLER_AXIS_LEFTX);
+        const float ly = getAxisValue(SDL_CONTROLLER_AXIS_LEFTY);
+        const float rx = getAxisValue(SDL_CONTROLLER_AXIS_RIGHTX);
+        const float ry = getAxisValue(SDL_CONTROLLER_AXIS_RIGHTY);
+        const float lt = getAxisValue(SDL_CONTROLLER_AXIS_TRIGGERLEFT);
+        const float rt = getAxisValue(SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+        constexpr float away = 0.15f;
+        if (std::abs(lx) < away && std::abs(ly) < away && std::abs(rx) < away && std::abs(ry) < away && lt < away
+            && rt < away)
+            return;
+        char text[160];
+        std::snprintf(text, sizeof(text), "pad sticks left=(%.2f,%.2f) right=(%.2f,%.2f) triggers=(%.2f,%.2f) gui=%d pick=%d",
+            lx, ly, rx, ry, lt, rt, OFBase::Environment::get().getWindowManager()->isGuiMode() ? 1 : 0, mPadPick ? 1 : 0);
+        logInput(InputLogKind::Sticks, text);
+    }
+
     void ControllerManager::update(float dt)
     {
+        logSticks(dt);
+
+        // The screens are shut: the pick of the pad goes with them
+        if (mPadPick && !OFBase::Environment::get().getWindowManager()->isGuiMode())
+            mPadPick = false;
+
         if (mGuiCursorEnabled && !(mJoystickLastUsed && !mGamepadGuiCursorEnabled))
         {
             float xAxis = mBindingsManager->getActionValue(A_MoveLeftRight) * 2.0f - 1.0f;
@@ -114,6 +147,9 @@ namespace OFInput
             float mouseWheelMove = -zAxis * dt * 1500.0f;
             if (xMove != 0 || yMove != 0 || mouseWheelMove != 0)
             {
+                // The stick has the pointer: A clicks where it is
+                if (xMove != 0 || yMove != 0)
+                    mPadPick = false;
                 mMouseManager->injectMouseMove(xMove, yMove, mouseWheelMove);
                 mMouseManager->warpMouse();
                 OFBase::Environment::get().getWindowManager()->setCursorActive(true);
@@ -145,9 +181,25 @@ namespace OFInput
                 OFBase::Environment::get().getWindowManager()->isConsoleMode()
                     || MyGUI::InputManager::getInstance().isModalAny() });
 
+        {
+            OFBase::WindowManager* winMgr = OFBase::Environment::get().getWindowManager();
+            const char* name = SDL_GameControllerGetStringForButton(static_cast<SDL_GameControllerButton>(arg.button));
+            logInput(InputLogKind::Button,
+                std::string("pad button=") + (name != nullptr ? name : "?") + " gui=" + (winMgr->isGuiMode() ? "1" : "0")
+                    + " pick=" + (mPadPick ? "1" : "0"));
+        }
+
         mJoystickLastUsed = true;
         if (OFBase::Environment::get().getWindowManager()->isGuiMode())
         {
+            // A screen of a script holds the pick that the D-pad made: A acts on it (the script has had the button)
+            // and is no click where the pointer was left
+            if (mPadPick && arg.button == SDL_CONTROLLER_BUTTON_A)
+            {
+                mPadPickPressed = true;
+                return;
+            }
+
             if (gamepadToGuiControl(arg))
                 return;
 
@@ -200,6 +252,12 @@ namespace OFInput
             return;
 
         mJoystickLastUsed = true;
+        // The A that acted on a pick was no press of the pointer, so its release is none either
+        if (arg.button == SDL_CONTROLLER_BUTTON_A && mPadPickPressed)
+        {
+            mPadPickPressed = false;
+            return;
+        }
         if (OFBase::Environment::get().getWindowManager()->isGuiMode())
         {
             if (mGamepadGuiCursorEnabled && (!Settings::gui().mControllerMenus || mGamepadMousePressed))
@@ -227,6 +285,36 @@ namespace OFInput
         mBindingsManager->controllerButtonReleased(deviceID, arg);
     }
 
+    void ControllerManager::tellTrigger(const SDL_ControllerAxisEvent& arg)
+    {
+        const bool left = arg.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT;
+        if (!left && arg.axis != SDL_CONTROLLER_AXIS_TRIGGERRIGHT)
+            return;
+
+        const int press = Settings::gui().mControllerTriggerPressThreshold;
+        const int rawRelease = Settings::gui().mControllerTriggerReleaseThreshold;
+        const int release = std::clamp(rawRelease, 0, press - 1);
+        bool& told = left ? mLeftTriggerTold : mRightTriggerTold;
+        const int button = left ? sLeftTriggerButton : sRightTriggerButton;
+        OFBase::WindowManager* winMgr = OFBase::Environment::get().getWindowManager();
+
+        if (arg.value >= press && !told && winMgr->isGuiMode())
+        {
+            told = true;
+            logInput(InputLogKind::Button,
+                std::string("pad button=") + (left ? "lefttrigger" : "righttrigger") + " gui=1 pick=" + (mPadPick ? "1" : "0"));
+            OFBase::Environment::get().getLuaManager()->inputEvent(
+                { OFBase::LuaManager::InputEvent::ControllerPressed, button,
+                    winMgr->isConsoleMode() || MyGUI::InputManager::getInstance().isModalAny() });
+        }
+        else if (arg.value <= release && told)
+        {
+            told = false;
+            OFBase::Environment::get().getLuaManager()->inputEvent(
+                { OFBase::LuaManager::InputEvent::ControllerReleased, button });
+        }
+    }
+
     void ControllerManager::axisMoved(int deviceID, const SDL_ControllerAxisEvent& arg)
     {
         if (mBindingsManager->isDetectingBindingState())
@@ -237,6 +325,9 @@ namespace OFInput
 
         if (!Settings::input().mEnableController || OFBase::Environment::get().getInputManager()->controlsDisabled())
             return;
+
+        // (a trigger is a button to the screens of the scripts, as the D-pad and the bumpers are)
+        tellTrigger(arg);
 
         mJoystickLastUsed = true;
         if (OFBase::Environment::get().getWindowManager()->isGuiMode())

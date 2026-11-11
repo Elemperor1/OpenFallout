@@ -882,12 +882,15 @@ local function press(code)
     end
 end
 
--- On the pad Y queues the attack on the part and X carries the queue out; the left bumper opens the screen and picks the
--- part while it is open, the right bumper picks the character (A is the engine's click: where nothing takes it, it queues
--- the attack as the attack control does)
+-- On the pad the right trigger queues the attack on the part (the games' own: the file puts Select on it) and A accepts the
+-- queue (the file's Accept, Enter here; the games' help says "Use: attack your target, A: accept your actions, B: cancel an
+-- attack"); Y queues too and X carries the queue out, which were the port's first buttons. The left bumper opens the screen
+-- and picks the part while it is open, the right bumper picks the character (A clicks where the pointer is while the
+-- pad holds no pick, and where nothing takes the click it queues the attack as the attack control does)
 local handlePad = pad.handler('vats',
     function() return isOpen() and I.UI.getMode() == 'Interface' and not messageOpen() end, press,
     { [input.CONTROLLER_BUTTON.Y] = input.KEY.Space, [input.CONTROLLER_BUTTON.X] = input.KEY.Enter,
+      [input.CONTROLLER_BUTTON.RightTrigger] = input.KEY.Space,
       [input.CONTROLLER_BUTTON.LeftShoulder] = input.KEY.W })
 
 local function onPad(button)

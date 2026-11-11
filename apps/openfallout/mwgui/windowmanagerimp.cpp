@@ -1996,7 +1996,10 @@ namespace OFGui
         bool mouseEmulation = OFBase::Environment::get().getInputManager()->joystickLastUsed()
             && OFBase::Environment::get().getInputManager()->isGamepadGuiCursorEnabled();
 
-        bool showCursor = mouseEmulation && Settings::hud().mMouseEmulationCursor && getCursorVisible();
+        // The circle is where the stick left the pointer: while the pad holds a pick (the D-pad moved it, and A acts on
+        // it) the pointer is not what the screen is waiting for, and the circle left at its old place only misleads
+        bool showCursor = mouseEmulation && Settings::hud().mMouseEmulationCursor && getCursorVisible()
+            && !OFBase::Environment::get().getInputManager()->padPick();
         mHud->setMouseEmulationCursorVisible(showCursor);
 
         if (showCursor)

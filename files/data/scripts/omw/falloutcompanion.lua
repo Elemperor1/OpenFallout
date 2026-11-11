@@ -336,7 +336,7 @@ end
 
 local function onPad(button)
     if not isOpen() or I.UI.getMode() ~= 'Interface' then return end
-    local code = pad.key(button)
+    local code = pad.translate(button)
     if code ~= nil then
         pad.log('companion', button, code)
         press(code)

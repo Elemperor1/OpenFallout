@@ -620,7 +620,8 @@ end
 
 -- The buttons of a pad: the D-pad stands for the arrows (up and down move the lit row, left and right move a slider), the
 -- bumpers for Shift and the left or right arrow (the previous and the next list), Y for Enter (what the row asks for). A
--- is the engine's own click where the pointer is, and B goes up one list (`escape`).
+-- is Enter on the row that the D-pad lit, or the engine's own click where the pointer is when the stick moved it last, and
+-- B goes up one list (`escape`).
 function module.pad(button)
     if not opened then return false end
     local B, K = input.CONTROLLER_BUTTON, input.KEY
@@ -628,7 +629,7 @@ function module.pad(button)
         pad.log('face', button, 'tab')
         return module.press(button == B.LeftShoulder and K.LeftArrow or K.RightArrow, nil, true)
     end
-    local code = pad.key(button)
+    local code = pad.translate(button)
     if code == nil then return false end
     pad.log('face', button, code)
     return module.press(code, nil, false)

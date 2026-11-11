@@ -36,6 +36,7 @@ local menuModule = require('scripts.omw.falloutmenu')
 local settingsItems = require('scripts.omw.falloutsettingsitems')
 local manual = require('scripts.omw.falloutmanual')
 local credits = require('scripts.omw.falloutcredits')
+local pad = require('scripts.omw.falloutpad')
 
 local FILE = 'options/start_menu.xml'
 -- The engine's own menu is in a layer of the window manager that the layer of the windows is below, so the menu is drawn
@@ -755,6 +756,9 @@ local function open()
     -- pause menu leaves it out: the file's picture of the pause screen shows only when the logo does not)
     if atTitle then shown:set('main_title', 'alpha', 255) end
     showList()
+    -- The menu is used by the lit row (the D-pad, and A for Enter), not by the pointer: the circle that the stick left on
+    -- the screen stays out of it until the stick moves the pointer again (M13: "the pointer left on the pause menu")
+    pad.holdPick()
     return true
 end
 
@@ -834,6 +838,9 @@ local function onPad(button)
             manual.leave()
         end
         return
+    end
+    if button == PAD.DPadUp or button == PAD.DPadDown or button == PAD.DPadLeft or button == PAD.DPadRight then
+        pad.holdPick()
     end
     if button == PAD.DPadUp then
         onKey({ code = input.KEY.UpArrow })

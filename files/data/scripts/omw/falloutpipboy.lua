@@ -962,9 +962,13 @@ local function pageKey(code)
     return true
 end
 
--- X drops the item; the other buttons stand for the keys of every screen
-local onPad = pad.handler('pipboy', function() return visible and I.UI.getMode() == 'Interface' and not messageOpen() end, press,
-    { [input.CONTROLLER_BUTTON.X] = input.KEY.D })
+-- The pad on the Pip-Boy (falloutpad.lua has the buttons): over a question (how many) or a screen of its own, and on the
+-- level up, the buttons are the plain arrows and pages of that screen
+local onPad = pad.handler('pipboy', function() return visible and I.UI.getMode() == 'Interface' and not messageOpen() end,
+    function(code) press(code, symbolOf(code)) end,
+    pad.pipboyOwn(function()
+        return dropPrompt ~= nil or view ~= 'pipboy' or (itemsPage.isOpen() and itemsPage.modalOpen())
+    end))
 
 return {
     engineHandlers = {

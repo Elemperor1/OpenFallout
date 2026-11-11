@@ -447,6 +447,12 @@ function module.isOpen()
     return shown ~= nil or repair.isOpen() or mods.isOpen()
 end
 
+-- Whether a question or a screen of its own is up over the list (how many, repair, mods): the sides of the pad then are
+-- the arrows of that screen, not the tabs of the page
+function module.modalOpen()
+    return quantity.isOpen() or repair.isOpen() or mods.isOpen()
+end
+
 -- Show the page (open the menu if it is not open) with what the player carries now; false when it cannot be shown
 function module.show()
     -- The repair screen and the mod screen are the page while they are up

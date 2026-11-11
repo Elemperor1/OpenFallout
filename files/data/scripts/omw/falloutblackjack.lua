@@ -421,6 +421,8 @@ local function openMenu()
     local opened = menuModule.open(FILE)
     if not opened then return false end
     shown = opened
+    -- No row here is picked by the D-pad: A is the click at the pointer, whatever an earlier screen held
+    padModule.releasePick()
     if not drawTiles() then
         destroyMenu()
         return false

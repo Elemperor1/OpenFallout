@@ -505,14 +505,14 @@ local function press(code, symbol)
 end
 
 -- On the pad X accepts the deal, as the file ties it to the button; the rest are the keys the buttons stand for (the
--- engine leaves the screen with B and clicks with A)
+-- engine leaves the screen with B; A is Enter on the pick of the D-pad, or the engine's click at the pointer)
 local function onPad(button)
     if not isOpen() or I.UI.getMode() ~= 'Interface' or messageOpen() then return end
     if button == input.CONTROLLER_BUTTON.X then
         press(nil, 'a')
         return
     end
-    local code = pad.key(button)
+    local code = pad.translate(button)
     if code ~= nil then
         pad.log('barter', button, code)
         press(code)

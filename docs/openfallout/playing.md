@@ -37,21 +37,24 @@ starts a new game of the game you pointed it at: its opening scene, the making o
 
 ## Game controller
 
-A controller that the operating system shows as a game controller (Xbox, PlayStation and Switch Pro pads, by cable or Bluetooth) is read through SDL, as in OpenMW, and `[Input] enable controller` is on by default. **None of this has been tried with a real pad yet**: the buttons below are what the code does and what the smoke test sends to the screens as events; a round with the pad in hand is still to be done. Each press that a Fallout screen acts on is logged as `Pad: screen=... button=... key=...` (the first 200 of a run), which is how to see what a pad did.
+A controller that the operating system shows as a game controller (Xbox, PlayStation and Switch Pro pads, by cable or Bluetooth) is read through SDL, as in OpenMW, and `[Input] enable controller` is on by default. The first hour of play with a pad found the menus clumsy (the D-pad moved the lit row, but A clicked where the pointer had been left), and the buttons below are the answer to that; the next round with a pad in hand will tell whether they feel right. Each press that a Fallout screen acts on is logged as `Pad: screen=... button=... key=...` (the first 200 of a run). The engine logs every key, button and stick that it hears as `Input: ...` lines in the log of the run (the first presses and a sample of the sticks), so a report of a pad that did nothing can say which side missed the press.
 
 In the world (the bindings OpenMW gives a pad): left stick walks, right stick looks, right trigger attacks, left trigger jumps, A activates, X draws or puts away the weapon, a click of the left stick sneaks, a click of the right stick changes the view, B opens the Pip-Boy, Start opens the menu, RB waits, the Guide button saves quickly, and (new) LB opens V.A.T.S. Y does nothing in Fallout. These are the defaults: the bindings file that an earlier run saved in the configuration folder (`input_v3.xml`) keeps the buttons it has.
 
-On a screen (the Pip-Boy, a conversation, V.A.T.S., a container, a bench, a lock, waiting): the left stick moves the pointer, A clicks what it is over and B leaves the screen (all three are the engine's). The right stick does not scroll a list; the D-pad, the bumpers, Y and X do what keys do:
+On a screen (the Pip-Boy, a conversation, V.A.T.S., a container, a bench, a lock, waiting, the start screen) the pad works in the way the games' own screens do on a pad: **the D-pad picks, and A acts on what is picked**. The last of the two ways that was used is the one A goes to. After a press of the D-pad (or a bumper or a trigger that moves the pick) A is the key Enter on the lit row, and the pointer is hidden; once the left stick moves the pointer, A clicks where the pointer is, as before. Leaving the screen puts A back to the pointer. B leaves the screen and the left stick moves the pointer (both are the engine's). The right stick does not scroll a list. The triggers are axes of the pad: a screen hears one as the button `LeftTrigger` or `RightTrigger` while it is open.
 
-| Screen | D-pad | LB / RB | Y | X |
-|---|---|---|---|---|
-| Pip-Boy | up and down move in the list, left and right change the page (STAT, INV, DATA); on the STAT, INV and DATA pages `[` and `]` on the keyboard change the tab (DATA: the world map, quests, notes and radio; Enter on the world map travels to the place named in the box in the middle) | a page up or down | use the thing picked (equip, eat, read) | drop it |
-| Conversation | up and down pick a topic | a page of topics | say the topic picked; carry on while a character speaks | |
-| V.A.T.S. | left and right pick the character, up and down the part | the character before or after | queue an attack on the part picked (the first press shows which part is picked) | attack: carry out the queue |
-| Container | up and down pick a thing | a page | take it (the first press shows which is picked) | take everything |
-| Bench | up and down pick a recipe, left and right a kind | a page | make it | |
-| Lock | | | put in a bobby pin | |
-| Waiting | left and right change the hours | | begin | |
+| Screen | D-pad | LB / RB | LT / RT | A | X | Y |
+|---|---|---|---|---|---|---|
+| Pip-Boy | up and down pick a row, left and right go to the tab before or after (WEAPONS, APPAREL, ...) | the page before or after (STAT, INV, DATA) | a page of the list up or down | use the thing picked (equip, eat, read) | drop it | repair it |
+| Conversation | up and down pick a topic | a page of topics | | say the topic picked; carry on while a character speaks | | the same as A |
+| V.A.T.S. | left and right pick the character, up and down the part | LB the part (and opens V.A.T.S. in the world), RB the character | RT queues an attack on the part picked | accept: carry out the queue | carry out the queue | queue an attack |
+| Container | up and down pick a thing | a page | | take it | take everything | take it |
+| Bench | up and down pick a recipe, left and right a kind | a page | | make it | | make it |
+| Lock | | | | | force the lock | put in a bobby pin |
+| Waiting | left and right change the hours | | | begin | | begin |
+| Start screen and menus | up and down pick a row | a page | | the row picked | | the row picked |
+
+The Pip-Boy, container, bench and conversation tables put the buttons where the games' own screens print them where the files say so (A Equip, X Drop, Y Repair, B Cancel; X takes everything from a container); what moves between the tabs of the Pip-Boy is not in the games' files, so the bumpers, the sides of the D-pad and the triggers there are a choice of this port. Over a question that a page asks (how many, repair, mods) X and Y mean nothing, and the other buttons are the plain arrows and pages of that question.
 
 The terminal (menus and the hacking game), the making of the character (the name still needs a keyboard) and the screen of a level up are used with the pointer and A only. The quests are on the DATA page of the Pip-Boy (QUESTS tab; the world map is on its first tab, where the mouse drags the map and the wheel zooms it): the journal of Morrowind (the J key, and LB by the old default) opens nothing in Fallout now.
 

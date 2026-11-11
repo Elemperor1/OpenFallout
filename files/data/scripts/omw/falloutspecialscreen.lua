@@ -15,6 +15,7 @@ local ui = require('openfallout.ui')
 local util = require('openfallout.util')
 
 local menuModule = require('scripts.omw.falloutmenu')
+local padModule = require('scripts.omw.falloutpad')
 local sceneModule = require('scripts.omw.falloutscene')
 
 local chargen = core.chargen
@@ -269,6 +270,8 @@ function module.start(page, state)
     if not shown then
         return false
     end
+    -- The model screens have no pick of the D-pad (it raises and lowers the values), so A is the click at the pointer
+    padModule.releasePick()
     local scene = sceneModule.open(SCENE)
     if not scene then
         shown:close()
