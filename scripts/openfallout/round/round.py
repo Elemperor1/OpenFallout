@@ -27,6 +27,7 @@ import platform
 import re
 import shutil
 import signal
+import struct
 import subprocess
 import sys
 import tempfile
@@ -261,9 +262,48 @@ def absolute(path):
     return Path(os.path.abspath(Path(path).expanduser()))
 
 
-def newest_save(folder):
-    """The newest save of a folder. The engine keeps its saves one level down, in a folder for each character
-    (`saves/<Character>/<slot>.omwsave`); saves laid straight into the folder are found too."""
+GAME_MASTERS = {"nv": "falloutnv.esm", "fo3": "fallout3.esm"}
+TTW_MASTER = "taleoftwowastelands.esm"
+
+
+def save_content_files(path):
+    """The content files a save lists (the `DEPE` sub-records of its header, in the first bytes of the file), or None when the
+    header cannot be read."""
+    try:
+        with open(path, "rb") as stream:
+            head = stream.read(65536)
+    except OSError:
+        return None
+    files, at = [], head.find(b"DEPE")
+    while at != -1 and head[at:at + 4] == b"DEPE" and at + 8 <= len(head):
+        size = struct.unpack_from("<I", head, at + 4)[0]
+        data = head[at + 8:at + 8 + size]
+        if len(data) < size:
+            break
+        files.append(data.split(b"\0", 1)[0].decode("utf-8", "replace"))
+        at += 8 + size
+    return files or None
+
+
+def save_is_for(path, game, content=()):
+    """Whether a save was made with the content of `game`, as the engine tells it (`Character::addSlot`: the first game file of
+    the save is the game's). A save whose header cannot be read is not turned away."""
+    files = save_content_files(path)
+    if files is None:
+        return True
+    lowered = [name.lower() for name in files]
+    if game == "ttw":
+        return TTW_MASTER in lowered
+    master = next((c.lower() for c in content if c.lower().endswith((".esm", ".omwgame"))), GAME_MASTERS.get(game))
+    if master is None:
+        return True
+    first = next((name for name in lowered if name.endswith((".esm", ".omwgame"))), None)
+    return first == master and not (game == "nv" and TTW_MASTER in lowered)
+
+
+def newest_save(folder, accept=None):
+    """The newest save of a folder that `accept` takes (all, when it is None). The engine keeps its saves one level down, in a
+    folder for each character (`saves/<Character>/<slot>.omwsave`); saves laid straight into the folder are found too."""
     folder = Path(folder)
     saves = [path for pattern in ("*", "*/*") for path in folder.glob(pattern)
              if path.is_file() and path.suffix.lower() in SAVE_SUFFIXES]
@@ -271,7 +311,10 @@ def newest_save(folder):
         saves = [path for path in folder.glob("*") if path.is_file()]
     if not saves:
         sys.exit(f"no save in {folder}")
-    return max(saves, key=lambda path: path.stat().st_mtime)
+    found = [path for path in saves if accept is None or accept(path)]
+    if not found:
+        sys.exit(f"no save of this game in {folder} ({len(saves)} save(s) there are of other games)")
+    return max(found, key=lambda path: path.stat().st_mtime)
 
 
 def resolve_save(config, profile):
@@ -282,7 +325,8 @@ def resolve_save(config, profile):
         folder = (profile.get("saves") or {}).get(config["game"])
         if not folder:
             sys.exit(f"the profile has no `saves` folder for {config['game']}")
-        return newest_save(folder)
+        content = ((profile.get("games") or {}).get(config["game"]) or {}).get("content", [])
+        return newest_save(folder, lambda path: save_is_for(path, config["game"], content))
     path = Path(save).expanduser()
     if not path.exists():
         sys.exit(f"no save {path}")

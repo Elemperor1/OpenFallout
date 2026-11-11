@@ -181,6 +181,26 @@ class ScenarioPlayer(unittest.TestCase):
         self.assertIn("ROUND\tnote\tfalse", lines)
         self.assertFalse(any(line.startswith("ROUND\tteleport\t") for line in lines))
 
+    def test_the_mountain_scenario_needs_a_save_in_the_open(self):
+        source = (SCRIPTS.parent / "scenarios" / "m13_mountains.lua").read_text(encoding="utf-8")
+        self.start(source)
+        self.lua.execute("require('openfallout.world').players[1].cell = { isExterior = false, id = 'inside' }")
+        self.tick(4)
+        lines = self.lines()
+        self.assertTrue(any(line.startswith("ROUND\terror\tscenario") and "interior" in line for line in lines))
+        self.assertFalse(any(line.startswith("ROUND\tteleport") for line in lines))
+
+    def test_the_mountain_scenario_runs_in_the_open(self):
+        source = (SCRIPTS.parent / "scenarios" / "m13_mountains.lua").read_text(encoding="utf-8")
+        self.start(source)
+        self.tick(4)
+        for _ in range(12):
+            self.tick(13)
+        lines = self.lines()
+        self.assertFalse(any(line.startswith("ROUND\terror") for line in lines), lines)
+        self.assertEqual(self.lua.eval("#teleports"), 2)
+        self.assertIn("ROUND\tnote\tstart\tcell\tw\texterior=true", lines)
+
     def test_hour_global_and_quest(self):
         self.start("return function(r) r.hour(14) r.global('GameHour') r.quest('Q', 9) r.quest('missing') "
                    "r.object('FormId:0x1', 'thing') end")

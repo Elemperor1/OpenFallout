@@ -78,7 +78,9 @@ as well.
 | `r.world`, `r.core`, `r.util`, `r.player()`, `r.lookup(form)` | the Lua modules and helpers, for steps of your own |
 
 `scenarios/smoke.lua` is the smallest scenario; `scenarios/m13_mountains.lua` with `rounds/m13-mountains.json` is the check of the
-distant land of New Vegas in seven variants of `game lod debug`.
+distant land of New Vegas in seven variants of `game lod debug`. It needs a save in the open of the Mojave (its places are
+positions in the worldspace the player is in): it stops with a `ROUND error` when the save is in an interior, and its `start` and
+`eye` lines say which worldspace the pictures were taken in.
 
 ## What it cannot do
 

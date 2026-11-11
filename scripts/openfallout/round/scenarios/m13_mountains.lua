@@ -3,6 +3,14 @@
 -- The variants of rounds/m13-mountains.json differ in `[Terrain] game lod debug` (nothing, flat, no-high, objects-only, no-land,
 -- no-records, wireframe), so one command gives every picture the questions of the round need.
 return function(r)
+    -- The places are positions in the worldspace the player is in, so the save must be in the open of the Mojave (a save in an
+    -- interior cannot reach them, and one in another worldspace would show other land). The cell is logged, so the report says
+    -- which worldspace the pictures were taken in.
+    local here = r.player().cell
+    r.log('start', 'cell', tostring(here and here.worldSpaceId), 'exterior=' .. tostring(here and here.isExterior))
+    if not (here and here.isExterior) then
+        error('the save is in an interior: this round needs a save in the open of the Mojave wasteland (give another with --save)')
+    end
     r.hour(14)
     -- E1: the Joshua trees on the far hills
     r.teleport{ pos = { -69319, 3528 }, onGround = true, yaw = -3.13, label = 'e1' }

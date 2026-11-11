@@ -134,6 +134,40 @@ class Commands(unittest.TestCase):
             os.utime(path, (stamp, stamp))
         self.assertEqual(round_runner.newest_save(self.tmp / "saves"), new)
 
+    @staticmethod
+    def fake_save(path, *content_files):
+        """A file with the header of a save that lists these content files."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        depe = b"".join(b"DEPE" + struct.pack("<I", len(name) + 1) + name.encode() + b"\0" for name in content_files)
+        path.write_bytes(b"SAVE" + bytes(12) + b"PLNA" + struct.pack("<I", 4) + b"Doc\0" + depe + b"SCRN" + bytes(8))
+
+    def test_latest_save_is_the_newest_of_the_game(self):
+        # one folder holds the saves of both games (the engine's user data): `--game nv` must not take a newer Fallout 3 save
+        nv = self.tmp / "saves" / "Doc" / "nv.omwsave"
+        fo3 = self.tmp / "saves" / "Lone" / "fo3.omwsave"
+        ttw = self.tmp / "saves" / "Courier" / "ttw.omwsave"
+        self.fake_save(nv, "FalloutNV.esm", "DeadMoney.esm")
+        self.fake_save(fo3, "Fallout3.esm")
+        self.fake_save(ttw, "FalloutNV.esm", "Fallout3.esm", "TaleOfTwoWastelands.esm")
+        for path, stamp in ((nv, 1), (fo3, 9), (ttw, 5)):
+            os.utime(path, (stamp, stamp))
+        profile = dict(self.profile, saves={"nv": str(self.tmp / "saves"), "fo3": str(self.tmp / "saves"),
+                                            "ttw": str(self.tmp / "saves")})
+        for game, expected in (("nv", nv), ("fo3", fo3), ("ttw", ttw)):
+            self.assertEqual(round_runner.resolve_save({"game": game, "save": "latest"}, profile), expected, game)
+
+    def test_latest_save_with_no_save_of_the_game_is_an_error(self):
+        self.fake_save(self.tmp / "saves" / "Lone" / "fo3.omwsave", "Fallout3.esm")
+        profile = dict(self.profile, saves={"nv": str(self.tmp / "saves")})
+        with self.assertRaises(SystemExit) as raised:
+            round_runner.resolve_save({"game": "nv", "save": "latest"}, profile)
+        self.assertIn("no save of this game", str(raised.exception))
+
+    def test_a_save_whose_header_cannot_be_read_is_not_turned_away(self):
+        path = self.tmp / "saves" / "odd.omwsave"
+        path.write_bytes(b"not a save")
+        self.assertTrue(round_runner.save_is_for(path, "nv"))
+
     def test_relative_paths_become_absolute(self):
         # the engine runs inside the folder of its run, so a path left relative would be read from there
         cwd = Path.cwd()
