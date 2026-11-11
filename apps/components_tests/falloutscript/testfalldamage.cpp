@@ -73,6 +73,22 @@ namespace
         EXPECT_EQ(damageToPlayerMultiplier(9), 2);
     }
 
+    TEST(FalloutScriptFallDamageTest, a_blow_is_scaled_by_the_difficulty_only_when_the_player_is_on_one_end_of_it)
+    {
+        // very easy: the player takes half and deals double; very hard: the player takes double and deals half
+        EXPECT_EQ(blowMultiplier(0, false, true), 0.5);
+        EXPECT_EQ(blowMultiplier(0, true, false), 2);
+        EXPECT_EQ(blowMultiplier(4, false, true), 2);
+        EXPECT_EQ(blowMultiplier(4, true, false), 0.5);
+        EXPECT_EQ(blowMultiplier(normalDifficulty, false, true), 1);
+        EXPECT_EQ(blowMultiplier(normalDifficulty, true, false), 1);
+        // two others hit each other as the file says, whatever the difficulty
+        EXPECT_EQ(blowMultiplier(0, false, false), 1);
+        EXPECT_EQ(blowMultiplier(4, false, false), 1);
+        // a blow of the player on itself is no blow of the player on another: it is as it is
+        EXPECT_EQ(blowMultiplier(0, true, true), 1);
+    }
+
     TEST(FalloutScriptFallDamageTest, a_heavy_landing_is_one_above_the_threshold)
     {
         const Settings settings = pluginSettings();

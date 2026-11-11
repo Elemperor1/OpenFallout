@@ -51,6 +51,7 @@
 #include <components/esm4/wornarmor.hpp>
 #include <components/falloutscript/arguments.hpp>
 #include <components/falloutscript/extendercommands.hpp>
+#include <components/falloutscript/falldamage.hpp>
 #include <components/falloutscript/fightai.hpp>
 #include <components/falloutscript/messagetext.hpp>
 #include <components/falloutscript/playercontrols.hpp>
@@ -2722,6 +2723,17 @@ namespace OFScript
         if (limb >= 0 && !blow.mMelee)
             if (const double multiplier = mLimbs.damageMultiplier(victim, limb); multiplier > 0)
                 dealt *= multiplier;
+        // The difficulty of the game scales the damage that reaches the health, by who is the player: what the player
+        // takes from another, and what the player does to another (the executables' helper that every blow passes
+        // before the health; the part of the body took its share before, and the condition of a limb goes by the damage
+        // before the difficulty, as a fall does)
+        dealt *= FalloutScript::FallDamage::blowMultiplier(gameDifficulty(), attacker != 0 && attacker == mPlayer,
+            victim == mPlayer);
+        // The god mode of the console keeps the health, the limbs and the armor of the player (a fall and the other hurts
+        // of the world honour it already), and the blow still lands: the character that struck is not told that it
+        // missed. A script that must not lose the player (the checks of the project) turns it on.
+        if (victim == mPlayer && OFBase::Environment::get().getWorld()->getGodModeState())
+            noDamage = true;
         // A shot of UseWeapon that does no damage has its damage number zeroed in the executable, and the rest of the
         // hit runs (round 10N: FalloutNV.exe 0x89a706 zeroes the float of the hit and goes on): the victim is hit, its
         // blocks hear of it, and it fights back, but its health, its limbs and the armor it wears keep what they have

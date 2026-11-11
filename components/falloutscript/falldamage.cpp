@@ -41,6 +41,15 @@ namespace FalloutScript::FallDamage
         return multipliers[std::clamp(difficulty, 0, 4)];
     }
 
+    double blowMultiplier(int difficulty, bool attackerIsPlayer, bool victimIsPlayer)
+    {
+        if (victimIsPlayer && !attackerIsPlayer)
+            return damageToPlayerMultiplier(difficulty);
+        if (attackerIsPlayer && !victimIsPlayer)
+            return damageByPlayerMultiplier(difficulty);
+        return 1;
+    }
+
     bool isHardLanding(const Settings& settings, double damage)
     {
         return damage > settings.mHardLanding;
