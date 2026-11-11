@@ -55,6 +55,7 @@ round's). Edit it by hand for Tale of Two Wastelands (`data` = the New Vegas fol
 | `limit` | seconds after which the engine is stopped (300) |
 | `variants` | a list of `{"name", "settings"}`: one engine start each; `--parallel N` runs N at a time, `--variant name` only that one |
 | `extra_args` | more arguments for the engine |
+| `allow_missing_content` | accept a save that wants a game plugin (`.esm`, `.esp`) the run does not load; without it such a round fails (a missing `.omwscripts`, such as the plugin of a play session, is a note) |
 
 ## The scenario (Lua)
 

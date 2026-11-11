@@ -426,13 +426,18 @@ def run_engine(command, run_dir, limit, env_extra=None, priority="low"):
     return process.returncode, time.monotonic() - started, sampler, timed_out
 
 
+def missing_content(text):
+    """The content files that the save wanted and the run did not load (the engine warns once for each)."""
+    return re.findall(r"Saved game dependency (\S+) is missing", text)
+
+
 def log_tail(text, count=8):
     """The last lines of the engine's log, each without its time stamp and cut at 200 characters."""
     return [line.split("]", 1)[-1].strip()[:200] for line in text.splitlines() if line.strip()][-count:]
 
 
 def write_report(run_dir, config, variant, status, seconds, sampler, timed_out, lines, problems, levels, shots, extra_shots,
-                 command, tail=()):
+                 command, tail=(), content_missing=()):
     name = variant.get("name", "run")
     errors = [line for line in lines if line.startswith("error")]
     # The scenario ended (`done end`): what the round asked is answered, so a crash while the engine quits (a known fault of
@@ -441,7 +446,13 @@ def write_report(run_dir, config, variant, status, seconds, sampler, timed_out, 
     # A screenshot that was asked for and never written is no evidence: the round fails (the engine writes the picture in the
     # background, so a crash while quitting can lose the last ones)
     missing = [shot for _, shot, path in shots if path is None]
-    verdict = "PASS" if finished and not timed_out and not errors and not missing else "FAIL"
+    # A headless run loads a save that wants content files the run does not load (the save of a play session wants the plugin of the
+    # play): a script file (.omwscripts) is harmless, but a game plugin that is missing can put the player in another place and
+    # draw another world, so the round fails unless the round file says `allow_missing_content`
+    not_loaded = list(content_missing)
+    serious = [file for file in not_loaded if not file.lower().endswith(".omwscripts")]
+    content_fails = bool(serious) and not config.get("allow_missing_content")
+    verdict = "PASS" if finished and not timed_out and not errors and not missing and not content_fails else "FAIL"
     exit_note = ("" if status == 0 else
                  f"; the engine ended with status {status} after the scenario had finished (a crash while quitting)" if finished
                  else f"; the engine ended with status {status} before the scenario finished")
@@ -456,6 +467,7 @@ def write_report(run_dir, config, variant, status, seconds, sampler, timed_out, 
               "seconds": round(seconds, 1),
               "timed_out": timed_out, "focus_samples": sampler.samples, "focus_front": sampler.front,
               "warnings": levels["W"], "errors": levels["E"], "scenario_errors": errors, "missing_shots": missing,
+              "content_not_loaded": not_loaded, "content_not_loaded_serious": serious,
               "shots": [{"n": n, "name": shot, "file": str(path) if path else None} for n, shot, path in shots],
               "round_lines": lines, "command": command}
     (run_dir / "report.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
@@ -466,6 +478,10 @@ def write_report(run_dir, config, variant, status, seconds, sampler, timed_out, 
            f"- log: {levels['W']} warnings, {levels['E']} errors; scenario errors: {len(errors)}" + exit_note,
            f"- screenshots: {sum(1 for s in shots if s[2])} of {len(shots)}" + (f" ({extra_shots} more than the scenario took)" if extra_shots else "") +
            (f"; MISSING, so the round fails: {', '.join(missing)}" if missing else ""),
+           *([f"- content files of the save that were not loaded: {', '.join(not_loaded)}" +
+              (" (script files only, harmless)" if not serious else
+               " (a game plugin: the world may differ from the save's, so the round fails; `allow_missing_content` in the round "
+               "file accepts it)" if content_fails else " (allowed by the round file)")] if not_loaded else []),
            "", "## Scenario lines", "", "```"] + lines[:400] + ["```", ""]
     if tail and not finished:
         # What the engine was doing when it stopped answering: a round that never began is told by its last lines
@@ -490,7 +506,8 @@ def run_variant(profile, config, variant, out_dir, save, priority="low"):
     lines = round_lines(text)
     shots, extra = collect_shots(run_dir / "userdata", run_dir / "shots", shot_names(lines), config.get("shot_width", 1280))
     return write_report(run_dir, config, variant, status, seconds, sampler, timed_out, lines, log_problems(text),
-                        count_levels(text), shots, extra, command, tail=log_tail(text))
+                        count_levels(text), shots, extra, command, tail=log_tail(text),
+                        content_missing=missing_content(text))
 
 
 def command_run(args):

@@ -296,6 +296,7 @@ class WholeRun(unittest.TestCase):
             path.write_bytes(b"\\x89PNG\\r\\n\\x1a\\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 2, 2, 8, 2, 0, 0, 0))
                              + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b""))
         lines = ["[10:00:00.000 I] start", "[10:00:01.000 W] Cannot read 0x1234"]
+        lines += ["[10:00:01.500 W] Warning: Saved game dependency %s is missing." % name for name in @MISSING@]
         for n, name in enumerate(("first", "second"), 1):
             lines.append("[10:00:02.000 I] ROUND\\tshot\\t%s\\tn=%d" % (name, n))
             if n <= @WRITTEN@:
@@ -306,15 +307,16 @@ class WholeRun(unittest.TestCase):
         sys.exit(@STATUS@)
     """
 
-    def run_round(self, status, done=True, written=2, extra=()):
+    def run_round(self, status, done=True, written=2, extra=(), missing=(), allow=False):
         tmp = Path(tempfile.mkdtemp(prefix="round-run-"))
         engine = self.make_engine(tmp, self.ENGINE.replace("@STATUS@", str(status)).replace("@DONE@", str(done))
-                                  .replace("@WRITTEN@", str(written)))
+                                  .replace("@WRITTEN@", str(written)).replace("@MISSING@", repr(list(missing))))
         (tmp / "s.lua").write_text("return function(r) end")
         profile = {"engine": str(engine), "resources": str(tmp),
                    "games": {"nv": {"data": [str(tmp)], "content": ["FalloutNV.esm"]}}, "out": str(tmp / "out")}
         (tmp / "profile.json").write_text(json.dumps(profile))
-        (tmp / "r.json").write_text(json.dumps({"name": "fake", "scenario": "s.lua", "variants": [{"name": "one"}, {"name": "two"}]}))
+        (tmp / "r.json").write_text(json.dumps({"name": "fake", "scenario": "s.lua", "variants": [{"name": "one"}, {"name": "two"}],
+                                                **({"allow_missing_content": True} if allow else {})}))
         code = round_runner.main(["--profile", str(tmp / "profile.json"), "run", str(tmp / "r.json"), "--parallel", "2", *extra])
         return tmp, code
 
@@ -384,6 +386,32 @@ class WholeRun(unittest.TestCase):
         self.assertIn("Last lines of the log", text)
         self.assertIn("ROUND\tshot\tsecond\tn=2", text)
         self.assertNotIn("10:00:02.000", text)
+
+    def test_a_missing_script_file_of_the_save_is_a_note_and_a_missing_plugin_fails_the_round(self):
+        # the save of a play session wants the plugin of the play, a script file: harmless
+        tmp, code = self.run_round(0, missing=("play.omwscripts",))
+        self.assertEqual(code, 0)
+        (run,) = list((tmp / "out").iterdir())
+        report = json.loads((run / "one" / "report.json").read_text())
+        self.assertEqual((report["verdict"], report["content_not_loaded"], report["content_not_loaded_serious"]),
+                         ("PASS", ["play.omwscripts"], []))
+        self.assertIn("not loaded: play.omwscripts (script files only, harmless)", (run / "one" / "report.md").read_text())
+        # a game plugin that is not loaded can change the world the save is in
+        tmp, code = self.run_round(0, missing=("play.omwscripts", "Mod.esp"))
+        self.assertEqual(code, 1)
+        (run,) = list((tmp / "out").iterdir())
+        report = json.loads((run / "one" / "report.json").read_text())
+        self.assertEqual((report["verdict"], report["content_not_loaded_serious"]), ("FAIL", ["Mod.esp"]))
+        self.assertIn("the round fails", (run / "one" / "report.md").read_text())
+        # unless the round file allows it
+        tmp, code = self.run_round(0, missing=("Mod.esp",), allow=True)
+        self.assertEqual(code, 0)
+        (run,) = list((tmp / "out").iterdir())
+        self.assertIn("allowed by the round file", (run / "one" / "report.md").read_text())
+
+    def test_missing_content_is_read_from_the_log(self):
+        self.assertEqual(round_runner.missing_content("a\nWarning: Saved game dependency X.esm is missing.\n"
+                                                      "Warning: Saved game dependency Y is missing.\n"), ["X.esm", "Y"])
 
     def test_a_finished_round_has_no_log_tail(self):
         tmp, code = self.run_round(0)
