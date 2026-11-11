@@ -124,6 +124,33 @@ class Commands(unittest.TestCase):
         os.utime(old, (1, 1))
         self.assertEqual(round_runner.newest_save(self.tmp / "saves"), new)
 
+    def test_newest_save_looks_in_the_folders_of_the_characters(self):
+        # the engine keeps its saves as saves/<Character>/<slot>.omwsave
+        old, new = self.tmp / "saves" / "Doc" / "a.omwsave", self.tmp / "saves" / "Sunny" / "b.omwsave"
+        for path, stamp in ((old, 1), (new, 5)):
+            path.parent.mkdir()
+            path.write_bytes(b"x")
+            os.utime(path, (stamp, stamp))
+        self.assertEqual(round_runner.newest_save(self.tmp / "saves"), new)
+
+    def test_relative_paths_become_absolute(self):
+        # the engine runs inside the folder of its run, so a path left relative would be read from there
+        cwd = Path.cwd()
+        os.chdir(self.tmp)
+        try:
+            profile = dict(self.profile, engine="bin/openfallout", resources="res",
+                           games={"nv": {"data": ["nv/Data"], "content": []}})
+            config = round_runner.load_round(self.round_file, self.Args())
+            command = round_runner.engine_command(profile, config, round_runner.absolute("out/run"), None)
+        finally:
+            os.chdir(cwd)
+        self.assertEqual(command[0], str(self.tmp.resolve() / "bin" / "openfallout"))
+        for flag in ("--resources", "--config", "--user-data"):
+            self.assertTrue(Path(command[command.index(flag) + 1]).is_absolute(), flag)
+        for index, word in enumerate(command):
+            if word == "--data":
+                self.assertTrue(Path(command[index + 1]).is_absolute(), command[index + 1])
+
     def test_command_is_headless_and_private(self):
         config = round_runner.load_round(self.round_file, self.Args())
         save = self.tmp / "saves" / "q.fos"

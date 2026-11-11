@@ -35,6 +35,7 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+SAVE_SUFFIXES = (".fos", ".ess", ".omwsave", ".fo3save")
 ROOT = HERE.parents[2]
 PROFILE_DEFAULT = Path(os.environ.get("OPENFALLOUT_ROUND_PROFILE", Path.home() / ".config" / "openfallout-rounds.json"))
 IS_MAC = platform.system() == "Darwin"
@@ -255,10 +256,19 @@ def load_round(path, args):
     return config
 
 
+def absolute(path):
+    """An absolute path that keeps symbolic links: the engine runs in the folder of its run, so no path may stay relative."""
+    return Path(os.path.abspath(Path(path).expanduser()))
+
+
 def newest_save(folder):
-    saves = [path for path in Path(folder).glob("*") if path.suffix.lower() in (".fos", ".ess", ".omwsave", ".fo3save")]
+    """The newest save of a folder. The engine keeps its saves one level down, in a folder for each character
+    (`saves/<Character>/<slot>.omwsave`); saves laid straight into the folder are found too."""
+    folder = Path(folder)
+    saves = [path for pattern in ("*", "*/*") for path in folder.glob(pattern)
+             if path.is_file() and path.suffix.lower() in SAVE_SUFFIXES]
     if not saves:
-        saves = [path for path in Path(folder).glob("*") if path.is_file()]
+        saves = [path for path in folder.glob("*") if path.is_file()]
     if not saves:
         sys.exit(f"no save in {folder}")
     return max(saves, key=lambda path: path.stat().st_mtime)
@@ -284,13 +294,13 @@ def engine_command(profile, config, run_dir, save, extra=()):
     game = (profile.get("games") or {}).get(config["game"])
     if game is None:
         sys.exit(f"the profile has no game `{config['game']}`")
-    engine = Path(profile["engine"]).expanduser()
+    engine = absolute(profile["engine"])
     command = [str(engine)]
     resources = profile.get("resources") or (engine.parent / "resources")
-    command += ["--resources", str(Path(resources).expanduser())]
+    command += ["--resources", str(absolute(resources))]
     command += ["--config", str(run_dir / "config"), "--user-data", str(run_dir / "userdata")]
     for data in game.get("data", []):
-        command += ["--data", str(Path(data).expanduser())]
+        command += ["--data", str(absolute(data))]
     command += ["--data", str(HERE), "--data", str(run_dir / "data")]
     for content in game.get("content", []):
         command += ["--content", content]
@@ -421,7 +431,7 @@ def command_run(args):
     profile = load_profile(args.profile)
     config = load_round(args.round, args)
     save = resolve_save(config, profile)
-    out_root = Path(args.out or profile.get("out") or Path(tempfile.gettempdir()) / "openfallout-rounds").expanduser()
+    out_root = absolute(args.out or profile.get("out") or Path(tempfile.gettempdir()) / "openfallout-rounds")
     out_dir = out_root / (time.strftime("%Y%m%d-%H%M%S-") + config["name"])
     out_dir.mkdir(parents=True)
     variants = config["variants"]
@@ -473,7 +483,7 @@ def command_profile(args):
     # The settings of the player's own configuration folder are read by the engine as the defaults under the run's own, so
     # the profile needs no `settings` unless a file other than that one is wanted
     profile = {"engine": str(engine), "games": games, "saves": {key: str(userdata / "saves") for key in games},
-               "out": str(Path(args.out).expanduser()) if args.out else None}
+               "out": str(absolute(args.out)) if args.out else None}
     # a macOS build is a bundle: the program is in Contents/MacOS and the resources in Contents/Resources
     bundle_resources = engine.parent.parent / "Resources" / "resources"
     if engine.parent.name == "MacOS" and bundle_resources.is_dir():
