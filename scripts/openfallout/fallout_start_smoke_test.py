@@ -5265,7 +5265,19 @@ def check_round(work, program, build, data, seconds):
     (folder / "round.json").write_text(json.dumps({
         "name": "smoke", "scenario": "scenario.lua", "start": "OFTestWorld:0,0", "limit": int(seconds),
         "resolution": [640, 360], "variants": [{"name": "one"}, {"name": "two"}]}), encoding="ascii")
+    # The configuration of the person names the other game (a plugin, a plugins file and a data folder that has its master):
+    # a round must not read it, so the run is the game of its profile only and the person's own folder is left as it is
+    other = folder / "othergame"
+    other.mkdir()
+    (other / "Fallout3.esm").write_bytes(b"this is not a plugin")
+    (other / "plugins.txt").write_text("Fallout3.esm\n", encoding="ascii")
+    player = home / ".config" / "openfallout"
+    player.mkdir(parents=True)
+    (player / "openfallout.cfg").write_text(
+        f'content=Fallout3.esm\nplugins-file="{other / "plugins.txt"}"\ndata="{other}"\n', encoding="ascii")
     env = dict(os.environ, HOME=str(home), LIBGL_ALWAYS_SOFTWARE="1")
+    for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME"):
+        env.pop(name, None)
     result = subprocess.run([sys.executable, str(ROOT / "scripts" / "openfallout" / "round" / "round.py"), "--profile",
                              str(folder / "profile.json"), "run", str(folder / "round.json"), "--parallel", "2"],
                             capture_output=True, text=True, env=env, timeout=seconds * 2 + 120, check=False)
@@ -5300,8 +5312,13 @@ def check_round(work, program, build, data, seconds):
         except ImportError:
             pass
         log = path.parent / "openfallout.log"
-        if "Headless: the window is created hidden" not in log.read_text(encoding="utf-8", errors="replace"):
+        text = log.read_text(encoding="utf-8", errors="replace")
+        if "Headless: the window is created hidden" not in text:
             found.append(f"round {name}: the engine did not say it created a hidden window")
+        if "Fallout3.esm" in text:
+            found.append(f"round {name}: the engine read the configuration of the person (it names Fallout3.esm)")
+    if sorted(path.name for path in player.iterdir()) != ["openfallout.cfg"]:
+        found.append(f"a round wrote into the configuration folder of the person: {sorted(path.name for path in player.iterdir())}")
     return found
 
 
