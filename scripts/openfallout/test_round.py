@@ -11,6 +11,7 @@ import struct
 import sys
 import tempfile
 import textwrap
+import time
 import unittest
 import zlib
 from pathlib import Path
@@ -301,16 +302,22 @@ class WholeRun(unittest.TestCase):
             lines.append("[10:00:02.000 I] ROUND\\tshot\\t%s\\tn=%d" % (name, n))
             if n <= @WRITTEN@:
                 png(shots / ("screenshot%03d.png" % (n - 1)))
+                lines.append("[10:00:02.500 I] %s has been saved" % (shots / ("screenshot%03d.png" % (n - 1))))
         if @DONE@:
             lines.append("[10:00:03.000 I] ROUND\\tdone\\tend")
         (config / "openfallout.log").write_text("\\n".join(lines) + "\\n")
+        if @LINGER@:
+            # the engine stays up after its scenario, as it does while it waits out the delay before it quits
+            import time
+            time.sleep(@LINGER@)
         sys.exit(@STATUS@)
     """
 
-    def run_round(self, status, done=True, written=2, extra=(), missing=(), allow=False):
+    def run_round(self, status, done=True, written=2, extra=(), missing=(), allow=False, linger=0):
         tmp = Path(tempfile.mkdtemp(prefix="round-run-"))
         engine = self.make_engine(tmp, self.ENGINE.replace("@STATUS@", str(status)).replace("@DONE@", str(done))
-                                  .replace("@WRITTEN@", str(written)).replace("@MISSING@", repr(list(missing))))
+                                  .replace("@WRITTEN@", str(written)).replace("@MISSING@", repr(list(missing)))
+                                  .replace("@LINGER@", str(linger)))
         (tmp / "s.lua").write_text("return function(r) end")
         profile = {"engine": str(engine), "resources": str(tmp),
                    "games": {"nv": {"data": [str(tmp)], "content": ["FalloutNV.esm"]}}, "out": str(tmp / "out")}
@@ -412,6 +419,44 @@ class WholeRun(unittest.TestCase):
     def test_missing_content_is_read_from_the_log(self):
         self.assertEqual(round_runner.missing_content("a\nWarning: Saved game dependency X.esm is missing.\n"
                                                       "Warning: Saved game dependency Y is missing.\n"), ["X.esm", "Y"])
+
+    def test_the_runner_stops_an_engine_that_stays_up_once_the_pictures_are_written(self):
+        # the engine waits out a long delay before it quits; the runner sees the end of the scenario and both pictures
+        # in the log and stops it (a sleep of 120 s would otherwise outlast the test)
+        started = time.monotonic()
+        tmp, code = self.run_round(0, linger=120)
+        self.assertLess(time.monotonic() - started, 60)
+        self.assertEqual(code, 0)
+        (run,) = list((tmp / "out").iterdir())
+        report = json.loads((run / "one" / "report.json").read_text())
+        self.assertEqual((report["verdict"], report["stopped_by_runner"], report["timed_out"]), ("PASS", True, False))
+        self.assertIn("the runner stopped the engine", (run / "one" / "report.md").read_text())
+
+    def test_pictures_reads_the_log_as_it_grows(self):
+        log = Path(tempfile.mkdtemp(prefix="round-log-")) / "openfallout.log"
+        pictures = round_runner.Pictures(log)
+        self.assertFalse(pictures.poll())                      # no log yet
+        log.write_text("[1 I] ROUND\tbegin\n[2 I] ROUND\tshot\ta\tn=1\n[3 I] ROUND\tshot\tb\tn=2\n")
+        self.assertFalse(pictures.poll())
+        with open(log, "a") as handle:
+            handle.write("[4 I] ROUND\tdone\tend\n[5 I] x/screenshot000.png has been saved\n")
+        self.assertFalse(pictures.poll())                      # the scenario ended, one of two pictures is written
+        with open(log, "a") as handle:
+            handle.write("[6 I] x/screenshot001.pn")           # a line cut in the middle is not counted yet
+        self.assertFalse(pictures.poll())
+        with open(log, "a") as handle:
+            handle.write("g has been saved\n")
+        self.assertTrue(pictures.poll())
+        self.assertEqual((pictures.asked, pictures.saved, pictures.done), (2, 2, True))
+
+    def test_a_scenario_with_no_pictures_is_over_when_it_ends(self):
+        log = Path(tempfile.mkdtemp(prefix="round-log-")) / "openfallout.log"
+        pictures = round_runner.Pictures(log)
+        log.write_text("[1 I] ROUND\tbegin\n")
+        self.assertFalse(pictures.poll())
+        with open(log, "a") as handle:
+            handle.write("[2 I] ROUND\tdone\tend\n")
+        self.assertTrue(pictures.poll())
 
     def test_a_finished_round_has_no_log_tail(self):
         tmp, code = self.run_round(0)

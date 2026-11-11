@@ -397,8 +397,52 @@ def priority_prefix(priority):
     return ["nice", "-n", "10"] if shutil.which("nice") else []
 
 
+class Pictures:
+    """Reads the engine's log while it runs: has the scenario ended, and are the pictures it asked for written? The engine
+    writes each picture in the background, in the same work queue as the loading of the land, and on a busy Mac that took
+    seconds for the first and longer than the game stayed up for the second (round R5/R6), so the run ends when the pictures
+    are there, not after a fixed time."""
+
+    def __init__(self, path):
+        self.path, self.offset, self.pending = Path(path), 0, ""
+        self.asked = self.saved = 0
+        self.done = False
+
+    def poll(self):
+        """Reads what the log has grown by; True when the scenario ended and every picture it asked for is written."""
+        try:
+            with open(self.path, "rb") as log:
+                log.seek(self.offset)
+                data = log.read()
+        except OSError:
+            return False
+        if data:
+            self.offset += len(data)
+            # only whole lines are counted: a word cut by the end of what was read is read next time
+            complete, _, self.pending = (self.pending + data.decode("utf-8", errors="replace")).rpartition("\n")
+            self.asked += complete.count("ROUND\tshot\t")
+            self.saved += complete.count(" has been saved")
+            self.done = self.done or "ROUND\tdone\t" in complete
+        return self.done and self.saved >= self.asked
+
+
+def stop_engine(process):
+    """Asks the engine's process group to quit (a polite SIGTERM, the engine quits on its own way), and ends it if it does not."""
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    try:
+        process.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+
+
 def run_engine(command, run_dir, limit, env_extra=None, priority="low"):
-    """Starts the engine at low priority and waits for it; gives (exit status, seconds, focus sampler, timed out)."""
+    """Starts the engine at low priority and waits for it; gives (exit status, seconds, focus sampler, timed out, ended early).
+    The run ends when the engine does, when the scenario ended and its pictures are written (`ended early`: the runner stops
+    the engine, which would otherwise wait out a delay made for slow pictures) or when `limit` seconds are over."""
     import pty
     env = dict(os.environ, OPENFALLOUT_HEADLESS="1", **(env_extra or {}))
     prefix = priority_prefix(priority)
@@ -410,20 +454,25 @@ def run_engine(command, run_dir, limit, env_extra=None, priority="low"):
     os.close(slave)
     sampler = FocusSampler(process.pid)
     sampler.start()
-    timed_out = False
-    try:
-        process.wait(timeout=limit)
-    except subprocess.TimeoutExpired:
-        timed_out = True
-        os.killpg(process.pid, signal.SIGTERM)
+    pictures = Pictures(run_dir / "config" / "openfallout.log")
+    timed_out = ended_early = False
+    while True:
         try:
-            process.wait(timeout=30)
+            process.wait(timeout=0.5)
+            break
         except subprocess.TimeoutExpired:
-            os.killpg(process.pid, signal.SIGKILL)
-            process.wait()
+            pass
+        if pictures.poll():
+            ended_early = True
+            stop_engine(process)
+            break
+        if time.monotonic() - started >= limit:
+            timed_out = True
+            stop_engine(process)
+            break
     sampler.stop()
     os.close(master)
-    return process.returncode, time.monotonic() - started, sampler, timed_out
+    return process.returncode, time.monotonic() - started, sampler, timed_out, ended_early
 
 
 def missing_content(text):
@@ -437,7 +486,7 @@ def log_tail(text, count=8):
 
 
 def write_report(run_dir, config, variant, status, seconds, sampler, timed_out, lines, problems, levels, shots, extra_shots,
-                 command, tail=(), content_missing=()):
+                 command, tail=(), content_missing=(), ended_early=False):
     name = variant.get("name", "run")
     errors = [line for line in lines if line.startswith("error")]
     # The scenario ended (`done end`): what the round asked is answered, so a crash while the engine quits (a known fault of
@@ -456,6 +505,8 @@ def write_report(run_dir, config, variant, status, seconds, sampler, timed_out, 
     exit_note = ("" if status == 0 else
                  f"; the engine ended with status {status} after the scenario had finished (a crash while quitting)" if finished
                  else f"; the engine ended with status {status} before the scenario finished")
+    if ended_early and finished:
+        exit_note = f"; the runner stopped the engine once the scenario had ended and its pictures were written (status {status})"
     focus = ("not measured (macOS only)" if not sampler.available and not IS_MAC else
              "NOT MEASURED: `lsappinfo` gave no answer, so this round cannot show that the engine stayed in the background"
              if not sampler.available else
@@ -465,7 +516,7 @@ def write_report(run_dir, config, variant, status, seconds, sampler, timed_out, 
         verdict = "FAIL"
     report = {"round": config["name"], "variant": name, "verdict": verdict, "exit_status": status, "exit_note": exit_note.lstrip("; "), "finished": finished,
               "seconds": round(seconds, 1),
-              "timed_out": timed_out, "focus_samples": sampler.samples, "focus_front": sampler.front,
+              "timed_out": timed_out, "stopped_by_runner": ended_early, "focus_samples": sampler.samples, "focus_front": sampler.front,
               "warnings": levels["W"], "errors": levels["E"], "scenario_errors": errors, "missing_shots": missing,
               "content_not_loaded": not_loaded, "content_not_loaded_serious": serious,
               "shots": [{"n": n, "name": shot, "file": str(path) if path else None} for n, shot, path in shots],
@@ -499,7 +550,7 @@ def run_variant(profile, config, variant, out_dir, save, priority="low"):
     prepare_run(profile, config, variant, run_dir, save)
     command = engine_command(profile, config, run_dir, save)
     env = {**config.get("env", {}), **variant.get("env", {})}
-    status, seconds, sampler, timed_out = run_engine(command, run_dir, config["limit"] + 30, env, priority)
+    status, seconds, sampler, timed_out, ended_early = run_engine(command, run_dir, config["limit"] + 30, env, priority)
     log = run_dir / "config" / "openfallout.log"
     text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
     (run_dir / "openfallout.log").write_text(text, encoding="utf-8")
@@ -507,7 +558,7 @@ def run_variant(profile, config, variant, out_dir, save, priority="low"):
     shots, extra = collect_shots(run_dir / "userdata", run_dir / "shots", shot_names(lines), config.get("shot_width", 1280))
     return write_report(run_dir, config, variant, status, seconds, sampler, timed_out, lines, log_problems(text),
                         count_levels(text), shots, extra, command, tail=log_tail(text),
-                        content_missing=missing_content(text))
+                        content_missing=missing_content(text), ended_early=ended_early)
 
 
 def command_run(args):
