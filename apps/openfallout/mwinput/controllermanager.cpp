@@ -249,14 +249,12 @@ namespace OFInput
                 const bool stick = arg.axis == SDL_CONTROLLER_AXIS_LEFTX || arg.axis == SDL_CONTROLLER_AXIS_LEFTY
                     || arg.axis == SDL_CONTROLLER_AXIS_RIGHTX || arg.axis == SDL_CONTROLLER_AXIS_RIGHTY;
                 // A trigger that is let go under a window is told to the bindings the same way: one that was pressed
-                // while a message was open would stay pressed
+                // while a message was open would stay pressed. Only its rest is told (the release threshold of the
+                // windows can be well above what a binding takes as pressed, and a half-pressed trigger must not
+                // press one while a window owns it)
                 const bool trigger
                     = arg.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT || arg.axis == SDL_CONTROLLER_AXIS_TRIGGERRIGHT;
-                const int triggerPressThreshold = Settings::gui().mControllerTriggerPressThreshold;
-                const int triggerReleaseThreshold
-                    = std::clamp<int>(Settings::gui().mControllerTriggerReleaseThreshold, 0, triggerPressThreshold - 1);
-                if ((stick && std::abs(arg.value) < stickNeutralValue)
-                    || (trigger && arg.value <= triggerReleaseThreshold))
+                if ((stick || trigger) && std::abs(arg.value) < stickNeutralValue)
                     mBindingsManager->controllerAxisMoved(deviceID, arg);
                 return;
             }

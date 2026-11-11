@@ -1,5 +1,6 @@
 #include "quadtreeworld.hpp"
 
+#include <osg/ComputeBoundsVisitor>
 #include <osg/PolygonMode>
 #include <osg/ShapeDrawable>
 #include <osgUtil/CullVisitor>
@@ -315,6 +316,11 @@ namespace Terrain
 
     QuadTreeWorld::~QuadTreeWorld() {}
 
+    void QuadTreeWorld::setClusterCulling(bool enabled, bool report)
+    {
+        TerrainDrawable::setClusterCulling(enabled, report);
+    }
+
     /// get the level of vertex detail to render this node at, expressed relative to the native resolution of the vertex
     /// data set, NOT relative to mMinSize as is the case with node LODs.
     unsigned int getVertexLod(QuadTreeNode* node, int vertexLodMod)
@@ -418,12 +424,17 @@ namespace Terrain
             }
             std::ostringstream made;
 
+            unsigned int chunkLod = DefaultLodCallback::getNativeLodLevel(entry.mNode, mMinSize);
+            // The chunks of up to 2 cells get as many vertices per cell as the smallest (the stitching to the
+            // neighbours is not changed, so the edges of the chunks of the debug view can have cracks)
+            if (mFineLand && entry.mNode->getSize() <= 2.f)
+                chunkLod = 0;
+
             int managerIndex = 0;
             for (QuadTreeWorld::ChunkManager* m : mChunkManagers)
             {
                 osg::ref_ptr<osg::Node> n = m->getChunk(entry.mNode->getSize(), entry.mNode->getCenter(),
-                    static_cast<unsigned char>(DefaultLodCallback::getNativeLodLevel(entry.mNode, mMinSize)),
-                    entry.mLodFlags, activeGrid, vd->getViewPoint(), compile);
+                    static_cast<unsigned char>(chunkLod), entry.mLodFlags, activeGrid, vd->getViewPoint(), compile);
                 if (n)
                     pat->addChild(n);
                 if (report)
@@ -437,11 +448,20 @@ namespace Terrain
                     }
                     else if (n)
                     {
-                        const osg::BoundingSphere bound = n->getBound();
+                        // The box of what is drawn, in the units of the world: the chunk is moved by the minus of the
+                        // centre of the node and the node by its centre
+                        osg::ComputeBoundsVisitor boundsVisitor;
+                        n->accept(boundsVisitor);
+                        const osg::BoundingBox box = boundsVisitor.getBoundingBox();
                         const osg::Group* group = n->asGroup();
                         made << n->className() << " with " << (group ? group->getNumChildren() : 0)
-                             << " children, mask " << n->getNodeMask() << ", height of the bound "
-                             << bound.center().z() - bound.radius() << " to " << bound.center().z() + bound.radius();
+                             << " children, mask " << n->getNodeMask();
+                        if (box.valid())
+                            made << ", the box of what is drawn x " << box.xMin() + center.x() * cellWorldSize << " to "
+                                 << box.xMax() + center.x() * cellWorldSize << " y "
+                                 << box.yMin() + center.y() * cellWorldSize << " to "
+                                 << box.yMax() + center.y() * cellWorldSize << " z " << box.zMin() << " to "
+                                 << box.zMax();
                     }
                     else
                         made << "nothing";

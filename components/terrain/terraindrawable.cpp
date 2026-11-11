@@ -3,12 +3,26 @@
 #include <osg/ClusterCullingCallback>
 #include <osgUtil/CullVisitor>
 
+#include <components/debug/debuglog.hpp>
 #include <components/sceneutil/lightmanager.hpp>
+
+#include <atomic>
 
 #include "compositemaprenderer.hpp"
 
 namespace Terrain
 {
+    namespace
+    {
+        std::atomic<bool> sClusterCulling{ true };
+        std::atomic<bool> sReportClusterCulls{ false };
+    }
+
+    void TerrainDrawable::setClusterCulling(bool enabled, bool report)
+    {
+        sClusterCulling = enabled;
+        sReportClusterCulls = report;
+    }
 
     TerrainDrawable::TerrainDrawable() {}
 
@@ -68,9 +82,19 @@ namespace Terrain
 
         bool shadowcam = cv->getCurrentCamera()->getName() == "ShadowCamera";
 
-        if (cv->getCullingMode() & osg::CullStack::CLUSTER_CULLING
+        if (sClusterCulling && cv->getCullingMode() & osg::CullStack::CLUSTER_CULLING
             && clusterCull(mClusterCullingCallback, cv->getEyePoint(), shadowcam))
+        {
+            if (sReportClusterCulls && !shadowcam && !mClusterCullReported)
+            {
+                mClusterCullReported = true;
+                Log(Debug::Info) << "Land of the records of " << mChunkSize << " cells at " << mChunkCenter.x() << ","
+                                 << mChunkCenter.y() << " is left out because its chunk faces away from the eye "
+                                 << "(deviation " << mClusterCullingCallback->getDeviation() << ", radius "
+                                 << mClusterCullingCallback->getRadius() << ")";
+            }
             return;
+        }
 
         osg::RefMatrix& matrix = *cv->getModelViewMatrix();
 

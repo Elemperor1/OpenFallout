@@ -54,6 +54,16 @@ namespace Terrain
 
         void createClusterCullingCallback();
 
+        /// Whether a chunk that faces away from the eye is left out (it is, unless a debug word of the distant land
+        /// says otherwise), and whether the first time one is left out is told to the log
+        static void setClusterCulling(bool enabled, bool report);
+        /// Where the chunk is, in cells, to tell it in the log
+        void setChunk(float size, const osg::Vec2f& center)
+        {
+            mChunkSize = size;
+            mChunkCenter = center;
+        }
+
         void compileGLObjects(osg::RenderInfo& renderInfo) const override;
 
         void setupWaterBoundingBox(float waterheight, float margin);
@@ -68,6 +78,9 @@ namespace Terrain
         PassVector mPasses;
 
         osg::ref_ptr<osg::ClusterCullingCallback> mClusterCullingCallback;
+        float mChunkSize = 0.f;
+        osg::Vec2f mChunkCenter;
+        bool mClusterCullReported = false;
 
         osg::ref_ptr<SceneUtil::LightListCallback> mLightListCallback;
         osg::ref_ptr<CompositeMap> mCompositeMap;

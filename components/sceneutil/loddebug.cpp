@@ -136,6 +136,10 @@ namespace SceneUtil
                 debug.mNoRecords = true;
             else if (word == "nodes")
                 debug.mNodes = true;
+            else if (word == "fine-land")
+                debug.mFineLand = true;
+            else if (word == "no-cluster")
+                debug.mNoCluster = true;
             else if (unknown != nullptr)
                 unknown->emplace_back(word);
         }

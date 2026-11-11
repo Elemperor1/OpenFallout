@@ -265,6 +265,7 @@ namespace Terrain
         geometry->setTexCoordArrayList(osg::Geometry::ArrayList(numUvSets, mBufferCache.getUVBuffer(numVerts)));
 
         geometry->createClusterCullingCallback();
+        geometry->setChunk(chunkSize, chunkCenter);
 
         geometry->setStateSet(mMultiPassRoot);
 

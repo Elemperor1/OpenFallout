@@ -37,6 +37,12 @@ namespace SceneUtil
         /// 1,500) when it is made: its size and centre in cells and what each chunk manager made for it, to tell which
         /// of them draws a place
         bool mNodes = false;
+        /// "fine-land": the land of the records is made with the most vertices that its chunks have (the chunk of
+        /// 2 cells with as many per cell as the one of half a cell), to tell if what is drawn over it floats because
+        /// the land is too coarse
+        bool mFineLand = false;
+        /// "no-cluster": the land of the records is not left out when its chunk faces away from the eye
+        bool mNoCluster = false;
 
         bool changesFiles() const { return mFlat || mWireframe || mNoSkirt; }
     };

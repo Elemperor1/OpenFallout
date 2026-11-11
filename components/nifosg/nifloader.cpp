@@ -300,6 +300,8 @@ namespace NifOsg
 {
     /// The alpha (of 255) above which a texel of the atlas of a block of distant objects is drawn
     constexpr int sLodBuildingAlphaThreshold = 128;
+    /// The node of a shape of a block of distant objects (the flag of its shader) is marked with this value
+    constexpr const char* sLodBuildingUserValue = "lodBuilding";
 
     bool Loader::sShowMarkers = false;
 
@@ -2810,6 +2812,8 @@ namespace NifOsg
                     if (texprop->lodBuilding())
                     {
                         handleAlphaTesting(true, osg::AlphaFunc::GREATER, sLodBuildingAlphaThreshold, *node);
+                        // Told to the alpha property of the shape, that is handled when the drawable is made
+                        node->setUserValue(sLodBuildingUserValue, true);
                         static std::atomic<int> sReported{ 0 };
                         if (sReported.fetch_add(1) < 4)
                             Log(Debug::Info)
@@ -3066,8 +3070,13 @@ namespace NifOsg
                         const Nif::NiAlphaProperty* alphaprop = static_cast<const Nif::NiAlphaProperty*>(property);
                         handleAlphaBlending(alphaprop->useAlphaBlending(), alphaprop->sourceBlendMode(),
                             alphaprop->destinationBlendMode(), !alphaprop->noSorter(), hasSortAlpha, *node);
-                        handleAlphaTesting(alphaprop->useAlphaTesting(), getTestMode(alphaprop->alphaTestMode()),
-                            alphaprop->mThreshold, *node);
+                        // A property that asks for a test is obeyed; one that asks for none does not take away the
+                        // test that the flag of the shader of a block of distant objects set on the node
+                        bool lodBuilding = false;
+                        node->getUserValue(sLodBuildingUserValue, lodBuilding);
+                        if (alphaprop->useAlphaTesting() || !lodBuilding)
+                            handleAlphaTesting(alphaprop->useAlphaTesting(), getTestMode(alphaprop->alphaTestMode()),
+                                alphaprop->mThreshold, *node);
                         break;
                     }
                     case Nif::RC_BSShaderPPLightingProperty:

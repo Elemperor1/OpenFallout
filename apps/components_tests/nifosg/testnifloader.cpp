@@ -377,6 +377,27 @@ osg::Group {
         EXPECT_NEAR(test->getReferenceValue(), 0.5f, 0.01f);
     }
 
+    // A shape of a block that lists an alpha property that tests nothing keeps what the flag of its shader asks
+    TEST_F(NifOsgLoaderTest, keepsTheAlphaTestOfABlockOfDistantObjectsWhenAnAlphaPropertyTestsNothing)
+    {
+        LodShape lod(Nif::BSSFlag2_LODBuilding | Nif::BSSFlag2_DepthWrite);
+        Nif::NiAlphaProperty alpha;
+        alpha.mRecordType = Nif::RC_NiAlphaProperty;
+        alpha.mController = nullptr;
+        alpha.mFlags = 0;
+        alpha.mThreshold = 0;
+        lod.mShape.mProperties.push_back(Nif::RecordPtrT<Nif::NiProperty>(&alpha));
+        Nif::NIFFile file(testNif);
+        file.mRoots.push_back(&lod.mShape);
+
+        const osg::ref_ptr<osg::Node> result = Loader::load(file, &mImageManager, &mMaterialManager);
+
+        const osg::AlphaFunc* test = alphaTestOf(*result);
+        ASSERT_NE(test, nullptr);
+        EXPECT_EQ(test->getFunction(), osg::AlphaFunc::GREATER);
+        EXPECT_NEAR(test->getReferenceValue(), 0.5f, 0.01f);
+    }
+
     TEST_F(NifOsgLoaderTest, testsNoAlphaOfAShapeThatIsNotABlockOfDistantObjects)
     {
         LodShape other(Nif::BSSFlag2_DepthWrite);
