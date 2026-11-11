@@ -144,10 +144,12 @@ def shot_names(lines):
 
 def parse_front_pid(front_output, info_output):
     """The process id of the frontmost application from the output of `lsappinfo front` (the ASN, "ASN:0x0-0x2b02b:") and of
-    `lsappinfo info -only pid <asn>` (`"pid"=1234`); None when either cannot be read."""
+    `lsappinfo info -only pid <asn>`. That prints `"pid"=1234` on some macOS versions and, on others, a block of the whole entry
+    (`pid = 1234 type="Foreground" ...`, the filter ignored): the first line that starts with the key counts, so `parentPID`
+    does not. None when either cannot be read."""
     if not re.search(r"ASN:", front_output or ""):
         return None
-    match = re.search(r'"pid"\s*=\s*(\d+)', info_output or "")
+    match = re.search(r'(?im)^\s*"?pid"?\s*=\s*(\d+)', info_output or "")
     return int(match.group(1)) if match else None
 
 
@@ -424,8 +426,13 @@ def run_engine(command, run_dir, limit, env_extra=None, priority="low"):
     return process.returncode, time.monotonic() - started, sampler, timed_out
 
 
+def log_tail(text, count=8):
+    """The last lines of the engine's log, each without its time stamp and cut at 200 characters."""
+    return [line.split("]", 1)[-1].strip()[:200] for line in text.splitlines() if line.strip()][-count:]
+
+
 def write_report(run_dir, config, variant, status, seconds, sampler, timed_out, lines, problems, levels, shots, extra_shots,
-                 command):
+                 command, tail=()):
     name = variant.get("name", "run")
     errors = [line for line in lines if line.startswith("error")]
     # The scenario ended (`done end`): what the round asked is answered, so a crash while the engine quits (a known fault of
@@ -460,6 +467,9 @@ def write_report(run_dir, config, variant, status, seconds, sampler, timed_out, 
            f"- screenshots: {sum(1 for s in shots if s[2])} of {len(shots)}" + (f" ({extra_shots} more than the scenario took)" if extra_shots else "") +
            (f"; MISSING, so the round fails: {', '.join(missing)}" if missing else ""),
            "", "## Scenario lines", "", "```"] + lines[:400] + ["```", ""]
+    if tail and not finished:
+        # What the engine was doing when it stopped answering: a round that never began is told by its last lines
+        out += ["## Last lines of the log (the scenario did not finish)", "", "```"] + list(tail) + ["```", ""]
     if problems:
         out += ["## First warnings and errors", ""] + [f"- {level} x{count}: {message}" for level, message, count in problems] + [""]
     out += ["## Screenshots", ""] + [f"- {n:02d} {shot}: {path.name if path else 'MISSING'}" for n, shot, path in shots] + [""]
@@ -480,7 +490,7 @@ def run_variant(profile, config, variant, out_dir, save, priority="low"):
     lines = round_lines(text)
     shots, extra = collect_shots(run_dir / "userdata", run_dir / "shots", shot_names(lines), config.get("shot_width", 1280))
     return write_report(run_dir, config, variant, status, seconds, sampler, timed_out, lines, log_problems(text),
-                        count_levels(text), shots, extra, command)
+                        count_levels(text), shots, extra, command, tail=log_tail(text))
 
 
 def command_run(args):
@@ -540,7 +550,8 @@ def command_profile(args):
         userdata = home / ".local" / "share" / "openfallout"
     # The settings of the player's own configuration folder are read by the engine as the defaults under the run's own, so
     # the profile needs no `settings` unless a file other than that one is wanted
-    profile = {"engine": str(engine), "games": games, "saves": {key: str(userdata / "saves") for key in games},
+    saves = absolute(args.saves) if args.saves else userdata / "saves"
+    profile = {"engine": str(engine), "games": games, "saves": {key: str(saves) for key in games},
                "out": str(absolute(args.out)) if args.out else None}
     # a macOS build is a bundle: the program is in Contents/MacOS and the resources in Contents/Resources
     bundle_resources = engine.parent.parent / "Resources" / "resources"
@@ -553,6 +564,9 @@ def command_profile(args):
     print(f"wrote {target}:\n{json.dumps(profile, indent=2)}")
     if not games:
         print("no game found under ~/Games: edit the `games` of the profile", file=sys.stderr)
+    if not any(True for pattern in ("*.omwsave", "*/*.omwsave") for _ in saves.glob(pattern)):
+        print(f"no save in {saves}: `\"save\": \"latest\"` would find none. Where the game is played the engine keeps its saves "
+              "(a --user-data folder of its own?): run `profile` again with --saves <that folder>/saves", file=sys.stderr)
     return 0
 
 
@@ -608,6 +622,8 @@ def main(argv=None):
     one = sub.add_parser("profile", help="write the profile of this computer")
     one.add_argument("--engine", required=True)
     one.add_argument("--out", help="where the results of the runs go")
+    one.add_argument("--saves", help="the folder `\"save\": \"latest\"` takes the newest save from (default: the engine's own "
+                                    "user-data folder)")
     one.set_defaults(handler=command_profile)
 
     for name, handler, text in (("run", command_run, "run a round"), ("check", command_check, "show what a run would use")):

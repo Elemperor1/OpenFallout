@@ -29,6 +29,8 @@ namespace OFState
         std::optional<std::pair<const Character*, std::filesystem::path>> mLoadRequest;
         // The load that was asked for by the quick load key says its note when it is done (a load clears the notes)
         bool mQuickLoadNote = false;
+        // A headless run has nobody to answer a question: a save that wants content files that are not loaded is loaded
+        bool mHeadless = false;
         State mState;
         CharacterManager mCharacterManager;
         double mTimePlayed;
@@ -46,6 +48,8 @@ namespace OFState
 
     public:
         StateManager(const std::filesystem::path& saves, const std::vector<std::string>& contentFiles);
+
+        void setHeadless(bool headless) { mHeadless = headless; }
 
         void requestQuit() override;
 

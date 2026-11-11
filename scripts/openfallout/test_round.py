@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Tests of round/round.py, the runner of the scripted checks: the settings merge, the reading of the log, the order of the
 screenshots, the command line, and a whole run against a stand-in for the engine (a script that writes a log and a picture)."""
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import stat
@@ -85,6 +87,13 @@ class Log(unittest.TestCase):
 class Focus(unittest.TestCase):
     def test_parse_front_pid(self):
         self.assertEqual(round_runner.parse_front_pid("ASN:0x0-0x2b02b:", '"pid"=4242'), 4242)
+        # the block that `lsappinfo info -only pid` prints on newer macOS versions (the filter is ignored there)
+        block = ('"Google Chrome" ASN:0x0-0x1e01e:\n    bundle path="/Applications/Google Chrome.app"\n'
+                 '    pid = 4242 type="Foreground" flavor=3 Version="1" fileType="APPL" creator="rimZ" arch=arm64\n'
+                 '    parentPID = 1\n    parentASN="Dock" ASN:0x0-0x1c01c:\n')
+        self.assertEqual(round_runner.parse_front_pid("ASN:0x0-0x1e01e:", block), 4242)
+        self.assertEqual(round_runner.parse_front_pid("ASN:0x0-0x1e01e:", "    parentPID = 1\n    pid = 9\n"), 9)
+        self.assertIsNone(round_runner.parse_front_pid("ASN:0x0-0x1e01e:", "    parentPID = 1\n"))
         self.assertIsNone(round_runner.parse_front_pid("", '"pid"=4242'))
         self.assertIsNone(round_runner.parse_front_pid("ASN:0x0-0x2b02b:", "nothing"))
 
@@ -185,6 +194,30 @@ class Commands(unittest.TestCase):
         for index, word in enumerate(command):
             if word == "--data":
                 self.assertTrue(Path(command[index + 1]).is_absolute(), command[index + 1])
+
+    def test_profile_takes_a_saves_folder_and_warns_when_it_holds_no_save(self):
+        class Given:
+            engine = str(self.tmp / "bin" / "openfallout")
+            out = None
+            saves = None
+            profile = str(self.tmp / "profile.json")
+
+        (self.tmp / "bin").mkdir()
+        (self.tmp / "bin" / "openfallout").write_text("x")
+        (self.tmp / "Games" / "Fallout New Vegas").mkdir(parents=True)
+        (self.tmp / "Games" / "Fallout New Vegas" / "FalloutNV.esm").write_text("x")
+        (self.tmp / "elsewhere" / "Player").mkdir(parents=True)
+        (self.tmp / "elsewhere" / "Player" / "Autosave.omwsave").write_bytes(b"1")
+        for saves, warned in ((None, True), (str(self.tmp / "elsewhere"), False)):
+            Given.saves = saves
+            err = io.StringIO()
+            with mock.patch.object(Path, "home", return_value=self.tmp), contextlib.redirect_stdout(io.StringIO()), \
+                    contextlib.redirect_stderr(err):
+                round_runner.command_profile(Given)
+            written = json.loads(Path(Given.profile).read_text())
+            self.assertEqual("no save in" in err.getvalue(), warned, err.getvalue())
+            if saves:
+                self.assertEqual(written["saves"]["nv"], saves)
 
     def test_command_is_headless_and_private(self):
         config = round_runner.load_round(self.round_file, self.Args())
@@ -346,6 +379,20 @@ class WholeRun(unittest.TestCase):
         report = json.loads((run / "one" / "report.json").read_text())
         self.assertEqual(report["verdict"], "FAIL")
         self.assertIn("before the scenario finished", report["exit_note"])
+        # a round that never finished says where the log stopped
+        text = (run / "one" / "report.md").read_text()
+        self.assertIn("Last lines of the log", text)
+        self.assertIn("ROUND\tshot\tsecond\tn=2", text)
+        self.assertNotIn("10:00:02.000", text)
+
+    def test_a_finished_round_has_no_log_tail(self):
+        tmp, code = self.run_round(0)
+        (run,) = list((tmp / "out").iterdir())
+        self.assertNotIn("Last lines of the log", (run / "one" / "report.md").read_text())
+
+    def test_log_tail(self):
+        self.assertEqual(round_runner.log_tail("[1 I] a\n\n[2 W] b\n[3 I] " + "x" * 300 + "\n", count=2),
+                         ["b", "x" * 200])
 
 
 if __name__ == "__main__":

@@ -37,7 +37,8 @@ The report holds numbers, record ids and the names the scenario gave, never a te
 `round.py profile --engine <path of the openfallout program>` looks for the games under `~/Games` (`Fallout New Vegas`,
 `Fallout 3`, with or without `/Data`), and writes the machine's profile: `engine`, `resources` (for a macOS bundle:
 `Contents/Resources/resources`), `games` (`data` folders and `content` plugins of each of `nv`, `fo3`, `ttw`; `content` is empty by default, which loads the plugins the game makes active, the same as playing, so a save finds the plugins it was made with), `saves` (the
-folder that `"save": "latest"` takes the newest file from), `out` and, if wanted, `settings` (a settings file laid under the
+folder that `"save": "latest"` takes the newest file from: the engine's own user-data folder unless `profile --saves <folder>` says
+where the game is played, and `profile` warns when the folder holds no save), `out` and, if wanted, `settings` (a settings file laid under the
 round's). Edit it by hand for Tale of Two Wastelands (`data` = the New Vegas folder, then the output of its installer).
 `round.py check <round file>` prints what a run would use without starting anything.
 

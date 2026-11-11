@@ -5305,6 +5305,35 @@ def check_round(work, program, build, data, seconds):
     return found
 
 
+def check_headless_load(work, program, build, data, seconds):
+    """A headless run has nobody to click: a save that wants a plugin that is not loaded (the save of a play session wants the
+    plugin of the play, a round loads its own) is loaded all the same, where it asks a question in a window otherwise and
+    waits for ever."""
+    found = []
+    folder = work / "headlessload"
+    home = folder / "home"
+    home.mkdir(parents=True)
+    for name in ("runtime", "runtime2"):
+        (folder / name).mkdir(mode=0o700)
+    log = home / ".config" / "openfallout" / "openfallout.log"
+    status, _ = run_engine(program, build / "resources", data, home, folder / "runtime", seconds, plugin.CELL_NAME, [],
+                           "savestest.omwscripts", before=[plugin.EMPTY_ADDON])
+    saved = sorted(home.rglob("*.omwsave"))
+    if len(saved) != 1:
+        return [f"expected one saved game, found {[str(path) for path in saved]}"]
+    log.rename(log.with_name("saving.log"))
+    run_engine(program, build / "resources", data, home, folder / "runtime2", seconds, None, [], "savestest.omwscripts",
+               load=saved[0], extra=["--headless"])
+    text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+    if f"Saved game dependency {plugin.EMPTY_ADDON} is missing" not in text:
+        found.append("the save did not miss a plugin: the check proves nothing")
+    if "Headless: 1 content file(s) of the save are not loaded, loading it anyway" not in text:
+        found.append("the engine did not say that it loads the save without the plugin")
+    if not any("OFTEST" in line and "saves\tloaded" in line for line in text.splitlines()):
+        found.append("the save was not loaded: the engine waits for an answer to the question of the missing plugin")
+    return found
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--build", required=True, type=Path, help="build directory with the openfallout program")
@@ -5760,6 +5789,11 @@ def main():
     if args.only in (None, "round"):
         print("== round: round.py, two headless starts of the synthetic game")
         found = check_round(work, program, build, data, max(args.seconds, 60))
+        for problem in found:
+            print("PROBLEM (round):", problem)
+        problems += found
+        print("== round: a headless load of a save that misses a plugin")
+        found = check_headless_load(work, program, build, data, max(args.seconds, 40))
         for problem in found:
             print("PROBLEM (round):", problem)
         problems += found

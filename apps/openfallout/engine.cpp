@@ -765,6 +765,7 @@ void OF::Engine::prepareEngine()
 {
     mStateManager = std::make_unique<OFState::StateManager>(mCfgMgr.getUserDataPath() / "saves", mContentFiles);
     mEnvironment.setStateManager(*mStateManager);
+    mStateManager->setHeadless(mHeadless);
 
     const bool stereoEnabled = Settings::stereo().mStereoEnabled || osg::DisplaySettings::instance().get()->getStereo();
     mStereoManager = std::make_unique<Stereo::Manager>(

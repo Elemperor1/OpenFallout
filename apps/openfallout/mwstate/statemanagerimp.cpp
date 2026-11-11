@@ -870,6 +870,15 @@ bool OFState::StateManager::confirmLoading(const std::vector<std::string_view>& 
     if (!fullList.empty())
         fullList.pop_back();
 
+    if (mHeadless)
+    {
+        // The question is a message box that waits for a click: in a headless run nobody clicks and the load would
+        // wait for ever
+        Log(Debug::Info) << "Headless: " << missingFiles.size()
+                         << " content file(s) of the save are not loaded, loading it anyway";
+        return true;
+    }
+
     constexpr size_t missingPluginsDisplayLimit = 12;
 
     std::vector<std::string> buttons;
