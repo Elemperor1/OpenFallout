@@ -77,6 +77,7 @@ namespace SDLUtil
 
         bool mWindowHasFocus;
         bool mMouseInWindow;
+        bool mHeadless;
 
         Uint16 mScaleX;
         Uint16 mScaleY;

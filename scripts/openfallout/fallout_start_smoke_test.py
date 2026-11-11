@@ -51,6 +51,7 @@ placeholder_skeleton.py writes.
 """
 import argparse
 import ctypes
+import json
 import math
 import os
 import pty
@@ -5226,6 +5227,84 @@ def check_creatures(text, scenario, found, animated):
     return problems
 
 
+# The round runner (scripts/openfallout/round): the engine runs --headless (its window is never shown, so a build that stops
+# the game while the window is hidden would never get to the end of the scenario), the scenario takes the player to a place in
+# the open and to the arena, asks the player script about the camera, the ground, the characters and the frame times, takes two
+# screenshots, and quits; the runner writes the report and the pictures
+ROUND_SCENARIO = """\
+return function(r)
+    r.eye('start')
+    r.hour(12)
+    r.teleport{ pos = { 600, 600 }, onGround = true, yaw = 1.0, label = 'open' }
+    r.wait(2)
+    r.look(1.0, 0.2)
+    r.eye('open')
+    r.ground('open', { { 128, 0 } })
+    r.shot('open')
+    r.teleport{ cell = '@ARENA@', pos = { 0, 0, 0 }, onGround = true, label = 'arena' }
+    r.wait(2)
+    r.actors('arena', 4000, 5)
+    r.fps('arena', 2)
+    r.shot('arena')
+    r.log('last note')
+end
+"""
+
+
+def check_round(work, program, build, data, seconds):
+    """Runs round.py on the synthetic game and reads its report."""
+    found = []
+    folder = work / "round"
+    folder.mkdir()
+    home = folder / "home"
+    home.mkdir()
+    (folder / "scenario.lua").write_text(ROUND_SCENARIO.replace("@ARENA@", plugin.ARENA_CELL_NAME), encoding="ascii")
+    (folder / "profile.json").write_text(json.dumps({
+        "engine": str(program), "resources": str(build / "resources"), "out": str(folder / "out"),
+        "games": {"nv": {"data": [str(data)], "content": ["OFTest.esm"]}}}), encoding="ascii")
+    (folder / "round.json").write_text(json.dumps({
+        "name": "smoke", "scenario": "scenario.lua", "start": "OFTestWorld:0,0", "limit": int(seconds),
+        "resolution": [640, 360], "variants": [{"name": "one"}, {"name": "two"}]}), encoding="ascii")
+    env = dict(os.environ, HOME=str(home), LIBGL_ALWAYS_SOFTWARE="1")
+    result = subprocess.run([sys.executable, str(ROOT / "scripts" / "openfallout" / "round" / "round.py"), "--profile",
+                             str(folder / "profile.json"), "run", str(folder / "round.json"), "--parallel", "2"],
+                            capture_output=True, text=True, env=env, timeout=seconds * 2 + 120)
+    print(result.stdout[-1500:])
+    if result.returncode != 0:
+        found.append(f"round.py ended with status {result.returncode}: {result.stderr[-400:]}")
+    reports = sorted((folder / "out").glob("*/*/report.json"))
+    if len(reports) != 2:
+        return found + [f"expected two reports, found {len(reports)}"]
+    for path in reports:
+        report = json.loads(path.read_text(encoding="utf-8"))
+        name = report["variant"]
+        lines = report["round_lines"]
+        if report["verdict"] != "PASS":
+            found.append(f"round {name}: the verdict is {report['verdict']} (exit status {report['exit_status']}, "
+                         f"errors {report['scenario_errors']})")
+        for wanted in ("begin\t", "eye\tstart\t", "teleport\tok\topen", "teleport\tok\tarena", "ground\topen\t",
+                       "actors\tarena\t", "fps\tarena\tframes=", "note\tlast note", "done\tend\t"):
+            if not any(line.startswith(wanted) for line in lines):
+                found.append(f"round {name}: no ROUND line that starts with {wanted!r}")
+        if len([s for s in report["shots"] if s["file"] and Path(s["file"]).exists()]) != 2:
+            found.append(f"round {name}: expected two screenshots, got {report['shots']}")
+        # a hidden window must still be drawn: the pictures are not blank (checked where Pillow is installed)
+        try:
+            from PIL import Image
+            for shot in report["shots"]:
+                if shot["file"] and Path(shot["file"]).exists() and shot["file"].endswith(".jpg"):
+                    with Image.open(shot["file"]) as image:
+                        colours = image.convert("RGB").resize((64, 36)).getcolors(64 * 36)
+                    if colours is None or len(colours) < 20:
+                        found.append(f"round {name}: the screenshot {shot['name']} is blank")
+        except ImportError:
+            pass
+        log = path.parent / "openfallout.log"
+        if "Headless: the window is created hidden" not in log.read_text(encoding="utf-8", errors="replace"):
+            found.append(f"round {name}: the engine did not say it created a hidden window")
+    return found
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--build", required=True, type=Path, help="build directory with the openfallout program")
@@ -5239,7 +5318,7 @@ def main():
     parser.add_argument("--display-lists", action="store_true",
                         help="run with `force vertex buffer objects = false`, the display lists of OpenGL: the engine "
                              "must not say it draws from vertex buffer objects")
-    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena", "range", "autoplay", "saves", "savesprobe", "mods", "activation", "archives"],
+    parser.add_argument("--only", choices=[scenario.name for scenario in SCENARIOS] + ["dialogue", "chargen", "newgame", "triggers", "arena", "range", "autoplay", "saves", "savesprobe", "mods", "activation", "archives", "round"],
                         help="run only this start (or the conversation, the making of the character or the new game), "
                              "not all")
     args = parser.parse_args()
@@ -5677,6 +5756,12 @@ def main():
             print(line.split("]", 1)[-1].strip())
         for problem in found:
             print("PROBLEM (newgame):", problem)
+        problems += found
+    if args.only in (None, "round"):
+        print("== round: round.py, two headless starts of the synthetic game")
+        found = check_round(work, program, build, data, max(args.seconds, 60))
+        for problem in found:
+            print("PROBLEM (round):", problem)
         problems += found
     if xvfb is not None:
         xvfb.terminate()

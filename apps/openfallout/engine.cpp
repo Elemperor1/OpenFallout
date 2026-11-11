@@ -387,6 +387,7 @@ OF::Engine::Engine(Files::ConfigurationManager& configurationManager)
     , mScriptConsoleMode(false)
     , mActivationDistanceOverride(-1)
     , mGrab(true)
+    , mHeadless(false)
     , mExportFonts(false)
     , mRandomSeed(0)
     , mNewGame(false)
@@ -510,7 +511,9 @@ void OF::Engine::createWindow()
     const int screen = Settings::video().mScreen;
     const int width = Settings::video().mResolutionX;
     const int height = Settings::video().mResolutionY;
-    const Settings::WindowMode windowMode = Settings::video().mWindowMode;
+    // A headless run is always a plain window, never full screen: it is not shown, and a full screen mode would
+    // take the display
+    const Settings::WindowMode windowMode = mHeadless ? Settings::WindowMode::Windowed : Settings::video().mWindowMode;
     const bool windowBorder = Settings::video().mWindowBorder;
     const SDLUtil::VSyncMode vsync = Settings::video().mVsyncMode;
     unsigned antialiasing = static_cast<unsigned>(Settings::video().mAntialiasing);
@@ -525,7 +528,16 @@ void OF::Engine::createWindow()
     }
 
     Uint32 flags = SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
-    if (windowMode == Settings::WindowMode::Fullscreen)
+    if (mHeadless)
+    {
+        // Created hidden and never shown (GraphicsWindowSDL2 and InputWrapper leave a window that was created hidden
+        // alone), so that no window, focus change or pointer grab ever reaches the desktop of whoever is working on
+        // it. One pixel of the picture is one pixel of the window, so a screenshot is exactly the size that was asked
+        // for, on a Retina display too.
+        flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN;
+        Log(Debug::Info) << "Headless: the window is created hidden and stays so, " << width << "x" << height;
+    }
+    else if (windowMode == Settings::WindowMode::Fullscreen)
         flags |= SDL_WINDOW_FULLSCREEN;
     else if (windowMode == Settings::WindowMode::WindowedFullscreen)
         flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;

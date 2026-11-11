@@ -31,8 +31,12 @@ namespace SDLUtil
         , mPendingWheelY(0.0)
         , mWindowHasFocus(true)
         , mMouseInWindow(true)
+        , mHeadless(false)
     {
         Uint32 flags = SDL_GetWindowFlags(mSDLWindow);
+        // A window that is hidden when the wrapper is made is hidden on purpose (a headless run): the game goes on as
+        // if it were shown, and what SDL says about its visibility is not what pauses it
+        mHeadless = (flags & SDL_WINDOW_HIDDEN) != 0;
         mWindowHasFocus = (flags & SDL_WINDOW_INPUT_FOCUS);
         mMouseInWindow = (flags & SDL_WINDOW_MOUSE_FOCUS);
         _setWindowScale();
@@ -298,7 +302,7 @@ namespace SDLUtil
                 break;
             case SDL_WINDOWEVENT_HIDDEN:
             case SDL_WINDOWEVENT_MINIMIZED:
-                if (mWindowListener)
+                if (mWindowListener && !mHeadless)
                     mWindowListener->windowVisibilityChange(false);
                 break;
         }

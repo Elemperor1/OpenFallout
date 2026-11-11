@@ -194,7 +194,10 @@ namespace SDLUtil
         if (!mValid)
             return false;
 
-        SDL_ShowWindow(mWindow);
+        // A window that was created hidden (a headless run) is never shown: showing it would take the focus and put it
+        // on the desktop of whoever is at the computer
+        if ((SDL_GetWindowFlags(mWindow) & SDL_WINDOW_HIDDEN) == 0)
+            SDL_ShowWindow(mWindow);
 
         getEventQueue()->syncWindowRectangleWithGraphicsContext();
 

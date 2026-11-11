@@ -109,6 +109,10 @@ namespace OpenMW
 
         addOption("no-grab", bpo::value<bool>()->implicit_value(true)->default_value(false), "Don't grab mouse cursor");
 
+        addOption("headless", bpo::value<bool>()->implicit_value(true)->default_value(false),
+            "Run for scripted checks: the window is never shown, takes no focus, grabs no mouse and makes no sound "
+            "(OPENFALLOUT_HEADLESS=1 does the same; OPENFALLOUT_HEADLESS_SOUND=1 keeps the sound)");
+
         addOption("export-fonts", bpo::value<bool>()->implicit_value(true)->default_value(false),
             "Export Morrowind .fnt fonts to PNG image and XML file in current directory");
 

@@ -25,3 +25,5 @@ Save orchestration is in [`apps/openfallout/mwscript/falloutsave.cpp`](../../app
 ## How to read evidence
 
 Source shows what is implemented. Unit tests show only the cases they exercise; find them alongside the owning component, including [`apps/components_tests/esm4/`](../../apps/components_tests/esm4/) and [`apps/openfallout_tests/`](../../apps/openfallout_tests/). Automated in-game evidence is recorded separately in the [harness guide](harness.md) and milestone sections of the [roadmap](gap-audit-and-roadmap.md). Manual play is a separate evidence category and should be claimed only where the project documentation records it. Do not infer game-engine parity from source resemblance, unit tests, or automated runs.
+
+A build is checked on the real games without anybody driving them by hand through the [rounds](../../scripts/openfallout/round/README.md): the engine runs `--headless` (a hidden window that never takes the focus, the pointer or the sound), a scenario file moves the player, takes screenshots and reads the world from inside, and `round.py` writes the report.
