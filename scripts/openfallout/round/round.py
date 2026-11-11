@@ -244,7 +244,9 @@ def convert_picture(source, target, width=1280):
 
 def collect_shots(userdata, shots_dir, names, width=1280):
     """Copies the screenshots of the run to `shots_dir` as `<n>-<name>.jpg`: the engine numbers them `screenshotNNN` in the
-    order they were taken, and the scenario logged `shot <name> n=<k>` for each, so the k-th file is the one of the k-th line."""
+    order they were taken, and the scenario logged `shot <name> n=<k>` for each, so the k-th file is the one of the k-th line (one
+    write queue thread by default, and `r.shot` waits for its file: the writes cannot swap unless `preload num threads` is above 1 and
+    two shots are asked for back to back)."""
     files = sorted((userdata / "screenshots").glob("screenshot*.*")) if (userdata / "screenshots").is_dir() else []
     shots_dir.mkdir(parents=True, exist_ok=True)
     written = []
@@ -627,6 +629,8 @@ def run_variant(profile, config, variant, out_dir, save, priority="low"):
 
 
 def command_run(args):
+    if IS_WINDOWS:
+        sys.exit("round.py run works on macOS and Linux only: it gives the engine a pseudo-terminal and stops it by process group")
     profile = load_profile(args.profile)
     config = load_round(args.round, args)
     save = resolve_save(config, profile)

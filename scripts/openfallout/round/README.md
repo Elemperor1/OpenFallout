@@ -92,6 +92,10 @@ reference is found and the save is in an interior.
 
 ## What it cannot do
 
+- `round.py run` works on macOS and Linux only (the engine is given a pseudo-terminal and stopped by process group); on Windows it
+  stops with a message. `profile` and `check` do not need that.
+- A screenshot is matched to its `shot` line by file order (the engine writes `screenshotNNN` one after the other and `r.shot` waits
+  for its file); with `preload num threads` above 1 and two shots asked for back to back (`r.shot(name, false)`) two writes could swap.
 - It sees what the engine draws, not what the player's eye would: for a look at a screen that a pointer or a key opens (the
   Pip-Boy, a conversation) the scenario must open it through the game's own scripts or events, the way `autoplay` does.
 - Sound is off unless `OPENFALLOUT_HEADLESS_SOUND=1`; nobody can hear a round, so sound is checked by its log lines.

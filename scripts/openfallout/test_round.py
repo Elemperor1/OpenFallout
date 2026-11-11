@@ -319,6 +319,13 @@ class Commands(unittest.TestCase):
             round_runner.load_round(self.round_file, self.Args())
 
 
+class WindowsRun(unittest.TestCase):
+    def test_run_says_that_it_needs_macos_or_linux_on_windows(self):
+        with mock.patch.object(round_runner, "IS_WINDOWS", True), self.assertRaises(SystemExit) as stop:
+            round_runner.command_run(object())
+        self.assertIn("macOS and Linux", str(stop.exception))
+
+
 class Pictures(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
