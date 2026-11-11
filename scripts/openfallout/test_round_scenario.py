@@ -23,6 +23,7 @@ paused = false
 sent_to_player = {}
 globals_table = { GameHour = 8 }
 teleports = {}
+object_cells = {}
 real_print = print
 print = function(...)
     local parts = {}
@@ -52,11 +53,11 @@ package.preload['openfallout.world'] = function()
         players = { player },
         globals = globals_table,
         quests = { find = function(name) if name == 'Q' then return { stage = 5, running = true, setStage = function(self, s) self.stage = s end } end end },
-        getExteriorCell = function(gx, gy, ref) return { grid = gx .. ',' .. gy } end,
+        getExteriorCell = function(gx, gy, ref) return { grid = gx .. ',' .. gy, via = ref } end,
         getCellByName = function(name) return { name = name } end,
         getCellById = function(id) return { id = id } end,
-        getObjectByFormId = function(id) return { id = id, recordId = 'rec', cell = player.cell, position = player.position, enabled = true,
-                                                   activateBy = function() end } end,
+        getObjectByFormId = function(id) return { id = id, recordId = 'rec', cell = object_cells[id] or player.cell,
+                                                   position = player.position, enabled = true, activateBy = function() end } end,
     }
 end
 function load_world(scenario_source, ...)
@@ -181,25 +182,47 @@ class ScenarioPlayer(unittest.TestCase):
         self.assertIn("ROUND\tnote\tfalse", lines)
         self.assertFalse(any(line.startswith("ROUND\tteleport\t") for line in lines))
 
-    def test_the_mountain_scenario_needs_a_save_in_the_open(self):
-        source = (SCRIPTS.parent / "scenarios" / "m13_mountains.lua").read_text(encoding="utf-8")
-        self.start(source)
-        self.lua.execute("require('openfallout.world').players[1].cell = { isExterior = false, id = 'inside' }")
-        self.tick(4)
-        lines = self.lines()
-        self.assertTrue(any(line.startswith("ROUND\terror\tscenario") and "interior" in line for line in lines))
-        self.assertFalse(any(line.startswith("ROUND\tteleport") for line in lines))
+    MOUNTAINS = (SCRIPTS.parent / "scenarios" / "m13_mountains.lua").read_text(encoding="utf-8")
 
-    def test_the_mountain_scenario_runs_in_the_open(self):
-        source = (SCRIPTS.parent / "scenarios" / "m13_mountains.lua").read_text(encoding="utf-8")
-        self.start(source)
+    def run_mountains(self, setup=""):
+        self.start(self.MOUNTAINS)
+        self.lua.execute(setup or "")
         self.tick(4)
         for _ in range(12):
             self.tick(13)
-        lines = self.lines()
+        return self.lines()
+
+    def test_the_mountain_scenario_goes_to_the_mojave_from_an_interior(self):
+        # the save is in an interior; a reference of the Mojave names the worldspace
+        lines = self.run_mountains(
+            "require('openfallout.world').players[1].cell = { isExterior = false, id = 'inside', worldSpaceId = 'inside' }\n"
+            "object_cells['FormId:FalloutNV.esm:' .. 0xcdf51] = { isExterior = true, worldSpaceId = 'mojave', gridX = 1, gridY = 2 }")
+        self.assertFalse(any(line.startswith("ROUND\terror") for line in lines), lines)
+        self.assertIn("ROUND\tnote\tanchor\t0xcdf51\tworldspace=mojave exterior=true", lines)
+        self.assertEqual(self.lua.eval("#teleports"), 2)
+        self.assertEqual(self.lua.eval("teleports[1].cell.via.worldSpaceId"), "mojave")
+        self.assertEqual(self.lua.eval("teleports[2].cell.via.worldSpaceId"), "mojave")
+        self.assertEqual((self.lua.eval("teleports[1].pos.x"), self.lua.eval("teleports[1].pos.z")), (-69319, 8381))
+
+    def test_the_mountain_scenario_tries_the_next_reference_and_then_the_cell_of_the_player(self):
+        lines = self.run_mountains(
+            "object_cells['FormId:FalloutNV.esm:' .. 0xcdf51] = { isExterior = false, id = 'a house' }\n"
+            "object_cells['FormId:FalloutNV.esm:' .. 0x10a201] = { isExterior = true, worldSpaceId = 'second' }")
+        self.assertIn("ROUND\tnote\tanchor\t0xcdf51\tworldspace=nil exterior=false", lines)
+        self.assertEqual(self.lua.eval("teleports[1].cell.via.worldSpaceId"), "second")
+        # no reference found: the player is in the open, so its own cell names the worldspace
+        lines = self.run_mountains("require('openfallout.world').getObjectByFormId = function() return nil end")
+        self.assertIn("ROUND\tnote\tanchor\t0xcdf51\tnot found", lines)
+        self.assertIn("ROUND\tnote\tanchor\tplayer cell\tworldspace=w", lines)
         self.assertFalse(any(line.startswith("ROUND\terror") for line in lines), lines)
         self.assertEqual(self.lua.eval("#teleports"), 2)
-        self.assertIn("ROUND\tnote\tstart\tcell\tw\texterior=true", lines)
+
+    def test_the_mountain_scenario_stops_when_the_worldspace_cannot_be_found(self):
+        lines = self.run_mountains(
+            "require('openfallout.world').getObjectByFormId = function() return nil end\n"
+            "require('openfallout.world').players[1].cell = { isExterior = false, id = 'inside' }")
+        self.assertTrue(any(line.startswith("ROUND\terror\tscenario") and "worldspace" in line for line in lines), lines)
+        self.assertEqual(self.lua.eval("#teleports"), 0)
 
     def test_hour_global_and_quest(self):
         self.start("return function(r) r.hour(14) r.global('GameHour') r.quest('Q', 9) r.quest('missing') "
