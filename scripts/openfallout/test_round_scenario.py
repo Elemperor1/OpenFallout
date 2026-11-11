@@ -183,10 +183,10 @@ class ScenarioPlayer(unittest.TestCase):
         return seen
 
     def test_a_shot_waits_for_the_message_boxes_to_come_to_rest(self):
-        replies = [dict(open=True), dict(open=False, quiet=1.0), dict(open=False, quiet=3.5)]
+        replies = [dict(open=True), dict(open=False, quiet=1.0), dict(open=False, quiet=3.5), dict(open=False, quiet=6.5)]
         seen = self.play_player("return function(r) r.shot('s') r.log('after') end",
                                 lambda what: replies.pop(0) if what == "quiet" and replies else {})
-        self.assertEqual(seen, ["quiet", "quiet", "quiet", "shot"])
+        self.assertEqual(seen, ["quiet", "quiet", "quiet", "quiet", "shot"])
         self.assertIn("ROUND\tnote\tafter", self.lines())
 
     def test_settle_gives_up_after_its_timeout_and_the_scenario_goes_on(self):

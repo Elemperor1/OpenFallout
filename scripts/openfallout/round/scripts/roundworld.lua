@@ -91,11 +91,12 @@ local function ask(what, args)
     return reply
 end
 
--- Waits until no message box has been open for `quiet` real seconds (3 by default), at most `timeout` seconds (40): the boxes that
--- the game opens are answered by the player script one second after they open, and the next one can follow at once. Gives whether
--- it came to rest; a timeout is a note (the `shot` line then says which box was open), not a failed round.
+-- Waits until no message box has been open for `quiet` real seconds (6 by default), at most `timeout` seconds (40): the boxes that
+-- the game opens are answered by the player script one second after they open, the next one can follow at once, and a run of
+-- them can pause for five seconds between two. Without any box it gives at once. Gives whether it came to rest; a timeout is a
+-- note (the `shot` line then says which box was open), not a failed round.
 function r.settle(quiet, timeout)
-    quiet, timeout = quiet or 3, timeout or 40
+    quiet, timeout = quiet or 6, timeout or 40
     local started_at = now()
     local deadline = started_at + timeout
     while true do
