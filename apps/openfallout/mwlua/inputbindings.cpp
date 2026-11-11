@@ -239,6 +239,17 @@ namespace OFLua
         api["isAltPressed"] = []() -> bool { return SDL_GetModState() & KMOD_ALT; };
         api["isSuperPressed"] = []() -> bool { return SDL_GetModState() & KMOD_GUI; };
         api["isControllerButtonPressed"] = [input](int button) {
+            // The triggers are axes: they count as pressed past the press threshold of the GUI settings, as a screen
+            // hears them
+            if (button == OFInput::ControllerManager::sLeftTriggerButton
+                || button == OFInput::ControllerManager::sRightTriggerButton)
+            {
+                const SDL_GameControllerAxis axis = button == OFInput::ControllerManager::sLeftTriggerButton
+                    ? SDL_CONTROLLER_AXIS_TRIGGERLEFT
+                    : SDL_CONTROLLER_AXIS_TRIGGERRIGHT;
+                return input->getControllerAxisValue(axis) * 32767.f
+                    >= static_cast<float>(Settings::gui().mControllerTriggerPressThreshold);
+            }
             return input->isControllerButtonPressed(static_cast<SDL_GameControllerButton>(button));
         };
         api["isMouseButtonPressed"]

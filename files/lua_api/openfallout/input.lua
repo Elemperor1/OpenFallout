@@ -201,7 +201,7 @@
 -- @field [parent=#CONTROLLER_BUTTON] #number DPadLeft
 -- @field [parent=#CONTROLLER_BUTTON] #number DPadRight
 -- @field [parent=#CONTROLLER_BUTTON] #number LeftTrigger Not a button of SDL: the left trigger is an axis, which a script's `onControllerButtonPress` hears as this button while a screen is open (past `[GUI] controller trigger press`)
--- @field [parent=#CONTROLLER_BUTTON] #number RightTrigger As `LeftTrigger`, for the right trigger
+-- @field [parent=#CONTROLLER_BUTTON] #number RightTrigger As `LeftTrigger`, for the right trigger (both can also be polled with `isControllerButtonPressed`)
 -- @field [parent=#CONTROLLER_BUTTON] #number Misc1
 -- @field [parent=#CONTROLLER_BUTTON] #number Paddle1
 -- @field [parent=#CONTROLLER_BUTTON] #number Paddle2

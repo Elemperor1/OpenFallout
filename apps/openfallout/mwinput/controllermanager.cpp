@@ -193,8 +193,9 @@ namespace OFInput
         if (OFBase::Environment::get().getWindowManager()->isGuiMode())
         {
             // A screen of a script holds the pick that the D-pad made: A acts on it (the script has had the button)
-            // and is no click where the pointer was left
-            if (mPadPick && arg.button == SDL_CONTROLLER_BUTTON_A)
+            // and is no click where the pointer was left. A box of the engine that opens over the screen (a modal of
+            // MyGUI) is not a screen of a script: A goes to it as it did.
+            if (mPadPick && arg.button == SDL_CONTROLLER_BUTTON_A && !MyGUI::InputManager::getInstance().isModalAny())
             {
                 mPadPickPressed = true;
                 return;
@@ -248,16 +249,19 @@ namespace OFInput
                 { OFBase::LuaManager::InputEvent::ControllerReleased, arg.button });
         }
 
+        // The A that acted on a pick was no press of the pointer, so its release is none either. The latch is let go
+        // where the release is seen, also when the controls are off, so that a release that was missed cannot swallow
+        // the release of a later A that did press the pointer.
+        const bool pickRelease = arg.button == SDL_CONTROLLER_BUTTON_A && mPadPickPressed;
+        if (arg.button == SDL_CONTROLLER_BUTTON_A)
+            mPadPickPressed = false;
+
         if (!Settings::input().mEnableController || OFBase::Environment::get().getInputManager()->controlsDisabled())
             return;
 
         mJoystickLastUsed = true;
-        // The A that acted on a pick was no press of the pointer, so its release is none either
-        if (arg.button == SDL_CONTROLLER_BUTTON_A && mPadPickPressed)
-        {
-            mPadPickPressed = false;
+        if (pickRelease)
             return;
-        }
         if (OFBase::Environment::get().getWindowManager()->isGuiMode())
         {
             if (mGamepadGuiCursorEnabled && (!Settings::gui().mControllerMenus || mGamepadMousePressed))

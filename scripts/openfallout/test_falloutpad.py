@@ -301,6 +301,10 @@ class ScriptsTest(unittest.TestCase):
             self.assertIn("pad.translate(button)", text, name)
             self.assertNotIn("pad.key(button)", text, name)
 
+    def test_the_stats_page_of_the_pipboy_gives_a_back_to_the_pointer(self):
+        text = (SCRIPTS / "falloutpipboy.lua").read_text(encoding="utf-8")
+        self.assertIn("if view == 'pipboy' and tab == 'stat' then pad.releasePick() end", text)
+
     def test_a_screen_with_no_pick_of_its_own_gives_a_back_to_the_pointer(self):
         for name in ("blackjack", "roulette", "slots", "caravan", "specialscreen"):
             text = (SCRIPTS / ("fallout%s.lua" % name)).read_text(encoding="utf-8")
