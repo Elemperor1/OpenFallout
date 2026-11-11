@@ -5265,8 +5265,9 @@ def check_round(work, program, build, data, seconds):
     (folder / "round.json").write_text(json.dumps({
         "name": "smoke", "scenario": "scenario.lua", "start": "OFTestWorld:0,0", "limit": int(seconds),
         "resolution": [640, 360], "variants": [{"name": "one"}, {"name": "two"}]}), encoding="ascii")
-    # The configuration of the person names the other game (a plugin, a plugins file and a data folder that has its master):
-    # a round must not read it, so the run is the game of its profile only and the person's own folder is left as it is
+    # The configuration of the person names the other game (a plugin, a plugins file and a data folder that has its master) and has
+    # a line that does not parse: a round must not read it, so the run is the game of its profile only and the person's own
+    # folder is left as it is
     other = folder / "othergame"
     other.mkdir()
     (other / "Fallout3.esm").write_bytes(b"this is not a plugin")
@@ -5274,7 +5275,7 @@ def check_round(work, program, build, data, seconds):
     player = home / ".config" / "openfallout"
     player.mkdir(parents=True)
     (player / "openfallout.cfg").write_text(
-        f'content=Fallout3.esm\nplugins-file="{other / "plugins.txt"}"\ndata="{other}"\n', encoding="ascii")
+        f'content=Fallout3.esm\nplugins-file="{other / "plugins.txt"}"\ndata="{other}"\nthis line does not parse\n', encoding="ascii")
     env = dict(os.environ, HOME=str(home), LIBGL_ALWAYS_SOFTWARE="1")
     for name in ("XDG_CONFIG_HOME", "XDG_DATA_HOME"):
         env.pop(name, None)

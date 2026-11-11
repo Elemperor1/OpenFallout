@@ -10,7 +10,7 @@ round is one step of the scenario, the questions that need different settings ar
 ```
 scripts/openfallout/round/round.py profile --engine <build>/openfallout    once per computer: writes ~/.config/openfallout-rounds.json
 scripts/openfallout/round/round.py build --ref origin/<branch>              incremental build in one persistent folder
-scripts/openfallout/round/round.py run rounds/m13-mountains.json --parallel 3
+scripts/openfallout/round/round.py run scripts/openfallout/round/rounds/m13-mountains.json --parallel 3
 ```
 
 ## What a run does
@@ -19,7 +19,7 @@ scripts/openfallout/round/round.py run rounds/m13-mountains.json --parallel 3
    the settings file of the profile if it has one, the defaults of `round.py`, the round file's `settings` and the variant's, each
    over the one before, and an `openfallout.cfg` of one line, `replace=config`), its own `userdata/` (a **copy** of the save) and a
    `data/` folder that holds the scenario. The player's own saves, settings and log are never written: the engine is started with
-   `--config`, `--user-data` and `--data-local` (an empty folder, so that the add-ons the player installed are not loaded) pointing there. It does not read the player's configuration files (`replace=config` skips them, the
+   `--config`, `--user-data` and `--data-local` (an empty folder, so that the add-ons the player installed are not loaded) pointing there. It does not read the player's configuration files (`--replace config` and the run's own `replace=config` skip them, the
    `openfallout.cfg` with its `data=` and `content=` lines too), so the runner lays the player's `settings.cfg` (view distance, field of
    view, terrain and the rest) under the run's itself.
 2. Starts the engine at low priority (`taskpolicy -b` on macOS, `nice -n 10` elsewhere) with `OPENFALLOUT_HEADLESS=1`, the

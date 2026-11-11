@@ -40,6 +40,7 @@ SAVE_SUFFIXES = (".fos", ".ess", ".omwsave", ".fo3save")
 ROOT = HERE.parents[2]
 PROFILE_DEFAULT = Path(os.environ.get("OPENFALLOUT_ROUND_PROFILE", Path.home() / ".config" / "openfallout-rounds.json"))
 IS_MAC = platform.system() == "Darwin"
+IS_WINDOWS = os.name == "nt"
 
 # What every run changes in the settings, under what the round file asks for: a plain window of a fixed size (a screenshot is
 # exactly that many pixels), no vsync and a low frame rate limit (it is a check, not a game, and it shares the computer)
@@ -344,7 +345,9 @@ def engine_command(profile, config, run_dir, save, extra=()):
     command = [str(engine)]
     resources = profile.get("resources") or (engine.parent / "resources")
     command += ["--resources", str(absolute(resources))]
-    command += ["--config", str(run_dir / "config"), "--user-data", str(run_dir / "userdata")]
+    # `--replace config` leaves the player's configuration folder out before anything in it is read (a file of theirs that does not
+    # parse cannot stop a round); the engine's own openfallout.cfg and the run's are the only ones. The run's cfg says `replace=config` too.
+    command += ["--config", str(run_dir / "config"), "--replace", "config", "--user-data", str(run_dir / "userdata")]
     # The engine's own openfallout.cfg (the one `replace=config` keeps) says `data-local=?userdata?data`, and `?userdata?` is the
     # player's data folder, not the one of `--user-data`: a private, empty one keeps the add-ons the player installed out of the
     # run (a master of the other game in it would change which game is chosen)
@@ -373,9 +376,21 @@ def player_config_dir():
     home = Path.home()
     if IS_MAC:
         return home / "Library" / "Preferences" / "openfallout"
-    if os.name == "nt":
+    if IS_WINDOWS:
         return home / "Documents" / "My Games" / "OpenFallout"
     return Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config") / "openfallout"
+
+
+def player_user_data_dir():
+    """The folder where the engine keeps the saves of the player by default."""
+    home = Path.home()
+    if IS_MAC:
+        return home / "Library" / "Application Support" / "openfallout"
+    if IS_WINDOWS:
+        # the engine's user data folder is its configuration folder there (components/files/windowspath.cpp)
+        return player_config_dir()
+    # the engine's own default honours XDG_DATA_HOME (components/files/linuxpath.cpp)
+    return Path(os.environ.get("XDG_DATA_HOME") or home / ".local" / "share") / "openfallout"
 
 
 def prepare_run(profile, config, variant, run_dir, save):
@@ -636,11 +651,7 @@ def command_profile(args):
                 # `content` empty: the plugins the game makes active, as when the game is played (a save wants the same ones)
                 games[key] = {"data": [str(folder)], "content": []}
                 break
-    if IS_MAC:
-        userdata = home / "Library" / "Application Support" / "openfallout"
-    else:
-        # the engine's own default honours XDG_DATA_HOME (components/files/linuxpath.cpp)
-        userdata = Path(os.environ.get("XDG_DATA_HOME") or home / ".local" / "share") / "openfallout"
+    userdata = player_user_data_dir()
     # The settings.cfg of the player's own configuration folder is laid under the run's by `prepare_run`, so the profile needs no
     # `settings` unless a file over that one is wanted
     saves = absolute(args.saves) if args.saves else userdata / "saves"

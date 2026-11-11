@@ -220,7 +220,12 @@ class Commands(unittest.TestCase):
             if saves:
                 self.assertEqual(written["saves"]["nv"], saves)
 
-    @unittest.skipIf(round_runner.IS_MAC, "the saves folder of macOS does not follow XDG_DATA_HOME")
+    def test_the_default_saves_folder_on_windows_is_the_user_data_folder_of_the_engine(self):
+        with mock.patch.object(Path, "home", return_value=self.tmp), mock.patch.object(round_runner, "IS_MAC", False), \
+                mock.patch.object(round_runner, "IS_WINDOWS", True):
+            self.assertEqual(round_runner.player_user_data_dir(), self.tmp / "Documents" / "My Games" / "OpenFallout")
+
+    @unittest.skipIf(round_runner.IS_MAC or round_runner.IS_WINDOWS, "only Linux follows XDG_DATA_HOME")
     def test_the_default_saves_folder_follows_xdg_data_home(self):
         class Given:
             engine = str(self.tmp / "bin" / "openfallout")
@@ -256,7 +261,8 @@ class Commands(unittest.TestCase):
         # other game) do not count, and a content list in the profile is the whole list
         config = round_runner.load_round(self.round_file, self.Args())
         command = round_runner.engine_command(self.profile, config, self.tmp / "run", None)
-        self.assertNotIn("--replace", command)
+        # the player's configuration folder is left out before it is parsed, and only that (a `--replace data` would drop the engine's own)
+        self.assertEqual([c for i, c in enumerate(command) if command[i - 1] == "--replace"], ["config"])
         # `?userdata?` in the engine's own cfg is the player's data folder: the run names an empty one of its own
         self.assertEqual(command[command.index("--data-local") + 1], str(self.tmp / "run" / "userdata" / "data"))
         self.assertEqual([c for i, c in enumerate(command) if command[i - 1] == "--content"], ["FalloutNV.esm", "round.omwscripts"])
