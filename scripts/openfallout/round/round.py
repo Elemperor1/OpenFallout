@@ -348,12 +348,8 @@ def engine_command(profile, config, run_dir, save, extra=()):
     for data in game.get("data", []):
         command += ["--data", str(absolute(data))]
     command += ["--data", str(HERE), "--data", str(run_dir / "data")]
-    # The plugins of the profile are the whole list and the `content=` lines of the player's own configuration (which the engine
-    # reads under the run's) do not count: appended to a list the same master would be named twice and the engine refuses to
-    # start, and with no list the plugins of another game that the player's configuration names would load for this game (any
-    # plugin that is named stops the engine from choosing the ones the game makes active). With no list the engine takes the
-    # plugins the selected game makes active, as the game itself does.
-    command += ["--replace", "content"]
+    # The plugins of the profile are the whole list (the player's own configuration is not read, see `prepare_run`); with no list
+    # the engine takes the plugins the selected game makes active, as the game itself does.
     for content in game.get("content", []):
         command += ["--content", content]
     command += ["--content", "round.omwscripts"]
@@ -382,7 +378,12 @@ def prepare_run(profile, config, variant, run_dir, save):
     (run_dir / "config" / "settings.cfg").write_text(merge_settings(base, *layers), encoding="utf-8")
     # an empty configuration file, so that this folder is a configuration folder of its own (the log and the settings of the run
     # are written here, not into the player's own)
-    (run_dir / "config" / "openfallout.cfg").write_text("", encoding="utf-8")
+    # `replace=config` drops the configuration files of the player (their `data=`, `content=` and `fallback=` lines) and keeps the
+    # first one, the engine's own: a round runs on the game and the plugins of its profile only. Read under the player's, the
+    # same master would be named twice (the engine then refuses to start), a `content=` line for the other game would load that
+    # game's plugins (any plugin that is named stops the engine from choosing the ones the selected game makes active) and a data
+    # directory of the other game would be searched too
+    (run_dir / "config" / "openfallout.cfg").write_text("replace=config\n", encoding="utf-8")
     if save is not None:
         shutil.copy(save, run_dir / "userdata" / "saves" / save.name)
     shutil.copy(config["scenario"], run_dir / "data" / "scripts" / "roundscenario.lua")

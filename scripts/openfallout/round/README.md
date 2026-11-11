@@ -16,7 +16,7 @@ scripts/openfallout/round/round.py run rounds/m13-mountains.json --parallel 3
 ## What a run does
 
 1. Makes a folder `<out>/<time>-<name>/<variant>/` with its own `config/` (a `settings.cfg` made of the defaults of
-   `round.py`, the round file's `settings` and the variant's, and an empty `openfallout.cfg`), its own `userdata/` (a **copy** of
+   `round.py`, the round file's `settings` and the variant's, and an `openfallout.cfg` of one line, `replace=config`), its own `userdata/` (a **copy** of
    the save) and a `data/` folder that holds the scenario. The player's own saves, settings and log are never written: the
    engine is started with `--config` and `--user-data` pointing there, and reads the player's own `settings.cfg` only as the
    defaults under the run's.
@@ -36,7 +36,7 @@ The report holds numbers, record ids and the names the scenario gave, never a te
 
 `round.py profile --engine <path of the openfallout program>` looks for the games under `~/Games` (`Fallout New Vegas`,
 `Fallout 3`, with or without `/Data`), and writes the machine's profile: `engine`, `resources` (for a macOS bundle:
-`Contents/Resources/resources`), `games` (`data` folders and `content` plugins of each of `nv`, `fo3`, `ttw`; `content` is empty by default, which loads the plugins the selected game makes active, the same as the game does, so a save finds the plugins it was made with; the `content=` lines of the player's own configuration are never used, they may name the plugins of the other game), `saves` (the
+`Contents/Resources/resources`), `games` (`data` folders and `content` plugins of each of `nv`, `fo3`, `ttw`; `content` is empty by default, which loads the plugins the selected game makes active, the same as the game does, so a save finds the plugins it was made with; the player's own `openfallout.cfg` is never read by a round (the run's `openfallout.cfg` says `replace=config`), because its `data=` and `content=` lines may name the other game), `saves` (the
 folder that `"save": "latest"` takes the newest file from: the engine's own user-data folder unless `profile --saves <folder>` says
 where the game is played, and `profile` warns when the folder holds no save), `out` and, if wanted, `settings` (a settings file laid under the
 round's). Edit it by hand for Tale of Two Wastelands (`data` = the New Vegas folder, then the output of its installer).
