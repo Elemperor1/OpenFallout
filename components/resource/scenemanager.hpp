@@ -214,6 +214,13 @@ namespace Resource
         /// that getInstance and getTemplate give, so it does not matter whether the file was loaded before.
         osg::ref_ptr<osg::Node> getInstanceKeepingShapes(VFS::Path::NormalizedView path);
 
+        /// The model in the file is kept with its shapes apart from now on, in every instance that getInstance and
+        /// getTemplate give after this (those that are in the scene already are as they are): a script changes one
+        /// shape of an object by its name (the pictures of the cards of the doctor of Goodsprings), which the optimizer
+        /// leaves no name to when it has merged the shape into another. The template is cached apart from the ordinary
+        /// one, as that of getInstanceKeepingShapes is.
+        void keepShapesOf(VFS::Path::NormalizedView path);
+
     private:
         osg::ref_ptr<osg::Node> loadSpeedTree(VFS::Path::NormalizedView path);
         osg::ref_ptr<Shader::ShaderVisitor> createShaderVisitor(const std::string& shaderPrefix = "objects");
@@ -239,6 +246,9 @@ namespace Resource
         mutable std::once_flag mErrorMarkerFlag;
 
         SceneUtil::LodDebug mLodDebug;
+
+        mutable std::mutex mKeepShapesMutex;
+        std::set<std::string, std::less<>> mKeepShapes;
 
         mutable std::mutex mSpeedTreeMutex;
         std::map<std::string, SpeedTreeStandIn, std::less<>> mSpeedTrees;

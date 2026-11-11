@@ -5,6 +5,8 @@
 
 #include <SDL.h>
 
+#include <cmath>
+
 #include <components/debug/debuglog.hpp>
 #include <components/esm/refid.hpp>
 #include <components/files/conversion.hpp>
@@ -25,6 +27,12 @@
 
 namespace OFInput
 {
+    namespace
+    {
+        // A stick this near to the middle (of 32,768) is let go: the window that reads the sticks takes no notice of it
+        constexpr int stickNeutralValue = 2000;
+    }
+
     ControllerManager::ControllerManager(BindingsManager* bindingsManager, MouseManager* mouseManager,
         const std::filesystem::path& userControllerBindingsFile, const std::filesystem::path& controllerBindingsFile)
         : mBindingsManager(bindingsManager)
@@ -234,7 +242,22 @@ namespace OFInput
         if (OFBase::Environment::get().getWindowManager()->isGuiMode())
         {
             if (gamepadToGuiControl(arg))
+            {
+                // A stick that is let go under a window that takes its events (or under the box of a script, whose
+                // pushes the bindings were given) would keep the value it had, and the pointer or the player would go
+                // on by itself when the window is gone. The bindings are told of the rest.
+                const bool stick = arg.axis == SDL_CONTROLLER_AXIS_LEFTX || arg.axis == SDL_CONTROLLER_AXIS_LEFTY
+                    || arg.axis == SDL_CONTROLLER_AXIS_RIGHTX || arg.axis == SDL_CONTROLLER_AXIS_RIGHTY;
+                // A trigger that is let go under a window is told to the bindings the same way: one that was pressed
+                // while a message was open would stay pressed. Only its rest is told (the release threshold of the
+                // windows can be well above what a binding takes as pressed, and a half-pressed trigger must not
+                // press one while a window owns it)
+                const bool trigger
+                    = arg.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT || arg.axis == SDL_CONTROLLER_AXIS_TRIGGERRIGHT;
+                if ((stick || trigger) && std::abs(arg.value) < stickNeutralValue)
+                    mBindingsManager->controllerAxisMoved(deviceID, arg);
                 return;
+            }
         }
         else if (mBindingsManager->actionIsActive(A_TogglePOV)
             && (arg.axis == SDL_CONTROLLER_AXIS_TRIGGERRIGHT || arg.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT))
@@ -379,7 +402,12 @@ namespace OFInput
 
         // A message box that a script draws is modal: the triggers do not cycle the windows beneath it and the sticks
         // do not scroll them, as the buttons do not. A trigger is still followed, so one let go under the box can cycle
-        // the windows again when it is gone
+        // the windows again when it is gone.
+        // Every axis still reaches the bindings, though: the pointer is moved by the value that the bindings hold for
+        // the left stick (ControllerManager::update), and a stick that was pushed when the box opened and let go under
+        // it would keep the value it had then, so the pointer drifted on by itself and the player walked on by itself
+        // after the box was closed (the Mac hour of round 13P: "when a popup opens while my cursor is moving, it stays
+        // in that moving state")
         if (const OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
             scripts != nullptr && scripts->luaMessageOpen())
         {
@@ -387,7 +415,7 @@ namespace OFInput
                 handleTriggerPress(arg.value, mRightTriggerGuiPressed, [] {});
             else if (arg.axis == SDL_CONTROLLER_AXIS_TRIGGERLEFT)
                 handleTriggerPress(arg.value, mLeftTriggerGuiPressed, [] {});
-            return true;
+            return false;
         }
 
         OFBase::WindowManager* winMgr = OFBase::Environment::get().getWindowManager();
@@ -417,7 +445,7 @@ namespace OFInput
                     winMgr->setCursorActive(false);
 
                 // Deadzone check
-                if (std::abs(arg.value) < 2000)
+                if (std::abs(arg.value) < stickNeutralValue)
                     return !mGamepadGuiCursorEnabled;
 
                 if (mGamepadGuiCursorEnabled

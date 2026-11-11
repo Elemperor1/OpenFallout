@@ -16,6 +16,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <osg/AlphaFunc>
 #include <osg/Geometry>
 #include <osgDB/Registry>
 
@@ -309,6 +310,103 @@ osg::Group {
         ASSERT_NE(find.mGeometry, nullptr);
         ASSERT_EQ(find.mGeometry->getNumPrimitiveSets(), 1u);
         EXPECT_EQ(find.mGeometry->getPrimitiveSet(0)->getNumIndices(), 3u);
+    }
+
+    // The trees of a block of distant objects are pictures with see-through parts in the atlas, and the file asks for
+    // no alpha test: the flag of the shader says what the games test
+    struct LodShape
+    {
+        Nif::NiTriShapeData mData;
+        Nif::BSSegmentedTriShape mShape;
+        Nif::BSShaderPPLightingProperty mProperty;
+
+        explicit LodShape(std::uint32_t flags2)
+        {
+            mData.mRecordType = Nif::RC_NiTriShapeData;
+            mData.mVertices = { osg::Vec3f(0, 0, 0), osg::Vec3f(1, 0, 0), osg::Vec3f(1, 1, 0) };
+            mData.mNumTriangles = 1;
+            mData.mTriangles = { 0, 1, 2 };
+            init(mShape);
+            mShape.mRecordType = Nif::RC_BSSegmentedTriShape;
+            mShape.mData = Nif::NiGeometryDataPtr(&mData);
+            // A file of these games lists the shader property with the properties of the shape
+            mShape.mProperties.push_back(Nif::RecordPtrT<Nif::NiProperty>(&mProperty));
+            mShape.mShaderProperty = Nif::BSShaderPropertyPtr(nullptr);
+            mShape.mAlphaProperty = Nif::NiAlphaPropertyPtr(nullptr);
+            mProperty.mRecordType = Nif::RC_BSShaderPPLightingProperty;
+            mProperty.mTextureSet = nullptr;
+            mProperty.mController = nullptr;
+            mProperty.mType = static_cast<std::uint32_t>(Nif::BSShaderType::ShaderType_Default);
+            mProperty.mShaderFlags2 = flags2;
+        }
+    };
+
+    const osg::AlphaFunc* alphaTestOf(const osg::Node& root)
+    {
+        // Whichever node of the shape holds the state
+        struct FindAlphaFunc : osg::NodeVisitor
+        {
+            FindAlphaFunc()
+                : osg::NodeVisitor(TRAVERSE_ALL_CHILDREN)
+            {
+            }
+            void apply(osg::Node& node) override
+            {
+                if (mFound == nullptr && node.getStateSet() != nullptr)
+                    mFound = dynamic_cast<const osg::AlphaFunc*>(
+                        node.getStateSet()->getAttribute(osg::StateAttribute::ALPHAFUNC));
+                traverse(node);
+            }
+            const osg::AlphaFunc* mFound = nullptr;
+        } find;
+        const_cast<osg::Node&>(root).accept(find);
+        return find.mFound;
+    }
+
+    TEST_F(NifOsgLoaderTest, testsTheAlphaOfTheShapeOfABlockOfDistantObjects)
+    {
+        LodShape lod(Nif::BSSFlag2_LODBuilding | Nif::BSSFlag2_DepthWrite);
+        Nif::NIFFile file(testNif);
+        file.mRoots.push_back(&lod.mShape);
+
+        const osg::ref_ptr<osg::Node> result = Loader::load(file, &mImageManager, &mMaterialManager);
+
+        const osg::AlphaFunc* test = alphaTestOf(*result);
+        ASSERT_NE(test, nullptr);
+        EXPECT_EQ(test->getFunction(), osg::AlphaFunc::GREATER);
+        EXPECT_NEAR(test->getReferenceValue(), 0.5f, 0.01f);
+    }
+
+    // A shape of a block that lists an alpha property that tests nothing keeps what the flag of its shader asks
+    TEST_F(NifOsgLoaderTest, keepsTheAlphaTestOfABlockOfDistantObjectsWhenAnAlphaPropertyTestsNothing)
+    {
+        LodShape lod(Nif::BSSFlag2_LODBuilding | Nif::BSSFlag2_DepthWrite);
+        Nif::NiAlphaProperty alpha;
+        alpha.mRecordType = Nif::RC_NiAlphaProperty;
+        alpha.mController = nullptr;
+        alpha.mFlags = 0;
+        alpha.mThreshold = 0;
+        lod.mShape.mProperties.push_back(Nif::RecordPtrT<Nif::NiProperty>(&alpha));
+        Nif::NIFFile file(testNif);
+        file.mRoots.push_back(&lod.mShape);
+
+        const osg::ref_ptr<osg::Node> result = Loader::load(file, &mImageManager, &mMaterialManager);
+
+        const osg::AlphaFunc* test = alphaTestOf(*result);
+        ASSERT_NE(test, nullptr);
+        EXPECT_EQ(test->getFunction(), osg::AlphaFunc::GREATER);
+        EXPECT_NEAR(test->getReferenceValue(), 0.5f, 0.01f);
+    }
+
+    TEST_F(NifOsgLoaderTest, testsNoAlphaOfAShapeThatIsNotABlockOfDistantObjects)
+    {
+        LodShape other(Nif::BSSFlag2_DepthWrite);
+        Nif::NIFFile file(testNif);
+        file.mRoots.push_back(&other.mShape);
+
+        const osg::ref_ptr<osg::Node> result = Loader::load(file, &mImageManager, &mMaterialManager);
+
+        EXPECT_EQ(alphaTestOf(*result), nullptr);
     }
 
     std::string formatOsgNodeForBSShaderProperty(std::string_view shaderPrefix)

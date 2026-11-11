@@ -8,6 +8,7 @@
 #include <map>
 #include <mutex>
 #include <string>
+#include <string_view>
 
 #include <osg/Geometry>
 #include <osg/StateSet>
@@ -83,27 +84,36 @@ namespace OFRender
         class ReplaceDiffuseMap : public osg::NodeVisitor
         {
         public:
-            explicit ReplaceDiffuseMap(const DiffuseChooser& choose)
+            /// With a name, only the nodes of that name (in any case) are changed
+            explicit ReplaceDiffuseMap(const DiffuseChooser& choose, std::string_view shape = {})
                 : osg::NodeVisitor(TRAVERSE_ALL_CHILDREN)
                 , mChoose(choose)
+                , mShape(shape)
             {
             }
 
             void apply(osg::Node& node) override
             {
-                replace(node);
+                if (named(node))
+                    replace(node);
                 traverse(node);
             }
 
             void apply(osg::Drawable& drawable) override
             {
-                replace(drawable);
+                if (named(drawable))
+                    replace(drawable);
                 traverse(drawable);
             }
 
             std::size_t mChanged = 0;
 
         private:
+            bool named(const osg::Node& node) const
+            {
+                return mShape.empty() || Misc::StringUtils::ciEqual(node.getName(), mShape);
+            }
+
             void replace(osg::Node& node)
             {
                 osg::StateSet* stateset = node.getStateSet();
@@ -140,6 +150,7 @@ namespace OFRender
             }
 
             DiffuseChooser mChoose;
+            std::string mShape;
         };
 
         std::mutex sCacheMutex;
@@ -276,6 +287,16 @@ namespace OFRender
             return 0;
         ReplaceDiffuseMap replace(choose);
         part.accept(replace);
+        return replace.mChanged;
+    }
+
+    std::size_t replaceDiffuseMapOfShape(osg::Node& model, std::string_view shape, osg::Image* image)
+    {
+        if (image == nullptr || shape.empty())
+            return 0;
+        const osg::ref_ptr<osg::Image> keep(image);
+        ReplaceDiffuseMap replace([keep](const osg::Image*) { return keep; }, shape);
+        model.accept(replace);
         return replace.mChanged;
     }
 

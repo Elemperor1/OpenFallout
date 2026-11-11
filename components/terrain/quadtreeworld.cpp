@@ -1,11 +1,14 @@
 #include "quadtreeworld.hpp"
 
+#include <osg/ComputeBoundsVisitor>
 #include <osg/PolygonMode>
 #include <osg/ShapeDrawable>
 #include <osgUtil/CullVisitor>
 
 #include <limits>
+#include <sstream>
 
+#include <components/debug/debuglog.hpp>
 #include <components/esm/util.hpp>
 #include <components/loadinglistener/reporter.hpp>
 #include <components/misc/constants.hpp>
@@ -398,6 +401,25 @@ namespace Terrain
             bool activeGrid = (center.x() > gridbounds.x() && center.y() > gridbounds.y() && center.x() < gridbounds.z()
                 && center.y() < gridbounds.w());
 
+            // The nodes near the eye are told to the log when they are asked for
+            constexpr float reportedDistanceInCells = 9.f;
+            constexpr std::size_t reportedNodes = 1500;
+            const osg::Vec3f eye = vd->getViewPoint();
+            const float distanceInCells
+                = (osg::Vec2f(center.x() * cellWorldSize, center.y() * cellWorldSize) - osg::Vec2f(eye.x(), eye.y()))
+                      .length()
+                / cellWorldSize;
+            // each node is told once, where it is first made
+            bool report = false;
+            if (mReportNodes && distanceInCells <= reportedDistanceInCells)
+            {
+                const std::lock_guard<std::mutex> lock(mReportMutex);
+                report = mReportedNodes.size() < reportedNodes
+                    && mReportedNodes.insert({ entry.mNode->getSize(), center.x(), center.y() }).second;
+            }
+            std::ostringstream made;
+
+            int managerIndex = 0;
             for (QuadTreeWorld::ChunkManager* m : mChunkManagers)
             {
                 osg::ref_ptr<osg::Node> n = m->getChunk(entry.mNode->getSize(), entry.mNode->getCenter(),
@@ -405,7 +427,42 @@ namespace Terrain
                     entry.mLodFlags, activeGrid, vd->getViewPoint(), compile);
                 if (n)
                     pat->addChild(n);
+                if (report)
+                {
+                    made << " [manager " << managerIndex << ": ";
+                    if (const auto* land = dynamic_cast<const TerrainDrawable*>(n.get()))
+                    {
+                        const osg::BoundingBox& box = land->getBoundingBox();
+                        made << "land of the records with " << land->getPasses().size() << " passes, mask "
+                             << land->getNodeMask() << ", heights " << box.zMin() << " to " << box.zMax();
+                    }
+                    else if (n)
+                    {
+                        // The box of what is drawn, in the units of the world: the chunk is moved by the minus of the
+                        // centre of the node and the node by its centre
+                        osg::ComputeBoundsVisitor boundsVisitor;
+                        n->accept(boundsVisitor);
+                        const osg::BoundingBox box = boundsVisitor.getBoundingBox();
+                        const osg::Group* group = n->asGroup();
+                        made << n->className() << " with " << (group ? group->getNumChildren() : 0)
+                             << " children, mask " << n->getNodeMask();
+                        if (box.valid())
+                            made << ", the box of what is drawn x " << box.xMin() + center.x() * cellWorldSize << " to "
+                                 << box.xMax() + center.x() * cellWorldSize << " y "
+                                 << box.yMin() + center.y() * cellWorldSize << " to "
+                                 << box.yMax() + center.y() * cellWorldSize << " z " << box.zMin() << " to "
+                                 << box.zMax();
+                    }
+                    else
+                        made << "nothing";
+                    made << "]";
+                }
+                ++managerIndex;
             }
+            if (report)
+                Log(Debug::Info) << "Quad tree node of " << entry.mNode->getSize() << " cells at " << center.x() << ","
+                                 << center.y() << (activeGrid ? " in the loaded cells" : "") << ", " << distanceInCells
+                                 << " cells from the eye:" << made.str();
             entry.mRenderingNode = pat;
         }
     }

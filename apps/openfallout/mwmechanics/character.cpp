@@ -853,6 +853,7 @@ namespace OFMechanics
         // Note that these animations wouldn't actually be visible (due to the Death animation's priority being higher).
         // However, they could still trigger text keys, such as Hit events, or sounds.
         resetCurrentMovementState();
+        mMovementIntent = CharState_None;
         resetCurrentWeaponState();
         resetCurrentHitState();
         resetCurrentIdleState();
@@ -2370,6 +2371,8 @@ namespace OFMechanics
                 }
             }
 
+            mMovementIntent = movestate;
+
             if (movestate != CharState_None)
             {
                 clearAnimQueue();
@@ -2991,10 +2994,12 @@ namespace OFMechanics
 
     bool CharacterController::isRunning() const
     {
-        return mMovementState == CharState_RunForward || mMovementState == CharState_RunBack
-            || mMovementState == CharState_RunLeft || mMovementState == CharState_RunRight
-            || mMovementState == CharState_SwimRunForward || mMovementState == CharState_SwimRunBack
-            || mMovementState == CharState_SwimRunLeft || mMovementState == CharState_SwimRunRight;
+        const auto runs = [](CharacterState state) {
+            return state == CharState_RunForward || state == CharState_RunBack || state == CharState_RunLeft
+                || state == CharState_RunRight || state == CharState_SwimRunForward || state == CharState_SwimRunBack
+                || state == CharState_SwimRunLeft || state == CharState_SwimRunRight;
+        };
+        return runs(mMovementState) || runs(mMovementIntent);
     }
 
     void CharacterController::setAttackingOrSpell(bool attackingOrSpell) const

@@ -1,5 +1,6 @@
 #include "nifloader.hpp"
 
+#include <atomic>
 #include <mutex>
 #include <optional>
 #include <set>
@@ -297,6 +298,11 @@ namespace
 
 namespace NifOsg
 {
+    /// The alpha (of 255) above which a texel of the atlas of a block of distant objects is drawn
+    constexpr int sLodBuildingAlphaThreshold = 128;
+    /// The node of a shape of a block of distant objects (the flag of its shader) is marked with this value
+    constexpr const char* sLodBuildingUserValue = "lodBuilding";
+
     bool Loader::sShowMarkers = false;
 
     void Loader::setShowMarkers(bool show)
@@ -2799,6 +2805,21 @@ namespace NifOsg
                     if (!texprop->mTextureSet.empty())
                         handleTextureSet(texprop->mTextureSet.getPtr(), texprop->wrapS(), texprop->wrapT(),
                             node->getName(), stateset, boundTextures);
+                    // The shape of a block of distant objects draws its trees as pictures with see-through parts from
+                    // one atlas, and no alpha property asks for the test: the games test the alpha of what the flag
+                    // marks, and without it each tree is a dark rectangle. The property is one of the shape (a file of
+                    // these games lists it with the properties), not of its drawable
+                    if (texprop->lodBuilding())
+                    {
+                        handleAlphaTesting(true, osg::AlphaFunc::GREATER, sLodBuildingAlphaThreshold, *node);
+                        // Told to the alpha property of the shape, that is handled when the drawable is made
+                        node->setUserValue(sLodBuildingUserValue, true);
+                        static std::atomic<int> sReported{ 0 };
+                        if (sReported.fetch_add(1) < 4)
+                            Log(Debug::Info)
+                                << "Distant objects " << mFilename << ": alpha test of " << sLodBuildingAlphaThreshold
+                                << " of 255 set on the node '" << node->getName() << "'";
+                    }
                     handleTextureControllers(texprop, composite, stateset, animflags);
                     if (texprop->refraction())
                         SceneUtil::setupDistortion(*node, { .mStrength = texprop->mRefraction.mStrength });
@@ -3049,8 +3070,13 @@ namespace NifOsg
                         const Nif::NiAlphaProperty* alphaprop = static_cast<const Nif::NiAlphaProperty*>(property);
                         handleAlphaBlending(alphaprop->useAlphaBlending(), alphaprop->sourceBlendMode(),
                             alphaprop->destinationBlendMode(), !alphaprop->noSorter(), hasSortAlpha, *node);
-                        handleAlphaTesting(alphaprop->useAlphaTesting(), getTestMode(alphaprop->alphaTestMode()),
-                            alphaprop->mThreshold, *node);
+                        // A property that asks for a test is obeyed; one that asks for none does not take away the
+                        // test that the flag of the shader of a block of distant objects set on the node
+                        bool lodBuilding = false;
+                        node->getUserValue(sLodBuildingUserValue, lodBuilding);
+                        if (alphaprop->useAlphaTesting() || !lodBuilding)
+                            handleAlphaTesting(alphaprop->useAlphaTesting(), getTestMode(alphaprop->alphaTestMode()),
+                                alphaprop->mThreshold, *node);
                         break;
                     }
                     case Nif::RC_BSShaderPPLightingProperty:

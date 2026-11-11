@@ -134,6 +134,8 @@ namespace SceneUtil
                 debug.mNoLand = true;
             else if (word == "no-records")
                 debug.mNoRecords = true;
+            else if (word == "nodes")
+                debug.mNodes = true;
             else if (unknown != nullptr)
                 unknown->emplace_back(word);
         }

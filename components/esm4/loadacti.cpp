@@ -68,6 +68,9 @@ void ESM4::Activator::load(ESM4::Reader& reader)
             case ESM::fourCC("RNAM"):
                 reader.getFormId(mRadioStation);
                 break;
+            case ESM::fourCC("WNAM"):
+                reader.getFormId(mWaterType);
+                break;
             case ESM::fourCC("XATO"):
                 reader.getZString(mActivationPrompt);
                 break; // FONV
@@ -91,7 +94,6 @@ void ESM4::Activator::load(ESM4::Reader& reader)
             case ESM::fourCC("OBND"):
             case ESM::fourCC("PNAM"):
             case ESM::fourCC("VMAD"):
-            case ESM::fourCC("WNAM"):
             case ESM::fourCC("CTDA"):
             case ESM::fourCC("CIS1"):
             case ESM::fourCC("CIS2"):

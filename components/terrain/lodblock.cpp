@@ -7,10 +7,13 @@
 #include <osg/MatrixTransform>
 #include <osg/NodeVisitor>
 #include <osg/TriangleIndexFunctor>
+#include <osg/Vec2f>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <vector>
 
 namespace Terrain
@@ -33,6 +36,17 @@ namespace Terrain
             osg::BoundingBox mBox;
         };
 
+        struct CollectTriangles
+        {
+            std::vector<std::array<unsigned int, 3>> mTriangles;
+
+            void operator()(unsigned int a, unsigned int b, unsigned int c) { mTriangles.push_back({ a, b, c }); }
+        };
+
+        // The triangles of one geometry, sorted into the cells. The triangles that share vertices are the parts of
+        // one object, and an object belongs to the cell its middle is in (as the reference of the game does): sorted
+        // by the center of each triangle, an object that stands on the edge of a loaded cell would lose the part of it
+        // in that cell, and the rest of it would hang in the air.
         struct SortTriangles
         {
             const osg::Vec3Array* mVertices = nullptr;
@@ -44,28 +58,102 @@ namespace Terrain
             std::array<std::vector<unsigned int>, 16> mIndices;
             std::array<osg::BoundingBox, 16> mBounds;
 
-            void operator()(unsigned int a, unsigned int b, unsigned int c)
+            struct Extent
             {
-                const std::size_t size = mVertices->size();
-                if (a >= size || b >= size || c >= size)
-                    return;
-                const osg::Vec3f center = ((*mVertices)[a] + (*mVertices)[b] + (*mVertices)[c]) / 3.f;
-                const osg::Vec3f world = center * mToWorld;
-                // The vertices come from a file: a coordinate that is not a number or is far out is not made an int
-                if (!std::isfinite(world.x()) || !std::isfinite(world.y()))
-                    return;
+                float mMinX = std::numeric_limits<float>::max();
+                float mMinY = std::numeric_limits<float>::max();
+                float mMaxX = std::numeric_limits<float>::lowest();
+                float mMaxY = std::numeric_limits<float>::lowest();
+
+                void expandBy(const osg::Vec2f& point)
+                {
+                    mMinX = std::min(mMinX, point.x());
+                    mMinY = std::min(mMinY, point.y());
+                    mMaxX = std::max(mMaxX, point.x());
+                    mMaxY = std::max(mMaxY, point.y());
+                }
+            };
+
+            static unsigned int findRoot(std::vector<unsigned int>& parent, unsigned int vertex)
+            {
+                while (parent[vertex] != vertex)
+                {
+                    parent[vertex] = parent[parent[vertex]];
+                    vertex = parent[vertex];
+                }
+                return vertex;
+            }
+
+            int getCell(float worldX, float worldY) const
+            {
                 constexpr float last = static_cast<float>(sCellsPerSide - 1);
                 const int x = static_cast<int>(
-                    std::clamp(std::floor(world.x() / mCellSize) - static_cast<float>(mFirstCellX), 0.f, last));
+                    std::clamp(std::floor(worldX / mCellSize) - static_cast<float>(mFirstCellX), 0.f, last));
                 const int y = static_cast<int>(
-                    std::clamp(std::floor(world.y() / mCellSize) - static_cast<float>(mFirstCellY), 0.f, last));
-                const int cell = y * sCellsPerSide + x;
+                    std::clamp(std::floor(worldY / mCellSize) - static_cast<float>(mFirstCellY), 0.f, last));
+                return y * sCellsPerSide + x;
+            }
+
+            void add(int cell, const std::array<unsigned int, 3>& triangle)
+            {
                 if ((mWanted & (1u << cell)) == 0)
                     return;
-                mIndices[cell].insert(mIndices[cell].end(), { a, b, c });
-                mBounds[cell].expandBy((*mVertices)[a]);
-                mBounds[cell].expandBy((*mVertices)[b]);
-                mBounds[cell].expandBy((*mVertices)[c]);
+                mIndices[cell].insert(mIndices[cell].end(), triangle.begin(), triangle.end());
+                for (const unsigned int index : triangle)
+                    mBounds[cell].expandBy((*mVertices)[index]);
+            }
+
+            void sort(const std::vector<std::array<unsigned int, 3>>& triangles)
+            {
+                const std::size_t size = mVertices->size();
+                // The vertices come from a file: a coordinate that is not a number or is far out is not made an int
+                std::vector<osg::Vec2f> world(size);
+                std::vector<bool> usable(size, false);
+                for (std::size_t i = 0; i < size; ++i)
+                {
+                    const osg::Vec3f point = (*mVertices)[i] * mToWorld;
+                    world[i] = osg::Vec2f(point.x(), point.y());
+                    usable[i] = std::isfinite(point.x()) && std::isfinite(point.y());
+                }
+
+                std::vector<std::array<unsigned int, 3>> valid;
+                valid.reserve(triangles.size());
+                std::vector<unsigned int> parent(size);
+                for (std::size_t i = 0; i < size; ++i)
+                    parent[i] = static_cast<unsigned int>(i);
+                for (const auto& triangle : triangles)
+                {
+                    if (triangle[0] >= size || triangle[1] >= size || triangle[2] >= size)
+                        continue;
+                    if (!usable[triangle[0]] || !usable[triangle[1]] || !usable[triangle[2]])
+                        continue;
+                    valid.push_back(triangle);
+                    const unsigned int root = findRoot(parent, triangle[0]);
+                    parent[findRoot(parent, triangle[1])] = root;
+                    parent[findRoot(parent, triangle[2])] = root;
+                }
+
+                std::vector<Extent> extents(size);
+                for (const auto& triangle : valid)
+                {
+                    Extent& extent = extents[findRoot(parent, triangle[0])];
+                    for (const unsigned int index : triangle)
+                        extent.expandBy(world[index]);
+                }
+
+                // An object that is wider than the block is not an object, and goes by its triangles
+                const float widest = static_cast<float>(sCellsPerSide) * mCellSize;
+                for (const auto& triangle : valid)
+                {
+                    const Extent& extent = extents[findRoot(parent, triangle[0])];
+                    if (extent.mMaxX - extent.mMinX <= widest && extent.mMaxY - extent.mMinY <= widest)
+                    {
+                        add(getCell((extent.mMinX + extent.mMaxX) / 2.f, (extent.mMinY + extent.mMaxY) / 2.f), triangle);
+                        continue;
+                    }
+                    const osg::Vec2f center = (world[triangle[0]] + world[triangle[1]] + world[triangle[2]]) / 3.f;
+                    add(getCell(center.x(), center.y()), triangle);
+                }
             }
         };
 
@@ -89,14 +177,17 @@ namespace Terrain
                 if (vertices == nullptr)
                     return;
 
-                osg::TriangleIndexFunctor<SortTriangles> sort;
+                osg::TriangleIndexFunctor<CollectTriangles> collect;
+                geometry.accept(collect);
+
+                SortTriangles sort;
                 sort.mVertices = vertices;
                 sort.mToWorld = osg::computeLocalToWorld(getNodePath());
                 sort.mFirstCellX = mFirstCellX;
                 sort.mFirstCellY = mFirstCellY;
                 sort.mCellSize = mCellSize;
                 sort.mWanted = mWanted;
-                geometry.accept(sort);
+                sort.sort(collect.mTriangles);
 
                 for (int cell = 0; cell < 16; ++cell)
                 {

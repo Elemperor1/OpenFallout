@@ -33,7 +33,10 @@ I.Settings.registerGroup({
     name = 'MovementSettings',
     permanentStorage = true,
     settings = {
-        boolSetting('alwaysRun', false),
+        -- Fallout 3 and New Vegas run by default (Fallout.ini bAlwaysRunByDefault=1): the run key walks, and the key of
+        -- the games' toggle (Caps Lock) turns the running off. The first hour of New Vegas on the Mac (round 13P) found a
+        -- player who walked until the run key was held and asked for a sprint key
+        boolSetting('alwaysRun', true),
         boolSetting('toggleSneak', false), -- TODO: consider removing this setting when we have the advanced binding UI
         boolSetting('smoothControllerMovement', true),
     },

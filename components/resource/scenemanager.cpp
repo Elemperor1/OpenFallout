@@ -1032,9 +1032,20 @@ namespace Resource
         return static_cast<osg::Node*>(mErrorMarker->clone(osg::CopyOp::DEEP_COPY_ALL));
     }
 
+    void SceneManager::keepShapesOf(VFS::Path::NormalizedView path)
+    {
+        const std::lock_guard lock(mKeepShapesMutex);
+        mKeepShapes.emplace(path.value());
+    }
+
     osg::ref_ptr<const osg::Node> SceneManager::getTemplate(
         VFS::Path::NormalizedView path, bool compile, bool keepShapes)
     {
+        if (!keepShapes)
+        {
+            const std::lock_guard lock(mKeepShapesMutex);
+            keepShapes = !mKeepShapes.empty() && mKeepShapes.find(path.value()) != mKeepShapes.end();
+        }
         // The template that keeps the shapes apart is a different object from the ordinary one of the file
         const std::string shapesKey = keepShapes ? std::string(path.value()) + "#shapes" : std::string();
         osg::ref_ptr<osg::Object> obj

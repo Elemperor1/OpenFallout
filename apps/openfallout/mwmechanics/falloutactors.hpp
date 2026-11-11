@@ -66,6 +66,9 @@ namespace OFMechanics
         ESM::FormId currentPackage(const OFWorld::Ptr& ptr) const;
 
         void update(float duration);
+        /// The character that the player talks with turns to the player (the minds are not updated while a
+        /// conversation pauses the world, so this is done for that one in each frame, paused or not)
+        void faceSpeaker(float duration);
 
         std::size_t size() const { return mMinds.size(); }
 

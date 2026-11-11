@@ -25,7 +25,6 @@ namespace FalloutScript
             { "ResetInventory", "an inventory is not rebuilt from the form of the character" },
             { "UnlockChallenge", "the challenges are not kept" },
             { "IncrementScriptedChallenge", "the challenges are not kept" },
-            { "SwapTextureOnRef", "the textures of a model are not swapped" },
             { "PlayBink", "videos are not played" },
             { "SetNoActivationSound", "an activation that does nothing makes no sound" },
             { "ClearNoActivationSound", "an activation that does nothing makes no sound" },

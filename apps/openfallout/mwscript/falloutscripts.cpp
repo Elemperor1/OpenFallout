@@ -13,6 +13,7 @@
 #include <components/esm4/creaturemodel.hpp>
 #include <components/esm4/levelled.hpp>
 #include <components/esm4/loadachr.hpp>
+#include <components/esm4/loadacti.hpp>
 #include <components/esm4/loadalch.hpp>
 #include <components/esm4/loadammo.hpp>
 #include <components/esm4/loadarmo.hpp>
@@ -44,6 +45,7 @@
 #include <components/esm4/loadsoun.hpp>
 #include <components/esm4/loadterm.hpp>
 #include <components/esm4/loadvtyp.hpp>
+#include <components/esm4/loadwatr.hpp>
 #include <components/esm4/loadweap.hpp>
 #include <components/esm4/loadwrld.hpp>
 #include <components/esm4/wornarmor.hpp>
@@ -57,8 +59,11 @@
 #include <components/misc/strings/algorithm.hpp>
 #include <components/misc/strings/lower.hpp>
 #include <components/nif/extra.hpp>
+#include <components/resource/imagemanager.hpp>
 #include <components/resource/niffilemanager.hpp>
 #include <components/resource/resourcesystem.hpp>
+#include <components/resource/scenemanager.hpp>
+#include <components/sceneutil/positionattitudetransform.hpp>
 #include <components/settings/values.hpp>
 #include <components/vfs/manager.hpp>
 #include <components/vfs/recursivedirectoryiterator.hpp>
@@ -79,6 +84,7 @@
 #include "../mwmechanics/falloutpackages.hpp"
 #include "../mwrender/animation.hpp"
 #include "../mwrender/falloutactoranimation.hpp"
+#include "../mwrender/falloutface.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
 #include "../mwworld/esmstore.hpp"
@@ -679,6 +685,10 @@ namespace OFScript
         mPresentation.clear();
         mSwitches.clear();
         mMagic.clear();
+        {
+            const std::lock_guard lock(mTextureSwapMutex);
+            mTextureSwaps.clear();
+        }
         // The needs of the hardcore mode count from the game that is loaded or started, not from the one that is left:
         // the days between two saves are not time the player lived through
         mHardcore.clear();
@@ -810,6 +820,9 @@ namespace OFScript
             // A menu is open: the scripts that wait for one, or are to go on while it is open, have their MenuMode
             // blocks run in place of GameMode
             mObjects.setSecondsPassed(frametime);
+            // A picture that a script swapped is shown while the menu is open (a conversation is one: the doctor shows
+            // his card while he asks what you see)
+            updateTextureSwaps();
             // What the blocks of the menu did to the items is told while it is open, not when it is closed
             raiseItemEvents();
             updateProgress(0);
@@ -838,6 +851,7 @@ namespace OFScript
         mObjects.setSecondsPassed(frametime);
         updateFurniture();
         updateDoors();
+        updateTextureSwaps();
         // What the items did since the last frame is told before any block of this frame runs, so that an AddItem or
         // EquipItem of a trigger block is told in the next frame
         raiseItemEvents();
@@ -1840,6 +1854,12 @@ namespace OFScript
                   .count()
             - askedAt;
         return since < 1000;
+    }
+
+    bool FalloutScripts::conversationHeld() const
+    {
+        const std::lock_guard lock(mDialogueMutex);
+        return mDialogue.active() && !mDialogue.canLeave();
     }
 
     void FalloutScripts::setLuaQuestion(bool open)
@@ -4889,6 +4909,56 @@ namespace OFScript
         return true;
     }
 
+    bool FalloutScripts::doorTowards(const OFWorld::Ptr& actor, FalloutScript::FormId reference, osg::Vec3f& position)
+    {
+        Place wanted;
+        if (actor.isEmpty() || actor.getCell() == nullptr || !whereIs(reference, wanted))
+            return false;
+        const OFWorld::CellStore* target = cellAt(wanted);
+        if (target == nullptr)
+            return false;
+        OFWorld::WorldModel* model = OFBase::Environment::get().getWorldModel();
+        const osg::Vec3f from = actor.getRefData().getPosition().asVec3();
+        float nearest = std::numeric_limits<float>::max();
+        bool found = false;
+        actor.getCell()->forEachType<ESM4::Door>([&](const OFWorld::Ptr& door) {
+            if (!door.getCellRef().getTeleport() || !door.getRefData().isEnabled())
+                return true;
+            const OFWorld::CellStore* leadsTo = model->findCell(door.getCellRef().getDestCell());
+            if (leadsTo == nullptr)
+                return true;
+            const bool sameSpace = leadsTo == target
+                || (leadsTo->isExterior() && target->isExterior()
+                    && leadsTo->getCell()->getWorldSpace() == target->getCell()->getWorldSpace());
+            if (!sameSpace)
+                return true;
+            const osg::Vec3f at = door.getRefData().getPosition().asVec3();
+            const float distance = (at - from).length();
+            if (distance < nearest)
+            {
+                nearest = distance;
+                position = at;
+                found = true;
+            }
+            return true;
+        });
+        return found;
+    }
+
+    void FalloutScripts::goThrough(const OFWorld::Ptr& actor, FalloutScript::FormId reference)
+    {
+        const FalloutScript::FormId user = scriptReferenceOf(actor);
+        Place place;
+        if (user == 0 || !whereIs(reference, place))
+            return;
+        Move move;
+        move.mWhere = place;
+        move.mParts = Move::Cell | Move::PositionX | Move::PositionY | Move::PositionZ | Move::AngleZ;
+        Log(Debug::Info) << "Package: " << FalloutScript::hex(user) << " goes through a door to "
+                         << FalloutScript::hex(reference);
+        askForMove(user, move);
+    }
+
     bool FalloutScripts::useFurniture(const OFWorld::Ptr& actor, const OFWorld::Ptr& furniture, bool place)
     {
         const FalloutScript::FormId user = scriptReferenceOf(actor);
@@ -4936,9 +5006,17 @@ namespace OFScript
             use.mEntry = place && entry ? static_cast<int>(entry->mIndex) : -1;
             use.mKind = entry ? entry->mRef : 10;
         }
+        // Where the furniture is and whether it is in the scene: a character on a seat that is not drawn is seen
+        // sitting on nothing
+        const osg::Vec3f at = furniture.getRefData().getPosition().asVec3();
         Log(Debug::Info) << "Furniture: " << FalloutScript::hex(user) << " uses " << FalloutScript::hex(seat)
                          << (entry ? " at entry " + std::to_string(entry->mIndex) : std::string())
-                         << (place ? " (put there)" : "");
+                         << (place ? " (put there)" : "") << "; the furniture is at " << static_cast<int>(at.x()) << ","
+                         << static_cast<int>(at.y()) << "," << static_cast<int>(at.z()) << ", "
+                         << (furniture.getRefData().isEnabled() ? "enabled" : "disabled") << ", "
+                         << (furniture.getRefData().getBaseNode() != nullptr ? "in the scene" : "not in the scene")
+                         << ", the character goes to " << static_cast<int>(where.x()) << ","
+                         << static_cast<int>(where.y()) << "," << static_cast<int>(where.z());
         return true;
     }
 
@@ -4988,6 +5066,103 @@ namespace OFScript
             }
         }
         return true;
+    }
+
+    bool FalloutScripts::swapTexture(FalloutScript::FormId reference, std::string_view shape, std::string_view texture)
+    {
+        if (reference == 0 || shape.empty() || texture.empty())
+            return false;
+        // The shape is found by its name, which the optimizer takes from a shape it merges into another: the model
+        // of this object is loaded with its shapes apart from now on (one that is in the scene already is as it is,
+        // the cards of the doctor are put there when they are enabled)
+        const OFWorld::Ptr ptr = findReference(reference);
+        Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem();
+        if (!ptr.isEmpty() && resources != nullptr)
+        {
+            const VFS::Path::Normalized model = ptr.getClass().getCorrectedModel(ptr);
+            if (!model.value().empty())
+                resources->getSceneManager()->keepShapesOf(model);
+        }
+        const std::lock_guard lock(mTextureSwapMutex);
+        std::vector<TextureSwap>& swaps = mTextureSwaps[reference];
+        // A shape has one picture: the one that was told last
+        const auto same = std::find_if(swaps.begin(), swaps.end(),
+            [shape](const TextureSwap& swap) { return Misc::StringUtils::ciEqual(swap.mShape, shape); });
+        if (same != swaps.end())
+        {
+            same->mTexture = std::string(texture);
+            same->mGivenTo = nullptr;
+        }
+        else
+            swaps.push_back({ std::string(shape), std::string(texture), nullptr, {} });
+        return true;
+    }
+
+    void FalloutScripts::updateTextureSwaps()
+    {
+        std::vector<std::pair<FalloutScript::FormId, std::vector<TextureSwap>>> todo;
+        {
+            const std::lock_guard lock(mTextureSwapMutex);
+            for (const auto& [reference, swaps] : mTextureSwaps)
+                todo.emplace_back(reference, swaps);
+        }
+        if (todo.empty())
+            return;
+        Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem();
+        if (resources == nullptr)
+            return;
+        for (auto& [reference, swaps] : todo)
+        {
+            const OFWorld::Ptr ptr = findReference(reference);
+            if (ptr.isEmpty() || !ptr.isInCell())
+                continue;
+            osg::Node* model = ptr.getRefData().getBaseNode();
+            if (model == nullptr)
+                continue;
+            for (TextureSwap& swap : swaps)
+            {
+                // The model has this picture already (the same node, the same file)
+                if (swap.mGivenTo.get() == model && swap.mGiven == swap.mTexture)
+                    continue;
+                // A script names a picture with no extension (the cards of the doctor): it is a DDS file, which the
+                // helper only looks for when it is asked to change an extension
+                const std::string name = FalloutScript::textureFileName(swap.mTexture);
+                const VFS::Path::Normalized path
+                    = Misc::ResourceHelpers::correctTexturePath(VFS::Path::toNormalized(name), *resources->getVFS());
+                osg::ref_ptr<osg::Image> image;
+                if (resources->getVFS()->exists(path))
+                    image = resources->getImageManager()->getImage(path);
+                if (image == nullptr)
+                {
+                    Log(Debug::Warning) << "SwapTexture: the picture " << path << " for " << swap.mShape << " of "
+                                        << FalloutScript::hex(reference) << " cannot be read";
+                    // Not asked again until the script names another
+                    swap.mGivenTo = model;
+                    swap.mGiven = swap.mTexture;
+                }
+                else
+                {
+                    const std::size_t changed = OFRender::replaceDiffuseMapOfShape(*model, swap.mShape, image);
+                    // A swap that changes no shape is a fault in the data or in the model: told as a warning
+                    Log(changed == 0 ? Debug::Warning : Debug::Info)
+                        << "SwapTexture: " << FalloutScript::hex(reference) << " shows " << path << " on "
+                        << swap.mShape << " (" << changed << " shapes)";
+                    swap.mGivenTo = model;
+                    swap.mGiven = swap.mTexture;
+                }
+                // What was given is kept with the swap, unless a script named another meanwhile
+                const std::lock_guard lock(mTextureSwapMutex);
+                const auto stored = mTextureSwaps.find(reference);
+                if (stored == mTextureSwaps.end())
+                    continue;
+                for (TextureSwap& kept : stored->second)
+                    if (Misc::StringUtils::ciEqual(kept.mShape, swap.mShape) && kept.mTexture == swap.mTexture)
+                    {
+                        kept.mGivenTo = swap.mGivenTo;
+                        kept.mGiven = swap.mGiven;
+                    }
+            }
+        }
     }
 
     bool FalloutScripts::isGroupPlaying(FalloutScript::FormId reference, std::string_view group)
@@ -5131,6 +5306,25 @@ namespace OFScript
             requestRest(true, referenceOf(furniture));
         else
             useFurniture(actor, furniture, true);
+    }
+
+    void FalloutScripts::activateActivator(const OFWorld::Ptr& activator, const OFWorld::Ptr& actor)
+    {
+        const ESM4::Activator* record = activator.get<ESM4::Activator>()->mBase;
+        const FalloutScript::FormId reference = referenceOf(activator);
+        // The sound of using it plays from the activator (the sound of a record that has none is not looked for)
+        if (!record->mActivationSound.isZeroOrUnset())
+            playSound(numberOf(record->mActivationSound), reference);
+        // The water of a sink, a toilet or a fountain is drunk by the player: the water type names the spell the games
+        // cast on whoever drinks it (WATR XNAM)
+        if (record->mWaterType.isZeroOrUnset() || scriptReferenceOf(actor) != mPlayer)
+            return;
+        const ESM4::Water* water = mStore.get<ESM4::Water>().search(record->mWaterType);
+        if (water == nullptr || water->mActorEffect.isZeroOrUnset())
+            return;
+        Log(Debug::Info) << "Drink: the player drinks from " << record->mEditorId << ", " << water->mEditorId
+                         << " casts " << FalloutScript::hex(numberOf(water->mActorEffect));
+        mMagic.castOnSelf(mPlayer, numberOf(water->mActorEffect));
     }
 
     void FalloutScripts::leaveFurniture(const OFWorld::Ptr& actor)
