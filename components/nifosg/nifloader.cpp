@@ -301,15 +301,6 @@ namespace NifOsg
     /// The alpha (of 255) above which a texel of the atlas of a block of distant objects is drawn
     constexpr int sLodBuildingAlphaThreshold = 128;
 
-    bool allowTransparencyOfDxt1(osg::Image& image)
-    {
-        if (image.getPixelFormat() != GL_COMPRESSED_RGB_S3TC_DXT1_EXT)
-            return false;
-        image.setPixelFormat(GL_COMPRESSED_RGBA_S3TC_DXT1_EXT);
-        image.setInternalTextureFormat(GL_COMPRESSED_RGBA_S3TC_DXT1_EXT);
-        return true;
-    }
-
     bool Loader::sShowMarkers = false;
 
     void Loader::setShowMarkers(bool show)
@@ -2627,25 +2618,6 @@ namespace NifOsg
             }
         }
 
-        /// The atlas of a block of distant objects is a DXT1 picture whose trees are the texels that are not
-        /// see-through: they are drawn by the alpha test, which needs the alpha channel of the picture to be there
-        void prepareLodAtlas(const osg::StateSet* stateset) const
-        {
-            const auto* diffuse
-                = dynamic_cast<const osg::Texture2D*>(stateset->getTextureAttribute(0, osg::StateAttribute::TEXTURE));
-            osg::Image* image = diffuse != nullptr ? const_cast<osg::Image*>(diffuse->getImage()) : nullptr;
-            if (image == nullptr)
-                return;
-            const int before = static_cast<int>(image->getPixelFormat());
-            const bool changed = allowTransparencyOfDxt1(*image);
-            static std::atomic<int> sReported{ 0 };
-            if (sReported.fetch_add(1) < 4)
-                Log(Debug::Info) << "Distant objects " << mFilename << ": the picture " << image->getFileName()
-                                 << " is " << image->s() << "x" << image->t() << " with pixel format " << before
-                                 << (changed ? " (made one with alpha)" : "")
-                                 << ", has see-through texels: " << (image->isImageTranslucent() ? "yes" : "no");
-        }
-
         void handleTextureSet(const Nif::BSShaderTextureSet* textureSet, bool wrapS, bool wrapT,
             const std::string& nodeName, osg::StateSet* stateset, std::vector<unsigned int>& boundTextures) const
         {
@@ -2831,8 +2803,19 @@ namespace NifOsg
                     if (!texprop->mTextureSet.empty())
                         handleTextureSet(texprop->mTextureSet.getPtr(), texprop->wrapS(), texprop->wrapT(),
                             node->getName(), stateset, boundTextures);
+                    // The shape of a block of distant objects draws its trees as pictures with see-through parts from
+                    // one atlas, and no alpha property asks for the test: the games test the alpha of what the flag
+                    // marks, and without it each tree is a dark rectangle. The property is one of the shape (a file of
+                    // these games lists it with the properties), not of its drawable
                     if (texprop->lodBuilding())
-                        prepareLodAtlas(stateset);
+                    {
+                        handleAlphaTesting(true, osg::AlphaFunc::GREATER, sLodBuildingAlphaThreshold, *node);
+                        static std::atomic<int> sReported{ 0 };
+                        if (sReported.fetch_add(1) < 4)
+                            Log(Debug::Info)
+                                << "Distant objects " << mFilename << ": alpha test of " << sLodBuildingAlphaThreshold
+                                << " of 255 set on the node '" << node->getName() << "'";
+                    }
                     handleTextureControllers(texprop, composite, stateset, animflags);
                     if (texprop->refraction())
                         SceneUtil::setupDistortion(*node, { .mStrength = texprop->mRefraction.mStrength });
@@ -3091,18 +3074,6 @@ namespace NifOsg
                     {
                         auto shaderprop = static_cast<const Nif::BSShaderPPLightingProperty*>(property);
                         specEnabled = shaderprop->specular();
-                        // The shape of a block of distant objects draws its trees as pictures with see-through parts
-                        // from one atlas, and no alpha property asks for the test: the games test the alpha of what the
-                        // flag marks, and without it each tree is a dark rectangle
-                        if (shaderprop->lodBuilding())
-                        {
-                            handleAlphaTesting(true, osg::AlphaFunc::GREATER, sLodBuildingAlphaThreshold, *node);
-                            static std::atomic<int> sReported{ 0 };
-                            if (sReported.fetch_add(1) < 4)
-                                Log(Debug::Info) << "Distant objects " << mFilename << ": alpha test of "
-                                                 << sLodBuildingAlphaThreshold << " of 255 set on the node '"
-                                                 << node->getName() << "' with " << properties.size() << " properties";
-                        }
                         break;
                     }
                     case Nif::RC_BSLightingShaderProperty:

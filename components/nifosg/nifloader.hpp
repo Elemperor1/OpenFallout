@@ -12,7 +12,6 @@ namespace SceneUtil
 
 namespace osg
 {
-    class Image;
     class Node;
 }
 
@@ -24,12 +23,6 @@ namespace Resource
 
 namespace NifOsg
 {
-    /// The renderer of the games reads the see-through texels of every DXT1 picture (a block whose first colour is not
-    /// above its second has them), while the reader of pictures of OSG takes a DXT1 picture whose file does not say it
-    /// has alpha as one without, and each of those texels is an opaque black one. Gives such a picture the format that
-    /// has the alpha; returns whether the format was changed. To be called before the picture is used for a texture.
-    bool allowTransparencyOfDxt1(osg::Image& image);
-
     /// The main class responsible for loading NIF files into an OSG-Scenegraph.
     /// @par This scene graph is self-contained and can be cloned using osg::clone if desired. Particle emitters
     ///      and programs hold a pointer to their ParticleSystem, which would need to be manually updated when cloning.

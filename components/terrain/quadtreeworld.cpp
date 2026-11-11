@@ -401,15 +401,21 @@ namespace Terrain
                 && center.y() < gridbounds.w());
 
             // The nodes near the eye are told to the log when they are asked for
-            constexpr float reportedDistanceInCells = 10.f;
-            constexpr int reportedNodes = 400;
+            constexpr float reportedDistanceInCells = 9.f;
+            constexpr std::size_t reportedNodes = 1500;
             const osg::Vec3f eye = vd->getViewPoint();
             const float distanceInCells
                 = (osg::Vec2f(center.x() * cellWorldSize, center.y() * cellWorldSize) - osg::Vec2f(eye.x(), eye.y()))
                       .length()
                 / cellWorldSize;
-            const bool report = mReportNodes && distanceInCells <= reportedDistanceInCells
-                && mReportedNodes.fetch_add(1) < reportedNodes;
+            // each node is told once, where it is first made
+            bool report = false;
+            if (mReportNodes && distanceInCells <= reportedDistanceInCells)
+            {
+                const std::lock_guard<std::mutex> lock(mReportMutex);
+                report = mReportedNodes.size() < reportedNodes
+                    && mReportedNodes.insert({ entry.mNode->getSize(), center.x(), center.y() }).second;
+            }
             std::ostringstream made;
 
             int managerIndex = 0;
@@ -423,7 +429,13 @@ namespace Terrain
                 if (report)
                 {
                     made << " [manager " << managerIndex << ": ";
-                    if (n)
+                    if (const auto* land = dynamic_cast<const TerrainDrawable*>(n.get()))
+                    {
+                        const osg::BoundingBox& box = land->getBoundingBox();
+                        made << "land of the records with " << land->getPasses().size() << " passes, mask "
+                             << land->getNodeMask() << ", heights " << box.zMin() << " to " << box.zMax();
+                    }
+                    else if (n)
                     {
                         const osg::BoundingSphere bound = n->getBound();
                         const osg::Group* group = n->asGroup();
