@@ -176,6 +176,7 @@ namespace OF
         std::filesystem::path mSaveGameFile;
         // Grab mouse?
         bool mGrab;
+        bool mHeadless;
 
         bool mExportFonts;
         unsigned int mRandomSeed;
@@ -241,6 +242,8 @@ namespace OF
         void setSkipMenu(bool skipMenu, bool newGame);
 
         void setGrabMouse(bool grab) { mGrab = grab; }
+        // The window is created hidden and stays so; the engine runs as if it were shown (see main.cpp)
+        void setHeadless(bool headless) { mHeadless = headless; }
 
         /// Initialise and enter main loop.
         void go();

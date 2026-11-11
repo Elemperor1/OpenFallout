@@ -23,6 +23,8 @@
 
 #include <boost/program_options/variables_map.hpp>
 
+#include <SDL_hints.h>
+
 #if defined(_WIN32)
 #include <components/misc/windows.hpp>
 // makes __argc and __argv available on windows
@@ -32,13 +34,66 @@ extern "C" __declspec(dllexport) DWORD AmdPowerXpressRequestHighPerformance = 0x
 #endif
 
 #include <algorithm>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <string_view>
 
 #if (defined(__APPLE__) || defined(__linux) || defined(__unix) || defined(__posix))
 #include <unistd.h>
 #endif
+
+#ifdef __APPLE__
+#include <dlfcn.h>
+#endif
+
+namespace
+{
+    // OPENFALLOUT_HEADLESS=1 in the environment is the same as --headless
+    bool isHeadlessEnvironment()
+    {
+        const char* value = std::getenv("OPENFALLOUT_HEADLESS");
+        return value != nullptr && std::string_view(value) == "1";
+    }
+
+#ifdef __APPLE__
+    // OPENFALLOUT_HEADLESS_POLICY=accessory or =prohibited sets the activation policy of the application
+    // (NSApplication), for a headless run on macOS: an application that is neither of the foreground nor able to be
+    // activated is never made the frontmost application, whatever SDL does with its window. It is done through the
+    // Objective-C runtime, looked up when it is needed, so that the program needs no Objective-C code and no more
+    // libraries. Nothing happens without the variable.
+    void setMacActivationPolicy()
+    {
+        const char* value = std::getenv("OPENFALLOUT_HEADLESS_POLICY");
+        if (value == nullptr)
+            return;
+        const std::string_view name(value);
+        const long policy = name == "prohibited" ? 2 : name == "accessory" ? 1 : -1;
+        if (policy < 0)
+            return;
+        using GetClass = void* (*)(const char*);
+        using GetSelector = void* (*)(const char*);
+        using Send = void* (*)(void*, void*);
+        using SendPolicy = signed char (*)(void*, void*, long);
+        void* runtime = dlopen("/usr/lib/libobjc.A.dylib", RTLD_LAZY);
+        if (runtime == nullptr)
+            return;
+        const auto getClass = reinterpret_cast<GetClass>(dlsym(runtime, "objc_getClass"));
+        const auto getSelector = reinterpret_cast<GetSelector>(dlsym(runtime, "sel_registerName"));
+        void* const message = dlsym(runtime, "objc_msgSend");
+        if (getClass == nullptr || getSelector == nullptr || message == nullptr)
+            return;
+        void* const application
+            = reinterpret_cast<Send>(message)(getClass("NSApplication"), getSelector("sharedApplication"));
+        if (application == nullptr)
+            return;
+        const bool done
+            = reinterpret_cast<SendPolicy>(message)(application, getSelector("setActivationPolicy:"), policy) != 0;
+        Log(Debug::Info) << "Headless: activation policy " << name << (done ? " set" : " refused");
+    }
+#endif
+}
 
 /**
  * \brief Parses application command line and calls \ref Cfg::ConfigurationManager
@@ -84,7 +139,10 @@ bool parseOptions(int argc, char** argv, OF::Engine& engine, Files::Configuratio
 
     OFGui::DebugWindow::startLogRecording();
 
-    engine.setGrabMouse(!variables["no-grab"].as<bool>());
+    const bool headless = variables["headless"].as<bool>() || isHeadlessEnvironment();
+    engine.setHeadless(headless);
+    // A headless run must never reach for the pointer
+    engine.setGrabMouse(!variables["no-grab"].as<bool>() && !headless);
 
     // Font encoding settings
     std::string encoding(variables["encoding"].as<std::string>());
@@ -282,7 +340,10 @@ bool parseOptions(int argc, char** argv, OF::Engine& engine, Files::Configuratio
 
     // other settings
     Fallback::Map::init(variables["fallback"].as<Fallback::FallbackMap>().mMap);
-    engine.setSoundUsage(!variables["no-sound"].as<bool>());
+    // A headless run is silent unless the sound is what is being looked at
+    const char* headlessSound = std::getenv("OPENFALLOUT_HEADLESS_SOUND");
+    const bool keepSound = !headless || (headlessSound != nullptr && std::string_view(headlessSound) == "1");
+    engine.setSoundUsage(!variables["no-sound"].as<bool>() && keepSound);
     engine.setActivationDistanceOverride(variables["activate-dist"].as<int>());
     engine.enableFontExport(variables["export-fonts"].as<bool>());
     engine.setRandomSeed(variables["random-seed"].as<unsigned int>());
@@ -342,6 +403,15 @@ int runApplication(int argc, char* argv[])
 {
     Platform::init();
 
+    // The engine starts SDL when it is made, before the options are read, so a headless run is recognised here: on
+    // macOS the application is told not to become an application of the foreground (SDL does that when it starts the
+    // video system) for as long as the window is hidden
+    bool headlessArgument = isHeadlessEnvironment();
+    for (int i = 1; i < argc; ++i)
+        headlessArgument = headlessArgument || std::string_view(argv[i]) == "--headless";
+    if (headlessArgument)
+        SDL_SetHint("SDL_MAC_BACKGROUND_APP", "1");
+
 #ifdef __APPLE__
     setenv("OSG_GL_TEXTURE_STORAGE", "OFF", 0);
 #endif
@@ -356,6 +426,11 @@ int runApplication(int argc, char* argv[])
     {
         if (!Misc::checkRequiredOSGPluginsArePresent())
             return 1;
+
+#ifdef __APPLE__
+        if (headlessArgument)
+            setMacActivationPolicy();
+#endif
 
         engine->go();
     }

@@ -156,6 +156,7 @@ namespace SceneUtil
     void AsyncScreenCaptureOperation::operator()(const osg::Image& image, const unsigned int contextId)
     {
         std::shared_ptr<SceneUtil::WorkItem> item = std::make_shared<ScreenCaptureWorkItem>(mImpl, image, contextId);
+        Log(Debug::Info) << "Screenshot captured, queued to be written";
         mQueue->addWorkItem(item);
         const auto isDone = [](const std::shared_ptr<SceneUtil::WorkItem>& v) { return v->isDone(); };
         const auto workItems = mWorkItems.lock();

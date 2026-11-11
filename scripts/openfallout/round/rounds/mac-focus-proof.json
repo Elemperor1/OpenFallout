@@ -1,0 +1,29 @@
+{
+  "name": "mac-focus-proof",
+  "game": "nv",
+  "save": "latest",
+  "scenario": "../scenarios/smoke.lua",
+  "resolution": [
+    1280,
+    720
+  ],
+  "framerate": 30,
+  "limit": 90,
+  "variants": [
+    {
+      "name": "hidden"
+    },
+    {
+      "name": "accessory",
+      "env": {
+        "OPENFALLOUT_HEADLESS_POLICY": "accessory"
+      }
+    },
+    {
+      "name": "prohibited",
+      "env": {
+        "OPENFALLOUT_HEADLESS_POLICY": "prohibited"
+      }
+    }
+  ]
+}

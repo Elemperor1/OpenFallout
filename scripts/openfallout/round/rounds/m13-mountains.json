@@ -1,0 +1,65 @@
+{
+  "name": "m13-mountains",
+  "game": "nv",
+  "save": "latest",
+  "scenario": "../scenarios/m13_mountains.lua",
+  "resolution": [
+    1728,
+    1117
+  ],
+  "framerate": 30,
+  "limit": 240,
+  "variants": [
+    {
+      "name": "plain"
+    },
+    {
+      "name": "flat",
+      "settings": {
+        "Terrain": {
+          "game lod debug": "flat"
+        }
+      }
+    },
+    {
+      "name": "no-high",
+      "settings": {
+        "Terrain": {
+          "game lod debug": "no-high"
+        }
+      }
+    },
+    {
+      "name": "objects-only",
+      "settings": {
+        "Terrain": {
+          "game lod debug": "objects-only"
+        }
+      }
+    },
+    {
+      "name": "no-land",
+      "settings": {
+        "Terrain": {
+          "game lod debug": "no-land"
+        }
+      }
+    },
+    {
+      "name": "no-records",
+      "settings": {
+        "Terrain": {
+          "game lod debug": "no-records"
+        }
+      }
+    },
+    {
+      "name": "wireframe",
+      "settings": {
+        "Terrain": {
+          "game lod debug": "wireframe"
+        }
+      }
+    }
+  ]
+}
