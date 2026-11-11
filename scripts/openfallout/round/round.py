@@ -441,6 +441,8 @@ def command_run(args):
     variants = config["variants"]
     if args.variant:
         variants = [v for v in variants if v.get("name") in args.variant]
+        if not variants:
+            sys.exit(f"no variant named {', '.join(args.variant)} in round {config['name']}")
     print(f"round {config['name']}: {len(variants)} start(s), {args.parallel} at a time, results in {out_dir}", flush=True)
     results = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.parallel)) as pool:

@@ -230,7 +230,7 @@ class WholeRun(unittest.TestCase):
         sys.exit(@STATUS@)
     """
 
-    def run_round(self, status, done=True, written=2):
+    def run_round(self, status, done=True, written=2, extra=()):
         tmp = Path(tempfile.mkdtemp(prefix="round-run-"))
         engine = self.make_engine(tmp, self.ENGINE.replace("@STATUS@", str(status)).replace("@DONE@", str(done))
                                   .replace("@WRITTEN@", str(written)))
@@ -239,7 +239,7 @@ class WholeRun(unittest.TestCase):
                    "games": {"nv": {"data": [str(tmp)], "content": ["FalloutNV.esm"]}}, "out": str(tmp / "out")}
         (tmp / "profile.json").write_text(json.dumps(profile))
         (tmp / "r.json").write_text(json.dumps({"name": "fake", "scenario": "s.lua", "variants": [{"name": "one"}, {"name": "two"}]}))
-        code = round_runner.main(["--profile", str(tmp / "profile.json"), "run", str(tmp / "r.json"), "--parallel", "2"])
+        code = round_runner.main(["--profile", str(tmp / "profile.json"), "run", str(tmp / "r.json"), "--parallel", "2", *extra])
         return tmp, code
 
     def test_passing_run(self):
@@ -274,6 +274,17 @@ class WholeRun(unittest.TestCase):
         self.assertEqual(report["missing_shots"], ["second"])
         text = (run / "one" / "report.md").read_text()
         self.assertIn("MISSING, so the round fails: second", text)
+
+    def test_a_variant_filter_that_matches_nothing_is_an_error(self):
+        with self.assertRaises(SystemExit) as raised:
+            self.run_round(0, extra=("--variant", "nope"))
+        self.assertIn("no variant named nope", str(raised.exception))
+
+    def test_a_variant_filter_runs_only_that_variant(self):
+        tmp, code = self.run_round(0, extra=("--variant", "two"))
+        self.assertEqual(code, 0)
+        (run,) = list((tmp / "out").iterdir())
+        self.assertEqual([p.name for p in run.iterdir() if p.is_dir()], ["two"])
 
     def test_an_engine_that_ends_before_the_scenario_fails(self):
         tmp, code = self.run_round(3, done=False)

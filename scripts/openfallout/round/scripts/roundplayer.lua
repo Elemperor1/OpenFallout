@@ -53,7 +53,7 @@ function handlers.camera(args)
         log('camera', 'unknown mode', tostring(args.mode))
         return {}
     end
-    camera.setMode(mode)
+    camera.setMode(mode, true)
     log('camera', 'mode', tostring(args.mode))
     return {}
 end

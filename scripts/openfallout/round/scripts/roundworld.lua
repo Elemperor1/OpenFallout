@@ -97,7 +97,8 @@ function r.shot(name)
     return reply
 end
 
--- Turns the camera (radians). The pitch is up positive.
+-- Turns the camera (radians). The pitch is down positive, as everywhere in the Lua API (`pitchChange`, `camera.setPitch`): 0.3
+-- looks down, -0.3 looks up.
 function r.look(yaw, pitch) return ask('look', { yaw = yaw, pitch = pitch }) end
 
 function r.camera(mode) return ask('camera', { mode = mode }) end
