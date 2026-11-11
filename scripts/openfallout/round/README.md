@@ -76,6 +76,7 @@ as well.
 | `r.eye(label)`, `r.ground(label, {{dx, dy}...})`, `r.actors(label, radius, count)`, `r.fps(label, seconds)` | log the player's place and camera, the height of the ground under the eye and offsets, the characters near the player (record id, distance, place), the frame times |
 | `r.hour(h)`, `r.global(name[, value])`, `r.quest(name[, stage])`, `r.speed(scale)` | the game's clock, a global, a quest, the speed of the world |
 | `r.object(form[, label])`, `r.activate(form)` | what the world says about an object (`"FormId:0x..."` or `{file, id}`), activate it |
+| `r.boxes(false)` | a message box that the game opens covers the picture and nobody clicks it in a round, so it is answered with its first button after a second (`ROUND box` lines name its number, form and buttons, never its text; a `shot` line says `box=<number>` when one is open as the picture is taken); `r.boxes(false)` leaves the boxes open, `r.boxes(true)` answers again |
 | `r.log(...)` | a note |
 | `r.world`, `r.core`, `r.util`, `r.player()`, `r.lookup(form)` | the Lua modules and helpers, for steps of your own |
 

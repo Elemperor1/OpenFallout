@@ -107,6 +107,10 @@ function r.look(yaw, pitch) return ask('look', { yaw = yaw, pitch = pitch }) end
 
 function r.camera(mode) return ask('camera', { mode = mode }) end
 
+-- A message box that the game opens covers the picture and nobody clicks it in a round, so it is answered with its first button
+-- after a second (`ROUND box` lines name it, never its text). `r.boxes(false)` leaves the boxes open, `r.boxes(true)` answers again.
+function r.boxes(answer) return ask('boxes', { answer = answer ~= false }) end
+
 -- Logs where the player's eye is and what the camera does; the answer is a table
 function r.eye(label) return ask('eye', { label = label }) end
 

@@ -157,9 +157,7 @@ namespace SceneUtil
     {
         std::shared_ptr<SceneUtil::WorkItem> item = std::make_shared<ScreenCaptureWorkItem>(mImpl, image, contextId);
         Log(Debug::Info) << "Screenshot captured, queued to be written";
-        // In front of the terrain and the other work that a queue holds: a picture waits for the frame it was taken
-        // in, and a long queue (a landscape loading) must not hold it back until the game ends
-        mQueue->addWorkItem(item, true);
+        mQueue->addWorkItem(item);
         const auto isDone = [](const std::shared_ptr<SceneUtil::WorkItem>& v) { return v->isDone(); };
         const auto workItems = mWorkItems.lock();
         workItems->erase(std::remove_if(workItems->begin(), workItems->end(), isDone), workItems->end());

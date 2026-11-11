@@ -11,6 +11,12 @@ local util = require('openfallout.util')
 local function log(...) print('ROUND', ...) end
 
 local shots = 0
+-- A message box of the game (a hint, a place, a tutorial) is modal and draws over the picture, and nobody clicks it in a round:
+-- the player script answers it with its first button after BOX_DELAY real seconds (as autoplay does) and logs its number, its form
+-- and its buttons, never its text. A scenario can leave the boxes alone (the question `boxes`).
+local BOX_DELAY = 1.0
+local answerBoxes = true
+local boxSerial, boxSeenAt, boxAnswered = nil, 0, nil
 -- the lengths of the last frames, in milliseconds, with the real time at which each one ended
 local frames = {}
 local MAX_FRAMES = 600
@@ -31,11 +37,50 @@ local function eyePosition()
     return self.position + util.vector3(0, 0, 128)
 end
 
+local function openBox()
+    if core.messageBox == nil then return nil end
+    local ok, box = pcall(core.messageBox.current)
+    return ok and box or nil
+end
+
+local function answerBox()
+    local box = openBox()
+    if box == nil then
+        boxSerial = nil
+        return
+    end
+    -- an answered box stays in the list until the frame after, and the next one has another serial
+    if box.serial == boxAnswered then return end
+    local now = core.getRealTime()
+    if box.serial ~= boxSerial then
+        boxSerial, boxSeenAt = box.serial, now
+        log('box', 'serial=' .. tostring(box.serial), 'buttons=' .. #box.buttons, 'form=' .. tostring(box.form),
+            answerBoxes and 'open' or 'left open')
+    end
+    if answerBoxes and now - boxSeenAt >= BOX_DELAY then
+        local ok, pressed = pcall(core.messageBox.press, 1)
+        log('box', 'serial=' .. tostring(box.serial), 'press 1', tostring(ok and pressed))
+        boxAnswered, boxSerial = box.serial, nil
+    end
+end
+
 local handlers = {}
+
+function handlers.boxes(args)
+    answerBoxes = args.answer ~= false
+    log('boxes', answerBoxes and 'answered' or 'left open')
+    return {}
+end
 
 function handlers.shot(args)
     shots = shots + 1
-    log('shot', tostring(args.name or '-'), 'n=' .. shots)
+    -- a box that is open when the picture is taken is in it: the line says so
+    local box = openBox()
+    if box then
+        log('shot', tostring(args.name or '-'), 'n=' .. shots, 'box=' .. tostring(box.serial))
+    else
+        log('shot', tostring(args.name or '-'), 'n=' .. shots)
+    end
     debug.takeScreenshot()
     return { n = shots }
 end
@@ -121,6 +166,7 @@ end
 return {
     engineHandlers = {
         onUpdate = function()
+            answerBox()
             local ms = core.getRealFrameDuration() * 1000
             if ms > 0 then
                 table.insert(frames, { ms = ms, at = core.getRealTime() })

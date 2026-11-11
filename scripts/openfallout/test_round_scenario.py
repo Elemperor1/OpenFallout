@@ -381,6 +381,45 @@ class PlayerScript(unittest.TestCase):
         self.ask("fps", label="f", seconds=1)
         self.assertTrue(any(line.startswith("ROUND\tfps\tf\tframes=5 mean=20.0ms") for line in self.lines()))
 
+    def open_box(self, serial=1, buttons=1):
+        self.lua.execute(
+            "box_open = { serial = %d, form = 'FormId:0x1', buttons = {%s}, text = 'SECRET', body = 'SECRET' }; pressed = {}\n"
+            "package.loaded['openfallout.core'].messageBox = { current = function() return box_open end,\n"
+            "    press = function(n) pressed[#pressed + 1] = n; box_open = nil; return true end }"
+            % (serial, ", ".join("'b'" for _ in range(buttons))))
+
+    def tick_frames(self, seconds):
+        for _ in range(int(seconds / 0.25)):
+            self.lua.execute("clock = clock + 0.25")
+            self.module.engineHandlers.onUpdate()
+
+    def test_a_message_box_is_answered_after_a_second_and_its_text_is_not_logged(self):
+        self.open_box(serial=4, buttons=2)
+        self.tick_frames(0.5)
+        self.assertEqual(self.lua.eval("#pressed"), 0)
+        self.tick_frames(1.0)
+        self.assertEqual(self.lua.eval("pressed[1]"), 1)
+        self.assertEqual(self.lua.eval("#pressed"), 1)
+        lines = self.lines()
+        self.assertIn("ROUND\tbox\tserial=4\tbuttons=2\tform=FormId:0x1\topen", lines)
+        self.assertIn("ROUND\tbox\tserial=4\tpress 1\ttrue", lines)
+        self.assertFalse(any("SECRET" in line for line in lines))
+
+    def test_a_shot_under_a_message_box_says_so(self):
+        self.open_box(serial=9)
+        self.ask("shot", name="e")
+        self.assertIn("ROUND\tshot\te\tn=1\tbox=9", self.lines())
+
+    def test_boxes_can_be_left_open(self):
+        self.ask("boxes", answer=False)
+        self.open_box(serial=2)
+        self.tick_frames(3)
+        self.assertEqual(self.lua.eval("#pressed"), 0)
+        self.assertIn("ROUND\tbox\tserial=2\tbuttons=1\tform=FormId:0x1\tleft open", self.lines())
+        self.ask("boxes", answer=True)
+        self.tick_frames(1.5)
+        self.assertEqual(self.lua.eval("#pressed"), 1)
+
     def test_unknown_question_is_answered_with_an_error(self):
         self.ask("nonsense")
         self.assertTrue(any(line.startswith("ROUND\terror\tnonsense") for line in self.lines()))
