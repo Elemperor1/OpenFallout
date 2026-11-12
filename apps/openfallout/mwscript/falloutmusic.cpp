@@ -340,14 +340,22 @@ namespace OFScript
                 music.mBattleSet = sets[std::uniform_int_distribution<std::size_t>(0, sets.size() - 1)(music.mRandom)];
         }
 
+        const ESM4::MediaSet* locationSet = music.mSet.isZeroOrUnset() ? nullptr : mStore.get<ESM4::MediaSet>().search(music.mSet);
+        const ESM4::MediaSet* battleSet
+            = music.mBattleSet.isZeroOrUnset() ? nullptr : mStore.get<ESM4::MediaSet>().search(music.mBattleSet);
+        // The default battle music (DOBJ) is for a fight in a place that has no battle set of its own and whose location set
+        // has no battle track of its own (the set of a dungeon has one): with either, that is the music of the fight, and the
+        // default track does not play over it
+        const bool setHasBattleTrack
+            = locations && locationSet != nullptr && locationSet->mSetType == 2 && !locationSet->mSet2.empty();
+        const bool defaultBattle = battleHasTracks && battleSet == nullptr && !setHasBattleTrack;
+
         // ---- Fallout 3's music, and the tracks of the records that New Vegas gives a file ----
         {
             FalloutScript::Music::DirectorInput input;
             input.mSeconds = frametime;
             input.mExplore = placeHasTracks ? placeMusic.toUint32() : 0;
-            // The default battle music (DOBJ) is for a place that has no battle set of its own; with one, the set is the music of
-            // the fight
-            input.mBattle = battleHasTracks && music.mBattleSet.isZeroOrUnset() ? battleMusic.toUint32() : 0;
+            input.mBattle = defaultBattle ? battleMusic.toUint32() : 0;
             input.mCombat = combat;
             input.mBlocked = scriptMusic;
             input.mPlaying = music.mTrack != 0 && sound->isMusicTrackPlaying(music.mTrack);
@@ -388,9 +396,6 @@ namespace OFScript
             }
         }
 
-        const ESM4::MediaSet* locationSet = music.mSet.isZeroOrUnset() ? nullptr : mStore.get<ESM4::MediaSet>().search(music.mSet);
-        const ESM4::MediaSet* battleSet
-            = music.mBattleSet.isZeroOrUnset() ? nullptr : mStore.get<ESM4::MediaSet>().search(music.mBattleSet);
         bool day = true;
         std::optional<int> layer;
         std::string key;
@@ -437,7 +442,8 @@ namespace OFScript
                 music.mStemFade = 3.f;
                 stem(battleSet->mSet2, battleSet->mLevel8, true);
             }
-            else if (locationSet != nullptr && locations)
+            // (while the default battle track is the music of the fight, the location set is quiet)
+            else if (locationSet != nullptr && locations && !(combat && defaultBattle))
             {
                 if (locationSet->mSetType == 1)
                 {

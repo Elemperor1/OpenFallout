@@ -363,11 +363,13 @@ namespace OFRender
             const int pick = Steps::pickByChance(chances, std::uniform_real_distribution<float>(0.f, 1.f)(random));
             if (pick < 0)
                 continue;
-            sound->playFalloutSound(matching[static_cast<std::size_t>(pick)]->mSound, actor,
-                Steps::stepVolume(settings, playerBody && OFBase::Environment::get().getWorld()->isFirstPerson(),
-                    std::uniform_real_distribution<float>(0.f, 1.f)(random)),
-                OFSound::Type::Foot, OFSound::PlayMode::Overlap);
-            return;
+            // (a sound that has no file to play leaves the event to the next piece too)
+            if (sound->playFalloutSound(matching[static_cast<std::size_t>(pick)]->mSound, actor,
+                    Steps::stepVolume(settings, playerBody && OFBase::Environment::get().getWorld()->isFirstPerson(),
+                        std::uniform_real_distribution<float>(0.f, 1.f)(random)),
+                    OFSound::Type::Foot, OFSound::PlayMode::Overlap)
+                != nullptr)
+                return;
         }
     }
 
