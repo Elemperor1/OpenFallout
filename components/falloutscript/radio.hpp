@@ -5,6 +5,7 @@
 #include <map>
 #include <set>
 #include <span>
+#include <string_view>
 #include <vector>
 
 #include "savestate.hpp"
@@ -127,6 +128,27 @@ namespace FalloutScript::Radio
     /// How loud the voice of a station is: the volume of the radio, less the static, and quieter while somebody speaks to
     /// the player
     float gainOf(const Signal& signal, bool dialogue, const Settings& settings);
+
+    /// What the first argument of PipboyRadio asks for (FalloutNV.exe 0x5D7FB0: "1", "enable" and "on" turn the radio on,
+    /// "0", "disable" and "off" turn it off, "tune" only tunes, compared without regard to case)
+    enum class PipboyAction
+    {
+        None,
+        On,
+        Off,
+        Tune,
+    };
+    PipboyAction pipboyActionOf(std::string_view word);
+
+    /// How far a creature that has a station on (SetNPCRadio) is heard: `fCreatureRadioMax` (2000 units in the executable)
+    /// times 1.1 (FalloutNV.exe 0x835271; the radius of any other reference is 110 times the maximum distance byte of its
+    /// station's template sound, 0x835252). Past it the creature's radio says nothing.
+    float creatureReach(float creatureRadioMax);
+
+    /// The gain that a radio track is started with and kept at: the channel of the radio has the volume setting (the
+    /// station's own volume is the setting of the games, which the channel stands for), so only the static and the mute
+    /// of a conversation are left
+    Settings channelSettings(const Settings& settings);
 
     /// What the radio keeps in a save: the stations that scripts turned on or off (SetBroadcastState) and those that the
     /// player found

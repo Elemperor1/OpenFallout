@@ -13,6 +13,7 @@
 #include <components/vfs/manager.hpp>
 
 #include "../mwbase/environment.hpp"
+#include "../mwbase/inputmanager.hpp"
 #include "../mwbase/soundmanager.hpp"
 #include "../mwbase/world.hpp"
 #include "../mwworld/esmstore.hpp"
@@ -217,6 +218,12 @@ namespace OFScript
                 return seconds;
         }
         return unknownImageSpaceSeconds;
+    }
+
+    void FalloutScripts::rumble(double left, double right, double seconds)
+    {
+        if (OFBase::InputManager* input = OFBase::Environment::get().getInputManager())
+            input->rumble(static_cast<float>(left), static_cast<float>(right), static_cast<float>(seconds));
     }
 
     void FalloutScripts::achievement(int id)

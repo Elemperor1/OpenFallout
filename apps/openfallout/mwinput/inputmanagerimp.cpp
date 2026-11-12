@@ -109,9 +109,14 @@ namespace OFInput
         mControllerManager->setPadPick(pick);
     }
 
+    void InputManager::rumble(float left, float right, float seconds)
+    {
+        mControllerManager->rumble(left, right, seconds);
+    }
+
     void InputManager::rumble(float strength, float seconds)
     {
-        mControllerManager->rumble(strength, seconds);
+        mControllerManager->rumble(strength, strength, seconds);
     }
 
     bool InputManager::padPick() const

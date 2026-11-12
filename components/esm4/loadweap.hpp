@@ -209,6 +209,12 @@ namespace ESM4
         // The sound that goes on while an automatic weapon is fired without a pause (NAM7, the attack loop of a minigun
         // or a flamer)
         ESM::FormId mLoopSound;
+        // The sounds of taking the weapon out (NAM9) and putting it away (NAM8), the one that goes on while it is held
+        // out (UNAM), and that of a blow that it blocks (NAM6), of Fallout 3 and New Vegas
+        ESM::FormId mEquipSound;
+        ESM::FormId mUnequipSound;
+        ESM::FormId mIdleSound;
+        ESM::FormId mBlockSound;
 
         float mBoundRadius;
 

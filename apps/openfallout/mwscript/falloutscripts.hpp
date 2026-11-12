@@ -1596,6 +1596,12 @@ namespace OFScript
             int mAnimationType = -1;
         };
         HeldWeapon heldWeapon(const OFWorld::Ptr& actor);
+        /// The character takes its weapon out or puts it away: the sound that the weapon's record has for it, from where
+        /// the character is (FalloutNV.exe 0x83A930, which the animation keys `Enum: Equip` and `Unequip` call)
+        void weaponHandled(const OFWorld::Ptr& actor, FalloutScript::FormId weapon, bool equip);
+        /// The character holds the weapon out (`held`) or puts it away: the sound of the weapon's record that goes on
+        /// while it is held out (its idle sound) starts or stops
+        void weaponHeld(const OFWorld::Ptr& actor, FalloutScript::FormId weapon, bool held);
         /// Whether the player holds the weapon out (or the fists, when it has none), as `core.combat.setDrawn` says
         bool isPlayerWeaponDrawn() { return mPlayer != 0 && mEquipment.weaponDrawn(mPlayer); }
         /// How many shots (or blows) the player has made: the body of the player plays the attack of the weapon when this
@@ -1946,7 +1952,12 @@ namespace OFScript
         /// The player jumps: the sound of the jump (New Vegas) from the ground it leaves
         void jumped(const OFWorld::Ptr& ptr);
         /// The pad shakes because the player was hurt, as the games' settings fRumblePainStrength and fRumblePainTime say
+        /// The pad of the player shakes for something that happened to it (the INI's `fRumble<Kind>Strength` and
+        /// `fRumble<Kind>Time`: Pain, Struck, Hit), unless a menu is open (the executable's own rule at 0x89CEBA)
+        void rumbleFor(const char* strengthSetting, double strengthDefault, const char* timeSetting, double timeDefault);
         void painRumble();
+        void struckRumble();
+        void hitRumble();
         /// The sound of the ground for a landing or a jump, from where the actor stands
         void playGroundStep(const OFWorld::Ptr& ptr, FalloutScript::Footsteps::Slot slot);
         /// A number that changes when what `playerBody` gives changes (the sex, race or look, armor put on or taken
@@ -2026,6 +2037,7 @@ namespace OFScript
         void forceWeather(FalloutScript::FormId weather, bool hold) override;
         void releaseWeather() override;
         double imageSpaceDuration(FalloutScript::FormId modifier) override;
+        void rumble(double left, double right, double seconds) override;
         void achievement(int id) override;
         FalloutScript::FormId parentCell(FalloutScript::FormId reference) override;
         FalloutScript::FormId parentWorldspace(FalloutScript::FormId reference) override;
@@ -2901,6 +2913,27 @@ namespace OFScript
             ESM::FormId mController;
             ESM::FormId mSet;
             ESM::FormId mBattleSet;
+            /// The order of the sets of each list of a controller (the executable keeps it in the controller and moves the set
+            /// that was picked to the end): by the controller and the list (0 its own location sets, 1 for an enemy,
+            /// 2 for a friend, 3 for an ally, 4 for the rest)
+            std::map<std::pair<std::uint32_t, int>, std::vector<std::uint32_t>> mSetLists;
+            /// Seconds left of the controller's delay before a set that was played to its end is picked again
+            float mRestartLeft = -1.f;
+            /// The seconds that the music has run, and what is heard of the layers of the location set: which layer (the
+            /// executable lets the layer change only after the set's DNAM seconds since the last change)
+            float mClock = 0.f;
+            ESM::FormId mLayerSet;
+            bool mLayerDay = true;
+            bool mLayerCombat = false;
+            std::optional<int> mLayer;
+            float mLayerFreeAt = 0.f;
+            /// The set whose open sound was played and whose close sound is still to come (a battle set, or the set of a
+            /// dungeon)
+            ESM::FormId mIntroSet;
+            /// The stingers of the incidental set of the region the player is in
+            FalloutScript::Music::Incidental mIncidental;
+            /// The player was dead at the last look (the music of a death plays once)
+            bool mWasDead = false;
             std::string mStemKey;
             std::vector<OFSound::MusicMixer::Stem> mStems;
             float mStemFade = 1.f;
@@ -2911,6 +2944,18 @@ namespace OFScript
         };
         void updateMusic(float frametime);
         void resetMusic();
+    public:
+        /// The default music (DOBJ) that plays over the music of the place and gives it back: the death of the player,
+        /// the completing of a quest and a level gained (any thread)
+        enum class Stinger
+        {
+            Death,
+            Success,
+            LevelUp,
+        };
+        void playStinger(Stinger kind);
+
+    private:
         void logMusic(const std::string& text);
         MusicPlayback mMusicPlayback;
         std::mutex mMusicMutex;
@@ -2980,6 +3025,9 @@ namespace OFScript
                 /// The topic and the record of the speaker, for the stations that say their lines where they are
                 FalloutScript::FormId mTopic = 0;
                 FalloutScript::FormId mSpeakerBase = 0;
+                /// The line is a song (a sound record in the place of a voice file): the radio that is set to dialogue only
+                /// does not play it
+                bool mSong = false;
             };
             FalloutScript::FormId mStation = 0;
             std::vector<Line> mLines;
@@ -2997,7 +3045,21 @@ namespace OFScript
             std::map<FalloutScript::FormId, FalloutScript::FormId> mRoomTopic;
             std::set<FalloutScript::FormId> mRoomInReach;
             float mGain = 0.f;
+            /// SetRadioToDialogueOnlyMode: the radio plays what is said and none of the songs
             bool mDialogueOnly = false;
+            /// The station that was tuned last (PipboyRadio with no station turns the radio on to it again)
+            FalloutScript::FormId mLastTuned = 0;
+            /// The topic that StartRadioConversation asked a station to say, by station, until the station says it
+            std::map<FalloutScript::FormId, FalloutScript::FormId> mPending;
+            /// SetNPCRadio: a character that has a station on, by the character: what it says goes on from where the
+            /// character is
+            struct NpcRadio
+            {
+                FalloutScript::FormId mStation = 0;
+                FalloutScript::FormId mTopic = 0;
+                float mRest = 0.f;
+            };
+            std::map<FalloutScript::FormId, NpcRadio> mNpc;
             int mLogged = 0;
         };
         /// What the scripts ask of the radio, from any thread: whether a station is on the air (SetBroadcastState,
@@ -3008,6 +3070,12 @@ namespace OFScript
         void resetRadio();
         /// Tunes the radio (the main thread)
         bool tuneRadioNow(FalloutScript::FormId station);
+        /// PipboyRadio (the main thread): turns the radio on or off, or tunes it, to the station (0: the one tuned last)
+        void pipboyRadioNow(FalloutScript::Radio::PipboyAction action, FalloutScript::FormId station);
+        /// StartRadioConversation (the main thread): the station says the topic next (0: what it says first), at once
+        void startRadioConversationNow(FalloutScript::FormId station, FalloutScript::FormId topic);
+        /// SetNPCRadio (the main thread): the character has the station on, or turns it off
+        void setNpcRadioNow(FalloutScript::FormId actor, FalloutScript::FormId station, bool on);
         /// Makes the list the Pip-Boy shows from the stations that are in reach (the main thread)
         void refreshRadioListing();
         void logRadio(const std::string& text);
@@ -3130,10 +3198,14 @@ namespace OFScript
         struct WeaponLoop
         {
             FalloutScript::FormId mWeapon = 0;
-            std::string mFile;
+            /// The sound record that loops
+            std::uint32_t mSound = 0;
             float mRemaining = 0.f;
         };
         std::map<FalloutScript::FormId, WeaponLoop> mWeaponLoops;
+        /// The sound that goes on while a character holds a weapon out (the idle sound of the weapon): the weapon each
+        /// character that has one started
+        std::map<FalloutScript::FormId, FalloutScript::FormId> mWeaponIdles;
         /// What is printed in the corner of the screen, what the characters around make of the player, and the clock
         /// (seconds of play) that the second is told by
         FalloutScript::Hud::MessageLine mHudMessages;

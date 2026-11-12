@@ -1,6 +1,8 @@
 #include "worldimp.hpp"
 
 #include <charconv>
+#include <cmath>
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -31,6 +33,7 @@
 #include <components/esm4/loadltex.hpp>
 #include <components/esm4/loadstat.hpp>
 #include <components/esm4/loadwrld.hpp>
+#include <components/falloutscript/footsteps.hpp>
 
 #include <components/misc/constants.hpp>
 #include <components/misc/convert.hpp>
@@ -2229,11 +2232,32 @@ namespace OFWorld
             return waterMaterial;
 
         const osg::Vec3f pos = actor.getRefData().getPosition().asVec3();
-        const OFPhysics::RayCastingResult hit = mPhysics->castRay(pos + osg::Vec3f(0.f, 0.f, 24.f),
-            pos - osg::Vec3f(0.f, 0.f, 48.f), { actor }, {},
-            OFPhysics::CollisionType_World | OFPhysics::CollisionType_HeightMap | OFPhysics::CollisionType_Door);
+        constexpr int groundMask
+            = OFPhysics::CollisionType_World | OFPhysics::CollisionType_HeightMap | OFPhysics::CollisionType_Door;
+        const OFPhysics::RayCastingResult hit
+            = mPhysics->castRay(pos + osg::Vec3f(0.f, 0.f, 24.f), pos - osg::Vec3f(0.f, 0.f, 48.f), { actor }, {}, groundMask);
         if (!hit.mHit)
             return -1;
+
+        // Stairs: the port's own rule (the executable asks a bit of the actor's movement that its physics sets): a flat
+        // tread of an object with ground a stride ahead or behind it that is a step higher or lower
+        if (!hit.mHitObject.isEmpty())
+        {
+            namespace Steps = FalloutScript::Footsteps;
+            static const Steps::StairSettings stairSettings;
+            const float facing = actor.getRefData().getPosition().rot[2];
+            const osg::Vec3f forward(std::sin(facing), std::cos(facing), 0.f);
+            const auto heightAt = [&](const osg::Vec3f& offset) -> std::optional<float> {
+                const osg::Vec3f at = hit.mHitPos + offset;
+                const OFPhysics::RayCastingResult other = mPhysics->castRay(
+                    at + osg::Vec3f(0.f, 0.f, 40.f), at - osg::Vec3f(0.f, 0.f, 60.f), { actor }, {}, groundMask);
+                if (!other.mHit)
+                    return std::nullopt;
+                return other.mHitPos.z();
+            };
+            stairs = Steps::isStairs(stairSettings, hit.mHitNormal.z(), hit.mHitPos.z(),
+                heightAt(forward * stairSettings.mReach), heightAt(forward * -stairSettings.mReach));
+        }
 
         int material = -1;
         const CellStore* cell = actor.getCell();
@@ -2309,8 +2333,6 @@ namespace OFWorld
                                             : std::string(cell != nullptr && cell->getCell()->isExterior() ? "land" : "no object"));
             }
         }
-        // Whether the ground is stairs is a flag of the actor's movement in the executable (bit 0x1000000 of the flags at
-        // +0x410 of its process, tested at FalloutNV.exe 0x838750), which the physics sets and this does not know
         return material;
     }
 

@@ -42,6 +42,7 @@
 #include "../mwclass/esm4npc.hpp"
 #include "../mwmechanics/actorutil.hpp"
 #include "../mwmechanics/character.hpp"
+#include "../mwscript/falloutscripts.hpp"
 #include "../mwsound/falloutfootsteps.hpp"
 #include "../mwworld/class.hpp"
 #include "../mwworld/esmstore.hpp"
@@ -310,10 +311,18 @@ namespace OFRender
             const OFWorld::Ptr actor = playerBody || mFirstPerson ? OFMechanics::getPlayer() : mPtr;
             sound->playFalloutSound(name, actor, 1.f, OFSound::Type::Sfx, OFSound::PlayMode::Normal);
         }
-        else if (text.starts_with("enum: ") && !mFirstPerson)
+        else if (text.starts_with("enum: "))
         {
             const std::optional<int> index = Steps::enumKeyIndex(text.substr(6));
             if (!index)
+                return;
+            // Taking a weapon out makes the sound of the weapon, in the arms of the player as in the body of anyone
+            if (*index == static_cast<int>(Steps::EnumKey::Equip))
+            {
+                playWeaponHandled(true);
+                return;
+            }
+            if (mFirstPerson)
                 return;
             if (mPtr.getType() == ESM4::Creature::sRecordId)
                 playCreatureSound(*index);
@@ -323,6 +332,18 @@ namespace OFRender
                 && *index <= static_cast<int>(Steps::EnumKey::ArmorRun))
                 playWornSound(*index);
         }
+    }
+
+    void FalloutActorAnimation::playWeaponHandled(bool equip)
+    {
+        if (mWeaponForm == 0 || !OFBase::Environment::get().hasFalloutScripts())
+            return;
+        // Of the player the body and the arms both run the move: the one that is shown makes the sound
+        const bool playerBody = !mMotionSource.isEmpty() && mMotionSource == OFMechanics::getPlayer();
+        if ((playerBody || mFirstPerson) && mFirstPerson != sFirstPersonArmsShown)
+            return;
+        OFBase::Environment::get().getFalloutScripts()->weaponHandled(
+            mFirstPerson ? OFMechanics::getPlayer() : (playerBody ? mMotionSource : mPtr), mWeaponForm, equip);
     }
 
     void FalloutActorAnimation::playWornSound(int type)
@@ -1006,13 +1027,24 @@ namespace OFRender
         return group;
     }
 
-    void FalloutActorAnimation::drawWeapon(std::string_view model, int animationType)
+    void FalloutActorAnimation::drawWeapon(std::string_view model, int animationType, std::uint32_t weapon)
     {
         if (mObjectRoot == nullptr)
             return;
         holsterWeapon();
         mWeaponType = animationType;
+        mWeaponForm = weapon;
         mDrawn = true;
+        // The sound that goes on while the weapon is held out (of the player the body and the arms both hold it: the one
+        // that is shown asks, the other does not)
+        if (weapon != 0 && OFBase::Environment::get().hasFalloutScripts())
+        {
+            const bool playerBody = !mMotionSource.isEmpty() && mMotionSource == OFMechanics::getPlayer();
+            const bool arms = mFirstPerson;
+            if (!((playerBody || arms) && mFirstPerson != sFirstPersonArmsShown))
+                OFBase::Environment::get().getFalloutScripts()->weaponHeld(
+                    arms ? OFMechanics::getPlayer() : (playerBody ? mMotionSource : mPtr), weapon, true);
+        }
         mWeaponTime = 0.f;
         mWeaponLooks = 0;
 
@@ -1054,6 +1086,21 @@ namespace OFRender
         if (!mDrawn)
             return;
         mDrawn = false;
+        if (mWeaponForm != 0 && OFBase::Environment::get().hasFalloutScripts())
+        {
+            // Putting the weapon away has its sound, and the one that went on while it was held out stops (the move of
+            // putting it away is not played: its key `Enum: Unequip` is taken for the moment of holstering)
+            const bool playerBody = !mMotionSource.isEmpty() && mMotionSource == OFMechanics::getPlayer();
+            const bool arms = mFirstPerson;
+            if (!((playerBody || arms) && mFirstPerson != sFirstPersonArmsShown))
+            {
+                const OFWorld::Ptr actor = arms ? OFMechanics::getPlayer() : (playerBody ? mMotionSource : mPtr);
+                OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+                scripts->weaponHeld(actor, 0, false);
+                scripts->weaponHandled(actor, mWeaponForm, false);
+            }
+        }
+        mWeaponForm = 0;
         if (!mAimGroup.empty())
         {
             disable(mAimGroup);

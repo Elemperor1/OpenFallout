@@ -75,6 +75,7 @@ namespace OFInput
         void setPadPick(bool pick) override;
         bool padPick() const override;
         void rumble(float strength, float seconds) override;
+        void rumble(float left, float right, float seconds) override;
 
         void toggleControlSwitch(std::string_view sw, bool value) override;
         bool getControlSwitch(std::string_view sw) override;

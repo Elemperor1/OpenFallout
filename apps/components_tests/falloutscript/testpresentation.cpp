@@ -7,6 +7,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <array>
 #include <map>
 #include <set>
 
@@ -27,6 +28,7 @@ namespace
     constexpr std::uint16_t OpStopLook = 0x105D;
     constexpr std::uint16_t OpPlaySound3D = 0x10B2;
     constexpr std::uint16_t OpAddAchievement = 0x114A;
+    constexpr std::uint16_t OpSetRumble = 0x11FB;
     constexpr std::uint16_t OpApplyImageSpaceModifier = 0x1191;
     constexpr std::uint16_t OpRemoveImageSpaceModifier = 0x1192;
     constexpr std::uint16_t OpAbs = 0x1221;
@@ -44,6 +46,7 @@ namespace
         std::vector<FormId> mAskedFrom;
         std::map<FormId, double> mDurations{ { flash, 2.0 }, { blur, 0.0 } };
         std::vector<int> mAchievements;
+        std::vector<std::array<double, 3>> mRumbles;
         bool mMusic = false;
         std::vector<FormId> mTracks;
         std::vector<std::pair<FormId, bool>> mForced;
@@ -68,6 +71,7 @@ namespace
             const auto found = mDurations.find(modifier);
             return found == mDurations.end() ? 0.0 : found->second;
         }
+        void rumble(double left, double right, double seconds) override { mRumbles.push_back({ left, right, seconds }); }
         void achievement(int id) override { mAchievements.push_back(id); }
     };
 
@@ -176,6 +180,17 @@ namespace
         EXPECT_EQ(run.call(OpAbs, 0, { -3.5 }), 3.5);
         EXPECT_EQ(run.call(OpAbs, 0, { 2 }), 2.0);
         EXPECT_EQ(run.call(OpAbs, 0, {}), 0.0);
+    }
+
+    TEST(FalloutScriptPresentationTest, set_rumble_hands_a_strength_for_each_motor_and_the_time_to_the_host)
+    {
+        Runner run;
+        run.call(OpSetRumble, 0, { 0.5, 0.25, 1.5 });
+        // a call with arguments missing shakes nothing in the ones that are not there
+        run.call(OpSetRumble, 0, { 1.0 });
+        ASSERT_EQ(run.mWorld.mRumbles.size(), 2u);
+        EXPECT_EQ(run.mWorld.mRumbles[0], (std::array<double, 3>{ 0.5, 0.25, 1.5 }));
+        EXPECT_EQ(run.mWorld.mRumbles[1], (std::array<double, 3>{ 1.0, 0.0, 0.0 }));
     }
 
     TEST(FalloutScriptPresentationTest, music_and_weather_are_handed_to_the_host)

@@ -364,6 +364,7 @@ namespace OFScript
                 }
                 log("Level " + std::to_string(reached.mLevel) + ": " + std::to_string(reached.mSkillPoints)
                     + " skill points" + (reached.mPerk ? " and a perk to choose" : ""));
+                playStinger(Stinger::LevelUp);
                 const std::lock_guard lock(mLevelUpMutex);
                 mLevelUps.push_back(reached);
                 mLevelUpOpen = true;

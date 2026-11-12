@@ -119,4 +119,42 @@ namespace
         EXPECT_EQ(records[0].mSounds[1].sound, 0x5678u);
         EXPECT_EQ(records[0].mSounds[1].flags, 4u);
     }
+
+    // The media sets of a region of New Vegas: its battle sets and its incidental set follow the RDAT of the sound kind
+    TEST(ESM4MusicRecordTest, regionReadsItsBattleSetsAndItsIncidentalSet)
+    {
+        std::string rdat;
+        const std::uint32_t kind = ESM4::Region::RDAT_Sound;
+        rdat.append(reinterpret_cast<const char*>(&kind), 4);
+        rdat.append(4, '\0');
+        const std::string data = zString("EDID", "AudioExtTest") + subRecord("RDAT", rdat)
+            + valueSubRecord("RDSI", std::uint32_t(0x00014E8B)) + valueSubRecord("RDSB", std::uint32_t(0x00014E86))
+            + valueSubRecord("RDSB", std::uint32_t(0x00014E87));
+        const std::vector<ESM4::Region> records = loadRecords<ESM4::Region>("REGN", record("REGN", 9, data));
+        ASSERT_EQ(records.size(), 1u);
+        EXPECT_EQ(records[0].mIncidentalSet.toUint32(), 0x00014E8Bu);
+        ASSERT_EQ(records[0].mBattleSets.size(), 2u);
+        EXPECT_EQ(records[0].mBattleSets[0].toUint32(), 0x00014E86u);
+        EXPECT_EQ(records[0].mBattleSets[1].toUint32(), 0x00014E87u);
+    }
+
+    // What is not in the sound entry (or is not a form) is left alone
+    TEST(ESM4MusicRecordTest, regionSetsOutsideTheSoundEntryOrOfTheWrongSizeAreSkipped)
+    {
+        std::string rdat;
+        const std::uint32_t kind = ESM4::Region::RDAT_Weather;
+        rdat.append(reinterpret_cast<const char*>(&kind), 4);
+        rdat.append(4, '\0');
+        std::string sound;
+        const std::uint32_t soundKind = ESM4::Region::RDAT_Sound;
+        sound.append(reinterpret_cast<const char*>(&soundKind), 4);
+        sound.append(4, '\0');
+        const std::string data = zString("EDID", "AudioExtTest") + subRecord("RDAT", rdat)
+            + valueSubRecord("RDSB", std::uint32_t(0x1)) + subRecord("RDAT", sound) + subRecord("RDSI", "ab")
+            + subRecord("RDSB", "abcdef");
+        const std::vector<ESM4::Region> records = loadRecords<ESM4::Region>("REGN", record("REGN", 9, data));
+        ASSERT_EQ(records.size(), 1u);
+        EXPECT_TRUE(records[0].mBattleSets.empty());
+        EXPECT_TRUE(records[0].mIncidentalSet.isZeroOrUnset());
+    }
 }

@@ -124,6 +124,22 @@ namespace FalloutScript::Footsteps
     /// 0x200 running) and the material flag of stairs: sneaking before stairs before running before walking
     Slot chooseSlot(Foot foot, bool sneaking, bool onStairs, bool running);
 
+    /// Whether the ground under a foot is a stair. The executable asks the movement of the actor (a bit that the physics
+    /// of Havok sets, 0x1000000 of the flags at +0x410 of its process, tested at 0x838750); the physics of the port has no
+    /// such bit, so a stair is told by its shape, as the port's own rule: the ground under the foot is flat (a tread, not
+    /// a slope) and the ground a stride ahead or behind it (`reach` units along where the actor faces, a stride of a
+    /// stair being about that long) is a step higher or lower, by `minStep` to `maxStep` units.
+    struct StairSettings
+    {
+        float mReach = 24.f;
+        float mMinStep = 5.f;
+        float mMaxStep = 30.f;
+        /// How flat the ground has to be: the z of its normal
+        float mFlatNormal = 0.95f;
+    };
+    bool isStairs(const StairSettings& settings, float normalZ, float height, std::optional<float> aheadHeight,
+        std::optional<float> behindHeight);
+
     /// The slot of the landing and of the jump
     constexpr Slot landSlot = Slot::Land;
     constexpr Slot jumpSlot = Slot::Jump;

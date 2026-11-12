@@ -1,72 +1,89 @@
 #include "watersoundupdater.hpp"
 
 #include "../mwbase/world.hpp"
+#include "../mwworld/cell.hpp"
 #include "../mwworld/cellstore.hpp"
+#include "../mwworld/esmstore.hpp"
 #include "../mwworld/ptr.hpp"
 
-#include <components/esm3/loadcell.hpp>
+#include <components/esm/util.hpp>
+#include <components/esm4/loadwatr.hpp>
 
-#include <osg/Vec3f>
+#include <cmath>
+#include <vector>
 
 namespace OFSound
 {
-    WaterSoundUpdater::WaterSoundUpdater(const WaterSoundUpdaterSettings& settings)
-        : mSettings(settings)
+    namespace
     {
+        // The water of an exterior cell that is loaded, by where it is in the grid
+        struct WaterCell
+        {
+            int mX;
+            int mY;
+            float mLevel;
+        };
     }
 
-    WaterSoundUpdate WaterSoundUpdater::update(const OFWorld::ConstPtr& player, const OFBase::World& world) const
+    WaterSoundUpdate WaterSoundUpdater::update(
+        const OFWorld::ConstPtr& player, const OFBase::World& world, const OFWorld::ESMStore& store) const
     {
+        namespace NearWater = FalloutScript::NearWater;
         WaterSoundUpdate result;
 
-        result.mId = player.getCell()->isExterior() ? mSettings.mNearWaterOutdoorID : mSettings.mNearWaterIndoorID;
-        result.mVolume = std::min(1.0f, getVolume(player, world));
+        if (!player.isInCell())
+            return result;
+        const OFWorld::CellStore& cellStore = *player.getCell();
+        const OFWorld::Cell* cell = cellStore.getCell();
+        // A cell of Fallout names its water type; without water the sound is not heard at all
+        if (cell == nullptr || !cell->hasWater() || cell->getWaterType().isZeroOrUnset())
+            return result;
+        const ESM4::Water* water = store.get<ESM4::Water>().search(cell->getWaterType());
+        if (water == nullptr || water->mSound.isZeroOrUnset())
+            return result;
 
-        return result;
-    }
+        const osg::Vec3f position = player.getRefData().getPosition().asVec3();
+        const NearWater::Point where{ position.x(), position.y() };
+        const float level = cellStore.getWaterLevel();
+        const bool interior = !cell->isExterior();
 
-    float WaterSoundUpdater::getVolume(const OFWorld::ConstPtr& player, const OFBase::World& world) const
-    {
-        if (mListenerUnderwater)
-            return 1.0f;
-
-        const OFWorld::CellStore& cell = *player.getCell();
-
-        if (!cell.getCell()->hasWater())
-            return 0.0f;
-
-        const osg::Vec3f pos = player.getRefData().getPosition().asVec3();
-        const float dist = std::abs(cell.getWaterLevel() - pos.z());
-
-        if (cell.isExterior() && dist < mSettings.mNearWaterOutdoorTolerance)
+        float strength = 0.f;
+        NearWater::Wet wet;
+        if (interior)
+            strength = NearWater::interiorStrength(level, position.z(), mListenerUnderwater, mSettings);
+        else
         {
-            if (mSettings.mNearWaterPoints <= 1)
-                return (mSettings.mNearWaterOutdoorTolerance - dist) / mSettings.mNearWaterOutdoorTolerance;
-
-            const float step = mSettings.mNearWaterRadius * 2.0f / (mSettings.mNearWaterPoints - 1);
-
-            int underwaterPoints = 0;
-
-            for (int x = 0; x < mSettings.mNearWaterPoints; x++)
+            const ESM::RefId worldspace = cell->getWorldSpace();
+            std::vector<WaterCell> cells;
+            for (const OFWorld::CellStore* active : world.getActiveCells())
             {
-                for (int y = 0; y < mSettings.mNearWaterPoints; y++)
-                {
-                    const float terrainX = pos.x() - mSettings.mNearWaterRadius + x * step;
-                    const float terrainY = pos.y() - mSettings.mNearWaterRadius + y * step;
-                    const float height = world.getTerrainHeightAt(
-                        osg::Vec3f(terrainX, terrainY, 0.0f), cell.getCell()->getWorldSpace());
-
-                    if (height < 0)
-                        underwaterPoints++;
-                }
+                const OFWorld::Cell* other = active->getCell();
+                if (other != nullptr && other->isExterior() && other->hasWater() && other->getWorldSpace() == worldspace)
+                    cells.push_back({ other->getGridX(), other->getGridY(), active->getWaterLevel() });
             }
-
-            return underwaterPoints * 2.0f / (mSettings.mNearWaterPoints * mSettings.mNearWaterPoints);
+            for (const NearWater::Point point : NearWater::samplePoints(where, mSettings))
+            {
+                // The water of the cell that the point is in (a point in a cell that is not loaded or has none is dry)
+                const ESM::ExteriorCellLocation location = ESM::positionToExteriorCellLocation(point.mX, point.mY, worldspace);
+                const WaterCell* found = nullptr;
+                for (const WaterCell& candidate : cells)
+                    if (candidate.mX == location.mX && candidate.mY == location.mY)
+                    {
+                        found = &candidate;
+                        break;
+                    }
+                if (found == nullptr)
+                    continue;
+                if (world.getTerrainHeightAt(osg::Vec3f(point.mX, point.mY, 0.f), worldspace) < found->mLevel)
+                    wet.add(point);
+            }
+            strength = NearWater::exteriorStrength(wet, level, position.z(), mListenerUnderwater, mSettings);
         }
 
-        if (!cell.isExterior() && dist < mSettings.mNearWaterIndoorTolerance)
-            return (mSettings.mNearWaterIndoorTolerance - dist) / mSettings.mNearWaterIndoorTolerance;
-
-        return 0.0f;
+        result.mSound = water->mSound;
+        result.mStrength = strength;
+        const NearWater::Point at = NearWater::soundPosition(where, wet, strength, interior, mSettings);
+        result.mPosition = osg::Vec3f(at.mX, at.mY, level);
+        return result;
     }
 }

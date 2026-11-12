@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 
 namespace FalloutScript::Footsteps
 {
@@ -156,6 +157,20 @@ namespace FalloutScript::Footsteps
         if (exists(lastResort))
             return std::string(lastResort);
         return {};
+    }
+
+    bool isStairs(const StairSettings& settings, float normalZ, float height, std::optional<float> aheadHeight,
+        std::optional<float> behindHeight)
+    {
+        if (normalZ < settings.mFlatNormal)
+            return false;
+        const auto isStep = [&](std::optional<float> other) {
+            if (!other)
+                return false;
+            const float rise = std::abs(*other - height);
+            return rise >= settings.mMinStep && rise <= settings.mMaxStep;
+        };
+        return isStep(aheadHeight) || isStep(behindHeight);
     }
 
     std::string armorSoundName(bool powerArmor, Foot foot)

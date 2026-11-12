@@ -227,4 +227,32 @@ namespace FalloutScript::Music
         mLastTarget = 0;
         mWait = -1.f;
     }
+
+    std::uint32_t pickSet(std::vector<std::uint32_t>& list, const Random& random)
+    {
+        if (list.empty())
+            return 0;
+        std::size_t picked = 0;
+        for (std::size_t i = 1; i < list.size(); ++i)
+            if (random(0, 3) == 0)
+                picked = i;
+        const std::uint32_t set = list[picked];
+        list.erase(list.begin() + static_cast<std::ptrdiff_t>(picked));
+        list.push_back(set);
+        return set;
+    }
+
+    Incidental::Sound Incidental::update(
+        float seconds, bool day, const IncidentalTimes& times, const std::function<double()>& unit)
+    {
+        mWait -= seconds;
+        if (mWait > 0.f)
+            return Sound::None;
+        float shortest = day ? times.mDayShortest : times.mNightShortest;
+        float longest = day ? times.mDayLongest : times.mNightLongest;
+        if (shortest > longest)
+            std::swap(shortest, longest);
+        mWait = std::max(0.f, shortest + static_cast<float>(unit()) * (longest - shortest));
+        return day ? Sound::Open : Sound::Close;
+    }
 }

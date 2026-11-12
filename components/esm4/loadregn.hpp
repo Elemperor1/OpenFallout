@@ -108,6 +108,10 @@ namespace ESM4
         bool mWeatherOverride = false;
         std::uint8_t mWeatherPriority = 0;
         std::vector<RegionSound> mSounds;
+        /// The media sets of the region (New Vegas, in the sound entry): the battle sets (RDSB, one is picked for a fight
+        /// when no audio marker has its own) and the incidental set (RDSI, its stingers are heard while nothing else plays)
+        std::vector<ESM::FormId> mBattleSets;
+        ESM::FormId mIncidentalSet;
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;

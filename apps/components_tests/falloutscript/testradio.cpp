@@ -268,4 +268,41 @@ namespace
         Saved loaded;
         EXPECT_THROW(readSaved(loaded, in, savedSectionVersion), FalloutScript::SaveError);
     }
+
+    TEST(FalloutScriptRadioTest, theWordsOfPipboyRadioAreTheOnesOfTheExecutable)
+    {
+        EXPECT_EQ(pipboyActionOf("1"), PipboyAction::On);
+        EXPECT_EQ(pipboyActionOf("enable"), PipboyAction::On);
+        EXPECT_EQ(pipboyActionOf("ON"), PipboyAction::On);
+        EXPECT_EQ(pipboyActionOf("0"), PipboyAction::Off);
+        EXPECT_EQ(pipboyActionOf("Disable"), PipboyAction::Off);
+        EXPECT_EQ(pipboyActionOf("off"), PipboyAction::Off);
+        EXPECT_EQ(pipboyActionOf("Tune"), PipboyAction::Tune);
+        EXPECT_EQ(pipboyActionOf(""), PipboyAction::None);
+        EXPECT_EQ(pipboyActionOf("tuner"), PipboyAction::None);
+        EXPECT_EQ(pipboyActionOf("2"), PipboyAction::None);
+    }
+
+    TEST(FalloutScriptRadioTest, theChannelOfTheRadioHasTheVolumeSoOnlyStaticAndTheMuteAreLeft)
+    {
+        Settings settings;
+        settings.mVolume = 0.25f;
+        settings.mDialogMute = 0.5f;
+        const Settings channel = channelSettings(settings);
+        EXPECT_FLOAT_EQ(channel.mVolume, 1.f);
+        EXPECT_FLOAT_EQ(channel.mDialogMute, 0.5f);
+        Signal signal;
+        signal.mInRange = true;
+        signal.mStatic = 0.2f;
+        EXPECT_FLOAT_EQ(gainOf(signal, false, channel), 0.8f);
+        EXPECT_FLOAT_EQ(gainOf(signal, true, channel), 0.4f);
+    }
+
+    TEST(FalloutScriptRadioTest, a_creature_with_a_station_on_is_heard_a_tenth_farther_than_the_setting)
+    {
+        EXPECT_FLOAT_EQ(creatureReach(2000.f), 2200.f);
+        EXPECT_FLOAT_EQ(creatureReach(0.f), 0.f);
+        // a setting below zero is no reach at all
+        EXPECT_FLOAT_EQ(creatureReach(-5.f), 0.f);
+    }
 }

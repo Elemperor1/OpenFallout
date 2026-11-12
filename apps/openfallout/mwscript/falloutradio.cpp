@@ -6,6 +6,7 @@
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm4/loadcell.hpp>
+#include <components/esm4/loadcrea.hpp>
 #include <components/esm4/loadrefr.hpp>
 #include <components/esm4/loadtact.hpp>
 #include <components/vfs/pathutil.hpp>
@@ -71,6 +72,9 @@ namespace OFScript
         radio.mUntilLook = 0.f;
         radio.mSinceLook = 0.f;
         radio.mDialogueOnly = false;
+        radio.mLastTuned = 0;
+        radio.mPending.clear();
+        radio.mNpc.clear();
         radio.mGroupCell = ESM::RefId();
         radio.mGroup = {};
         const std::lock_guard lock(mRadioMutex);
@@ -184,6 +188,7 @@ namespace OFScript
             said.mSeconds = lineSeconds(line.mText);
             said.mTopic = topic;
             said.mSpeakerBase = line.mSpeakerBase != 0 ? line.mSpeakerBase : base.toUint32();
+            said.mSong = line.mSound != 0 && !said.mVoice.empty() && !soundFilesOf(line.mSound).empty();
             result.push_back(std::move(said));
         }
         if (view.mLines.empty())
@@ -260,15 +265,77 @@ namespace OFScript
             return true;
         }
         if (radio.mReceiver.tuned() == station)
+        {
+            radio.mLastTuned = station;
             return true;
+        }
         if (!radio.mReceiver.tune(station))
             return false;
         // (the receiver only holds stations that are proxied for the Pip-Boy)
         stopRadioVoice();
         radio.mRest = 0.f;
+        radio.mLastTuned = station;
         logRadio("the radio is tuned to " + std::to_string(station));
         refreshRadioListing();
         return true;
+    }
+
+    void FalloutScripts::pipboyRadioNow(FalloutScript::Radio::PipboyAction action, FalloutScript::FormId station)
+    {
+        using Action = FalloutScript::Radio::PipboyAction;
+        RadioPlayback& radio = mRadioPlayback;
+        switch (action)
+        {
+            case Action::None:
+                return;
+            case Action::Off:
+                tuneRadioNow(0);
+                return;
+            case Action::On:
+            case Action::Tune:
+                // Without a station the radio goes back to the one it was tuned to, and one that is not in reach leaves
+                // it off (the executable turns the radio off when the station cannot be tuned)
+                if (station == 0)
+                    station = radio.mLastTuned;
+                if (station == 0 || !tuneRadioNow(station))
+                    tuneRadioNow(0);
+                return;
+        }
+    }
+
+    void FalloutScripts::startRadioConversationNow(FalloutScript::FormId station, FalloutScript::FormId topic)
+    {
+        RadioPlayback& radio = mRadioPlayback;
+        if (station == 0)
+            return;
+        // What is said now is cut off: the conversation is the next thing the station says, as soon as the radio is asked
+        if (radio.mReceiver.tuned() == station)
+        {
+            stopRadioVoice();
+            radio.mStation = station;
+            radio.mNextTopic = topic;
+            radio.mRest = 0.f;
+        }
+        else
+            radio.mPending[station] = topic;
+        logRadio("the station " + std::to_string(station) + " is asked to start a conversation");
+    }
+
+    void FalloutScripts::setNpcRadioNow(FalloutScript::FormId actor, FalloutScript::FormId station, bool on)
+    {
+        if (actor == 0)
+            return;
+        RadioPlayback& radio = mRadioPlayback;
+        if (!on)
+        {
+            radio.mNpc.erase(actor);
+            return;
+        }
+        RadioPlayback::NpcRadio& entry = radio.mNpc[actor];
+        entry.mStation = station;
+        entry.mTopic = 0;
+        entry.mRest = 0.f;
+        logRadio("the character " + std::to_string(actor) + " has the station " + std::to_string(station) + " on");
     }
 
     void FalloutScripts::updateRadio(float frametime)
@@ -401,7 +468,21 @@ namespace OFScript
                 stopRadioVoice();
                 radio.mStation = tuned;
             }
-            radio.mGain = Radio::gainOf(radio.mReceiver.signal(tuned), false, settings);
+            // (the volume of the radio is the channel of its own: the gain is what is left of the static and, while the
+            // player is spoken to, the mute of fRadioDialogMute)
+            bool spokenTo;
+            {
+                const std::lock_guard lock(mDialogueMutex);
+                spokenTo = mDialogue.active();
+            }
+            radio.mGain = Radio::gainOf(radio.mReceiver.signal(tuned), spokenTo, Radio::channelSettings(settings));
+            // A station that was asked to start a conversation before it was tuned says it first
+            if (const auto pending = radio.mPending.find(tuned); pending != radio.mPending.end())
+            {
+                radio.mNextTopic = pending->second;
+                radio.mRest = 0.f;
+                radio.mPending.erase(pending);
+            }
             if (radio.mNext >= radio.mLines.size())
             {
                 radio.mLines.clear();
@@ -422,6 +503,10 @@ namespace OFScript
                         + " line(s)" + (next != 0 ? ", and goes on" : ""));
                 }
             }
+            // A radio that is set to dialogue only says what is said and plays none of the songs
+            while (radio.mNext < radio.mLines.size() && radio.mDialogueOnly && radio.mLines[radio.mNext].mSong
+                && !radio.mStarted)
+                ++radio.mNext;
             if (radio.mNext < radio.mLines.size())
             {
                 const RadioPlayback::Line& line = radio.mLines[radio.mNext];
@@ -430,7 +515,7 @@ namespace OFScript
                     radio.mStarted = true;
                     radio.mTrack = 0;
                     if (!line.mVoice.empty())
-                        radio.mTrack = sound->startMusicTrack(VFS::Path::Normalized(line.mVoice), radio.mGain, 0.f, false);
+                        radio.mTrack = sound->startRadioTrack(VFS::Path::Normalized(line.mVoice), radio.mGain);
                     radio.mWait = radio.mTrack != 0 ? 0.f : line.mSeconds;
                     logRadio(std::string("a line ") + (radio.mTrack != 0 ? "plays " + line.mVoice : std::string("has no file")));
                 }
@@ -439,6 +524,9 @@ namespace OFScript
                     if (radio.mTrack != 0)
                     {
                         sound->fadeMusicTrack(radio.mTrack, radio.mGain, 0.25f, false);
+                        // A song that plays when the radio is set to dialogue only is cut off
+                        if (radio.mDialogueOnly && line.mSong)
+                            sound->stopMusicTrack(radio.mTrack);
                         if (!sound->isMusicTrackPlaying(radio.mTrack))
                         {
                             sound->stopMusicTrack(radio.mTrack);
@@ -469,6 +557,13 @@ namespace OFScript
             if (findReference(station.mReference).isEmpty())
                 continue;
             float& rest = radio.mRoomRest[station.mReference];
+            // A conversation that was asked for starts at once (what it says is cut off)
+            if (const auto pending = radio.mPending.find(station.mReference); pending != radio.mPending.end())
+            {
+                radio.mRoomTopic[station.mReference] = pending->second;
+                rest = 0.f;
+                radio.mPending.erase(pending);
+            }
             // The pause between two chains is of the time after the station has spoken
             const bool saying = std::any_of(mSayings.begin(), mSayings.end(),
                 [&](const Saying& other) { return other.mReference == station.mReference; });
@@ -502,5 +597,59 @@ namespace OFScript
             }
             logRadio(station.mName + " in the room says " + (said ? "a chain" : "nothing"));
         }
+
+        // ---- The characters that have a station on (SetNPCRadio) say what it says, where they are ----
+        for (auto& [actor, entry] : radio.mNpc)
+        {
+            // A character that is not in a loaded cell is not heard
+            const OFWorld::Ptr npc = findReference(actor);
+            if (npc.isEmpty())
+                continue;
+            // A creature with a radio is heard within fCreatureRadioMax (times 1.1) of the player (FalloutNV.exe 0x835271);
+            // beyond that it says nothing (what it would say is not kept: the station goes on without it)
+            if (ESM::FormId base; baseOf(actor, base) && mStore.get<ESM4::Creature>().search(base) != nullptr)
+            {
+                const float reach = FalloutScript::Radio::creatureReach(static_cast<float>(gameSetting("fCreatureRadioMax", 2000.0)));
+                if ((npc.getRefData().getPosition().asVec3() - player.getRefData().getPosition().asVec3()).length() > reach)
+                    continue;
+            }
+            const bool saying = std::any_of(
+                mSayings.begin(), mSayings.end(), [&](const Saying& other) { return other.mReference == actor; });
+            if (saying)
+                continue;
+            if (const auto pending = radio.mPending.find(entry.mStation); pending != radio.mPending.end())
+            {
+                entry.mTopic = pending->second;
+                entry.mRest = 0.f;
+            }
+            entry.mRest -= frametime;
+            if (entry.mRest > 0.f)
+                continue;
+            FalloutScript::FormId next = 0;
+            const std::vector<RadioPlayback::Line> steps = radioStep(entry.mStation, entry.mTopic, next);
+            entry.mTopic = steps.empty() ? 0 : next;
+            entry.mRest = steps.empty() ? radioNothingRest : (next != 0 ? 0.f : radioRest);
+            std::vector<SaidLine> lines;
+            for (const RadioPlayback::Line& step : steps)
+            {
+                // (the songs are left out when the radio is set to dialogue only)
+                if (radio.mDialogueOnly && step.mSong)
+                    continue;
+                SaidLine& line = lines.emplace_back();
+                line.mVoice = step.mVoice;
+                line.mText = step.mText;
+                line.mSeconds = step.mSeconds;
+                line.mTopic = step.mTopic;
+                line.mSpeakerBase = step.mSpeakerBase;
+            }
+            if (!lines.empty())
+            {
+                lines.back().mEnd = true;
+                startSaying(actor, std::move(lines));
+            }
+        }
+        // (a conversation that was asked of a station that nobody plays any more is dropped)
+        if (radio.mPending.size() > 64)
+            radio.mPending.clear();
     }
 }

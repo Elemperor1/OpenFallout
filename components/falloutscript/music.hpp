@@ -7,6 +7,7 @@
 #include <functional>
 #include <optional>
 #include <span>
+#include <vector>
 
 namespace FalloutScript::Music
 {
@@ -87,6 +88,25 @@ namespace FalloutScript::Music
     /// it, and an empty one none.
     std::optional<std::size_t> nextTrack(std::size_t count, std::size_t& last, const Random& random);
 
+    // ---- The set a media location controller picks (FalloutNV.exe 0x595560) ----
+
+    /// Picks one of the sets of a controller's list and moves it to the end of the list (0x905330 takes it out of the list,
+    /// 0x905820 appends it). The pick is the executable's: the first set of the list is picked, and each one after it takes
+    /// over with a chance of one in four (a random number from 0 to 3 that is 0). So the set that played last, now the last
+    /// of the list, is picked a quarter of the times, the one before it three sixteenths, and so on, and the one that has
+    /// waited longest the rest. A list of one set picks it again and again. `list` holds the form ids of the sets, in the
+    /// order the controller keeps them; an empty list picks nothing (0).
+    std::uint32_t pickSet(std::vector<std::uint32_t>& list, const Random& random);
+
+    /// How a controller's sets are played (the looping options of its `NAM1`: 0 loops, 1 random, 2 retrigger, 3 none;
+    /// FalloutNV.exe 0x598000, read by the updates of the location sets and of the dungeon sets): a controller whose
+    /// option is 0 loops the tracks of the set, any other plays them once and picks a set again when they are over, after the
+    /// controller's own delay (`NAM4`, seconds).
+    constexpr bool loopsSets(std::uint8_t loopingOptions)
+    {
+        return (loopingOptions & 3) == 0;
+    }
+
     // ---- The volume and loop of a music record (FalloutNV.exe 0x830050, 0x830080) ----
 
     struct Attenuation
@@ -110,6 +130,40 @@ namespace FalloutScript::Music
     /// `fraction` (the distance from the marker divided by its radius). 0 outer, 1 middle, 2 inner, none when the
     /// place is outside all of them.
     std::optional<int> layerAt(float fraction, std::uint8_t enabled, const std::array<float, 3>& boundaryPercent);
+
+    // ---- The stingers of an incidental media set (FalloutNV.exe 0x598890) ----
+
+    /// The times of an incidental set, in seconds: DNAM and FNAM are the shortest and the longest wait after the open sound
+    /// (heard by day), ENAM and GNAM after the close sound (heard by night)
+    struct IncidentalTimes
+    {
+        float mDayShortest = 0.f;
+        float mNightShortest = 0.f;
+        float mDayLongest = 0.f;
+        float mNightLongest = 0.f;
+    };
+
+    /// When the stingers of the incidental set of a region play: the first as soon as there is one, the open sound of the
+    /// set by day and the close sound by night, and the next after a random wait between the times of the set for that
+    /// half of the day. The wait runs only while the stingers are asked for (the executable keeps one time for all the
+    /// sets).
+    class Incidental
+    {
+    public:
+        enum class Sound : std::uint8_t
+        {
+            None,
+            Open,
+            Close,
+        };
+        /// `unit` is a random number in [0, 1)
+        Sound update(float seconds, bool day, const IncidentalTimes& times, const std::function<double()>& unit);
+        void reset() { mWait = 0.f; }
+        float wait() const { return mWait; }
+
+    private:
+        float mWait = 0.f;
+    };
 
     // ---- When the music of a place plays (the pacing the port chose) ----
 

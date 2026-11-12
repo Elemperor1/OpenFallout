@@ -1617,7 +1617,7 @@ namespace OFMechanics
             if (held.mWeapon == 0 && mind.mDrawn == 0 && animation->isWeaponDrawn())
                 return;
             mind.mDrawn = held.mWeapon;
-            animation->drawWeapon(held.mModel, held.mAnimationType);
+            animation->drawWeapon(held.mModel, held.mAnimationType, held.mWeapon);
         }
 
         /// A character that fights goes for its target, attacks it from where its weapon reaches, or runs away from it.

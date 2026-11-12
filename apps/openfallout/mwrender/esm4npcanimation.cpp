@@ -26,6 +26,7 @@
 #include "../mwbase/environment.hpp"
 #include "../mwbase/world.hpp"
 #include "../mwclass/esm4npc.hpp"
+#include "../mwsound/falloutfootsteps.hpp"
 #include "../mwworld/esmstore.hpp"
 #include "../mwworld/refdata.hpp"
 
@@ -317,15 +318,7 @@ namespace OFRender
             = OFClass::falloutNpcParts(*race, isFemale, hair, headParts, OFClass::ESM4Npc::getEquippedArmor(mPtr));
         images.mHat = parts.mHatOn;
         // What the armor adds to the sound of the steps: power armor has its own, other heavy armor the common one
-        int armorSounds = 0;
-        for (const ESM4::Armor* armor : OFClass::ESM4Npc::getEquippedArmor(mPtr))
-        {
-            if ((armor->mGeneralFlags & ESM4::Armor::FO3_PowerArmor) != 0)
-                armorSounds = 2;
-            else if ((armor->mGeneralFlags & ESM4::Armor::FO3_HeavyArmor) != 0 && armorSounds == 0)
-                armorSounds = 1;
-        }
-        setArmorSoundKind(armorSounds);
+        setArmorSoundKind(OFSound::armorSoundKind(mPtr));
         // A body with no texture of the editor gets its tone from the coefficients as the face does, from the .egt of
         // the model of its body; the hands and the skin of the clothes take the one picture (as in the games). The
         // model is the race's, not the one in the list of parts: a piece that covers the upper body takes that part
