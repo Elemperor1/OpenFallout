@@ -16,6 +16,7 @@
 #include <components/debug/gldebug.hpp>
 
 #include <components/misc/rng.hpp>
+#include <components/misc/thread.hpp>
 
 #include <components/vfs/filesystemarchive.hpp>
 #include <components/vfs/manager.hpp>
@@ -165,6 +166,22 @@ namespace
 
     private:
         int mMaxTextureImageUnits = 0;
+    };
+
+    // Runs on the thread that draws the main camera (the draw thread in OSG's DrawThreadPerContext model, the main
+    // thread when single-threaded) and marks that thread frame-critical once. A draw callback rather than a one-off
+    // operation, because the viewer starts a new draw thread each time threading is stopped and started again.
+    class FrameCriticalDrawThreadCallback : public osg::Camera::DrawCallback
+    {
+    public:
+        void operator()(osg::RenderInfo& /*renderInfo*/) const override
+        {
+            thread_local bool raised = false;
+            if (raised)
+                return;
+            raised = true;
+            Misc::setCurrentThreadFrameCriticalPriority();
+        }
     };
 
     void reportStats(unsigned frameNumber, osgViewer::Viewer& viewer, std::ostream& stream)
@@ -994,6 +1011,9 @@ void OF::Engine::go()
 {
     assert(!mContentFiles.empty());
 
+    // The frame waits for this thread (input, simulation, cull). Threads it starts keep their own class.
+    Misc::setCurrentThreadFrameCriticalPriority();
+
     Log(Debug::Info) << "OSG version: " << osgGetVersion();
     SDL_version sdlVersion;
     SDL_GetVersion(&sdlVersion);
@@ -1014,6 +1034,7 @@ void OF::Engine::go()
     mViewer->getCamera()->getOrCreateStateSet()->removeAttribute(osg::StateAttribute::MATERIAL);
     SceneUtil::disableFFPStateForRenderer(static_cast<osgViewer::Renderer*>(mViewer->getCamera()->getRenderer()));
     mViewer->setReleaseContextAtEndOfFrameHint(false);
+    mViewer->getCamera()->addInitialDrawCallback(new FrameCriticalDrawThreadCallback);
 
     // Do not try to outsmart the OS thread scheduler (see bug #4785).
     mViewer->setUseConfigureAffinity(false);
