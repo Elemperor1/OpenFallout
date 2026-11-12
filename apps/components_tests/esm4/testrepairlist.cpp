@@ -116,4 +116,41 @@ namespace
         EXPECT_TRUE(records[0].mSounds.empty());
         EXPECT_EQ(records[0].mIconMale, "a.dds");
     }
+
+    // The sounds an armor is worn with (SNAM, twelve bytes) and the armor whose sounds it takes when it has none (TNAM)
+    // are read from those subrecords alone: a skipped subrecord of the same size (the hashes of a model, the bounds,
+    // the race, a count of keywords) is not a sound or a template
+    TEST(ESM4ArmorSoundTest, onlySnamMakesAWornSoundAndOnlyTnamTheTemplate)
+    {
+        // a sound: the form, the chance, three bytes of nothing and the type
+        std::string soundData;
+        const std::uint32_t form = 0x00001234;
+        soundData.append(reinterpret_cast<const char*>(&form), 4);
+        soundData.push_back(static_cast<char>(75));
+        soundData.append(3, '\0');
+        const std::uint32_t type = 2;
+        soundData.append(reinterpret_cast<const char*>(&type), 4);
+        const std::string data = zString("EDID", "SoundArmor") + subRecord("MODT", bytePattern(12, 1))
+            + subRecord("MO2T", bytePattern(12, 40)) + subRecord("OBND", bytePattern(12, 60))
+            + valueSubRecord<std::uint32_t>("RNAM", 0x00000099) + valueSubRecord<std::uint32_t>("KSIZ", 3)
+            + subRecord("SNAM", soundData) + valueSubRecord<std::uint32_t>("TNAM", 0x00004321);
+        const std::vector<ESM4::Armor> records = loadRecords<ESM4::Armor>("ARMO", record("ARMO", 5, data));
+        ASSERT_EQ(records.size(), 1u);
+        ASSERT_EQ(records[0].mSounds.size(), 1u);
+        EXPECT_EQ(records[0].mSounds[0].mSound.toUint32(), 0x1234u);
+        EXPECT_EQ(records[0].mSounds[0].mChance, 75);
+        EXPECT_EQ(records[0].mSounds[0].mType, 2u);
+        EXPECT_EQ(records[0].mTemplate.toUint32(), 0x4321u);
+    }
+
+    TEST(ESM4ArmorSoundTest, anArmorWithOnlyModelDataAndBoundsHasNoSoundAndNoTemplate)
+    {
+        const std::string data = zString("EDID", "Plain") + subRecord("MODT", bytePattern(12, 1))
+            + subRecord("OBND", bytePattern(12, 60)) + valueSubRecord<std::uint32_t>("RNAM", 0x00000099)
+            + valueSubRecord<std::uint32_t>("KSIZ", 3);
+        const std::vector<ESM4::Armor> records = loadRecords<ESM4::Armor>("ARMO", record("ARMO", 5, data));
+        ASSERT_EQ(records.size(), 1u);
+        EXPECT_TRUE(records[0].mSounds.empty());
+        EXPECT_TRUE(records[0].mTemplate.isZeroOrUnset());
+    }
 }

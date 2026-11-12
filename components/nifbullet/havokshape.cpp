@@ -442,6 +442,12 @@ namespace NifBullet
                 case Nif::RC_bhkPackedNiTriStripsShape:
                 {
                     const auto& strips = static_cast<const Nif::bhkPackedNiTriStripsShape&>(shape);
+                    // What stops a foot is what the collision has: the subshapes of the data that are solid (the
+                    // collision is made from that list and its filters), before the ones of the shape
+                    if (!strips.mData.empty())
+                        for (const Nif::hkSubPartData& part : strips.mData->mSubshapes)
+                            if (isSolidHavokFilter(part.mHavokFilter))
+                                return part.mHavokMaterial.mMaterial;
                     if (!strips.mSubshapes.empty())
                         return strips.mSubshapes.front().mHavokMaterial.mMaterial;
                     if (!strips.mData.empty() && !strips.mData->mSubshapes.empty())

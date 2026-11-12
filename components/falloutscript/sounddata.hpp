@@ -12,6 +12,9 @@ namespace FalloutScript
     /// (the executables compare a distance with the maximum byte times 100: FalloutNV.exe 0x8384F0, 0x838608).
     struct SoundData
     {
+        /// The lowest pitch that is played: the output does not play at a pitch of zero or less
+        static constexpr float minimumPitch = 0.1f;
+
         enum Flags : std::uint16_t
         {
             RandomFrequencyShift = 0x0001,
@@ -52,7 +55,7 @@ namespace FalloutScript
         float distanceGain(float distance) const;
 
         /// The pitch of one playing: one plus the frequency adjustment in percent, and with the flag of the random
-        /// shift anywhere from minus that to plus that (`unit` is a number in [0, 1])
+        /// shift anywhere from minus that to plus that (`unit` is a number in [0, 1]); never under `minimumPitch`
         float pitch(float unit) const;
     };
 
