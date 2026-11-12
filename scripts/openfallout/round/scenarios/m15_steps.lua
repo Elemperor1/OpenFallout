@@ -53,7 +53,11 @@ return { limit = 300, delay = 4, run = function(r)
     r.teleport{ pos = { HOUSE_FRONT.x, HOUSE_FRONT.y, HOUSE_FRONT.z }, worldspace = mojave, yaw = 0, onGround = true, label = 'house front' }
     r.wait(4)
     r.activate(HOUSE_DOOR, 'door in')
-    r.waitFor(function() return player.cell ~= nil and not player.cell.isExterior end, 40, 'interior')
+    -- A door that did not take the player in leaves the house phase outdoors: the round fails rather than pass without
+    -- having looked at the floors of a house
+    if not r.waitFor(function() return player.cell ~= nil and not player.cell.isExterior end, 40, 'interior') then
+        error('C the door of the doctor\'s house did not take the player indoors')
+    end
     r.wait(10)
     r.settle(3, 30)
     r.camera('ThirdPerson')
