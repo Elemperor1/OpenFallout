@@ -1030,27 +1030,31 @@ namespace OFRender
     {
         if (mPlayerAnimation == nullptr || mPlayerNode == nullptr || !OFBase::Environment::get().hasFalloutScripts())
             return;
-        // The player's eyes are where the camera is in the first person: the body would look out of its own head
-        const bool visible = mCamera->getMode() != Camera::Mode::FirstPerson;
-        // The shots of the player are counted even where the body is not drawn, so that the ones made in the first
-        // person are not played at once when the camera moves out
-        OFScript::FalloutScripts* shotScripts = OFBase::Environment::get().getFalloutScripts();
-        const unsigned shots = shotScripts->playerShots();
+        // The player's eyes are where the camera is in the first person: the body would look out of its own head, and
+        // what the player sees there is the arms, with the weapon in them
+        const bool thirdPerson = mCamera->getMode() != Camera::Mode::FirstPerson;
+        // The shots of the player are counted even where nothing is drawn, so that the ones made with the body hidden
+        // are not played at once when it shows
+        OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+        const unsigned shots = scripts->playerShots();
         const bool shotMade = shots != mPlayerShotsSeen;
         mPlayerShotsSeen = shots;
+        const bool dead = scripts->isPlayerDead();
+        const bool drawn = scripts->isPlayerWeaponDrawn() && !dead;
+        const bool wantArms = !thirdPerson && drawn;
         if (mPlayerBody == nullptr)
         {
-            if (!visible)
+            if (!thirdPerson && !wantArms)
                 return;
-            mPlayerBody = std::make_unique<FalloutPlayerBody>(mPlayerNode, mResourceSystem);
+            mPlayerBody = std::make_unique<FalloutPlayerBody>(
+                mPlayerNode, mSceneRoot, mResourceSystem, mFirstPersonFieldOfView, this);
         }
-        mPlayerBody->setVisible(visible);
-        if (!visible)
+        mPlayerBody->setVisible(thirdPerson);
+        mPlayerBody->setArmsVisible(wantArms);
+        if (!thirdPerson && !wantArms)
             return;
-        OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
         const OFWorld::Ptr& player = mPlayerAnimation->getPtr();
         const std::uint64_t revision = scripts->playerBodyRevision();
-        const bool dead = scripts->isPlayerDead();
         // A player who is alive again (revived, or a game loaded) stands: the body that fell is made again
         if (!dead && mPlayerBody->isDown())
             mPlayerBodyTried.reset();
@@ -1070,11 +1074,12 @@ namespace OFRender
         // The games do not lie the player down to sleep: the screen fades and the hours pass
         mPlayerBody->setPose(scripts->isPlayerSleeping() ? 0 : scripts->furnitureKindOf(player));
         // The weapon the player holds is in its hand when it is out, and a shot plays the attack of its type
-        const bool drawn = scripts->isPlayerWeaponDrawn() && !dead;
         const OFScript::FalloutScripts::HeldWeapon held = scripts->heldWeapon(player);
         mPlayerBody->setWeapon(drawn, held.mWeapon, held.mModel, held.mAnimationType);
         if (shotMade && drawn)
             mPlayerBody->attack();
+        // The arms hang where the camera is: this frame's place, which the camera has when the scene is drawn
+        mPlayerBody->placeArms(mCamera->getPosition(), mCamera->getOrient());
     }
 
     void RenderingManager::updatePlayerPtr(const OFWorld::Ptr& ptr)

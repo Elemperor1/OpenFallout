@@ -36,6 +36,26 @@ namespace OFRender
         return folder;
     }
 
+    std::string falloutFirstPersonModel(std::string_view model)
+    {
+        const std::size_t slash = model.find_last_of("/\\");
+        const std::size_t dot = model.find_last_of('.');
+        const std::size_t end = dot == std::string_view::npos || (slash != std::string_view::npos && dot < slash)
+            ? model.size()
+            : dot;
+        if (Misc::StringUtils::lowerCase(model.substr(0, end)).ends_with("1st"))
+            return std::string(model);
+        std::string result(model.substr(0, end));
+        result += "1st";
+        result += model.substr(end);
+        return result;
+    }
+
+    bool falloutIsFirstPersonPart(bool hand, std::string_view model)
+    {
+        return hand || Misc::StringUtils::lowerCase(model).find("pipboyglove") != std::string::npos;
+    }
+
     std::string chooseFalloutIdle(std::string_view folder, const std::vector<std::string>& files)
     {
         // The people of the games have no idle in the folder of their skeleton that moves their body: `mtidle.kf` of

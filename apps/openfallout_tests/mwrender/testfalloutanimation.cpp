@@ -20,6 +20,37 @@ namespace
         EXPECT_EQ(falloutAnimationFolder("skeleton.nif"), "");
     }
 
+    TEST(OpenFalloutRenderFalloutFirstPersonModel, putsTheSuffixBeforeTheExtension)
+    {
+        EXPECT_EQ(falloutFirstPersonModel("characters\\_Male\\LeftHand.nif"), "characters\\_Male\\LeftHand1st.nif");
+        EXPECT_EQ(falloutFirstPersonModel("meshes/characters/_male/femalerighthand.NIF"),
+            "meshes/characters/_male/femalerighthand1st.NIF");
+        EXPECT_EQ(falloutFirstPersonModel("lefthandpipboyglove.nif"), "lefthandpipboyglove1st.nif");
+    }
+
+    TEST(OpenFalloutRenderFalloutFirstPersonModel, leavesAModelThatHasItAndAddsToOneWithNoExtension)
+    {
+        EXPECT_EQ(falloutFirstPersonModel("meshes/characters/_male/lefthand1st.nif"),
+            "meshes/characters/_male/lefthand1st.nif");
+        EXPECT_EQ(falloutFirstPersonModel("meshes/characters/_male/LeftHand1ST.nif"),
+            "meshes/characters/_male/LeftHand1ST.nif");
+        EXPECT_EQ(falloutFirstPersonModel("meshes/a.b/hand"), "meshes/a.b/hand1st");
+        EXPECT_EQ(falloutFirstPersonModel(""), "1st");
+    }
+
+    TEST(OpenFalloutRenderFalloutFirstPersonModel, theSkeletonIsInTheFolderOfTheFirstPersonAnimations)
+    {
+        EXPECT_EQ(falloutAnimationFolder(sFirstPersonSkeleton), "meshes/characters/_1stperson/");
+    }
+
+    TEST(OpenFalloutRenderFalloutFirstPersonPart, isAHandOrThePipBoyGlove)
+    {
+        EXPECT_TRUE(falloutIsFirstPersonPart(true, "characters\\_Male\\RightHand.nif"));
+        EXPECT_TRUE(falloutIsFirstPersonPart(false, "Characters\\_Male\\LeftHandPipboyGlove.NIF"));
+        EXPECT_FALSE(falloutIsFirstPersonPart(false, "Armor\\VaultSuit\\M\\Outfit.NIF"));
+        EXPECT_FALSE(falloutIsFirstPersonPart(false, "characters\\_Male\\UpperBody.nif"));
+    }
+
     struct OpenFalloutRenderChooseFalloutIdle : Test
     {
         const std::string mFolder = "meshes/characters/_male/";

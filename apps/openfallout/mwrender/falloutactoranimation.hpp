@@ -77,6 +77,14 @@ namespace OFRender
         /// one.
         void startAnimations(bool female);
 
+        /// The skeleton that is not the actor's own: the arms of the first person have one of their own, with the
+        /// animations beside it. It is the path that the object root was made from. Empty for the skeleton of the
+        /// actor's model.
+        std::string mSkeletonOverride;
+        /// The arms that the player sees through their own eyes: their skeleton hangs from the camera and not from the
+        /// floor, so it is not lowered to it
+        bool mFirstPerson = false;
+
         /// Adds a model to the actor and returns the node that it is, null when there is no model. A model that is not
         /// skinned names the bone it is put on in its file; one that does not (a hat) and is for the head
         /// (`forHead`), with its vertices around the origin of the head, is put on the head bone.

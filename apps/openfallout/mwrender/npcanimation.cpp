@@ -416,19 +416,27 @@ namespace OFRender
         RenderingManager* mRenderingManager;
     };
 
+    void setFirstPersonRenderBin(osg::Node& root)
+    {
+        [[maybe_unused]] static const bool prototypeAdded = [&] {
+            osg::ref_ptr<osgUtil::RenderBin> depthClearBin(new osgUtil::RenderBin);
+            depthClearBin->setDrawCallback(new DepthClearCallback());
+            osgUtil::RenderBin::addRenderBinPrototype("DepthClear", depthClearBin);
+            return true;
+        }();
+        root.getOrCreateStateSet()->setRenderBinDetails(
+            RenderBin_FirstPerson, "DepthClear", osg::StateSet::OVERRIDE_RENDERBIN_DETAILS);
+    }
+
+    void addFirstPersonFieldOfView(osg::Node& root, float fov, RenderingManager* renderingManager)
+    {
+        root.addCullCallback(new OverrideFieldOfViewCallback(fov, renderingManager));
+    }
+
     void NpcAnimation::setRenderBin()
     {
         if (mViewMode == VM_FirstPerson)
-        {
-            [[maybe_unused]] static const bool prototypeAdded = [&] {
-                osg::ref_ptr<osgUtil::RenderBin> depthClearBin(new osgUtil::RenderBin);
-                depthClearBin->setDrawCallback(new DepthClearCallback());
-                osgUtil::RenderBin::addRenderBinPrototype("DepthClear", depthClearBin);
-                return true;
-            }();
-            mObjectRoot->getOrCreateStateSet()->setRenderBinDetails(
-                RenderBin_FirstPerson, "DepthClear", osg::StateSet::OVERRIDE_RENDERBIN_DETAILS);
-        }
+            setFirstPersonRenderBin(*mObjectRoot);
         else if (osg::StateSet* stateset = mObjectRoot->getStateSet())
             stateset->setRenderBinToInherit();
     }
@@ -543,8 +551,8 @@ namespace OFRender
         if (is1stPerson)
         {
             mObjectRoot->setNodeMask(Mask_FirstPerson);
-            mObjectRoot->addCullCallback(new OverrideFieldOfViewCallback(
-                mFirstPersonFieldOfView, OFBase::Environment::get().getWorld()->getRenderingManager()));
+            addFirstPersonFieldOfView(
+                *mObjectRoot, mFirstPersonFieldOfView, OFBase::Environment::get().getWorld()->getRenderingManager());
         }
 
         mWeaponAnimationTime->updateStartTime();

@@ -387,7 +387,9 @@ namespace OFRender
         if (mObjectRoot == nullptr)
             return;
 
-        const std::string skeleton = mPtr.getClass().getCorrectedModel(mPtr);
+        const std::string skeleton = mSkeletonOverride.empty()
+            ? std::string(mPtr.getClass().getCorrectedModel(mPtr).value())
+            : mSkeletonOverride;
         const std::string folder = falloutAnimationFolder(skeleton);
         if (folder.empty())
         {
@@ -456,7 +458,7 @@ namespace OFRender
         // the walking ones key at height 0: the skeleton file has "Bip01" at the standing height of the pelvis, so a
         // person that has not walked yet had that height twice and stood 61 to 67 units above the floor (found on the
         // Mac, round 11J)
-        if (mPtr.getType() == ESM4::Npc::sRecordId)
+        if (mPtr.getType() == ESM4::Npc::sRecordId && !mFirstPerson)
         {
             SceneUtil::FindByNameVisitor find("Bip01");
             mObjectRoot->accept(find);

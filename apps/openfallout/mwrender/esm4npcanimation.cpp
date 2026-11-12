@@ -33,11 +33,15 @@
 
 namespace OFRender
 {
-    ESM4NpcAnimation::ESM4NpcAnimation(
-        const OFWorld::Ptr& ptr, osg::ref_ptr<osg::Group> parentNode, Resource::ResourceSystem* resourceSystem)
+    ESM4NpcAnimation::ESM4NpcAnimation(const OFWorld::Ptr& ptr, osg::ref_ptr<osg::Group> parentNode,
+        Resource::ResourceSystem* resourceSystem, bool firstPerson)
         : FalloutActorAnimation(ptr, std::move(parentNode), resourceSystem)
     {
-        setObjectRoot(mPtr.getClass().getCorrectedModel(mPtr), true, true, false);
+        mFirstPerson = firstPerson;
+        if (firstPerson)
+            mSkeletonOverride = std::string(sFirstPersonSkeleton);
+        setObjectRoot(firstPerson ? mSkeletonOverride : std::string(mPtr.getClass().getCorrectedModel(mPtr).value()), true, true,
+            false);
         updateParts();
 
         // Only the characters of Fallout have animation files that are read
@@ -336,8 +340,17 @@ namespace OFRender
         std::size_t wornSkin = 0;
         std::string hairTexture;
         std::string eyeTexture;
-        for (const OFClass::FalloutNpcPart& npcPart : parts.mParts)
+        for (const OFClass::FalloutNpcPart& listed : parts.mParts)
         {
+            OFClass::FalloutNpcPart npcPart = listed;
+            if (mFirstPerson)
+            {
+                // The arms of the first person: only the hands and the glove of the Pip-Boy, each from the file the games
+                // keep for the first person
+                if (!falloutIsFirstPersonPart(npcPart.mKind == OFClass::FalloutPartKind::Hand, npcPart.mModel))
+                    continue;
+                npcPart.mModel = falloutFirstPersonModel(npcPart.mModel);
+            }
             const osg::ref_ptr<osg::Node> part = insertPart(npcPart.mModel, npcPart.mForHead);
             if (part == nullptr)
             {
@@ -384,7 +397,8 @@ namespace OFRender
             std::ostringstream ref;
             ref << mPtr.getCellRef().getRefId();
             // (the stream of the log stays in the base that an earlier line left it in)
-            Log(Debug::Info) << std::dec << "Look of " << ref.str() << ": " << race->mEditorId
+            Log(Debug::Info) << std::dec << "Look of " << ref.str() << (mFirstPerson ? " (first person)" : "") << ": "
+                             << race->mEditorId
                              << (isFemale ? " female" : " male") << ", " << inserted << " parts"
                              << (missing != 0 ? " (" + std::to_string(missing) + " not found)" : std::string())
                              << ", hair " << (hair != nullptr ? hair->mEditorId : std::string("none"))

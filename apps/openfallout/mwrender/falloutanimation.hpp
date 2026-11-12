@@ -14,6 +14,20 @@ namespace OFRender
     /// no folder gives an empty one.
     std::string falloutAnimationFolder(std::string_view skeleton);
 
+    /// The skeleton of the arms that the player sees in the first person (the games keep it, and the animations of those
+    /// arms, in a folder of their own: `_1stperson`). It has no mesh: the hands are put on it by bone name.
+    inline constexpr std::string_view sFirstPersonSkeleton = "meshes/characters/_1stperson/skeleton.nif";
+
+    /// The model of a hand, or of the Pip-Boy glove, that the first person sees: the games keep a second file for each,
+    /// named like the first with `1st` before the extension (`lefthand.nif` and `lefthand1st.nif`). A model that has the
+    /// suffix is given back as it is.
+    std::string falloutFirstPersonModel(std::string_view model);
+
+    /// Whether a part of a character is one that the first person sees: a hand, or the Pip-Boy glove that stands in the
+    /// place of the left one (`hand` says that the part is a hand of the race). The rest of the body stays behind the
+    /// player's eyes.
+    bool falloutIsFirstPersonPart(bool hand, std::string_view model);
+
     /// The animation a character plays when it stands, chosen among the paths of the files in the folder of its
     /// skeleton (lower case, as the virtual file system lists them, files of folders below that one included): the file
     /// `mtidle.kf`, else `locomotion/mtidle.kf` (the standing pose of the people of the games, whose folder has none

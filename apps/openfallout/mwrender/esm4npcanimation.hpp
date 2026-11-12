@@ -28,8 +28,11 @@ namespace OFRender
     class ESM4NpcAnimation : public FalloutActorAnimation
     {
     public:
-        ESM4NpcAnimation(
-            const OFWorld::Ptr& ptr, osg::ref_ptr<osg::Group> parentNode, Resource::ResourceSystem* resourceSystem);
+        /// With `firstPerson` the character is the arms that the player sees through their own eyes: the skeleton of the
+        /// first person with the hands (and the Pip-Boy glove) of the character on it, and the animations that sit beside
+        /// that skeleton; the rest of the body is left out.
+        ESM4NpcAnimation(const OFWorld::Ptr& ptr, osg::ref_ptr<osg::Group> parentNode,
+            Resource::ResourceSystem* resourceSystem, bool firstPerson = false);
         ~ESM4NpcAnimation() override;
 
     private:
