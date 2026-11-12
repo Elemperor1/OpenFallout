@@ -5,8 +5,12 @@
 #   OPENFALLOUT_CODESIGN_IDENTITY  Developer ID Application identity (name or SHA-1). When it is set, every nested
 #                                  library, plug-in and helper executable is signed on its own, then the bundle
 #                                  (inside out, no --deep). When it is unset or empty, the bundle gets today's ad hoc
-#                                  signature. "-" takes the same hardened path with an ad hoc signature, for local
-#                                  checks without a certificate.
+#                                  signature. "-" takes the same hardened path with an ad hoc signature: it checks
+#                                  that signing and `codesign --verify` work without a certificate, but the result
+#                                  does not start (an ad hoc signature has no Team ID, so library validation refuses
+#                                  the bundled libraries). To launch a hardened build locally, sign with an identity
+#                                  that has a Team ID (e.g. an Apple Development certificate); CI/check_mac_package.py
+#                                  reports the problem without starting the app.
 #   OPENFALLOUT_CODESIGN_TEAM_ID   Team identifier. When set, each signed bundle must verify against a Developer ID
 #                                  requirement for that team.
 # Neither value is printed.

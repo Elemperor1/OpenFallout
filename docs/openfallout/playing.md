@@ -47,6 +47,16 @@ Whether Game Mode really turns on is checked by hand: start the game full screen
 
 Starting the binary directly (`/Applications/OpenFallout.app/Contents/MacOS/openfallout ...`, or `openfallout` from a build folder) works as before, and is what the probe and autoplay tools keep doing; Game Mode stays off then.
 
+### Checking a package
+
+`CI/check_mac_package.py` checks a disk image or an app bundle as it would be shipped:
+
+    CI/check_mac_package.py build/OpenFallout-<version>-arm64.dmg --mode local --smoke run
+
+It checks, in order, the layout of the disk image and the app, that every Mach-O file and nested bundle is validly signed, that the app and its engine app declare Game Mode, the role-playing-games category and high resolution and have no `LSRequiresCarbon`, that the engine links the OpenAL Soft in the bundle and not the system's OpenAL framework, that a hardened engine can load its libraries (every Mach-O file carries its Team ID, or library validation is turned off by entitlement; an ad hoc signature with the hardened runtime, `OPENFALLOUT_CODESIGN_IDENTITY=-`, fails here, because macOS would refuse the libraries and the game would crash at start), and finally a start smoke run: the engine app is started through `mac_launch.py --background` with a hidden window (`--headless`, `SDL_MAC_BACKGROUND_APP=1`) and folders of its own, on the synthetic plugin of the Fallout start smoke test, and must load the cell, run a Lua script, report the LuaJIT compiler in the expected state (`--expect-jit on`, the default, means it compiled hot code) and quit peacefully. The engine logs the compiler's state once per run as `LuaJIT compiler: on (<flags>); hot loop: <n> compiled trace(s), <m> aborted`; the check prints that line whatever the outcome. Each step prints `PASS`, `FAIL` or `SKIP` with the reason; `--work <folder>` keeps the run's files and log.
+
+Local mode accepts an ad hoc signature and asks no Gatekeeper questions; release mode arrives with notarization. The macOS CI job runs the check in local mode with `--smoke auto`, which reports the smoke step as skipped when the runner gives the engine no OpenGL context. When it is skipped there, run the check with `--smoke run` on a Mac with a display before a release is tagged.
+
 ## Game controller
 
 A controller that the operating system shows as a game controller (Xbox, PlayStation and Switch Pro pads, by cable or Bluetooth) is read through SDL, as in OpenMW, and `[Input] enable controller` is on by default. The first hour of play with a pad found the menus clumsy (the D-pad moved the lit row, but A clicked where the pointer had been left), and the buttons below are the answer to that; the next round with a pad in hand will tell whether they feel right. Each press that a Fallout screen acts on is logged as `Pad: screen=... button=... key=...` (the first 200 of a run). The engine logs every key, button and stick that it hears as `Input: ...` lines in the log of the run (the first presses and a sample of the sticks), so a report of a pad that did nothing can say which side missed the press.
