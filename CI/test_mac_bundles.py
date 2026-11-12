@@ -1,6 +1,7 @@
 """Configure the actual Apple packaging rules with stand-in Qt/OSG plugins."""
 
 import os
+import plistlib
 from pathlib import Path
 import plistlib
 import shutil
@@ -10,6 +11,13 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent.parent
+MACHO = bytes.fromhex("cffaedfe") + bytes(28)
+IDENTITY = "Developer ID Application: Example Studio (EXAMPLE123)"
+TEAM = "EXAMPLE123"
+ENTITLEMENTS = {
+    "OpenFallout.app": "openfallout.entitlements",
+    "OpenFallout-CS.app": "openfallout-cs.entitlements",
+}
 
 
 class MacBundleTests(unittest.TestCase):
@@ -75,6 +83,8 @@ endif()
             return
         config = (build / "CPackConfig.cmake").read_text()
         self.assertIn(f'set(CPACK_OPENFALLOUT_APPLICATIONS "{";".join(expected)}")', config)
+        entitlements = [f"{root}/source/files/mac/{ENTITLEMENTS[bundle]}" for bundle in expected]
+        self.assertIn(f'set(CPACK_OPENFALLOUT_ENTITLEMENTS "{";".join(entitlements)}")', config)
         for bundle in ("OpenFallout.app", "OpenFallout-CS.app"):
             if bundle in expected:
                 self.assertIn(f'fixup_bundle("${{CMAKE_INSTALL_PREFIX}}/{bundle}"', install)
@@ -84,26 +94,149 @@ endif()
             self.assertEqual(len(plugins), 4 if qt and bundle in expected else 0)
 
         # CPack must sign only the selected bundles, even when one app is disabled.
+        signed = self.sign(root, expected)
+        self.assertEqual(len(signed), len(expected))
+        for call, bundle in zip(signed, expected):
+            # With no identity the bundle keeps today's ad hoc signature.
+            self.assertEqual(call, ["--force", "--deep", "-s", "-", str(self.app_root / bundle)])
+
+    def stage(self, root, bundles):
+        """Lay out bundles as CPack stages them, with stand-in Mach-O files."""
         stage = root / "package"
-        for bundle in expected:
-            (stage / "ALL_IN_ONE" / bundle / "Contents/PlugIns/osgPlugins-3.6.5").mkdir(parents=True)
+        for bundle in bundles:
+            contents = stage / "ALL_IN_ONE" / bundle / "Contents"
+            executable = bundle[:-len(".app")].lower()
+            (contents / "PlugIns/osgPlugins-3.6.5").mkdir(parents=True)
+            (contents / "Info.plist").write_text(
+                "<plist><dict><key>CFBundleExecutable</key>"
+                f"<string>{executable}</string></dict></plist>\n")
+            framework = contents / "Frameworks/QtCore.framework"
+            nested = {
+                f"MacOS/{executable}": MACHO,
+                "MacOS/helper": MACHO,
+                "MacOS/launch.sh": b"#!/bin/sh\n",
+                "Frameworks/libSDL2-2.0.0.dylib": MACHO,
+                "Frameworks/QtCore.framework/Versions/A/QtCore": MACHO,
+                "PlugIns/osgPlugins-3.6.5/osgdb_dds.so": MACHO,
+                "PlugIns/platforms/libqcocoa.dylib": MACHO,
+                "Resources/qt.conf": b"[Paths]\n",
+            }
+            for relative, data in nested.items():
+                (contents / relative).parent.mkdir(parents=True, exist_ok=True)
+                (contents / relative).write_bytes(data)
+            (framework / "Versions/Current").symlink_to("A")
+            (framework / "QtCore").symlink_to("Versions/Current/QtCore")
+        return stage
+
+    def sign(self, root, bundles, **environment):
+        """Run the CPack signing script and return every recorded codesign call."""
+        stage = self.stage(root, bundles)
         binary = root / "bin"
-        binary.mkdir()
+        binary.mkdir(exist_ok=True)
         signing_log = root / "signed.txt"
         codesign = binary / "codesign"
-        codesign.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$SIGNING_LOG"\n')
+        codesign.write_text(
+            "#!/bin/sh\nIFS=$(printf '\\t')\nprintf '%s\\n' \"$*\" >> \"$SIGNING_LOG\"\n")
         codesign.chmod(0o755)
+        env = {k: v for k, v in os.environ.items() if not k.startswith("OPENFALLOUT_CODESIGN")}
+        env.update(environment, PATH=str(binary) + os.pathsep + os.environ["PATH"],
+                   SIGNING_LOG=str(signing_log))
+        entitlements = [str(ROOT / "files/mac" / ENTITLEMENTS[bundle]) for bundle in bundles]
         result = subprocess.run([
-            "cmake", "-DAPPLE=TRUE", f"-DCPACK_OPENFALLOUT_APPLICATIONS={';'.join(expected)}",
+            "cmake", "-DAPPLE=TRUE", f"-DCPACK_OPENFALLOUT_APPLICATIONS={';'.join(bundles)}",
+            f"-DCPACK_OPENFALLOUT_ENTITLEMENTS={';'.join(entitlements)}",
             f"-DCPACK_TEMPORARY_INSTALL_DIRECTORY={stage}",
             "-P", str(ROOT / "cmake/SignMacApplications.cmake"),
-        ], env=dict(os.environ, PATH=str(binary) + os.pathsep + os.environ["PATH"],
-                    SIGNING_LOG=str(signing_log)), text=True, capture_output=True)
+        ], env=env, text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        signed = signing_log.read_text().splitlines()
-        self.assertEqual(len(signed), len(expected))
-        for line, bundle in zip(signed, expected):
-            self.assertTrue(line.endswith(bundle), line)
+        self.output = result.stdout + result.stderr
+        self.app_root = stage / "ALL_IN_ONE"
+        if not signing_log.exists():
+            return []
+        return [line.split("\t") for line in signing_log.read_text().splitlines()]
+
+    def sign_with_identity(self, bundles, **environment):
+        temporary = tempfile.TemporaryDirectory(prefix="mac signing ")
+        self.addCleanup(temporary.cleanup)
+        return self.sign(Path(temporary.name), bundles,
+                         OPENFALLOUT_CODESIGN_IDENTITY=IDENTITY, **environment)
+
+    def test_identity_signs_each_nested_binary_before_its_bundle(self):
+        bundles = ["OpenFallout.app", "OpenFallout-CS.app"]
+        calls = [call for call in self.sign_with_identity(bundles) if "--sign" in call]
+        targets = [call[-1] for call in calls]
+        for bundle in bundles:
+            app = str(self.app_root / bundle)
+            nested = [app + "/Contents/" + relative for relative in (
+                "MacOS/helper",
+                "Frameworks/libSDL2-2.0.0.dylib",
+                "Frameworks/QtCore.framework",
+                "PlugIns/osgPlugins/osgdb_dds.so",
+                "PlugIns/platforms/libqcocoa.dylib",
+            )]
+            self.assertIn(app, targets)
+            for item in nested:
+                self.assertEqual(targets.count(item), 1, item)
+                self.assertLess(targets.index(item), targets.index(app), item)
+            # The main executable is sealed by the bundle signature; scripts,
+            # resources and symlinks are not code.
+            self.assertEqual(
+                sorted(t for t in targets if t.startswith(app + "/")), sorted(nested))
+
+    def test_identity_uses_hardened_runtime_timestamp_and_entitlements(self):
+        bundles = ["OpenFallout.app", "OpenFallout-CS.app"]
+        calls = [call for call in self.sign_with_identity(bundles) if "--sign" in call]
+        self.assertTrue(calls)
+        for call in calls:
+            self.assertEqual(call[call.index("--sign") + 1], IDENTITY)
+            self.assertEqual(call[call.index("--options") + 1], "runtime")
+            self.assertIn("--timestamp", call)
+        for bundle in bundles:
+            app = str(self.app_root / bundle)
+            entitlements = str(ROOT / "files/mac" / ENTITLEMENTS[bundle])
+            # Executables carry their app's entitlements; libraries and plug-ins
+            # take those of the process that loads them.
+            for target in (app, app + "/Contents/MacOS/helper"):
+                call = next(call for call in calls if call[-1] == target)
+                self.assertEqual(call[call.index("--entitlements") + 1], entitlements)
+            for call in calls:
+                if call[-1].startswith(app + "/Contents/") and "/Contents/MacOS/" not in call[-1]:
+                    self.assertNotIn("--entitlements", call)
+
+    def test_entitlements_files_are_release_safe(self):
+        for name in ENTITLEMENTS.values():
+            with open(ROOT / "files/mac" / name, "rb") as entitlements:
+                values = plistlib.load(entitlements)
+            self.assertNotIn("com.apple.security.get-task-allow", values, name)
+        game = (ROOT / "files/mac/openfallout.entitlements").read_text()
+        self.assertIn("LUAJIT ENTITLEMENT", game)
+
+    def test_identity_never_uses_deep_or_prints_secrets(self):
+        calls = self.sign_with_identity(["OpenFallout.app", "OpenFallout-CS.app"],
+                                        OPENFALLOUT_CODESIGN_TEAM_ID=TEAM)
+        for call in calls:
+            if "--sign" in call or "-s" in call:
+                self.assertNotIn("--deep", call)
+        self.assertNotIn(IDENTITY, self.output)
+        self.assertNotIn(TEAM, self.output)
+
+    def test_empty_identity_takes_ad_hoc_path(self):
+        temporary = tempfile.TemporaryDirectory(prefix="mac signing ")
+        self.addCleanup(temporary.cleanup)
+        calls = self.sign(Path(temporary.name), ["OpenFallout.app"], OPENFALLOUT_CODESIGN_IDENTITY="")
+        self.assertEqual(calls, [["--force", "--deep", "-s", "-", str(self.app_root / "OpenFallout.app")]])
+
+    def test_identity_verifies_each_bundle_against_the_team(self):
+        calls = self.sign_with_identity(["OpenFallout.app"], OPENFALLOUT_CODESIGN_TEAM_ID=TEAM)
+        app = str(self.app_root / "OpenFallout.app")
+        self.assertEqual(calls[-1], [
+            "--verify", "--deep", "--strict",
+            f'-R=anchor apple generic and certificate leaf[subject.OU] = "{TEAM}"', app])
+        self.assertEqual(calls[-2][-1], app)
+
+    def test_identity_without_team_verifies_strictly(self):
+        calls = self.sign_with_identity(["OpenFallout.app"])
+        self.assertEqual(calls[-1], ["--verify", "--deep", "--strict", str(self.app_root / "OpenFallout.app")])
 
     def test_tools_only_without_qt(self):
         self.check_bundles(game=False, editor=False, qt=False)
