@@ -72,7 +72,7 @@ add_openfallout_dir (mwlua
 
 add_openfallout_dir (mwsound
     soundmanagerimp openaloutput ffmpegdecoder headcache warmqueue sound soundbuffer sounddecoder soundoutput
-    loudness movieaudiofactory alext efx efxpresets regionsoundselector watersoundupdater
+    loudness movieaudiofactory alext efx efxpresets regionsoundselector watersoundupdater falloutsound falloutfootsteps
     )
 
 add_openfallout_dir (mwworld

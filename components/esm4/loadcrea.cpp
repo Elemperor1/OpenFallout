@@ -132,11 +132,25 @@ void ESM4::Creature::load(ESM4::Reader& reader)
             case ESM::fourCC("CSCR"):
                 reader.getFormId(mSoundBase);
                 break;
+            case ESM::fourCC("CSDT"):
+            {
+                CreatureSoundGroup group;
+                if (subHdr.dataSize >= sizeof(group.mType))
+                    reader.get(group.mType);
+                else
+                    reader.skipSubRecordData();
+                mSoundGroups.push_back(std::move(group));
+                break;
+            }
             case ESM::fourCC("CSDI"):
                 reader.getFormId(mSound);
+                if (!mSoundGroups.empty())
+                    mSoundGroups.back().mSounds.push_back({ mSound, 100 });
                 break;
             case ESM::fourCC("CSDC"):
                 reader.get(mSoundChance);
+                if (!mSoundGroups.empty() && !mSoundGroups.back().mSounds.empty())
+                    mSoundGroups.back().mSounds.back().mChance = mSoundChance;
                 break;
             case ESM::fourCC("BNAM"):
                 reader.get(mBaseScale);
@@ -208,7 +222,6 @@ void ESM4::Creature::load(ESM4::Reader& reader)
                     reader.skipSubRecordData();
                 break;
             case ESM::fourCC("MODT"):
-            case ESM::fourCC("CSDT"):
             case ESM::fourCC("EAMT"): // FO3
             case ESM::fourCC("NAM4"): // FO3
             case ESM::fourCC("NAM5"): // FO3

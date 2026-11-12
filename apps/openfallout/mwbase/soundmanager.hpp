@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 
+#include <components/esm/formid.hpp>
 #include <components/vfs/pathutil.hpp>
 
 #include "../mwsound/type.hpp"
@@ -195,6 +196,20 @@ namespace OFBase
         ///< Play a 3D sound at \a initialPos. If the sound should be moving, it must be updated using
         ///< Sound::setPosition.
 
+        /// Play a sound record of Fallout 3 or New Vegas by its editor id (the case does not matter) or by its form,
+        /// as that record says: its volume, the curve of its volume over the distance, its pitch, whether it loops or
+        /// is heard as it is, and, for a record that names a folder, one of the files in it at random. With a reference
+        /// the sound comes from it, and without one (an empty reference) it is heard as it is. Null when there is no
+        /// such record, it has no file, or there is no sound.
+        virtual Sound* playFalloutSound(std::string_view editorId, const OFWorld::ConstPtr& reference, float volume,
+            Type type = Type::Sfx, PlayMode mode = PlayMode::Normal)
+            = 0;
+        virtual Sound* playFalloutSound(ESM::FormId sound, const OFWorld::ConstPtr& reference, float volume,
+            Type type = Type::Sfx, PlayMode mode = PlayMode::Normal)
+            = 0;
+        /// Whether a sound record of Fallout has this editor id and files to play
+        virtual bool hasFalloutSound(std::string_view editorId) = 0;
+
         virtual void stopSound(Sound* sound) = 0;
         ///< Stop the given sound from playing
 
@@ -238,6 +253,9 @@ namespace OFBase
             = 0;
 
         virtual void setListenerVel(const osg::Vec3f& vel) = 0;
+
+        /// Where the listener is (the camera)
+        virtual osg::Vec3f getListenerPosition() const = 0;
 
         virtual void updatePtr(const OFWorld::ConstPtr& old, const OFWorld::ConstPtr& updated) = 0;
 

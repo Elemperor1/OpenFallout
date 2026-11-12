@@ -377,6 +377,12 @@ namespace OFBase
         virtual bool isWaterWalkingCastableOnTarget(const OFWorld::ConstPtr& target) const = 0;
         virtual bool isOnGround(const OFWorld::Ptr& ptr) const = 0;
 
+        /// The Havok material of what an actor stands on (the index of the executables' tables of the sounds of steps:
+        /// 0 stone, 2 dirt, 4 grass, 5 metal, 8 water, 9 wood and so on): that of the collision shape of the object
+        /// under its feet, or of the land texture there, water when it wades. -1 when there is nothing it could be read
+        /// from. `stairs` is whether the ground is stairs (the stairs materials of the games).
+        virtual int getFloorMaterial(const OFWorld::ConstPtr& actor, bool& stairs) const = 0;
+
         virtual osg::Matrixf getActorHeadTransform(const OFWorld::ConstPtr& actor) const = 0;
 
         virtual OFRender::Camera* getCamera() = 0;

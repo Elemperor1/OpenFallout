@@ -108,6 +108,10 @@ namespace OFBase
         virtual void readRecord(ESM::ESMReader& reader, uint32_t type) = 0;
 
         virtual void resetIdleTime() = 0;
+
+        /// The pad vibrates with the given strength (0 to 1) for the given seconds, when there is a pad and the setting for
+        /// its vibration is on
+        virtual void rumble(float strength, float seconds) = 0;
         virtual bool isIdle() const = 0;
 
         virtual void executeAction(int action) = 0;

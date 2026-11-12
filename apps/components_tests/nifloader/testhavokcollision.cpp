@@ -398,6 +398,31 @@ namespace
         expectNear(triangles[2], btVector3(0, 7, 0));
     }
 
+    // What a foot comes down on is the material of a subshape that stops something (the one that makes the collision)
+    TEST_F(TestHavokCollision, the_material_of_packed_strips_is_that_of_the_first_subshape_that_is_solid)
+    {
+        Nif::hkPackedNiTriStripsData data;
+        Nif::hkSubPartData trigger{};
+        trigger.mNumVertices = 3;
+        trigger.mHavokFilter.mLayer = triggerLayer;
+        trigger.mHavokMaterial.mMaterial = 5;
+        Nif::hkSubPartData solid{};
+        solid.mNumVertices = 3;
+        solid.mHavokFilter.mLayer = staticLayer;
+        solid.mHavokMaterial.mMaterial = 7;
+        data.mSubshapes = { trigger, solid };
+        Nif::bhkPackedNiTriStripsShape strips;
+        strips.mRecordType = Nif::RC_bhkPackedNiTriStripsShape;
+        strips.mData = Nif::hkPackedNiTriStripsDataPtr(&data);
+
+        ASSERT_TRUE(NifBullet::havokMaterialOf(strips).has_value());
+        EXPECT_EQ(*NifBullet::havokMaterialOf(strips), 7u);
+
+        // With none that is solid, the first one of the shape's list or of the data is what there is
+        data.mSubshapes = { trigger };
+        EXPECT_EQ(NifBullet::havokMaterialOf(strips), std::optional<std::uint32_t>(5u));
+    }
+
     TEST_F(TestHavokCollision, subshapes_that_do_not_add_up_to_the_vertices_are_not_read)
     {
         Nif::hkPackedNiTriStripsData data;

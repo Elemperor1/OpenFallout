@@ -459,6 +459,7 @@ namespace OFWorld
         bool isWading(const OFWorld::ConstPtr& object) const override;
         bool isWaterWalkingCastableOnTarget(const OFWorld::ConstPtr& target) const override;
         bool isOnGround(const OFWorld::Ptr& ptr) const override;
+        int getFloorMaterial(const OFWorld::ConstPtr& actor, bool& stairs) const override;
 
         osg::Matrixf getActorHeadTransform(const OFWorld::ConstPtr& actor) const override;
 

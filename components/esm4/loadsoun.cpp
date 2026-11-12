@@ -48,9 +48,11 @@ void ESM4::Sound::load(ESM4::Reader& reader)
                 reader.getZString(mSoundFile);
                 break;
             case ESM::fourCC("SNDX"):
+                mDataSize = subHdr.dataSize;
                 reader.get(mData);
                 break;
             case ESM::fourCC("SNDD"):
+                mDataSize = subHdr.dataSize;
                 if (subHdr.dataSize == 8)
                     reader.get(&mData, 8);
                 else

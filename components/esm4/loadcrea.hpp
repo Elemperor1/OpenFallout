@@ -133,6 +133,21 @@ namespace ESM4
         ESM::FormId mVoice; // VTCK, the voice type (VTYP) of the creature
         ESM::FormId mSound;
         std::uint8_t mSoundChance;
+        /// The sounds of a creature in Fallout 3 and New Vegas, a group for each CSDT (its type, then the sounds that
+        /// follow it, each a CSDI with the chance in percent of its CSDC). The types are the foot that comes down (0 left
+        /// foot, 1 right foot, 2 left back foot, 3 right back foot, the same numbers as the text key `Enum`), 4 idle,
+        /// 5 aware, 6 attack, 7 hit, 8 death, 9 weapon.
+        struct CreatureSound
+        {
+            ESM::FormId mSound;
+            std::uint8_t mChance = 100;
+        };
+        struct CreatureSoundGroup
+        {
+            std::uint32_t mType = 0;
+            std::vector<CreatureSound> mSounds;
+        };
+        std::vector<CreatureSoundGroup> mSoundGroups;
         float mBaseScale;
         float mTurningSpeed;
         float mFootWeight;

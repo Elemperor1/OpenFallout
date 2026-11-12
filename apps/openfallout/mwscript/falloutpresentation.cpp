@@ -79,20 +79,18 @@ namespace OFScript
         // The world of the sounds is not touched while scripts run on another thread
         runOnMainThread([this, sound, reference] {
             OFBase::SoundManager* manager = OFBase::Environment::get().getSoundManager();
-            const std::vector<std::string> files = soundFilesOf(sound);
-            if (manager == nullptr || files.empty())
+            if (manager == nullptr)
                 return;
-            const std::string& file = files.size() == 1
-                ? files[0]
-                : files[std::uniform_int_distribution<std::size_t>(0, files.size() - 1)(mWeaponSoundRandom)];
-            const VFS::Path::Normalized path(file);
-            // The player hears a sound that no one makes as it is, and the sound of a reference comes from it
+            const ESM::FormId form = ESM::FormId::fromUint32(sound);
+            // The player hears a sound that no one makes as it is, and the sound of a reference comes from it; either
+            // way the record says how loud it is, how far it is heard, its pitch, and whether it loops
             if (const OFWorld::Ptr ptr
                 = reference != 0 && reference != mPlayer ? findReference(reference) : OFWorld::Ptr();
                 !ptr.isEmpty())
-                manager->playSound3D(ptr, path, 1.f, 1.f, OFSound::Type::Sfx, OFSound::PlayMode::Normal);
+                manager->playFalloutSound(form, ptr, 1.f, OFSound::Type::Sfx, OFSound::PlayMode::Normal);
             else if (reference == 0 || reference == mPlayer)
-                manager->playSound(path, 1.f, 1.f, OFSound::Type::Sfx, OFSound::PlayMode::NoEnv);
+                manager->playFalloutSound(
+                    form, OFWorld::ConstPtr(), 1.f, OFSound::Type::Sfx, OFSound::PlayMode::NoEnv);
         });
     }
 

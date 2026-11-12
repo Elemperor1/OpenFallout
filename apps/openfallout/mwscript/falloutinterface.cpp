@@ -1,5 +1,7 @@
 #include "falloutscripts.hpp"
 
+#include "../mwsound/falloutfootsteps.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <map>
@@ -17,6 +19,7 @@
 #include <components/falloutscript/messagetext.hpp>
 
 #include "../mwbase/environment.hpp"
+#include "../mwbase/inputmanager.hpp"
 #include "../mwbase/mechanicsmanager.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
@@ -125,6 +128,7 @@ namespace OFScript
             playSound(drowning, mPlayer);
         if (OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager())
             windows->activateHitOverlay(false);
+        painRumble();
         // No blow comes between the damage and the death of a player that has none left of its health
         const std::lock_guard strikeLock(mStrikeMutex);
         const auto transitions = mActors.holdTransitions();
@@ -132,6 +136,31 @@ namespace OFScript
         // (a player with less than a point of health is out as well: see SwimBreathStep::mFatal)
         if (step.mFatal || mActorValues.current(mPlayer, AV::health) <= 0)
             mActors.kill(mPlayer);
+    }
+
+    void FalloutScripts::playGroundStep(const OFWorld::Ptr& ptr, FalloutScript::Footsteps::Slot slot)
+    {
+        OFBase::World* world = OFBase::Environment::get().getWorld();
+        if (world == nullptr || ptr.isEmpty())
+            return;
+        OFSound::FootstepRequest request;
+        request.mActor = ptr;
+        request.mSlot = slot;
+        request.mPlayerInFirstPerson = world->isFirstPerson();
+        OFSound::playFootstep(request);
+    }
+
+    void FalloutScripts::painRumble()
+    {
+        if (OFBase::InputManager* input = OFBase::Environment::get().getInputManager())
+            input->rumble(static_cast<float>(gameSetting("fRumblePainStrength", 0.5)),
+                static_cast<float>(gameSetting("fRumblePainTime", 0.2)));
+    }
+
+    void FalloutScripts::jumped(const OFWorld::Ptr& ptr)
+    {
+        if (mPlayer != 0 && !ptr.isEmpty() && scriptReferenceOf(ptr) == mPlayer)
+            playGroundStep(ptr, FalloutScript::Footsteps::Slot::Jump);
     }
 
     bool FalloutScripts::landed(const OFWorld::Ptr& ptr, float heightLost)
@@ -143,6 +172,8 @@ namespace OFScript
         // minus the exemptions of the reads, so this is where it would go if they ever fall)
         if (mPlayer == 0 || ptr.isEmpty() || scriptReferenceOf(ptr) != mPlayer)
             return false;
+        // The player comes down on the ground with the sound that the ground has for it, whether it hurts or not
+        playGroundStep(ptr, FalloutScript::Footsteps::Slot::Land);
         const Fall::Settings settings = Fall::Settings::fromGameSettings(
             [this](std::string_view name) -> std::optional<double> { return gameSetting(name); });
         const double damage = Fall::damage(settings, heightLost);
@@ -157,6 +188,7 @@ namespace OFScript
             return true;
         if (OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager())
             windows->activateHitOverlay();
+        painRumble();
         // The damage of a fall has no attacker and no armor: it is taken off the health as it is, after what the
         // difficulty of the game makes of the damage to the player
         const double toPlayer = Fall::damageToPlayerMultiplier(gameDifficulty());

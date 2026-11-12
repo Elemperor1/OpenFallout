@@ -2,6 +2,7 @@
 #define GAME_SOUND_SOUNDMANAGER_H
 
 #include <map>
+#include <random>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -14,6 +15,7 @@
 
 #include "../mwbase/soundmanager.hpp"
 
+#include "falloutsound.hpp"
 #include "regionsoundselector.hpp"
 #include "soundbuffer.hpp"
 #include "type.hpp"
@@ -118,6 +120,17 @@ namespace OFSound
 
         SoundBuffer* insertSound(const std::string& soundId, const ESM::Sound* sound);
 
+        /// The sound records of Fallout, made when one is first asked for (the store of records is read by then)
+        std::unique_ptr<FalloutSounds> mFalloutSounds;
+        /// The pick of a file of a folder and the shifts of pitch: not the generator that the game uses, which sound
+        /// must not move
+        std::minstd_rand mSoundRandom{ 0x5eed };
+        /// How many times each sound record was played, for the log at the end of a run (what a round can say of sound)
+        std::map<std::string, unsigned> mFalloutPlayed;
+        FalloutSounds* falloutSounds();
+        Sound* playFalloutRecord(const FalloutSound& record, const OFWorld::ConstPtr& reference, float volume,
+            Type type, PlayMode mode);
+
         // returns a decoder to start streaming, or nullptr if the sound was not found
         DecoderPtr loadVoice(VFS::Path::NormalizedView voicefile);
 
@@ -136,7 +149,7 @@ namespace OFSound
         Sound* playSound(SoundBuffer* sfx, float volume, float pitch, Type type = Type::Sfx,
             PlayMode mode = PlayMode::Normal, float offset = 0);
         Sound* playSound3D(const OFWorld::ConstPtr& ptr, SoundBuffer* sfx, float volume, float pitch, Type type,
-            PlayMode mode, float offset);
+            PlayMode mode, float offset, const FalloutScript::SoundData* curve = nullptr, bool flat = false);
 
         void updateSounds(float duration);
         void updateRegionSound(float duration);
@@ -253,6 +266,12 @@ namespace OFSound
         ///< Sound::setPosition.
         ///< @param offset Number of seconds into the sound to start playback.
 
+        Sound* playFalloutSound(std::string_view editorId, const OFWorld::ConstPtr& reference, float volume,
+            Type type = Type::Sfx, PlayMode mode = PlayMode::Normal) override;
+        Sound* playFalloutSound(ESM::FormId sound, const OFWorld::ConstPtr& reference, float volume,
+            Type type = Type::Sfx, PlayMode mode = PlayMode::Normal) override;
+        bool hasFalloutSound(std::string_view editorId) override;
+
         void stopSound(Sound* sound) override;
         ///< Stop the given sound from playing
         /// @note no-op if \a sound is null
@@ -296,6 +315,8 @@ namespace OFSound
             const osg::Vec3f& pos, const osg::Vec3f& dir, const osg::Vec3f& up, bool underwater) override;
 
         void setListenerVel(const osg::Vec3f& vel) override;
+
+        osg::Vec3f getListenerPosition() const override { return mListenerPos; }
 
         void updatePtr(const OFWorld::ConstPtr& old, const OFWorld::ConstPtr& updated) override;
 

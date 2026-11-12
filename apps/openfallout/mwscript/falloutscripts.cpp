@@ -77,6 +77,7 @@
 #include "../mwbase/luamanager.hpp"
 #include "../mwbase/mechanicsmanager.hpp"
 #include "../mwbase/soundmanager.hpp"
+#include "../mwsound/falloutsound.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
 #include "../mwclass/esm4base.hpp"
@@ -2779,9 +2780,10 @@ namespace OFScript
         // The blow that hurts the player flashes the screen red, as the fall of the engine does
         if (victim == mPlayer && dealt > 0)
         {
-            runOnMainThread([] {
+            runOnMainThread([this] {
                 if (OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager())
                     windows->activateHitOverlay();
+                painRumble();
             });
         }
         if (limb >= 0)
@@ -3105,15 +3107,12 @@ namespace OFScript
         }
         if (files.empty())
             return;
-        const std::string& file = files.size() == 1
-            ? files[0]
-            : files[std::uniform_int_distribution<std::size_t>(0, files.size() - 1)(mWeaponSoundRandom)];
-        const VFS::Path::Normalized path(file);
-        // A weapon that fires faster than its sound lasts does not cut the shot before off
+        // A weapon that fires faster than its sound lasts does not cut the shot before off. The record says how far the
+        // shot is heard and how loud it is there.
         if (attacker == mPlayer)
-            sound->playSound(path, 1.f, 1.f, OFSound::Type::Sfx, OFSound::PlayMode::OverlapNoEnv);
+            sound->playFalloutSound(id, OFWorld::ConstPtr(), 1.f, OFSound::Type::Sfx, OFSound::PlayMode::OverlapNoEnv);
         else if (const OFWorld::Ptr reference = findReference(attacker); !reference.isEmpty())
-            sound->playSound3D(reference, path, 1.f, 1.f, OFSound::Type::Sfx, OFSound::PlayMode::Overlap);
+            sound->playFalloutSound(id, reference, 1.f, OFSound::Type::Sfx, OFSound::PlayMode::Overlap);
     }
 
     bool FalloutScripts::keepWeaponLoop(FalloutScript::FormId attacker, FalloutScript::FormId weapon, double interval)
@@ -4129,35 +4128,12 @@ namespace OFScript
         }
         std::vector<std::string> files;
         if (const ESM4::Sound* sound = mStore.get<ESM4::Sound>().search(refId(id)))
-            if (!sound->mSoundFile.empty())
-                if (const Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem())
-                {
-                    const VFS::Manager& vfs = *resources->getVFS();
-                    std::string folder = VFS::Path::normalizeFilename(sound->mSoundFile);
-                    if (!folder.empty() && folder.back() == VFS::Path::separator)
-                    {
-                        // A sound record can name a folder (half of the sound records of New Vegas do), of which the
-                        // game plays one file
-                        if (folder.compare(0, 6, "sound/") != 0)
-                            folder.insert(0, "sound/");
-                        for (const VFS::Path::Normalized& file : vfs.getRecursiveDirectoryIterator(folder))
-                        {
-                            const std::string_view extension = file.extension().value();
-                            if (extension == "wav" || extension == "ogg" || extension == "mp3")
-                                files.push_back(file.value());
-                        }
-                    }
-                    else
-                    {
-                        // As for every sound record: the mp3 a wav was converted to, when that is what there is
-                        constexpr VFS::Path::NormalizedView soundDir("sound");
-                        constexpr VFS::Path::ExtensionView mp3("mp3");
-                        const VFS::Path::Normalized path = Misc::ResourceHelpers::correctResourcePath(
-                            { { soundDir } }, VFS::Path::toNormalized(sound->mSoundFile), vfs, mp3);
-                        if (vfs.exists(path))
-                            files.push_back(path.value());
-                    }
-                }
+            if (const Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem())
+                // A sound record can name a folder (half of the sound records of New Vegas do), of which the game plays
+                // one file
+                for (const VFS::Path::Normalized& file :
+                    OFSound::falloutSoundFiles(sound->mSoundFile, *resources->getVFS()))
+                    files.push_back(file.value());
         const std::lock_guard lock(mSoundFilesMutex);
         mSoundFiles.emplace(id, files);
         return files;

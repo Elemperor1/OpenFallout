@@ -72,6 +72,7 @@ namespace OFLua
             { "invertYAxis", "Input", "invert y axis", true },
             { "crosshair", "HUD", "crosshair", true },
             { "subtitles", "GUI", "subtitles", true },
+            { "rumble", "Input", "gamepad rumble", true },
         };
 
         const Option& findOption(std::string_view name)

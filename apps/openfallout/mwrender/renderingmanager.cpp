@@ -1042,17 +1042,14 @@ namespace OFRender
         const bool dead = scripts->isPlayerDead();
         const bool drawn = scripts->isPlayerWeaponDrawn() && !dead;
         const bool wantArms = !thirdPerson && drawn;
+        // The body is made in the first person too, and kept up to date (it holds what the player holds, and holsters
+        // when the player does): it is not drawn there, but it goes on moving, and its steps and the sounds that its
+        // animations name are what the player hears
         if (mPlayerBody == nullptr)
-        {
-            if (!thirdPerson && !wantArms)
-                return;
             mPlayerBody = std::make_unique<FalloutPlayerBody>(
                 mPlayerNode, mSceneRoot, mResourceSystem, mFirstPersonFieldOfView, this);
-        }
         mPlayerBody->setVisible(thirdPerson);
         mPlayerBody->setArmsVisible(wantArms);
-        if (!thirdPerson && !wantArms)
-            return;
         const OFWorld::Ptr& player = mPlayerAnimation->getPtr();
         const std::uint64_t revision = scripts->playerBodyRevision();
         // A player who is alive again (revived, or a game loaded) stands: the body that fell is made again

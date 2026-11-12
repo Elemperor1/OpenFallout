@@ -213,6 +213,27 @@ void ESM4::Armor::load(ESM4::Reader& reader)
                 else
                     reader.skipSubRecordData();
                 break;
+            case ESM::fourCC("SNAM"): // FONV
+                if (subHdr.dataSize == 12)
+                {
+                    // The sound, its chance, three bytes of nothing, and the type
+                    WornSound sound;
+                    reader.getFormId(sound.mSound);
+                    reader.get(sound.mChance);
+                    std::uint8_t padding[3];
+                    reader.get(padding);
+                    reader.get(sound.mType);
+                    mSounds.push_back(sound);
+                }
+                else
+                    reader.skipSubRecordData();
+                break;
+            case ESM::fourCC("TNAM"): // the armor whose sounds this one uses
+                if (subHdr.dataSize == 4)
+                    reader.getFormId(mTemplate);
+                else
+                    reader.skipSubRecordData();
+                break;
             case ESM::fourCC("MODT"):
             case ESM::fourCC("MO2B"):
             case ESM::fourCC("MO3B"):
@@ -226,7 +247,6 @@ void ESM4::Armor::load(ESM4::Reader& reader)
             case ESM::fourCC("RNAM"): // race formid
             case ESM::fourCC("KSIZ"):
             case ESM::fourCC("KWDA"):
-            case ESM::fourCC("TNAM"):
             case ESM::fourCC("BAMT"):
             case ESM::fourCC("BIDS"):
             case ESM::fourCC("BMCT"):
@@ -239,7 +259,6 @@ void ESM4::Armor::load(ESM4::Reader& reader)
             case ESM::fourCC("MODS"): // FO3
             case ESM::fourCC("MO3S"): // FO3
             case ESM::fourCC("BNAM"): // FONV
-            case ESM::fourCC("SNAM"): // FONV
             case ESM::fourCC("DAMC"): // Destructible
             case ESM::fourCC("DEST"):
             case ESM::fourCC("DMDC"):

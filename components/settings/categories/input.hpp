@@ -25,6 +25,7 @@ namespace Settings
         SettingValue<bool> mInvertXAxis{ mIndex, "Input", "invert x axis" };
         SettingValue<bool> mInvertYAxis{ mIndex, "Input", "invert y axis" };
         SettingValue<bool> mEnableController{ mIndex, "Input", "enable controller" };
+        SettingValue<bool> mGamepadRumble{ mIndex, "Input", "gamepad rumble" };
         SettingValue<float> mGamepadCursorSpeed{ mIndex, "Input", "gamepad cursor speed",
             makeMaxStrictSanitizerFloat(0) };
         SettingValue<float> mJoystickDeadZone{ mIndex, "Input", "joystick dead zone",

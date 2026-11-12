@@ -23,6 +23,7 @@
 #include <components/esm/refid.hpp>
 #include <components/esm4/effectlist.hpp>
 #include <components/esm4/loadnpc.hpp>
+#include <components/falloutscript/footsteps.hpp>
 #include <components/falloutscript/actors.hpp>
 #include <components/falloutscript/actortraits.hpp>
 #include <components/falloutscript/actorvalues.hpp>
@@ -1926,6 +1927,12 @@ namespace OFScript
         /// rule of Morrowind that the controller has is not used. False for a character that is not the player, whose
         /// falls the rule does not read yet.
         bool landed(const OFWorld::Ptr& ptr, float heightLost);
+        /// The player jumps: the sound of the jump (New Vegas) from the ground it leaves
+        void jumped(const OFWorld::Ptr& ptr);
+        /// The pad shakes because the player was hurt, as the games' settings fRumblePainStrength and fRumblePainTime say
+        void painRumble();
+        /// The sound of the ground for a landing or a jump, from where the actor stands
+        void playGroundStep(const OFWorld::Ptr& ptr, FalloutScript::Footsteps::Slot slot);
         /// A number that changes when what `playerBody` gives changes (the sex, race or look, armor put on or taken
         /// off), cheap enough to ask every frame
         std::uint64_t playerBodyRevision();

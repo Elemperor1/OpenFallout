@@ -183,6 +183,19 @@ namespace ESM4
         std::vector<ESM::FormId> mAddOns; // TES5 ARMA
         Data mData;
 
+        /// TNAM of New Vegas: the armor (an audio template, as `ArmorHeavyAudioTemplate`) whose sounds this one has when it
+        /// has none of its own
+        ESM::FormId mTemplate;
+        /// SNAM of New Vegas: the sounds that the animation text keys `Enum: Foley...` and `Enum: Armor...` of the one
+        /// who wears it play (the type is the number of the key: 17 to 19 foley sneak, walk and run, 20 to 22 armor)
+        struct WornSound
+        {
+            ESM::FormId mSound;
+            std::uint8_t mChance = 100;
+            std::uint32_t mType = 0;
+        };
+        std::vector<WornSound> mSounds;
+
         /// DNAM of Fallout 3 and New Vegas, absent from a record without one: the armor rating (what the games show),
         /// the flags that go with it, and the damage threshold (New Vegas only)
         bool mHasRating = false;

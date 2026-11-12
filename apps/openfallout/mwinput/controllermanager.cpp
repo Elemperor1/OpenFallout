@@ -597,6 +597,18 @@ namespace OFInput
         return true;
     }
 
+    void ControllerManager::rumble(float strength, float seconds)
+    {
+        if (!Settings::input().mGamepadRumble || strength <= 0.f || seconds <= 0.f)
+            return;
+        SDL_GameController* cntrl = mBindingsManager->getControllerOrNull();
+        if (cntrl == nullptr)
+            return;
+        const auto motor = static_cast<Uint16>(std::clamp(strength, 0.f, 1.f) * 65535.f);
+        const auto milliseconds = static_cast<Uint32>(std::clamp(seconds, 0.f, 10.f) * 1000.f);
+        SDL_GameControllerRumble(cntrl, motor, motor, milliseconds);
+    }
+
     float ControllerManager::getAxisValue(SDL_GameControllerAxis axis) const
     {
         SDL_GameController* cntrl = mBindingsManager->getControllerOrNull();

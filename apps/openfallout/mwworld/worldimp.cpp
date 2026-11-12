@@ -1,6 +1,8 @@
 #include "worldimp.hpp"
 
 #include <charconv>
+#include <set>
+#include <string>
 #include <vector>
 
 #include <osg/ComputeBoundsVisitor>
@@ -26,6 +28,7 @@
 #include <components/esm3/loadstat.hpp>
 #include <components/esm4/loadcell.hpp>
 #include <components/esm4/loaddoor.hpp>
+#include <components/esm4/loadltex.hpp>
 #include <components/esm4/loadstat.hpp>
 #include <components/esm4/loadwrld.hpp>
 
@@ -38,7 +41,10 @@
 
 #include <components/files/collections.hpp>
 
+#include <components/esm/esmterrain.hpp>
+#include <components/esmterrain/storage.hpp>
 #include <components/resource/bulletshape.hpp>
+#include <components/resource/bulletshapemanager.hpp>
 #include <components/esm4/loadtree.hpp>
 #include <components/resource/resourcesystem.hpp>
 #include <components/resource/scenemanager.hpp>
@@ -92,6 +98,7 @@
 #include "../mwphysics/collisiontype.hpp"
 #include "../mwphysics/object.hpp"
 #include "../mwphysics/physicssystem.hpp"
+#include "../mwrender/landmanager.hpp"
 
 #include "../mwsound/constants.hpp"
 
@@ -2207,6 +2214,102 @@ namespace OFWorld
             return false; // not castable if too deep or if not enough room to move actor to surface
         else
             return true;
+    }
+
+    int World::getFloorMaterial(const OFWorld::ConstPtr& actor, bool& stairs) const
+    {
+        stairs = false;
+        if (actor.isEmpty() || !actor.isInCell())
+            return -1;
+        // An actor with its feet in water has the material of water
+        constexpr int waterMaterial = 8;
+        if (isUnderwater(actor, 0.05f))
+            return waterMaterial;
+
+        const osg::Vec3f pos = actor.getRefData().getPosition().asVec3();
+        const OFPhysics::RayCastingResult hit = mPhysics->castRay(pos + osg::Vec3f(0.f, 0.f, 24.f),
+            pos - osg::Vec3f(0.f, 0.f, 48.f), { actor }, {},
+            OFPhysics::CollisionType_World | OFPhysics::CollisionType_HeightMap | OFPhysics::CollisionType_Door);
+        if (!hit.mHit)
+            return -1;
+
+        int material = -1;
+        const CellStore* cell = actor.getCell();
+        if (!hit.mHitObject.isEmpty())
+        {
+            const VFS::Path::Normalized model = hit.mHitObject.getClass().getCorrectedModel(hit.mHitObject);
+            if (!model.empty())
+            {
+                try
+                {
+                    if (const std::shared_ptr<const Resource::BulletShape> shape
+                        = mPhysics->getShapeManager()->getShape(model))
+                        material = shape->mHavokMaterial;
+                }
+                catch (const std::exception& e)
+                {
+                    // The files of a model can be missing (a plugin may have more than the archives hold): the ground
+                    // is then of no known material, and that is said once for the model
+                    static std::set<std::string> sSaid;
+                    if (sSaid.emplace(std::string(model.value())).second)
+                        Log(Debug::Warning) << "Material of the floor of " << model << " is not known: " << e.what();
+                }
+            }
+        }
+        else if (cell != nullptr && cell->getCell()->isExterior())
+        {
+            // The land: the texture that shows most where the foot comes down. Each quarter of a cell has a base
+            // texture and layers over it that show where their opacity is.
+            constexpr float cellSize = 4096.f;
+            constexpr float quarter = cellSize / 2.f;
+            const float x = hit.mHitPos.x();
+            const float y = hit.mHitPos.y();
+            const int cellX = static_cast<int>(std::floor(x / cellSize));
+            const int cellY = static_cast<int>(std::floor(y / cellSize));
+            const std::shared_ptr<const ESMTerrain::LandObject> land
+                = mRendering->getLandManager()->getLand(ESM::ExteriorCellLocation(cellX, cellY, cell->getCell()->getWorldSpace()));
+            const ESM::LandData* data = land != nullptr ? land->getData(0) : nullptr;
+            if (data != nullptr && data->isEsm4())
+            {
+                const float localX = x - static_cast<float>(cellX) * cellSize;
+                const float localY = y - static_cast<float>(cellY) * cellSize;
+                const bool right = localX >= quarter;
+                const bool top = localY >= quarter;
+                const ESM4::Land::Texture& texture = data->getEsm4Texture((right ? 1 : 0) + (top ? 2 : 0));
+                ESM::FormId ltex = ESM::FormId::fromUint32(texture.base.formId);
+                // The point of the 17 by 17 grid of the quarter that is nearest
+                const int gridX = std::clamp(static_cast<int>(std::lround((localX - (right ? quarter : 0.f)) / quarter * 16.f)), 0, 16);
+                const int gridY = std::clamp(static_cast<int>(std::lround((localY - (top ? quarter : 0.f)) / quarter * 16.f)), 0, 16);
+                const int position = gridY * 17 + gridX;
+                float strongest = 0.5f;
+                for (const ESM4::Land::TxtLayer& layer : texture.layers)
+                    for (const ESM4::Land::VTXT& point : layer.data)
+                        if (point.position == position && point.opacity > strongest)
+                        {
+                            strongest = point.opacity;
+                            ltex = ESM::FormId::fromUint32(layer.texture.formId);
+                        }
+                if (!ltex.isZeroOrUnset())
+                    if (const ESM4::LandTexture* record = mStore.get<ESM4::LandTexture>().search(ESM::RefId::formIdRefId(ltex)))
+                        material = record->mHavokMaterial;
+            }
+        }
+        if (material < 0)
+        {
+            // Said for the first few: what the ground was where its material was not known
+            static int sSaid = 0;
+            if (sSaid < 30)
+            {
+                ++sSaid;
+                Log(Debug::Info) << "Floor material of " << actor.getCellRef().getRefId() << " not known: "
+                                 << (!hit.mHitObject.isEmpty()
+                                            ? "object " + std::string(hit.mHitObject.getClass().getCorrectedModel(hit.mHitObject).value())
+                                            : std::string(cell != nullptr && cell->getCell()->isExterior() ? "land" : "no object"));
+            }
+        }
+        // Whether the ground is stairs is a flag of the actor's movement in the executable (bit 0x1000000 of the flags at
+        // +0x410 of its process, tested at FalloutNV.exe 0x838750), which the physics sets and this does not know
+        return material;
     }
 
     bool World::isOnGround(const OFWorld::Ptr& ptr) const

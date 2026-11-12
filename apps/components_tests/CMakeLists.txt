@@ -207,10 +207,12 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testcaravan.cpp
     falloutscript/testcasino.cpp
     falloutscript/testslots.cpp
+    falloutscript/testsounddata.cpp
     falloutscript/testhotkeys.cpp
     falloutscript/testinteraction.cpp
     falloutscript/testderivedstats.cpp
     falloutscript/testfalldamage.cpp
+    falloutscript/testfootsteps.cpp
     falloutscript/testhardcore.cpp
     falloutscript/testequipment.cpp
     falloutscript/testfightai.cpp

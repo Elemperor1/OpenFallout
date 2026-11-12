@@ -2225,6 +2225,8 @@ namespace OFMechanics
                 else if (mJumpState != JumpState_InAir && vec.z() > 0.f)
                 {
                     mInJump = true;
+                    if (isPlayer && OFBase::Environment::get().hasFalloutScripts())
+                        OFBase::Environment::get().getFalloutScripts()->jumped(mPtr);
                     if (vec.x() == 0 && vec.y() == 0)
                         vec.z() = jumpHeight;
                     else

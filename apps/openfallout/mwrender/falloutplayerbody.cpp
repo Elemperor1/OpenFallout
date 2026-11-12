@@ -156,13 +156,12 @@ namespace OFRender
             clear();
             return false;
         }
-        // Only what shows is made now: a player who looks out of their own eyes has no use for the body, and the
-        // other way round
-        if (mVisible)
-            buildBody();
+        // The body is made even when it is not drawn (it keeps moving for the sounds of its steps); the arms only when
+        // they show
+        buildBody();
         if (mArmsVisible)
             buildArms();
-        return mAnimation != nullptr || mArms != nullptr || (!mVisible && !mArmsVisible);
+        return mAnimation != nullptr || mArms != nullptr;
     }
 
     void FalloutPlayerBody::buildBody()
@@ -174,7 +173,7 @@ namespace OFRender
             const OFWorld::Ptr& ptr = mRef->getPtr();
             mRoot = new osg::Group;
             mRoot->setName("Player Body");
-            mRoot->setNodeMask(mVisible ? ~0u : 0u);
+            mRoot->setNodeMask(mVisible ? ~0u : static_cast<unsigned>(Mask_UpdateVisitor));
             mParent->addChild(mRoot);
             mAnimation = new ESM4NpcAnimation(ptr, mRoot, mResourceSystem);
             // The character of the data stands still; the body walks as the player does
@@ -189,7 +188,7 @@ namespace OFRender
             mBodyFailed = true;
             return;
         }
-        Log(Debug::Info) << "Player body: made for the third person camera";
+        Log(Debug::Info) << "Player body: made " << (mVisible ? "for the third person camera" : "(not drawn: the camera is in the first person)");
         syncWeapon();
     }
 
@@ -230,10 +229,11 @@ namespace OFRender
     void FalloutPlayerBody::setVisible(bool visible)
     {
         mVisible = visible;
-        if (visible)
-            buildBody();
+        buildBody();
+        // A body that is not drawn still goes on moving, for the sounds of its steps (Mask_UpdateVisitor is the mask of
+        // the traversal that updates it, which the cull and the picking do not have)
         if (mRoot != nullptr)
-            mRoot->setNodeMask(visible ? ~0u : 0u);
+            mRoot->setNodeMask(visible ? ~0u : static_cast<unsigned>(Mask_UpdateVisitor));
     }
 
     void FalloutPlayerBody::setArmsVisible(bool visible)
@@ -241,6 +241,8 @@ namespace OFRender
         mArmsVisible = visible;
         if (visible)
             buildArms();
+        // The first-person sounds are the arms' (the body keeps its own quiet): they are only silenced when arms play
+        FalloutActorAnimation::setFirstPersonArmsShown(visible && mArms != nullptr);
         if (mArmsRoot != nullptr)
             mArmsRoot->setNodeMask(visible ? static_cast<unsigned>(Mask_FirstPerson) : 0u);
     }

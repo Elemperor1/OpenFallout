@@ -86,8 +86,10 @@ namespace ESM4
         std::string mEditorId;
 
         std::string mSoundFile;
-        SNDX mData;
-        SoundData mExtra;
+        SNDX mData{};
+        SoundData mExtra{};
+        // How many bytes of the sound data (SNDX or SNDD) the record has: a short one leaves the rest as it is
+        std::uint32_t mDataSize = 0;
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;
