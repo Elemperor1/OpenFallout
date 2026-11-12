@@ -340,6 +340,12 @@ function r.fight(actor, target, label)
             return string.format('inCombat=%s target=%s', tostring(core.combat.inCombat(form(actor))), core.combat.target(form(actor)))
         end)
         state = good and text or tostring(text)
+        -- the call does not say whether the fight began (a dead actor, or one that is out, is not started): it is a failed step when the
+        -- actor is not in a fight a moment after, so that a round does not pass without the fight that it asked for
+        local fighting, inCombat = pcall(core.combat.inCombat, form(actor))
+        if fighting and not inCombat then
+            ok, err = false, 'the fight did not begin (the actor is not in combat)'
+        end
     end
     return outcome('fight', ok, err, tostring(label or '-'), state)
 end

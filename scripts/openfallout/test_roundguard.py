@@ -138,6 +138,17 @@ class StateAndLock(unittest.TestCase):
         self.state.heavy_file.write_text("not json")
         self.assertEqual(self.state.settle_remaining(now=1010), 0.0)
 
+    def test_a_lock_that_is_a_link_is_refused_and_its_target_is_left_alone(self):
+        target = self.tmp / "precious.txt"
+        target.write_text("keep me", encoding="utf-8")
+        self.state.lock_file.parent.mkdir(parents=True, exist_ok=True)
+        self.state.lock_file.symlink_to(target)
+        with self.assertRaises(roundguard.Refused) as refused:
+            with roundguard.Lock(self.state.lock_file, "round x"):
+                self.fail("a lock that is a link must be refused")
+        self.assertIn("cannot be opened safely", refused.exception.reasons[0])
+        self.assertEqual(target.read_text(encoding="utf-8"), "keep me")
+
     def test_the_lock_is_held_by_one_at_a_time_and_says_by_whom(self):
         with roundguard.Lock(self.state.lock_file, "build"):
             with self.assertRaises(roundguard.Refused) as refused:

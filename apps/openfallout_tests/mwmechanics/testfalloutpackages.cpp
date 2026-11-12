@@ -310,6 +310,36 @@ namespace
         EXPECT_TRUE(falloutStraightWalkable(osg::Vec3f(5, 5, 0), osg::Vec3f(5, 5, 90), floor, clear));
     }
 
+    TEST(FalloutPackagesTest, aThinWallBetweenTwoProbesOfAStraightWalkIsNotMissed)
+    {
+        // A wall across +x at `wall`: the distance from a start to it, as the world would give it
+        const auto probeFor = [](float wall) {
+            return [wall](const osg::Vec3f& start, const osg::Vec3f& direction, float longest) {
+                if (direction.x() <= 0.f)
+                    return longest;
+                const float hit = (wall - start.x()) / direction.x();
+                return hit >= 0.f && hit < longest ? hit : longest;
+            };
+        };
+        // Probes 50 units apart, as the walk takes them; every wall between the first and the last unit of the line
+        // is met by one of them (the last unit is the tolerance at the end, where the target may stand against a wall)
+        for (float wall = 2.f; wall <= 148.5f; wall += 0.25f)
+        {
+            bool met = false;
+            for (float from = 0.f; from < 150.f; from += 50.f)
+                met = met
+                    || falloutSegmentBlocked(osg::Vec3f(from, 0, 0), osg::Vec3f(from + 50.f, 0, 0), probeFor(wall),
+                        { 35.f, 100.f });
+            EXPECT_TRUE(met) << "a wall at " << wall << " was not met";
+        }
+        // Nothing in the way, and a segment that is no longer than a unit
+        EXPECT_FALSE(falloutSegmentBlocked(
+            osg::Vec3f(0, 0, 0), osg::Vec3f(50, 0, 0), [](const osg::Vec3f&, const osg::Vec3f&, float longest) { return longest; },
+            { 35.f }));
+        EXPECT_FALSE(falloutSegmentBlocked(
+            osg::Vec3f(0, 0, 0), osg::Vec3f(0.5f, 0, 0), probeFor(0.2f), { 35.f }));
+    }
+
     TEST(FalloutPackagesTest, aStraightWalkIsNotMadeWhereThereIsNoFloorOrTheFloorJumps)
     {
         const auto clear = [](const osg::Vec3f&, const osg::Vec3f&) { return false; };

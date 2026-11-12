@@ -506,30 +506,40 @@ class Pictures:
         return self.done and self.saved >= self.asked
 
 
-def stop_engine(process):
-    """Asks the engine's process group to quit (a polite SIGTERM, the engine quits on its own way), and ends it if it does not."""
+def kill_engine(process):
+    """Ends the engine's process group at once (SIGKILL): an engine that waits for a window system that does not answer cannot act on
+    a polite SIGTERM, and every second it stays is a second more that it holds up. Gives whether the engine is confirmed gone (the
+    process was reaped): on a stalled system it may not be, and the runner must not take that for an end."""
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        return True
+    try:
+        process.wait(timeout=10)
+        return True
+    except subprocess.TimeoutExpired:
+        return False
+
+
+def stop_engine(process, guard=None, patience=30.0):
+    """Asks the engine's process group to quit (a polite SIGTERM, the engine quits on its own way), and ends it if it does not within
+    `patience` seconds, or at once when the guard trips while it waits (the kill switch, a window system that stopped answering).
+    Gives (the engine is confirmed gone, the reason that the guard gave while it waited or None)."""
     try:
         os.killpg(process.pid, signal.SIGTERM)
     except ProcessLookupError:
-        return
-    try:
-        process.wait(timeout=30)
-    except subprocess.TimeoutExpired:
-        os.killpg(process.pid, signal.SIGKILL)
-        process.wait()
-
-
-def kill_engine(process):
-    """Ends the engine's process group at once (SIGKILL): an engine that waits for a window system that does not answer cannot act on
-    a polite SIGTERM, and every second it stays is a second more that it holds up."""
-    try:
-        os.killpg(process.pid, signal.SIGKILL)
-    except ProcessLookupError:
-        return
-    try:
-        process.wait(timeout=10)
-    except subprocess.TimeoutExpired:
-        pass
+        return True, None
+    waited = 0.0
+    while waited < patience:
+        try:
+            process.wait(timeout=0.5)
+            return True, None
+        except subprocess.TimeoutExpired:
+            waited += 0.5
+        tripped = guard.problem() if guard is not None else None
+        if tripped:
+            return kill_engine(process), tripped
+    return kill_engine(process), None
 
 
 def engine_environment(extra, is_mac):
@@ -563,6 +573,7 @@ def run_engine(command, run_dir, limit, env_extra=None, priority="low", guard=No
     pictures = Pictures(run_dir / "config" / "openfallout.log")
     timed_out = ended_early = False
     tripped = None
+    gone = True
     while True:
         try:
             process.wait(timeout=0.5)
@@ -571,16 +582,23 @@ def run_engine(command, run_dir, limit, env_extra=None, priority="low", guard=No
             pass
         tripped = guard.problem() if guard is not None else None
         if tripped:
-            kill_engine(process)
+            gone = kill_engine(process)
             break
         if pictures.poll():
             ended_early = True
-            stop_engine(process)
+            gone, tripped = stop_engine(process, guard)
             break
         if time.monotonic() - started >= limit:
             timed_out = True
-            stop_engine(process)
+            gone, tripped = stop_engine(process, guard)
             break
+    if not gone:
+        # The process was not reaped after a SIGKILL (a stalled system): another build or round must not start on top of it, so the
+        # kill switch is set, which every later one is refused for until somebody has looked and resumed
+        reason = f"the engine (pid {process.pid}) did not end after SIGKILL; look at the process list, then run `round.py resume`"
+        print(reason, flush=True)
+        if guard is not None:
+            guard.state.stop(reason + "\n")
     sampler.stop()
     os.close(master)
     return process.returncode, time.monotonic() - started, sampler, timed_out, ended_early, tripped
@@ -714,11 +732,13 @@ def make_system():
     return roundguard.default_system(IS_MAC)
 
 
-def guard_root(args):
-    """The folder of the guards' files (lock, kill switch, acknowledgement): the folder of the results of the profile, or `--out`."""
+def guard_root(args, with_out=True):
+    """The folder of the guards' files (lock, kill switch, acknowledgement): the folder of the results that the profile names, or the
+    `--out` of the commands that are about the guards (`preflight`, `stop`, `resume`, `ack-panic`). A run passes `with_out=False`: its
+    `--out` moves its results only, and a build and a run of one profile must meet the same lock."""
     path = Path(args.profile)
     profile = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
-    out = getattr(args, "out", None) or profile.get("out")
+    out = (getattr(args, "out", None) if with_out else None) or profile.get("out")
     return absolute(out) if out else Path(tempfile.gettempdir()) / "openfallout-rounds"
 
 
@@ -764,7 +784,9 @@ def command_run(args):
     config = load_round(args.round, args)
     save = resolve_save(config, profile)
     out_root = absolute(args.out or profile.get("out") or Path(tempfile.gettempdir()) / "openfallout-rounds")
-    state, system = roundguard.State(out_root), make_system()
+    # The guards' files stay in one place whatever folder this run puts its results in: a build and a run of one profile must meet the
+    # same lock, kill switch and acknowledgement (`--out` moves the results only)
+    state, system = roundguard.State(guard_root(args, with_out=False)), make_system()
     variants = config["variants"]
     if args.variant:
         variants = [v for v in variants if v.get("name") in args.variant]

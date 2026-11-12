@@ -340,7 +340,15 @@ class Lock:
     def __enter__(self):
         import fcntl
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        handle = open(self.path, "a+", encoding="utf-8")
+        # The folder is the user's own (a shared temporary folder is not a place to trust: somebody else may have made it), and the
+        # lock is not a link that somebody else planted (a link would have the runner truncate and write into its target)
+        if os.stat(self.path.parent).st_uid != os.getuid():
+            raise Refused([f"the folder of the guards ({self.path.parent}) belongs to another user"])
+        try:
+            descriptor = os.open(self.path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+        except OSError as error:
+            raise Refused([f"the lock file ({self.path}) cannot be opened safely: {error.strerror}"])
+        handle = os.fdopen(descriptor, "a+", encoding="utf-8")
         try:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:

@@ -292,6 +292,11 @@ function handlers.equip(args)
     local stats = core.combat.weapon()
     log('equip', 'form=' .. tostring(chosen.form), 'result=' .. tostring(result), 'inHand=' .. tostring(stats.weapon),
         'rounds=' .. tostring(stats.rounds), 'range=' .. number(stats.range, 0))
+    -- the use of an item says what happened, and nothing (an empty answer) when nothing did: the weapon is not in the hand then
+    if result == nil or result == '' then
+        log('error', 'equip', 'nothing happened when the weapon was used', tostring(chosen.form))
+        return { ok = false }
+    end
     return { ok = true, form = tostring(chosen.form) }
 end
 

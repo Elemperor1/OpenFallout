@@ -382,6 +382,14 @@ class ScenarioPlayer(unittest.TestCase):
         self.assertIn("ROUND\tfight\tok\tg1\tinCombat=true target=FormId:0x14", lines)
         self.assertIn("ROUND\tnote\tFormId:0x1629a4>FormId:0x14", lines)
 
+    def test_a_fight_that_did_not_begin_is_a_failed_step(self):
+        self.start("return function(r) "
+                   "r.core.combat = { start = function(a, b) end, "
+                   "inCombat = function() return false end, target = function() return '' end } "
+                   "r.fight({ id = '0x1629a4' }, r.player(), 'dead one') end")
+        self.tick(4)
+        self.assertTrue(any(line.startswith("ROUND\terror\tfight\tthe fight did not begin") for line in self.lines()))
+
     def test_enemy_makes_two_factions_enemies_and_says_so(self):
         self.start("return function(r) "
                    "local calls = {} "

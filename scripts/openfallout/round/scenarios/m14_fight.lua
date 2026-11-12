@@ -151,8 +151,7 @@ return { limit = 900, delay = 4, run = function(r)
     go(SITE_X, 'site X')
     local g1, g2 = lookup(SITE_X.gun1), lookup(SITE_X.gun2)
     if g1 == nil or g2 == nil then
-        r.log('C the placed gangers were not found: nothing to fight')
-        return
+        error('C the placed gangers were not found: there is nothing to fight, and a round with no fight must not pass')
     end
     -- they are taken to the open ground (their camp is a rocky slope) before the player goes there
     r.putAt(g1, { pos = { ARENA_C.x - 70, ARENA_C.y + 20 * M, ARENA_C.z }, yaw = math.pi, label = 'ganger1 to the arena' })
@@ -278,8 +277,7 @@ return { limit = 900, delay = 4, run = function(r)
     go(SITE_Y, 'site Y')
     e1 = lookup(SITE_Y.gun1)
     if e1 == nil then
-        r.log('E the placed ganger was not found: nothing to sneak up on')
-        return
+        error('E the placed ganger was not found: there is nothing to sneak up on, and a round with no ganger must not pass')
     end
     -- the data has the Powder Gangers neutral to the player (round 14F: "does not attack the player on sight"), so the two factions are made
     -- enemies, as a quest of the game does, and the character that notices the player goes for it

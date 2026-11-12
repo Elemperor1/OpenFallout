@@ -155,6 +155,23 @@ namespace OFMechanics
         return from + way * (distance / length);
     }
 
+    bool falloutSegmentBlocked(const osg::Vec3f& from, const osg::Vec3f& to, const FalloutRayProbe& ray,
+        std::initializer_list<float> heights)
+    {
+        const osg::Vec3f way = to - from;
+        const float length = way.length();
+        if (length <= 1.f)
+            return false;
+        const osg::Vec3f direction = way / length;
+        for (const float height : heights)
+        {
+            const osg::Vec3f start = from + osg::Vec3f(0.f, 0.f, height) - direction;
+            if (ray(start, direction, length + 1.f) < length)
+                return true;
+        }
+        return false;
+    }
+
     bool falloutStraightWalkable(const osg::Vec3f& from, const osg::Vec3f& to, const FalloutFloorProbe& floor,
         const FalloutWayProbe& blocked, float step, float stepHeight, float longest)
     {

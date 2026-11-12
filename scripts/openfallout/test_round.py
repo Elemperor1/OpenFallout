@@ -855,6 +855,57 @@ class GuardedBuild(unittest.TestCase):
             self.assertIsNotNone(roundguard_state(self.tmp).acknowledged())
 
 
+class GuardRoot(unittest.TestCase):
+    def test_a_run_keeps_the_guards_of_its_profile_whatever_folder_its_results_go_to(self):
+        tmp = Path(tempfile.mkdtemp(prefix="guard-root-"))
+        profile = tmp / "profile.json"
+        profile.write_text(json.dumps({"out": str(tmp / "a")}), encoding="utf-8")
+        args = mock.Mock(profile=str(profile), out=str(tmp / "b"))
+        self.assertEqual(round_runner.guard_root(args, with_out=False), tmp / "a")
+        # the commands about the guards take the folder they are told
+        self.assertEqual(round_runner.guard_root(args), tmp / "b")
+
+
+class StopEngine(unittest.TestCase):
+    """The end of an engine: a polite stop that the guard can cut short, and a kill that says whether the process is gone."""
+
+    @staticmethod
+    def stubborn():
+        """A process in its own group that ignores SIGTERM (an engine waiting for a window system)."""
+        import subprocess
+        code = "import signal, sys, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); print('up', flush=True); time.sleep(60)"
+        process = subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE, start_new_session=True)
+        process.stdout.readline()                                    # the handler is set
+        return process
+
+    def test_a_guard_that_trips_cuts_the_polite_stop_short(self):
+        process = self.stubborn()
+        guard = mock.Mock()
+        guard.problem.return_value = "the window system stopped answering"
+        began = time.monotonic()
+        gone, tripped = round_runner.stop_engine(process, guard, patience=30.0)
+        self.assertTrue(gone)
+        self.assertEqual(tripped, "the window system stopped answering")
+        self.assertLess(time.monotonic() - began, 10)
+        self.assertIsNotNone(process.poll())
+
+    def test_a_stop_that_is_not_answered_in_time_kills(self):
+        process = self.stubborn()
+        gone, tripped = round_runner.stop_engine(process, None, patience=1.0)
+        self.assertTrue(gone)
+        self.assertIsNone(tripped)
+        self.assertIsNotNone(process.poll())
+
+    def test_an_engine_that_is_not_reaped_is_not_taken_for_gone(self):
+        import subprocess
+        process = mock.Mock(pid=2 ** 22 + 12345)
+        process.wait.side_effect = subprocess.TimeoutExpired("engine", 10)
+        with mock.patch.object(round_runner.os, "killpg"):
+            self.assertFalse(round_runner.kill_engine(process))
+        with mock.patch.object(round_runner.os, "killpg", side_effect=ProcessLookupError):
+            self.assertTrue(round_runner.kill_engine(process))
+
+
 def roundguard_state(tmp):
     """The guards' state of the folder of results `<tmp>/out`."""
     return round_runner.roundguard.State(tmp / "out")

@@ -944,15 +944,12 @@ namespace OFMechanics
             };
             // The knees and the chest of the walker
             const auto blocked = [&world](const osg::Vec3f& a, const osg::Vec3f& b) {
-                for (const float height : { straightKneeHeight, straightChestHeight })
-                {
-                    const osg::Vec3f start(a.x(), a.y(), a.z() + height);
-                    const osg::Vec3f way(b.x() - a.x(), b.y() - a.y(), b.z() - a.z());
-                    const float length = way.length();
-                    if (length > 1.f && world.getDistToNearestRayHit(start, way, length) < length - 1.f)
-                        return true;
-                }
-                return false;
+                return falloutSegmentBlocked(
+                    a, b,
+                    [&world](const osg::Vec3f& start, const osg::Vec3f& direction, float longest) {
+                        return world.getDistToNearestRayHit(start, direction, longest);
+                    },
+                    { straightKneeHeight, straightChestHeight });
             };
             return falloutStraightWalkable(from, to, floor, blocked);
         }

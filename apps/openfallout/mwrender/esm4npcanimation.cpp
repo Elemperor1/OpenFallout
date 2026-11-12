@@ -331,6 +331,26 @@ namespace OFRender
             images.mHairColour = osg::Vec3f(
                 traits.mHairColour.red / 255.f, traits.mHairColour.green / 255.f, traits.mHairColour.blue / 255.f);
 
+        // The hands of the first person show whatever the character wears: a piece that covers a hand (gloves, power
+        // armor) takes the race's hand out of the list for the third person, and the first-person file of that piece is
+        // not looked for here, so the race's own hand stays as the fallback (a review of the PR found the hand missing)
+        OFClass::FalloutNpcParts shown = parts;
+        if (mFirstPerson)
+        {
+            const OFClass::FalloutNpcParts bare = OFClass::falloutNpcParts(*race, isFemale, nullptr, {}, {});
+            for (const OFClass::FalloutNpcPart& hand : bare.mParts)
+            {
+                if (hand.mKind != OFClass::FalloutPartKind::Hand)
+                    continue;
+                const bool listed = std::any_of(shown.mParts.begin(), shown.mParts.end(),
+                    [&hand](const OFClass::FalloutNpcPart& other) {
+                        return other.mKind == OFClass::FalloutPartKind::Hand
+                            && Misc::StringUtils::ciEqual(other.mModel, hand.mModel);
+                    });
+                if (!listed)
+                    shown.mParts.push_back(hand);
+            }
+        }
         std::size_t inserted = 0;
         std::size_t missing = 0;
         std::size_t morphed = 0;
@@ -340,7 +360,7 @@ namespace OFRender
         std::size_t wornSkin = 0;
         std::string hairTexture;
         std::string eyeTexture;
-        for (const OFClass::FalloutNpcPart& listed : parts.mParts)
+        for (const OFClass::FalloutNpcPart& listed : shown.mParts)
         {
             OFClass::FalloutNpcPart npcPart = listed;
             if (mFirstPerson)
