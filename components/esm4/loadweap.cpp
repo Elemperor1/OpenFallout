@@ -72,6 +72,9 @@ ESM4::Weapon::GameData ESM4::Weapon::decodeGameData(const std::vector<std::uint8
     data.mAttackMultiplier = field<float>(bytes, 60, 1.f);
     data.mFireRate = field<float>(bytes, 64);
     data.mOverrideActionPoints = field<float>(bytes, 68);
+    data.mRumbleLeftMotor = field<float>(bytes, 72);
+    data.mRumbleRightMotor = field<float>(bytes, 76);
+    data.mRumbleDuration = field<float>(bytes, 80);
     data.mOverrideDamageToWeaponMult = field<float>(bytes, 84, 1.f);
     data.mAttacksPerSecond = field<float>(bytes, 88);
     data.mReloadTime = field<float>(bytes, 92);

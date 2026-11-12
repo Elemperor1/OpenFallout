@@ -149,6 +149,10 @@ namespace ESM4
             float mAttackMultiplier = 1.f;
             float mFireRate = 0.f;
             float mOverrideActionPoints = 0.f;
+            /// The rumble of a shot on a pad: the strengths of its left and right motors (0 to 1) and how long it lasts
+            float mRumbleLeftMotor = 0.f;
+            float mRumbleRightMotor = 0.f;
+            float mRumbleDuration = 0.f;
             float mOverrideDamageToWeaponMult = 1.f;
             float mAttacksPerSecond = 0.f;
             float mReloadTime = 0.f;

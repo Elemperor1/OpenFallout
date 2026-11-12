@@ -1,6 +1,7 @@
 #ifndef GAME_MWBASE_INPUTMANAGER_H
 #define GAME_MWBASE_INPUTMANAGER_H
 
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -23,6 +24,11 @@ namespace ESM
 namespace MyGUI
 {
     class Widget;
+}
+
+namespace OFInput::TriggerFeel
+{
+    struct Weapon;
 }
 
 namespace OFBase
@@ -112,6 +118,16 @@ namespace OFBase
         /// The pad vibrates with the given strength (0 to 1) for the given seconds, when there is a pad and the setting for
         /// its vibration is on
         virtual void rumble(float strength, float seconds) = 0;
+
+        /// What the game says about the player for the feel of the pad's triggers, once a frame: the weapon in the
+        /// hands (none: no weapon), whether it is out of the holster, and whether a menu or another screen of the game
+        /// is open. The input manager adds what it knows itself (the window's focus, the windows of the engine, the
+        /// setting) and clears the resistance when any of them says so.
+        virtual void setTriggerState(const std::optional<OFInput::TriggerFeel::Weapon>& weapon, bool drawn, bool menu)
+            = 0;
+        /// The player's weapon fired or swung: the fire trigger of a pad with trigger motors buzzes (on the next frame;
+        /// it may be called from any thread)
+        virtual void weaponFired() = 0;
         virtual bool isIdle() const = 0;
 
         virtual void executeAction(int action) = 0;

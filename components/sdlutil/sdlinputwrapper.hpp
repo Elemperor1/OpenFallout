@@ -36,6 +36,8 @@ namespace SDLUtil
         void setMouseVisible(bool visible);
         void setMouseRelative(bool relative);
         bool getMouseRelative() { return mMouseRelative; }
+        /// Whether the window has the keyboard focus (the game is the app in front)
+        bool windowHasFocus() const { return mWindowHasFocus; }
         void setGrabPointer(bool grab);
 
         void warpMouse(int x, int y);

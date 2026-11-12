@@ -82,6 +82,18 @@ Input Settings
    Disable to avoid controller interference or for split-screen setups.
 
 .. omw-setting::
+   :title: gamepad trigger effects
+   :type: boolean
+   :range: true, false
+   :default: true
+
+   Whether the fire trigger feels the weapon in the player's hands.
+   On a DualSense the trigger resists as the weapon does (a gun's trigger gives way at its break, an automatic one
+   resists lightly to the end of the pull); on an Xbox One or Series controller the trigger motor buzzes with each shot
+   (this also needs ``gamepad rumble``). The resistance is cleared in menus, while the weapon is holstered and while the
+   game window does not have the focus. Controllers without these features ignore the setting.
+
+.. omw-setting::
    :title: gamepad cursor speed
    :type: float32
    :range: >0

@@ -3,15 +3,20 @@
 
 #include <array>
 #include <filesystem>
+#include <memory>
+#include <optional>
 #include <string>
 
 #include <components/sdlutil/events.hpp>
 #include <components/settings/settings.hpp>
 
+#include "triggerfeel.hpp"
+
 namespace OFInput
 {
     class BindingsManager;
     class MouseManager;
+    class TriggerDevice;
 
     class ControllerManager : public SDLUtil::ControllerListener
     {
@@ -20,7 +25,7 @@ namespace OFInput
             const std::filesystem::path& userControllerBindingsFile,
             const std::filesystem::path& controllerBindingsFile);
 
-        virtual ~ControllerManager() = default;
+        virtual ~ControllerManager();
 
         void update(float dt);
 
@@ -52,6 +57,15 @@ namespace OFInput
         void rumble(float strength, float seconds);
         bool padPick() const { return mPadPick; }
 
+        /// The feel of the fire trigger (the right one) for the game as it is and the weapon in the player's hands
+        /// (none: no weapon): the resistance of the weapon is set on a pad that can resist (a DualSense) while the
+        /// weapon is out in play with the window in front, and cleared in menus, in the holster and out of focus
+        void updateTriggers(const TriggerFeel::Situation& situation, const std::optional<TriggerFeel::Weapon>& weapon);
+
+        /// The player's weapon fired or swung: the fire trigger of a pad with trigger motors (an Xbox pad) buzzes with
+        /// the rumble of the weapon, when the vibration setting and the trigger effects are on
+        void weaponFired();
+
         // The buttons that a script hears for the two triggers, which are axes of the pad (they are no SDL button)
         static constexpr int sLeftTriggerButton = 100;
         static constexpr int sRightTriggerButton = 101;
@@ -80,6 +94,9 @@ namespace OFInput
 
         int getControllerType();
 
+        // The triggers of the pad in use, made again when the pad changes
+        TriggerDevice* triggerDevice();
+
         BindingsManager* mBindingsManager;
         MouseManager* mMouseManager;
 
@@ -97,6 +114,11 @@ namespace OFInput
         // the release of a trigger they heard)
         bool mLeftTriggerTold = false;
         bool mRightTriggerTold = false;
+        std::unique_ptr<TriggerDevice> mTriggerDevice;
+        SDL_GameController* mTriggerController = nullptr;
+        TriggerFeel::Planner mTriggerPlanner;
+        TriggerFeel::Situation mTriggerSituation;
+        TriggerFeel::Feel mTriggerFeel;
     };
 }
 #endif
