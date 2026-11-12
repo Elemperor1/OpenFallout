@@ -30,7 +30,8 @@ jobs:
   # Documentation-only changes skip the platform builds.  The job fails open to a full
   # build: a problem in it leaves "code" empty, which the jobs below read as "build".
   Changes:
-    runs-on: ubuntu-latest
+    # Blacksmith sticky disks (Docker image cache) are shared, so only trusted master runs use them.
+    runs-on: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }}
     outputs:
       code: ${{ steps.classify.outputs.code }}
 
@@ -74,7 +75,8 @@ jobs:
   Ubuntu:
     needs: Changes
     if: ${{ !cancelled() && needs.Changes.outputs.code != 'false' && (github.event_name != 'workflow_dispatch' || !inputs.validate-release) }}
-    runs-on: ubuntu-latest
+    # Blacksmith sticky disks (Docker image cache) are shared, so only trusted master runs use them.
+    runs-on: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }}
     env:
       # Collect coverage without optimizer-induced changes to executable lines.
       BUILD_TYPE: Debug
@@ -303,6 +305,8 @@ jobs:
     #     name: build_artifact.7z
 
   MacOS:
+    # Keep check names independent of the runner label (CI/harness_release.py matches them).
+    name: MacOS (${{ matrix.args.image }})
     needs: Changes
     if: ${{ !cancelled() && needs.Changes.outputs.code != 'false' && (github.event_name != 'workflow_dispatch' || !inputs.validate-release) }}
     strategy:
@@ -310,10 +314,13 @@ jobs:
       matrix:
         args:
           - image: macos-26
+            runner: blacksmith-6vcpu-macos-26
+          # Blacksmith macOS runners are Apple Silicon only, so the Intel build stays GitHub-hosted.
           - image: macos-26-intel
     uses: ./.github/workflows/macos.yml
     with:
       image: ${{ matrix.args.image }}
+      runner: ${{ matrix.args.runner }}
 
   Windows:
     needs: Changes
@@ -322,7 +329,7 @@ jobs:
       fail-fast: true
       matrix:
         image:
-        - "2022"
+        - "2025"
 
     uses: ./.github/workflows/windows.yml
     with:
@@ -333,6 +340,6 @@ jobs:
     name: Windows release packaging
     uses: ./.github/workflows/windows.yml
     with:
-      image: "2022"
+      image: "2025"
       build-type: Release
       package: true

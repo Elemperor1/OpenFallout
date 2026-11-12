@@ -22,8 +22,28 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  select-runner:
+    runs-on: ubuntu-24.04
+    outputs:
+      runner: ${{ steps.select.outputs.runner }}
+    steps:
+      - id: select
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          runner=ubuntu-24.04
+          if [[ "$EVENT_REF" == "refs/heads/$DEFAULT_BRANCH" ]] && \
+             [[ "$EVENT_NAME" == push || "$EVENT_NAME" == schedule || "$EVENT_NAME" == workflow_dispatch ]]; then
+            runner=blacksmith-4vcpu-ubuntu-2404
+          fi
+          echo "runner=$runner" >> "$GITHUB_OUTPUT"
+
   HTML:
-    runs-on: ubuntu-latest
+    # Blacksmith's Docker image cache uses shared sticky disks.
+    needs: select-runner
+    runs-on: ${{ needs.select-runner.outputs.runner }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
