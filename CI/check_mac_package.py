@@ -36,7 +36,8 @@ Local mode accepts an ad hoc signature and skips the gatekeeper step; release mo
 Gatekeeper's acceptance and the stapled tickets (CI runs it on the notarized build, CI/macos/release_signing.py).
 `--notes FILE` appends one release-notes line: the package, the result, the mode, the smoke result and the macOS version
 and chip of the machine that ran the check. `--smoke auto` runs the smoke step but reports it as
-skipped when the machine gives the engine no OpenGL context (a hosted CI runner may have none); run it with
+skipped when the machine gives the engine no OpenGL context, or only Apple's software renderer and the run does not
+finish there (a hosted CI runner has no GPU); run it with
 `--smoke run` on a Mac with a display before a release is tagged.
 
 The exit status is 0 when no step failed.
@@ -430,6 +431,7 @@ JIT_LINE = re.compile(r"LuaJIT compiler: (on|off) \(([^)]*)\); hot loop: (\w+) c
                       re.MULTILINE)
 QUIT = "Quitting peacefully."
 NO_GL = re.compile(r"Failed to create SDL window|Failed to create GraphicsContext|GL context|OpenGL context", re.IGNORECASE)
+SOFTWARE_GL = "OpenGL Renderer: Apple Software Renderer"
 CI_HINT = ("run `CI/check_mac_package.py <package> --smoke run` on a Mac with a display before the release is tagged")
 
 
@@ -449,25 +451,27 @@ def prepare_smoke(work):
 
 
 def smoke_verdict(text, expect_jit):
-    """(problems, the compiler state the log shows or None, whether the engine had no OpenGL context)."""
+    """(compiler problems, other problems, the compiler state the log shows or None, whether the engine had no
+    OpenGL context)."""
     jit = JIT_LINE.search(text)
     state = None
+    compiler = []
     problems = []
     if jit:
         state = f"{jit.group(1)} ({jit.group(2)}); hot loop: {jit.group(3)} compiled trace(s), {jit.group(4)} aborted{jit.group(5)}"
         compiled = jit.group(1) == "on" and jit.group(3).isdigit() and int(jit.group(3)) > 0
         if expect_jit == "on" and not compiled:
-            problems.append(f"the LuaJIT compiler should be on and compile hot code; the engine says: {state}")
+            compiler.append(f"the LuaJIT compiler should be on and compile hot code; the engine says: {state}")
         if expect_jit == "off" and compiled:
-            problems.append(f"the LuaJIT compiler should be off; the engine says: {state}")
+            compiler.append(f"the LuaJIT compiler should be off; the engine says: {state}")
     else:
-        problems.append("the log has no LuaJIT compiler line (is the engine older than this check?)")
+        compiler.append("the log has no LuaJIT compiler line (is the engine older than this check?)")
     if not STARTED.search(text):
         problems.append("the game did not start (the Lua player script never ran in the cell)")
     if QUIT not in text:
         problems.append("the engine did not quit peacefully (no 'Quitting peacefully.' in the log)")
     no_gl = not STARTED.search(text) and NO_GL.search(text) is not None
-    return problems, state, no_gl
+    return compiler, problems, state, no_gl
 
 
 def stop_engine(app):
@@ -497,7 +501,7 @@ def check_smoke(app, options):
         if launched.returncode != 0:
             helper_error = f"the launch helper (open) failed: {launched.stderr.strip()}"
     text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
-    problems, state, no_gl = smoke_verdict(text, options.expect_jit)
+    compiler, problems, state, no_gl = smoke_verdict(text, options.expect_jit)
     print(f"smoke: LuaJIT compiler: {state or 'not reported'} (log: {log})")
     if no_gl and options.smoke == "auto":
         raise SmokeSkipped(f"this machine gave the engine no OpenGL context; {CI_HINT}")
@@ -511,6 +515,12 @@ def check_smoke(app, options):
         problems.insert(0, helper_error)
     if timed_out:
         problems.insert(0, f"the engine was still running after {options.seconds:g} s and was stopped")
+    # A hosted runner without a GPU gives Apple's software renderer. A run that does not finish there says nothing
+    # about a player's Mac, so auto mode reports it as skipped; the compiler state is still judged.
+    if problems and not compiler and options.smoke == "auto" and SOFTWARE_GL in text:
+        raise SmokeSkipped(f"this machine has only Apple's software renderer (no GPU) and the run did not finish there: "
+                           f"{'; '.join(problems)}; {CI_HINT}")
+    problems = compiler + problems
     if problems:
         raise StepFailed("; ".join(problems))
     return f"started in {STARTED.search(text).group(1)}, LuaJIT compiler: {state}, quit peacefully"

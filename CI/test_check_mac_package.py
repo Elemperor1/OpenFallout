@@ -279,6 +279,7 @@ JIT_ON = "[12:00:00.500 I] LuaJIT compiler: on (fold cse dce fwd dse narrow loop
 JIT_NOTHING_COMPILED = "[12:00:00.500 I] LuaJIT compiler: on (fold cse); hot loop: 0 compiled trace(s), 3 aborted, first abort error 27\n"
 QUIT = "[12:00:05.000 I] Quitting peacefully.\n"
 NO_GL = "[12:00:00.400 E] Error in framelistener: Failed to create SDL window: Could not create GL context\n"
+SOFTWARE_GL = "[12:00:00.300 I] OpenGL Renderer: Apple Software Renderer\n"
 
 
 @unittest.skipUnless(ON_MAC, "needs macOS, clang and codesign")
@@ -370,6 +371,27 @@ class SmokeRunTests(unittest.TestCase):
         status, output, _ = self.smoke(NO_GL, "--smoke", "run")
         self.assertEqual(status, 1, output)
         self.assertIn("FAIL smoke", output)
+
+    def test_software_renderer_run_that_does_not_finish_is_skipped_in_auto_mode_only(self):
+        crash = "\n\n*** Fatal Error ***\nInvalid address alignment (signal 10)\nAddress: 0x900000a00\n"
+        log = SOFTWARE_GL + JIT_ON + STARTED
+        status, output, _ = self.smoke(log, "--smoke", "auto", stderr=crash)
+        self.assertEqual(status, 0, output)
+        self.assertIn("SKIP smoke: this machine has only Apple's software renderer", output)
+        self.assertIn("Invalid address alignment (signal 10)", output)
+        status, output, _ = self.smoke(log, "--smoke", "run", stderr=crash)
+        self.assertEqual(status, 1, output)
+        self.assertIn("FAIL smoke", output)
+
+    def test_wrong_compiler_state_fails_in_auto_mode_even_on_the_software_renderer(self):
+        status, output, _ = self.smoke(SOFTWARE_GL + JIT_NOTHING_COMPILED + STARTED, "--smoke", "auto")
+        self.assertEqual(status, 1, output)
+        self.assertIn("the LuaJIT compiler should be on", output)
+
+    def test_software_renderer_run_that_finishes_passes(self):
+        status, output, _ = self.smoke(SOFTWARE_GL + JIT_ON + STARTED + QUIT, "--smoke", "auto")
+        self.assertEqual(status, 0, output)
+        self.assertIn("PASS smoke", output)
 
 
 # ------------------------------------------------------------------------------------------------------- release mode

@@ -30,7 +30,9 @@ stays green. A run on a tag or the default branch that has only some of the secr
    the smoke result and the macOS version and chip it ran on, e.g. `- OpenFallout-0.52.0-macOS-arm64.dmg: packaged-app
    check PASS (release mode; smoke SKIP) on macOS 26.1 (25B78), Apple M2 (Virtual), arm64`. `CI/harness_release.py`
    refuses to publish a release whose disk images lack that line. When the smoke step was skipped on the runner (no
-   OpenGL context), run `CI/check_mac_package.py <dmg> --mode release --smoke run --notes notes.md` on a Mac with a
+   OpenGL context, or only Apple's software renderer: the hosted arm64 runner has no GPU, and on 12 November 2026 the
+   engine ended there with a bus error about 9.5 s after the cell started, while the same package passed on a Mac with
+   a GPU), run `CI/check_mac_package.py <dmg> --mode release --smoke run --notes notes.md` on a Mac with a
    display and add its line to the release notes before publishing.
 
 Secret values never reach the log: the scripts echo every command with them replaced by `***` (GitHub masks them as

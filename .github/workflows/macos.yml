@@ -203,6 +203,7 @@ jobs:
         path: |
           ${{ runner.temp }}/package-check/config/openfallout.log
           ${{ runner.temp }}/package-check/*.log
+          ~/Library/Logs/DiagnosticReports/openfallout*.ips
         if-no-files-found: ignore
 
     - name: Store dmg
