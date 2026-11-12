@@ -244,7 +244,9 @@ namespace OFScript
         // ---- New Vegas's location sets and battle sets ----
         // The cell's own music record decides over the markers' sets; a cell that asks for no music (1NoMusic) has no music
         // of its record but keeps the sets of its markers (the doctor's house of Goodsprings has both)
-        const bool locations = !placeHasTracks && !scriptMusic;
+        // (while a script track plays the markers and the controller are still followed, so that the set of the place is not
+        // chosen again when the track is over; the mixer is not updated then)
+        const bool locations = !placeHasTracks;
         const MusicMarker* marker = nullptr;
         float fraction = 2.f;
         if (locations)

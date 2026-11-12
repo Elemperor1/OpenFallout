@@ -175,7 +175,7 @@ namespace OFScript
         const FalloutScript::DialogueSpeaker speaker{ station, base.toUint32() };
         // The station says a response of the topic: the conditions of the responses (the quests that run the station)
         // choose which, and its end script runs
-        const FalloutScript::DialogueView view = mDialogue.say(speaker, topic, 0, false, false, 0);
+        const FalloutScript::DialogueView view = mDialogue.say(speaker, topic, 0, true, false, 0);
         for (const FalloutScript::DialogueLine& line : view.mLines)
         {
             RadioPlayback::Line said;
@@ -469,12 +469,13 @@ namespace OFScript
             if (findReference(station.mReference).isEmpty())
                 continue;
             float& rest = radio.mRoomRest[station.mReference];
-            rest -= frametime;
-            if (rest > 0.f)
-                continue;
+            // The pause between two chains is of the time after the station has spoken
             const bool saying = std::any_of(mSayings.begin(), mSayings.end(),
                 [&](const Saying& other) { return other.mReference == station.mReference; });
             if (saying)
+                continue;
+            rest -= frametime;
+            if (rest > 0.f)
                 continue;
             // What it says goes on through the topics the responses offer, as the tuned station's does (the topic of
             // a chain is kept for it)

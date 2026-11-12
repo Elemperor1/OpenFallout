@@ -116,4 +116,34 @@ namespace FalloutScript::Radio
         mDiscovered.clear();
         mTuned = 0;
     }
+
+    void writeSaved(const Saved& saved, SaveWriter& out)
+    {
+        out.count(saved.mBroadcast.size());
+        for (const auto& [station, on] : saved.mBroadcast)
+        {
+            out.form(station);
+            out.boolean(on);
+        }
+        out.count(saved.mDiscovered.size());
+        for (const std::uint32_t station : saved.mDiscovered)
+            out.form(station);
+    }
+
+    void readSaved(Saved& saved, SaveReader& in, std::uint32_t /*version*/)
+    {
+        saved = Saved();
+        const std::size_t broadcasts = in.count(5);
+        for (std::size_t i = 0; i < broadcasts; ++i)
+        {
+            const std::optional<std::uint32_t> station = in.form();
+            const bool on = in.boolean();
+            if (station)
+                saved.mBroadcast[*station] = on;
+        }
+        const std::size_t discovered = in.count(4);
+        for (std::size_t i = 0; i < discovered; ++i)
+            if (const std::optional<std::uint32_t> station = in.form())
+                saved.mDiscovered.insert(*station);
+    }
 }

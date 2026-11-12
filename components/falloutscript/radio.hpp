@@ -7,6 +7,8 @@
 #include <span>
 #include <vector>
 
+#include "savestate.hpp"
+
 namespace FalloutScript::Radio
 {
     /// The radio of the games: a station is a talking activator (TACT with the radio flag) that is placed in the world with
@@ -125,6 +127,18 @@ namespace FalloutScript::Radio
     /// How loud the voice of a station is: the volume of the radio, less the static, and quieter while somebody speaks to
     /// the player
     float gainOf(const Signal& signal, bool dialogue, const Settings& settings);
+
+    /// What the radio keeps in a save: the stations that scripts turned on or off (SetBroadcastState) and those that the
+    /// player found
+    struct Saved
+    {
+        std::map<std::uint32_t, bool> mBroadcast;
+        std::set<std::uint32_t> mDiscovered;
+    };
+    constexpr std::uint32_t savedSectionVersion = 1;
+    void writeSaved(const Saved& saved, SaveWriter& out);
+    /// A station whose plugin is no longer loaded is dropped
+    void readSaved(Saved& saved, SaveReader& in, std::uint32_t version);
 
     /// A station as the receiver is told of it in an update
     struct Sighting

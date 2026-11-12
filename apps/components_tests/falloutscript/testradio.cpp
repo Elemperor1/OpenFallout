@@ -1,9 +1,12 @@
 #include <components/falloutscript/radio.hpp>
+#include <components/falloutscript/savestate.hpp>
 
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <optional>
 #include <set>
+#include <string>
 #include <vector>
 
 namespace
@@ -214,5 +217,55 @@ namespace
         receiver.reset();
         EXPECT_FALSE(receiver.discovered(7));
         EXPECT_FALSE(receiver.inReach(7));
+    }
+
+    TEST(FalloutScriptRadioTest, theStationsScriptsSetAndThoseFoundSurviveASave)
+    {
+        Saved saved;
+        saved.mBroadcast[0x0100AA01] = true;
+        saved.mBroadcast[0x0100AA02] = false;
+        saved.mDiscovered = { 0x0100AA01, 0x0100AA03 };
+        FalloutScript::SaveWriter out;
+        writeSaved(saved, out);
+        const std::string bytes = out.take();
+        FalloutScript::SaveReader in(bytes);
+        Saved loaded;
+        readSaved(loaded, in, savedSectionVersion);
+        EXPECT_EQ(loaded.mBroadcast, saved.mBroadcast);
+        EXPECT_EQ(loaded.mDiscovered, saved.mDiscovered);
+        EXPECT_TRUE(in.atEnd());
+    }
+
+    TEST(FalloutScriptRadioTest, aStationOfAPluginThatIsNotLoadedAnyMoreIsDropped)
+    {
+        Saved saved;
+        saved.mBroadcast[0x0100AA01] = true;
+        saved.mBroadcast[0x0200BB01] = true;
+        saved.mDiscovered = { 0x0100AA01, 0x0200BB01 };
+        FalloutScript::SaveWriter out;
+        writeSaved(saved, out);
+        const std::string bytes = out.take();
+        FalloutScript::SaveReader in(bytes, [](std::uint32_t form) -> std::optional<std::uint32_t> {
+            if ((form >> 24) == 0x02)
+                return std::nullopt;
+            return form;
+        });
+        Saved loaded;
+        readSaved(loaded, in, savedSectionVersion);
+        EXPECT_EQ(loaded.mBroadcast.size(), 1u);
+        EXPECT_EQ(loaded.mBroadcast.count(0x0100AA01), 1u);
+        EXPECT_EQ(loaded.mDiscovered, std::set<std::uint32_t>{ 0x0100AA01 });
+    }
+
+    TEST(FalloutScriptRadioTest, aSaveThatIsCutShortIsAnError)
+    {
+        Saved saved;
+        saved.mBroadcast[0x0100AA01] = true;
+        FalloutScript::SaveWriter out;
+        writeSaved(saved, out);
+        const std::string bytes = out.take().substr(0, 6);
+        FalloutScript::SaveReader in(bytes);
+        Saved loaded;
+        EXPECT_THROW(readSaved(loaded, in, savedSectionVersion), FalloutScript::SaveError);
     }
 }

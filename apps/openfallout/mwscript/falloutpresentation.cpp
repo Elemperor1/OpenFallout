@@ -172,6 +172,8 @@ namespace OFScript
             if (mMusicPlayback.mTrack != 0)
                 sound->fadeMusicTrack(mMusicPlayback.mTrack, 0.f, 1.f, true);
             mMusicPlayback.mTrack = 0;
+            // (and the director is told that what it played was cut short, as when a script track blocks it)
+            mMusicPlayback.mDirector.reset();
             mMusicPlayback.mMixer.stopAll(*sound, 1.f);
             mMusicPlayback.mStemKey.clear();
             mMusicPlayback.mStems.clear();
