@@ -1,6 +1,6 @@
 -- M14 round 14A: what moving and fighting look like in the engine now (New Vegas). A survey: it logs, it does not judge.
 -- Phases: S setup (out of the interior), A first person, B third person, C a fight with two armed hostiles, D V.A.T.S.,
--- E detection and sneak. Lengths in game units: one metre is about 70 units.
+-- E detection and sneak, F a fight that starts far away (the character has to walk). Lengths in game units: one metre is about 70 units.
 -- The characters are references that stand in the world (the engine's fight state is kept by form id, and the objects that
 -- world.createObject makes have none); each is looked up by its form id, and a spawned one of the same kind stands in when not found.
 local M = 70
@@ -15,7 +15,7 @@ local ARENA_E = { x = -69660, y = 1300, z = 8352 }
 local SITE_X = { x = -21860, y = -38900, z = 8100, gun1 = 0x1629a4, gun2 = 0x1629a3, melee = 0x1629a5 }   -- cell -6,-10
 local SITE_Y = { x = -23198, y = -26000, z = 6300, gun1 = 0x0f1977, melee = 0x0f1978 }                      -- cell -6,-6
 
-local RUN = { A = true, B = true, C = true, E = true, D = true }   -- which phases run (a quick check sets some to false)
+local RUN = { A = true, B = true, C = true, E = true, D = true, F = true }   -- which phases run (a quick check sets some to false)
 
 return { limit = 900, delay = 4, run = function(r)
     local function phase(name) r.log('PHASE ' .. name) end
@@ -369,6 +369,26 @@ return { limit = 900, delay = 4, run = function(r)
     r.shot('D4_vats_after', false)
     r.state('v1', e1)
     r.inspect('v1', e1)
+    r.untrack()
+    end
+    if RUN.F then
+    ---------------------------------------------------------------- F: a fight that starts out of the engage distance
+    -- round 14H: in C the characters stood within their engage distance (about 1,400 units for a rifle) and held; here the ganger that
+    -- noticed the player is put 35 m away (2,450 units) and told to fight, to see whether it walks up to the distance it shoots from
+    phase('F far fight')
+    r.drawn(false)
+    r.camera('ThirdPerson')
+    r.teleport{ pos = { ARENA_C.x, ARENA_C.y, ARENA_C.z }, yaw = 0, onGround = true, label = 'F to the arena' }
+    r.wait(3)
+    r.putAt(e1, { pos = { ARENA_C.x, ARENA_C.y + 35 * M, ARENA_C.z }, yaw = math.pi, label = 'e1 35 m north' })
+    r.wait(2)
+    r.track({ { label = 'player', actor = player }, { label = 'e1', actor = e1 } }, 0.5)
+    r.fight(e1, player, 'e1 -> player, far')
+    for i = 1, 12 do
+        r.wait(1.5)
+        r.actorState('F e1 ' .. i, e1)
+        if i % 3 == 1 then r.shot('F_far_' .. i, false) end
+    end
     r.untrack()
     end
     phase('done')
