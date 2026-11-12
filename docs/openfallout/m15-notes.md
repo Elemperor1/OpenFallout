@@ -66,8 +66,23 @@ A media set has up to six files (`NAM2` to `NAM7`: three layers for the day, thr
 
 **Not done:** the intro and outro sounds of dungeon sets and the incidental sets (`NAM1` 2 and 3 of `MSET`), the `StreamMusic` command (the vanilla table row has no parameters), the retrigger and random loop modes of a controller (they play as loops), the marker's own triggers `MNAM` and `NNAM` (the boundaries of the set are used), a fight that the player is near but not in (the engine does not hand the music a list of characters that fight others), stingers for death, success and level up (`DOBJ`).
 
+## Ambient sound (`FalloutNV.exe`, the acoustic space and the region)
+
+**The space.** A cell names an acoustic space (`XCAS`, record `ASPC`). The space has up to four loops (`SNAM`: dawn, day, dusk, night) and, for an interior, only the first is used. The loops change at 5, 8, 18 and 20 o'clock (`fAmbientDayStart` and its kin of the game settings). A loop starts about 2 s after the player is in the space (it is not played in the instant of a door), fades in over 3 s, and fades out over 5 s when the space or the time of day changes to another loop. The loop of the space is a normal `SOUN` record: its flags, volume and file are those of the sound.
+
+**The region.** The space names a sound region (`RDAT` of the sound kind and `RDSD` in the `REGN` record: a sound, the weather it is for, a chance). A sound of the region that loops is on while the weather is one it is for (pleasant `1`, cloudy `2`, rainy `4`, snow `8`: the classification bits of the weather) and fades in over 0.6 s and out over 1 s. A sound that does not loop is rolled now and then; one that asks for a random location (`SOUN` flag `0x08`) is played at a place around the player that is between a quarter and three quarters of how far the sound is heard.
+
+**The weather.** The `SNAM` sounds of the weather in use (rain, wind, thunder) are heard out of doors: those that loop play while the weather is, the others are rolled like the sounds of a region.
+
+**What the port chose, because nothing that was read says it:** how often the sounds of a region are rolled (each sound has its own clock of 120 s that starts at a random time, and it is rolled with its chance as a share of a million when the clock runs out, so the sounds are spread out), the chance of a thunder-like sound of the weather (0.3 per roll), the distance of a sound with a random location. The weather in use is the one the sky shows now (the port does not blend the sounds of the weather it is changing to).
+
+**Files.** 340 sound records of New Vegas (most of the loops: a campfire, flames, water, the hum of a house) name `.wav` files that the archives have only as `.ogg`; the port looks for the `.ogg` when the `.wav` and the `.mp3` are not there.
+
+**Not done:** the radio (the Pip-Boy stations, `iRadioUpdateInterval`, the signal of a transmitter), the sounds of water (`WATR` `SNAM`: not loops in the port yet), the loops of an interior cell that has no space, the random and retrigger loop modes.
+
 ## Checks
 
 - Unit tests: `FalloutScriptFootsteps*`, `FalloutScriptSoundData*` (components), `ESM4CreatureTest.readsTheSoundLists...`, `ESM4RepairListTest.armorReadsItsWornSounds...`, `OFSoundFalloutSoundTest.*` (the folder and file lookup of the sound records).
 - Music: `FalloutScriptMusic*` (the rules, components), `ESM4MusicRecordTest.*` (loaders), `OFSoundFalloutMusic*` (files and mixer), `FalloutScriptCombatCommandsTest.a_faction_stands*`. The round `scripts/openfallout/round/rounds/m15-music.json` logs `Music:` lines (the controller and set at each place, the track layers and their gains, combat music on and off, scripts' tracks) and `Music track N plays <file>` for each file that is started.
 - The engine logs `Footstep of <ref>: material N, <surface>, <slot> -> <sound>` for the first few steps.
+- Ambient: `FalloutScriptAmbient*` (the rules, components), `ESM4MusicRecordTest.regionReadsItsSounds` (the loader). The round `scripts/openfallout/round/rounds/m15-ambient.json` logs `Ambient:` lines (the space the player is in and its region, each loop that starts or fades out, each sound that is played).

@@ -350,6 +350,30 @@ namespace OFSound
     SoundManager::MusicTrackId SoundManager::startMusicTrack(
         VFS::Path::NormalizedView filename, float gain, float fadeIn, bool loop)
     {
+        return startTrack(filename, gain, fadeIn, loop, Type::Music);
+    }
+
+    SoundManager::MusicTrackId SoundManager::startFalloutLoop(ESM::FormId sound, float fadeIn)
+    {
+        FalloutSounds* sounds = falloutSounds();
+        if (sounds == nullptr || !mOutput->isInitialized())
+            return 0;
+        const FalloutSound* record = sounds->find(sound);
+        if (record == nullptr || record->mFiles.empty())
+            return 0;
+        // A record that names a folder plays one of its files at random
+        const VFS::Path::Normalized& file = record->mFiles.size() == 1
+            ? record->mFiles.front()
+            : record->mFiles[std::uniform_int_distribution<std::size_t>(0, record->mFiles.size() - 1)(mSoundRandom)];
+        const MusicTrackId id = startTrack(file, record->mData.staticGain(), fadeIn, true, Type::Sfx);
+        if (id != 0)
+            ++mFalloutPlayed[record->mEditorId];
+        return id;
+    }
+
+    SoundManager::MusicTrackId SoundManager::startTrack(
+        VFS::Path::NormalizedView filename, float gain, float fadeIn, bool loop, Type type)
+    {
         if (!mOutput->isInitialized() || filename.value().empty())
             return 0;
         DecoderPtr decoder = getStreamDecoder();
@@ -368,8 +392,8 @@ namespace OFSound
         StreamPtr track = getStreamRef();
         track->init([&] {
             SoundParams params;
-            params.mBaseVolume = volumeFromType(Type::Music);
-            params.mFlags = PlayMode::NoEnvNoScaling | Type::Music | Play_2D;
+            params.mBaseVolume = volumeFromType(type);
+            params.mFlags = PlayMode::NoEnvNoScaling | type | Play_2D;
             // The track starts silent when it fades in, so that it is not heard at full volume before the fade begins
             params.mFadeVolume = fadeIn > 0.f ? 0.f : gain;
             return params;
@@ -795,8 +819,38 @@ namespace OFSound
         return mFalloutSounds.get();
     }
 
-    Sound* SoundManager::playFalloutRecord(
-        const FalloutSound& record, const OFWorld::ConstPtr& reference, float volume, Type type, PlayMode mode)
+    Sound* SoundManager::playSound3DAt(const osg::Vec3f& position, SoundBuffer* sfx, float volume, float pitch,
+        Type type, PlayMode mode, const FalloutScript::SoundData& curve)
+    {
+        if (!mOutput->isInitialized())
+            return nullptr;
+
+        const float squaredDist = (mListenerPos - position).length2();
+        SoundPtr sound = getSoundRef();
+        sound->init([&] {
+            SoundParams params;
+            params.mPos = position;
+            params.mVolume = volume * sfx->getVolume();
+            params.mBaseVolume = volumeFromType(type);
+            params.mPitch = pitch;
+            params.mMinDistance = std::max(curve.minDistance(), 1.f);
+            params.mMaxDistance
+                = curve.hasDistance() ? std::max(curve.maxDistance(), params.mMinDistance) : sNoDistanceLimit;
+            params.mFadeVolume = initialFadeVolume(squaredDist, params.mMinDistance, params.mMaxDistance, type, mode);
+            params.mFlags = mode | type | Play_3D;
+            return params;
+        }());
+        if (!mOutput->playSound3D(sound.get(), sfx->getHandle(), 0.f))
+            return nullptr;
+
+        Sound* result = sound.get();
+        mActiveSounds[nullptr].mList.emplace_back(std::move(sound), sfx);
+        mSoundBuffers.use(*sfx);
+        return result;
+    }
+
+    Sound* SoundManager::playFalloutRecord(const FalloutSound& record, const OFWorld::ConstPtr& reference,
+        float volume, Type type, PlayMode mode, const osg::Vec3f* position)
     {
         if (!mOutput->isInitialized())
             return nullptr;
@@ -825,9 +879,13 @@ namespace OFSound
 
         const float pitch = data.pitch(std::uniform_real_distribution<float>(0.f, 1.f)(mSoundRandom));
         const float gain = volume * data.staticGain();
-        Sound* result = reference.isEmpty() || data.isTwoDimensional()
-            ? playSound(sfx, gain, pitch, type, mode, 0.f)
-            : playSound3D(reference, sfx, gain, pitch, type, mode, 0.f, &data);
+        Sound* result = nullptr;
+        if (data.isTwoDimensional() || (reference.isEmpty() && position == nullptr))
+            result = playSound(sfx, gain, pitch, type, mode, 0.f);
+        else if (position != nullptr)
+            result = playSound3DAt(*position, sfx, gain, pitch, type, mode, data);
+        else
+            result = playSound3D(reference, sfx, gain, pitch, type, mode, 0.f, &data);
         if (result != nullptr)
             ++mFalloutPlayed[record.mEditorId];
         return result;
@@ -851,6 +909,28 @@ namespace OFSound
             return nullptr;
         const FalloutSound* record = sounds->find(sound);
         return record != nullptr ? playFalloutRecord(*record, reference, volume, type, mode) : nullptr;
+    }
+
+    Sound* SoundManager::playFalloutSoundAt(
+        ESM::FormId sound, const osg::Vec3f& position, float volume, Type type, PlayMode mode)
+    {
+        FalloutSounds* sounds = falloutSounds();
+        if (sounds == nullptr || !mOutput->isInitialized())
+            return nullptr;
+        const FalloutSound* record = sounds->find(sound);
+        return record != nullptr ? playFalloutRecord(*record, OFWorld::ConstPtr(), volume, type, mode, &position)
+                                 : nullptr;
+    }
+
+    std::optional<FalloutScript::SoundData> SoundManager::falloutSoundData(ESM::FormId sound)
+    {
+        FalloutSounds* sounds = falloutSounds();
+        if (sounds == nullptr)
+            return std::nullopt;
+        const FalloutSound* record = sounds->find(sound);
+        if (record == nullptr || record->mFiles.empty())
+            return std::nullopt;
+        return record->mData;
     }
 
     bool SoundManager::hasFalloutSound(std::string_view editorId)

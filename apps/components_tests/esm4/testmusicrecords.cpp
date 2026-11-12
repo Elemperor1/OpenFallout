@@ -1,5 +1,6 @@
 #include <components/esm4/loadmusc.hpp>
 #include <components/esm4/loadrefr.hpp>
+#include <components/esm4/loadregn.hpp>
 
 #include "syntheticplugin.hpp"
 
@@ -70,5 +71,26 @@ namespace
         const std::vector<ESM4::Reference> records = loadRecords<ESM4::Reference>("REFR", record("REFR", 0x2001, data));
         ASSERT_EQ(records.size(), 1u);
         EXPECT_FALSE(records[0].mAudioMarker.mIsMarker);
+    }
+
+    // The sounds of a region (RDSD, after its RDAT of the sound kind): the sound, the weather it is for and its chance
+    TEST(ESM4MusicRecordTest, regionReadsItsSounds)
+    {
+        std::string rdat;
+        const std::uint32_t kind = ESM4::Region::RDAT_Sound;
+        rdat.append(reinterpret_cast<const char*>(&kind), 4);
+        rdat.append(4, '\0');
+        std::string sounds;
+        const std::uint32_t values[6] = { 0x00001234, 15, 800000, 0x00005678, 4, 100000 };
+        sounds.append(reinterpret_cast<const char*>(values), sizeof(values));
+        const std::string data = zString("EDID", "AudioExtTest") + subRecord("RDAT", rdat) + subRecord("RDSD", sounds);
+        const std::vector<ESM4::Region> records = loadRecords<ESM4::Region>("REGN", record("REGN", 9, data));
+        ASSERT_EQ(records.size(), 1u);
+        ASSERT_EQ(records[0].mSounds.size(), 2u);
+        EXPECT_EQ(records[0].mSounds[0].sound, 0x1234u);
+        EXPECT_EQ(records[0].mSounds[0].flags, 15u);
+        EXPECT_EQ(records[0].mSounds[0].chance, 800000u);
+        EXPECT_EQ(records[0].mSounds[1].sound, 0x5678u);
+        EXPECT_EQ(records[0].mSounds[1].flags, 4u);
     }
 }

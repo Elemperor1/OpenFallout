@@ -47,6 +47,15 @@ namespace OFSound
         constexpr VFS::Path::ExtensionView mp3("mp3");
         VFS::Path::Normalized path
             = Misc::ResourceHelpers::correctResourcePath({ { soundDir } }, VFS::Path::toNormalized(name), vfs, mp3);
+        // The records of the looping sounds (a campfire, a fire, water, the hum of a house) name wav files that the archives
+        // have only as ogg: 340 of the sound records of New Vegas, and the games play them
+        if (!vfs.exists(path))
+        {
+            constexpr VFS::Path::ExtensionView ogg("ogg");
+            VFS::Path::Normalized oggPath = path;
+            if (oggPath.changeExtension(ogg) && vfs.exists(oggPath))
+                path = std::move(oggPath);
+        }
         if (vfs.exists(path))
             files.push_back(std::move(path));
         return files;

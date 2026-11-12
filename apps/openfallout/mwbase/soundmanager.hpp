@@ -3,11 +3,13 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
 
 #include <components/esm/formid.hpp>
+#include <components/falloutscript/sounddata.hpp>
 #include <components/vfs/pathutil.hpp>
 
 #include "../mwsound/type.hpp"
@@ -138,6 +140,9 @@ namespace OFBase
         virtual MusicTrackId startMusicTrack(VFS::Path::NormalizedView filename, float gain, float fadeIn, bool loop)
             = 0;
         /// Fades the track to the gain in the seconds; with `stopAtEnd` it stops when it has faded
+        /// The loop of a sound record of Fallout (an ambient sound), as a track that the calls below follow (it is as loud as
+        /// the sound effects, not the music). 0 when there is no such record, it has no file, or there is no sound.
+        virtual MusicTrackId startFalloutLoop(ESM::FormId sound, float fadeIn) = 0;
         virtual void fadeMusicTrack(MusicTrackId track, float gain, float seconds, bool stopAtEnd) = 0;
         virtual bool isMusicTrackPlaying(MusicTrackId track) const = 0;
         virtual void stopMusicTrack(MusicTrackId track) = 0;
@@ -219,6 +224,13 @@ namespace OFBase
         virtual Sound* playFalloutSound(ESM::FormId sound, const OFWorld::ConstPtr& reference, float volume,
             Type type = Type::Sfx, PlayMode mode = PlayMode::Normal)
             = 0;
+        /// The same, from a place in the world (a sound that the record says is two-dimensional is heard as it is)
+        virtual Sound* playFalloutSoundAt(ESM::FormId sound, const osg::Vec3f& position, float volume,
+            Type type = Type::Sfx, PlayMode mode = PlayMode::Normal)
+            = 0;
+        /// The settings of the sound record of Fallout with this form (its flags, volume and distances); none when the
+        /// record does not exist or has no file to play
+        virtual std::optional<FalloutScript::SoundData> falloutSoundData(ESM::FormId sound) = 0;
         /// Whether a sound record of Fallout has this editor id and files to play
         virtual bool hasFalloutSound(std::string_view editorId) = 0;
 

@@ -167,7 +167,13 @@ void ESM4::Region::load(ESM4::Reader& reader)
                 std::size_t numSounds = subHdr.dataSize / sizeof(RegionSound);
                 mSounds.resize(numSounds);
                 for (std::size_t i = 0; i < numSounds; ++i)
+                {
                     reader.get(mSounds.at(i));
+                    // The sound is a form of the file's own numbering: it takes the one of the load order
+                    ESM::FormId32 sound = mSounds[i].sound;
+                    reader.adjustFormId(sound);
+                    mSounds[i].sound = sound;
+                }
 
                 break;
             }

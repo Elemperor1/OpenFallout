@@ -675,6 +675,7 @@ namespace OFScript
         mEquipment.clear();
         mCombat.clear();
         resetMusic();
+        resetAmbient();
         mOpenStates.clear();
         mDoorsWithoutCollision.clear();
         mItemHolders.clear();
@@ -884,6 +885,7 @@ namespace OFScript
         }
         updateBreath(frametime);
         updateMusic(frametime);
+        updateAmbient(frametime);
         mHudTime += frametime;
         raiseCombatEvents(frametime);
         updateProgress(frametime);

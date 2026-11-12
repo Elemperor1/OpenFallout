@@ -55,7 +55,7 @@ add_openfallout_dir (mwscript
     locals scriptmanagerimp compilercontext interpretercontext cellextensions miscextensions
     guiextensions soundextensions skyextensions statsextensions containerextensions
     aiextensions controlextensions extensions globalscripts ref dialogueextensions
-    animationextensions transformationextensions consoleextensions userextensions falloutscripts falloutprogress falloutreputation falloutobjectstate falloutdetection falloutinterface falloutpresentation falloutpipboy falloutinteraction falloutmusic falloutcrafting falloutbarter falloutrepair falloutlook falloutmods falloutcompanion falloutcasino falloutcaravan fallouthotkeys falloutregionline falloutvats falloutsave
+    animationextensions transformationextensions consoleextensions userextensions falloutscripts falloutprogress falloutreputation falloutobjectstate falloutdetection falloutinterface falloutpresentation falloutpipboy falloutinteraction falloutmusic falloutambient falloutcrafting falloutbarter falloutrepair falloutlook falloutmods falloutcompanion falloutcasino falloutcaravan fallouthotkeys falloutregionline falloutvats falloutsave
     )
 
 add_openfallout_dir (mwlua

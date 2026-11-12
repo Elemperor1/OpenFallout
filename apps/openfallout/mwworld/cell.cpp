@@ -198,6 +198,7 @@ namespace OFWorld
         if (mMusic.isZeroOrUnset() && world != nullptr)
             mMusic = world->mMusic;
         mMusicType = cell.mMusicType;
+        mAcousticSpace = cell.mAcousticSpace;
         mDescription = getCellDescription(cell, world);
     }
 

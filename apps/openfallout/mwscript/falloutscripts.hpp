@@ -57,6 +57,7 @@
 #include <components/falloutscript/interpreter.hpp>
 #include <components/falloutscript/itemmods.hpp>
 #include <components/falloutscript/itemuse.hpp>
+#include <components/falloutscript/ambient.hpp>
 #include <components/falloutscript/limbs.hpp>
 #include <components/falloutscript/magic.hpp>
 #include <components/falloutscript/mapmarkers.hpp>
@@ -2896,6 +2897,29 @@ namespace OFScript
         void logMusic(const std::string& text);
         MusicPlayback mMusicPlayback;
         std::mutex mMusicMutex;
+
+        /// The ambient sound of the place the player is in (falloutambient.cpp): the loop of the acoustic space of the cell,
+        /// and the loops and sounds of the region that space names.
+        struct AmbientPlayback
+        {
+            FalloutScript::Ambient::RegionRoller mRoller;
+            std::mt19937 mRandom{ std::random_device{}() };
+            ESM::FormId mSpace;
+            float mSpaceTime = 0.f;
+            float mUntilLook = 0.f;
+            struct Loop
+            {
+                // 0 for a loop that the output did not start (it is not tried again until it has been left out)
+                OFBase::SoundManager::MusicTrackId mTrack = 0;
+                bool mOfSpace = false;
+            };
+            std::map<std::uint32_t, Loop> mLoops;
+            int mLogged = 0;
+        };
+        void updateAmbient(float frametime);
+        void resetAmbient();
+        void logAmbient(const std::string& text);
+        AmbientPlayback mAmbientPlayback;
         /// The seconds that the player holds its breath
         double mostBreath();
         /// Whether the furniture is a bed that the actor would lie on

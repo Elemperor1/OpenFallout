@@ -129,6 +129,7 @@ namespace ESM4
     struct LoadScreen;
     struct LoadScreenType;
     struct MagicEffect;
+    struct AcousticSpace;
     struct MediaLocationController;
     struct MediaSet;
     struct Message;
@@ -191,7 +192,7 @@ namespace OFWorld
             // Special entry which is hardcoded and not loaded from an ESM
             Store<ESM::Attribute>,
 
-            Store<ESM4::Activator>, Store<ESM4::ActorCharacter>, Store<ESM4::ActorCreature>,
+            Store<ESM4::AcousticSpace>, Store<ESM4::Activator>, Store<ESM4::ActorCharacter>, Store<ESM4::ActorCreature>,
             Store<ESM4::ActorValueInfo>, Store<ESM4::AIPackage>, Store<ESM4::AmmoEffect>, Store<ESM4::Ammunition>, Store<ESM4::Armor>,
             Store<ESM4::ArmorAddon>, Store<ESM4::BodyPartData>, Store<ESM4::Book>, Store<ESM4::Casino>,
             Store<ESM4::CaravanCard>, Store<ESM4::CaravanDeck>, Store<ESM4::CaravanMoney>, Store<ESM4::Cell>,

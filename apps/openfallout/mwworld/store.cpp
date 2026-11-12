@@ -10,6 +10,7 @@
 #include <components/esm3/esmreader.hpp>
 #include <components/esm3/esmwriter.hpp>
 #include <components/esm4/loadaloc.hpp>
+#include <components/esm4/loadaspc.hpp>
 #include <components/esm4/loaddehy.hpp>
 #include <components/esm4/loadhung.hpp>
 #include <components/esm4/loadmset.hpp>
@@ -1220,6 +1221,7 @@ template class OFWorld::TypedDynamicStore<ESM4::LightingTemplate>;
 template class OFWorld::TypedDynamicStore<ESM4::LoadScreen>;
 template class OFWorld::TypedDynamicStore<ESM4::LoadScreenType>;
 template class OFWorld::TypedDynamicStore<ESM4::MagicEffect>;
+template class OFWorld::TypedDynamicStore<ESM4::AcousticSpace>;
 template class OFWorld::TypedDynamicStore<ESM4::MediaLocationController>;
 template class OFWorld::TypedDynamicStore<ESM4::MediaSet>;
 template class OFWorld::TypedDynamicStore<ESM4::Message>;
