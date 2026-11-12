@@ -136,19 +136,49 @@ local function inView()
     local found = {}
     local from = camera.getPosition()
     local forward = camera.viewportToWorldVector(v2(0.5, 0.5))
+    -- Why a character that is near is not offered, said once each time the screen is asked for (round 14A: the screen
+    -- said "No target in sight" for a character that could be targeted, 700 units ahead in the middle of the view)
+    local why = {}
     for _, actor in ipairs(nearby.actors) do
-        if actor:isValid() and vats.canTarget(actor) then
-            local head = actor.position + v3(0, 0, headHeight)
-            local direction = (head - from):normalize()
-            local cosine = direction:dot(forward)
-            if cosine >= viewCosine then
-                local ray = nearby.castRay(from, head, { ignore = self, collisionType = nearby.COLLISION_TYPE.Default })
-                if ray.hitObject == nil or ray.hitObject == actor then
-                    found[#found + 1] = { actor = actor, cosine = cosine }
+        if actor ~= self.object and actor:isValid() then
+            local distance = (actor.position - from):length()
+            if not vats.canTarget(actor) then
+                if distance < 3000 and #why < 8 then
+                    why[#why + 1] = string.format('%s %.0f units: the weapon cannot reach it, or it is down', tostring(actor.recordId), distance)
+                end
+            else
+                local head = actor.position + v3(0, 0, headHeight)
+                local direction = (head - from):normalize()
+                local cosine = direction:dot(forward)
+                if cosine >= viewCosine then
+                    -- The character is in sight when any part of it is: the head, else the chest, else the legs (a low
+                    -- wall or a crate in front of the head does not hide the rest of the body)
+                    local blocked
+                    local seen = false
+                    for _, height in ipairs({ headHeight, headHeight * 0.65, headHeight * 0.3 }) do
+                        local point = actor.position + v3(0, 0, height)
+                        local ray = nearby.castRay(from, point, { ignore = self, collisionType = nearby.COLLISION_TYPE.Default })
+                        if ray.hitObject == nil or ray.hitObject == actor then
+                            seen = true
+                            break
+                        end
+                        blocked = blocked or { object = ray.hitObject, position = ray.hitPos, point = point }
+                    end
+                    if seen then
+                        found[#found + 1] = { actor = actor, cosine = cosine }
+                    elseif #why < 8 then
+                        why[#why + 1] = string.format('%s %.0f units: something is in the way (%s at %.0f,%.0f,%.0f; the head is at %.0f,%.0f,%.0f)',
+                            tostring(actor.recordId), distance, tostring(blocked.object.recordId or blocked.object),
+                            blocked.position.x, blocked.position.y, blocked.position.z, head.x, head.y, head.z)
+                    end
+                elseif #why < 8 and distance < 3000 then
+                    why[#why + 1] = string.format('%s %.0f units: outside the view (cosine %.2f, needs %.2f)',
+                        tostring(actor.recordId), distance, cosine, viewCosine)
                 end
             end
         end
     end
+    for _, line in ipairs(why) do print('VATS not offered', line) end
     table.sort(found, function(a, b) return a.cosine > b.cosine end)
     local actors = {}
     for index = 1, math.min(#found, maxTargets) do

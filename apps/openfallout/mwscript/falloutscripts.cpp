@@ -6,6 +6,9 @@
 #include <cstdlib>
 #include <limits>
 #include <optional>
+#include <map>
+#include <set>
+#include <sstream>
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm/refid.hpp>
@@ -2473,17 +2476,18 @@ namespace OFScript
         ESM::FormId base;
         if (actor == 0 || actor == mPlayer || !baseOf(actor, base) || base.isZeroOrUnset())
             return false;
-        // The flag is part of the base data, which a template can give
+        // The flag is part of the base data, which a template can give (a levelled list of characters gives the one that
+        // the cell shows for this reference)
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
-        {
-            const ESM4::Npc* owner = templateOwner(mStore, npc, ESM4::Npc::Template_UseBaseData);
-            return owner != nullptr && (owner->mBaseConfig.fo3.flags & ESM4::Npc::FO3_Essential) != 0;
-        }
+            return (templateRecordOf(mStore, *npc, ESM4::Npc::Template_UseBaseData, seed).mBaseConfig.fo3.flags
+                       & ESM4::Npc::FO3_Essential)
+                != 0;
         if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
-        {
-            const ESM4::Creature* owner = templateOwner(mStore, creature, ESM4::Creature::Template_UseBaseData);
-            return owner != nullptr && (owner->mBaseConfig.fo3.flags & ESM4::Creature::FO3_Essential) != 0;
-        }
+            return (templateRecordOf(mStore, *creature, ESM4::Creature::Template_UseBaseData, seed)
+                           .mBaseConfig.fo3.flags
+                       & ESM4::Creature::FO3_Essential)
+                != 0;
         return false;
     }
 
@@ -2821,10 +2825,12 @@ namespace OFScript
             // A character that is hit fights back, and the attacker is in the fight too
             if (attacker != 0 && !tolerated)
             {
-                if (!mCombat.inCombat(victim))
-                    FalloutScript::startFight(mCombat, mActors, victim, attacker);
-                if (!mCombat.inCombat(attacker))
-                    FalloutScript::startFight(mCombat, mActors, attacker, victim);
+                // (a character with no package has no mind until it has one that is to fight: round 14D, a fight that
+                // was started stood still for want of one)
+                if (!mCombat.inCombat(victim) && FalloutScript::startFight(mCombat, mActors, victim, attacker))
+                    evaluatePackage(victim);
+                if (!mCombat.inCombat(attacker) && FalloutScript::startFight(mCombat, mActors, attacker, victim))
+                    evaluatePackage(attacker);
             }
             return result;
         }
@@ -2835,6 +2841,10 @@ namespace OFScript
         {
             // Of two blows that kill at once, the one that marks the death is the killing blow
             result.mKilled = mActors.setDead(victim, true, attacker, limb);
+            // The body falls by the mind of the character, which one with no package has not got until it is dead
+            // (round 14D: shot dead, two characters stood upright with their weapons out)
+            if (result.mKilled)
+                evaluatePackage(victim);
         }
         return result;
     }
@@ -3010,6 +3020,8 @@ namespace OFScript
             mActors.removeItem(attacker, stats.mAmmo, stats.mAmmoUse);
         }
         result.mFired = true;
+        if (attacker == mPlayer)
+            ++mPlayerShots;
         {
             const std::lock_guard lock(mFireMutex);
             mFireCooldowns[attacker] = static_cast<float>(stats.mInterval);
@@ -3221,7 +3233,14 @@ namespace OFScript
         if (target.isEmpty() || !target.isInCell() || !target.getRefData().isEnabled() || mActors.isDead(targetId)
             || mCombat.unconscious(targetId) || mObjectState.ghost(targetId))
         {
-            // Nobody goes for a target that is gone
+            // Nobody goes for a target that is gone (round 14A: a fight started from a script was over half a second
+            // later, and nothing said why)
+            Log(Debug::Info) << FalloutScript::hex(self) << " ends its fight: its target " << FalloutScript::hex(targetId)
+                             << (target.isEmpty() ? " is not found" : (!target.isInCell() ? " is in no cell" : ""))
+                             << (!target.isEmpty() && !target.getRefData().isEnabled() ? " is disabled" : "")
+                             << (mActors.isDead(targetId) ? " is dead" : "")
+                             << (mCombat.unconscious(targetId) ? " is unconscious" : "")
+                             << (mObjectState.ghost(targetId) ? " is a ghost" : "");
             mCombat.stop(self);
             return stance;
         }
@@ -3368,7 +3387,31 @@ namespace OFScript
                 break;
         }
         if (!FalloutScript::FightAI::attacksOnSight(traits.mAggression, standing))
+        {
+            // Said once for each character and again when what it rests on changes (round 14F: the Powder Gangers were
+            // made enemies of the player and the line was not said again, so it could not tell whether that took)
+            static std::map<FalloutScript::FormId, std::string> told;
+            std::ostringstream reason;
+            reason << "aggression " << static_cast<int>(traits.mAggression) << ", standing "
+                   << (standing == Standing::Enemy ? "enemy" : standing == Standing::Ally ? "ally" : "neutral");
+            const auto factionsOf = [this](FalloutScript::FormId who) {
+                std::ostringstream text;
+                std::vector<std::pair<FalloutScript::FormId, int>> list;
+                if (!mActors.factions(who, list))
+                    return std::string("none known");
+                for (const auto& [faction, rank] : list)
+                    text << FalloutScript::hex(faction) << ' ';
+                return text.str();
+            };
+            reason << "; its factions " << factionsOf(self) << "; the player's " << factionsOf(mPlayer);
+            std::string& last = told[self];
+            if (last != reason.str())
+            {
+                last = reason.str();
+                Log(Debug::Info) << FalloutScript::hex(self) << " does not attack the player on sight: " << last;
+            }
             return false;
+        }
         radius = traits.mRadius;
         return true;
     }
@@ -3639,16 +3682,14 @@ namespace OFScript
         };
         if (base.isZeroOrUnset())
             return true;
+        // A record that takes its factions from a template has those of the template, and a levelled list of
+        // characters in the place of the template gives the character that the cell shows for this reference (round 14G:
+        // the placed Powder Gangers are such records and had no factions at all, so no faction said they were enemies)
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
-        {
-            if (const ESM4::Npc* owner = templateOwner(mStore, npc, ESM4::Npc::Template_UseFactions))
-                take(owner->mFactions);
-        }
+            take(templateRecordOf(mStore, *npc, ESM4::Npc::Template_UseFactions, seed).mFactions);
         else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
-        {
-            if (const ESM4::Creature* owner = templateOwner(mStore, creature, ESM4::Creature::Template_UseFactions))
-                take(owner->mFactions);
-        }
+            take(templateRecordOf(mStore, *creature, ESM4::Creature::Template_UseFactions, seed).mFactions);
         return true;
     }
 

@@ -14,6 +14,20 @@ namespace OFRender
     /// no folder gives an empty one.
     std::string falloutAnimationFolder(std::string_view skeleton);
 
+    /// The skeleton of the arms that the player sees in the first person (the games keep it, and the animations of those
+    /// arms, in a folder of their own: `_1stperson`). It has no mesh: the hands are put on it by bone name.
+    inline constexpr std::string_view sFirstPersonSkeleton = "meshes/characters/_1stperson/skeleton.nif";
+
+    /// The model of a hand, or of the Pip-Boy glove, that the first person sees: the games keep a second file for each,
+    /// named like the first with `1st` before the extension (`lefthand.nif` and `lefthand1st.nif`). A model that has the
+    /// suffix is given back as it is.
+    std::string falloutFirstPersonModel(std::string_view model);
+
+    /// Whether a part of a character is one that the first person sees: a hand, or the Pip-Boy glove that stands in the
+    /// place of the left one (`hand` says that the part is a hand of the race). The rest of the body stays behind the
+    /// player's eyes.
+    bool falloutIsFirstPersonPart(bool hand, std::string_view model);
+
     /// The animation a character plays when it stands, chosen among the paths of the files in the folder of its
     /// skeleton (lower case, as the virtual file system lists them, files of folders below that one included): the file
     /// `mtidle.kf`, else `locomotion/mtidle.kf` (the standing pose of the people of the games, whose folder has none
@@ -39,6 +53,39 @@ namespace OFRender
     /// "sprint" for the walk). Empty for a file that is not there.
     FalloutLocomotion chooseFalloutLocomotion(
         std::string_view folder, const std::vector<std::string>& files, bool female);
+
+    /// The way a character moves relative to where it faces
+    enum class FalloutDirection
+    {
+        Forward,
+        Backward,
+        Left,
+        Right,
+    };
+
+    /// The direction of a movement that goes `forward` units a second ahead of the character (negative: behind it) and
+    /// `side` to its right (negative: to its left), from the direction it was moving in: the one with the larger share,
+    /// and the one it was in unless the other has clearly more (a character that turns while it walks does not flicker
+    /// between two of them).
+    FalloutDirection chooseFalloutDirection(float forward, float side, FalloutDirection current);
+
+    /// The animation file for one way of moving, among the paths of the files in the folder of the skeleton of a
+    /// character (lower case, as the virtual file system lists them, files of folders below that one included). The
+    /// games name them by what the character holds, whether it sneaks, whether it runs and which way it goes:
+    /// `1hpforward.kf` and `1hpfastleft.kf` for a pistol, `sneakmtforward.kf` for sneaking with whatever is held (a few
+    /// types have names of their own, `sneak2hhforward.kf`), `mtbackward.kf` for the hands free. `prefix` is that of
+    /// the weapon type (`falloutWeaponPrefix`, empty for no weapon out). A name the files do not have is taken from the
+    /// next of: the sneaking one with the weapon's prefix, the sneaking one of `mt`, the one of the weapon, the one of
+    /// `mt`; a direction none of those has is the forward one. A file of the folder for the sex of the character comes
+    /// before one of the folder `locomotion` or the folder itself, then any other; those named for children and for
+    /// the hurt are left out. Empty when there is none (a creature, whose movements `chooseFalloutLocomotion` finds).
+    std::string chooseFalloutMove(std::string_view folder, std::string_view prefix, bool sneak,
+        FalloutDirection direction, bool run, bool female, const std::vector<std::string>& files);
+
+    /// The animation of a character that stands sneaking: `sneak` and the prefix of the weapon it holds, else
+    /// `sneakmtidle.kf` (its folder or `locomotion`). Empty when there is none.
+    std::string chooseFalloutSneakIdle(
+        std::string_view folder, std::string_view prefix, bool female, const std::vector<std::string>& files);
 
     enum class FalloutGait
     {

@@ -1,9 +1,13 @@
 #include "falloutscripts.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <map>
 
+#include <components/debug/debuglog.hpp>
 #include <components/falloutscript/actorvalues.hpp>
+#include <components/falloutscript/arguments.hpp>
 #include <components/falloutscript/detection.hpp>
 #include <components/sceneutil/util.hpp>
 
@@ -93,16 +97,33 @@ namespace OFScript
 
         const FalloutScript::Detection::Setting setting
             = [this](std::string_view name, double fallback) { return gameSetting(name, fallback); };
-        const Sighting sighting
-            = FalloutScript::Detection::sighting(FalloutScript::Detection::stealth(input, setting), setting);
-        if (sighting != Sighting::Seen)
-            return sighting;
+        const double stealth = FalloutScript::Detection::stealth(input, setting);
+        const Sighting sighting = FalloutScript::Detection::sighting(stealth, setting);
         // What is high enough to be seen is only heard when the target is behind the watcher or behind a wall
         const double facing = watcher.getRefData().getPosition().rot[2];
         const double cone = gameSetting("fDetectionViewCone", 190);
-        if (!visible || !FalloutScript::Detection::inViewCone(facing, to.x() - from.x(), to.y() - from.y(), cone))
-            return Sighting::Noticed;
-        return Sighting::Seen;
+        const bool inCone
+            = FalloutScript::Detection::inViewCone(facing, to.x() - from.x(), to.y() - from.y(), cone);
+        const Sighting result = sighting == Sighting::Seen && (!visible || !inCone) ? Sighting::Noticed : sighting;
+        // What a watcher made of the player, said now and then for the ones that are near (round 14A: a sneaking player
+        // at 3 units from an armed character that never noticed it, and nothing said why)
+        if (other == mPlayer && input.mDistance < 2500)
+        {
+            static std::map<FalloutScript::FormId, std::chrono::steady_clock::time_point> told;
+            const auto now = std::chrono::steady_clock::now();
+            auto& last = told[self];
+            if (last == std::chrono::steady_clock::time_point() || now - last > std::chrono::seconds(3))
+            {
+                last = now;
+                static const char* const names[] = { "does not see it", "notices it", "sees it" };
+                Log(Debug::Info) << FalloutScript::hex(self) << " and the player, " << std::lround(input.mDistance)
+                                 << " units apart: stealth " << stealth << ", " << names[static_cast<int>(result)]
+                                 << " (perception " << input.mPerception << ", light " << input.mLight << ", sneaks "
+                                 << input.mSneaking << ", moves " << input.mMoving << ", runs " << input.mRunning
+                                 << ", line of sight " << visible << ", in its view " << inCone << ")";
+            }
+        }
+        return result;
     }
 
     FalloutScript::Detection::Sighting FalloutScripts::sightOfPlayer(const OFWorld::Ptr& watcher)

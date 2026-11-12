@@ -6,7 +6,11 @@ local self = require('openfallout.self')
 local camera = require('openfallout.camera')
 local debug = require('openfallout.debug')
 local nearby = require('openfallout.nearby')
+local input = require('openfallout.input')
 local util = require('openfallout.util')
+local animation = require('openfallout.animation')
+local types = require('openfallout.types')
+local I = require('openfallout.interfaces')
 
 local function log(...) print('ROUND', ...) end
 
@@ -70,6 +74,10 @@ local function answerBox()
     end
 end
 
+-- The camera mode that the scenario asked for: the game's camera goes to its vanity mode (it circles the player) when nothing has
+-- touched the controls for a while, and a round touches nothing, so the mode is put back (and logged, three times at most)
+local wantedMode, modeForced = nil, 0
+
 local handlers = {}
 
 -- Whether a box is open and for how many seconds none has been (the add-ons of a save open their notices one after the other
@@ -112,6 +120,7 @@ function handlers.camera(args)
         return {}
     end
     camera.setMode(mode, true)
+    wantedMode = mode
     log('camera', 'mode', tostring(args.mode))
     return {}
 end
@@ -176,8 +185,402 @@ function handlers.fps(args)
     return { frames = n, mean = mean }
 end
 
+
+-- ---- M14 additions: the fight, the weapon, the animation groups ------------------------------------------------------------
+-- Each handler logs lines that start with ROUND and holds numbers, record ids and the names of animation groups, never a text.
+
+local Actor = types.Actor
+
+local function formOf(object)
+    -- the form id as core.combat wants it ("" when the object has none)
+    if object == nil then return '' end
+    local id = tostring(object.id)
+    -- a placed reference's id is "0x..." and the combat calls want it as core.getFormId writes it
+    if id:sub(1, 2) == '0x' then id = 'FormId:' .. id end
+    -- the player's own reference has no form id of the content; the games call it 0x14
+    if object == self.object then id = 'FormId:0x14' end
+    return id
+end
+
+local function number(value, digits)
+    if value == nil then return 'nil' end
+    return string.format('%.' .. (digits or 1) .. 'f', value)
+end
+
+-- The health of the player is the Pip-Boy's (Actor.stats does not follow the engine's health of Fallout); a character's is the one the
+-- crosshair's bar shows
+local function health(actor)
+    local ok, value = pcall(function()
+        if actor == self.object then return core.pipboy.stats().health end
+        return core.hud.target(actor).health
+    end)
+    return ok and value or nil
+end
+
+-- The player's godmode: on, so that a round is not cut short (the state is logged)
+function handlers.god(args)
+    local want = args.on ~= false
+    if debug.isGodMode() ~= want then debug.toggleGodMode() end
+    log('god', tostring(debug.isGodMode()))
+    return { on = debug.isGodMode() }
+end
+
+-- The weapon of the player: the form, what the games' rules allow, the rounds
+function handlers.weapon(args)
+    local stats = core.combat.weapon()
+    log('weapon', tostring(args.label or '-'), 'form=' .. tostring(stats.weapon), 'melee=' .. tostring(stats.melee),
+        'auto=' .. tostring(stats.automatic), 'range=' .. number(stats.range, 0), 'interval=' .. number(stats.interval, 2),
+        'ammoUse=' .. tostring(stats.ammoUse), 'rounds=' .. tostring(stats.rounds), 'stance=' .. tostring(Actor.getStance(self)))
+    return { weapon = stats.weapon, rounds = stats.rounds, melee = stats.melee }
+end
+
+-- What the player carries as the Pip-Boy lists it (the engine's inventory of the games is not the one of Actor.inventory):
+-- one line for each weapon and kind of ammunition, with forms and numbers only
+local function pipboyWeapons(holder)
+    local ok, rows = pcall(core.pipboy.items, holder)
+    if not ok then
+        log('error', 'inventory', tostring(rows))
+        return {}
+    end
+    return rows
+end
+
+function handlers.inventory(args)
+    local rows = pipboyWeapons(args.holder)
+    local weapons, ammo, other = 0, 0, 0
+    for _, item in ipairs(rows) do
+        if item.category == 'weapons' then
+            weapons = weapons + 1
+            log('item', tostring(args.label or '-'), 'weapon', 'form=' .. tostring(item.form), 'count=' .. tostring(item.count),
+                'equipped=' .. tostring(item.equipped), 'hasAmmo=' .. tostring(item.hasAmmo), 'clip=' .. tostring(item.clip),
+                'loaded=' .. tostring(item.loaded), 'reserve=' .. tostring(item.reserve), 'damage=' .. number(item.damage))
+        elseif item.category == 'ammo' then
+            ammo = ammo + 1
+            log('item', tostring(args.label or '-'), 'ammo', 'form=' .. tostring(item.form), 'count=' .. tostring(item.count),
+                'usable=' .. tostring(item.usable))
+        else
+            other = other + 1
+        end
+    end
+    log('inventory', tostring(args.label or '-'), 'weapons=' .. weapons, 'ammoKinds=' .. ammo, 'others=' .. other)
+    return { weapons = weapons }
+end
+
+-- Puts a weapon of the Pip-Boy's list in the hand: the one with this form, or (no form given) the first ranged one that has
+-- rounds; `pick` is the 1st, 2nd... of those. Uses the Pip-Boy's own `use`, as the player's click on the row does.
+function handlers.equip(args)
+    local chosen, n = nil, 0
+    for _, item in ipairs(pipboyWeapons()) do
+        if item.category == 'weapons' then
+            local match
+            if args.form then
+                match = tostring(item.form) == tostring(args.form)
+            else
+                match = item.hasAmmo and (item.clip or 0) > 0 and ((item.loaded or 0) + (item.reserve or 0)) > 0
+            end
+            if match then
+                n = n + 1
+                if n == (args.pick or 1) then chosen = item end
+            end
+        end
+    end
+    if chosen == nil then
+        log('error', 'equip', 'no such weapon', tostring(args.form or 'ranged #' .. tostring(args.pick or 1)))
+        return { ok = false }
+    end
+    local result = chosen.equipped and 'already' or core.pipboy.use(chosen.id)
+    local stats = core.combat.weapon()
+    log('equip', 'form=' .. tostring(chosen.form), 'result=' .. tostring(result), 'inHand=' .. tostring(stats.weapon),
+        'rounds=' .. tostring(stats.rounds), 'range=' .. number(stats.range, 0))
+    -- the use of an item says what happened, and nothing (an empty answer) when nothing did: the weapon is not in the hand then
+    if result == nil or result == '' then
+        log('error', 'equip', 'nothing happened when the weapon was used', tostring(chosen.form))
+        return { ok = false }
+    end
+    return { ok = true, form = tostring(chosen.form) }
+end
+
+-- The weapon out or away: the stance of the actor and the engine's own flag (what falloutcombat.lua does on the key)
+function handlers.drawn(args)
+    local on = args.on ~= false
+    Actor.setStance(self, on and Actor.STANCE.Weapon or Actor.STANCE.Nothing)
+    core.combat.setDrawn(on)
+    log('drawn', tostring(on), 'stance=' .. tostring(Actor.getStance(self)))
+    return {}
+end
+
+-- What the camera's ray hits (as falloutcombat.lua aims): the object, or nil
+local function aimTarget(stats)
+    local from = camera.getPosition()
+    local origin = self.position
+    local to = from + camera.viewportToWorldVector(util.vector2(0.5, 0.5)) * (stats.range + (from - origin):length())
+    local result = nearby.castRay(from, to, { ignore = self, collisionType = nearby.COLLISION_TYPE.Default })
+    return result.hitObject, result.hitPos
+end
+
+-- The player shoots once with core.combat.fire at `target` (an object), or at what the camera's ray hits when none is given
+function handlers.fire(args)
+    local stats = core.combat.weapon()
+    local target, hitPos = args.target, nil
+    local how = 'given'
+    if target == nil then target, hitPos = aimTarget(stats) how = 'ray' end
+    local ok, row = pcall(core.combat.fire, target)
+    if not ok then
+        log('error', 'fire', tostring(row))
+        return { fired = false }
+    end
+    log('fire', tostring(args.label or '-'), 'aim=' .. how, 'target=' .. (target and tostring(target.recordId) or 'none'),
+        'fired=' .. tostring(row.fired), 'ammoOut=' .. tostring(row.outOfAmmo), 'hit=' .. tostring(row.hit),
+        'damage=' .. number(row.damage), 'crit=' .. tostring(row.critical), 'killed=' .. tostring(row.killed),
+        'downed=' .. tostring(row.downed), 'rounds=' .. tostring(core.combat.weapon().rounds))
+    return { fired = row.fired, hit = row.hit, killed = row.killed, damage = row.damage }
+end
+
+-- Turns the camera and the player to look at an object (its middle), the pitch positive down
+function handlers.aimAt(args)
+    local target = args.target
+    local eye = eyePosition()
+    local to = target.position + util.vector3(0, 0, args.up or 80)
+    local d = to - eye
+    local yaw = math.atan2(d.x, d.y)
+    local pitch = math.atan2(-d.z, math.sqrt(d.x * d.x + d.y * d.y))
+    camera.setYaw(yaw)
+    camera.setPitch(pitch)
+    log('aimAt', tostring(args.label or '-'), string.format('yaw=%.2f pitch=%.2f distance=%.0f', yaw, pitch, d:length()))
+    return {}
+end
+
+-- Walks, runs or sneaks for some real seconds: the controls are set each frame (the movement controls of the game are left
+-- alone while it lasts); `sneak` alone with no movement crouches in place
+local moving = nil
+function handlers.move(args)
+    I.Controls.overrideMovementControls(true)
+    moving = { forward = args.forward or 0, side = args.side or 0, run = args.run == true, sneak = args.sneak == true,
+        untilAt = core.getRealTime() + (args.seconds or 2) }
+    log('move', string.format('forward=%.0f side=%.0f run=%s sneak=%s seconds=%.1f', moving.forward, moving.side,
+        tostring(moving.run), tostring(moving.sneak), args.seconds or 2))
+    return {}
+end
+
+-- Keeps crouching (or stands again) without moving
+local crouch = nil
+function handlers.crouch(args)
+    I.Controls.overrideMovementControls(true)
+    crouch = args.on ~= false
+    self.controls.sneak = crouch
+    log('crouch', tostring(crouch))
+    return {}
+end
+
+-- The attack control of the actor (the engine's own attack of a weapon in hand, apart from core.combat.fire)
+function handlers.use(args)
+    self.controls.use = args.on == false and self.ATTACK_TYPE.NoAttack or self.ATTACK_TYPE.Any
+    log('use', tostring(args.on ~= false))
+    return {}
+end
+
+-- What the characters around make of the player: the sneak meter's word, and the health of the player
+function handlers.status(args)
+    local ok, state = pcall(core.hud.status)
+    if not ok then
+        log('error', 'status', tostring(state))
+        return {}
+    end
+    log('status', tostring(args.label or '-'), 'sneaking=' .. tostring(state.sneaking), 'sneak=' .. tostring(state.sneak),
+        'weaponDrawn=' .. tostring(state.weaponDrawn), 'hp=' .. number(health(self.object)))
+    return { sneak = state.sneak, sneaking = state.sneaking, hp = health(self.object) }
+end
+
+-- The camera and the stance of the player in numbers
+function handlers.mode(args)
+    log('mode', tostring(args.label or '-'), 'camera=' .. tostring(camera.getMode()), 'stance=' .. tostring(Actor.getStance(self)),
+        'sneaking=' .. tostring(self.controls.sneak), 'onGround=' .. tostring(Actor.isOnGround(self)),
+        'speed=' .. number(Actor.getCurrentSpeed(self)), 'ui=' .. tostring(I.UI.getMode()))
+    return {}
+end
+
+-- Sampling of animation state: every `every` real seconds (0.25) the groups that play on each tracked actor, one line each.
+-- tracked: list of { label, actor }. The bone groups: lower body, torso, left arm, right arm (openfallout.animation.BONE_GROUP).
+local tracked, trackEvery, lastTrack = {}, 0.25, 0
+local trackStarted = 0
+local function groups(actor)
+    local out = {}
+    for _, pair in ipairs({ { 'L', animation.BONE_GROUP.LowerBody }, { 'T', animation.BONE_GROUP.Torso },
+        { 'LA', animation.BONE_GROUP.LeftArm }, { 'RA', animation.BONE_GROUP.RightArm } }) do
+        local ok, group = pcall(animation.getActiveGroup, actor, pair[2])
+        table.insert(out, pair[1] .. '=' .. (ok and (group == '' and '-' or tostring(group)) or 'error'))
+    end
+    return table.concat(out, ' ')
+end
+
+local sampleErrorLogged = {}
+-- the animation groups that the skeleton's folder has (file names without the folder and the ending), asked of an actor each sample
+-- to see which play: the folder of the skeleton and its locomotion folders, and the first person folder
+local candidates = nil
+local function candidateGroups()
+    if candidates ~= nil then return candidates end
+    candidates = {}
+    local vfs = require('openfallout.vfs')
+    local seen = {}
+    for _, prefix in ipairs({ 'meshes/characters/_male/', 'meshes/characters/_1stperson/' }) do
+        local ok, iterator = pcall(vfs.pathsWithPrefix, prefix)
+        if ok then
+            for path in iterator do
+                path = tostring(path):lower()
+                if path:match('%.kf$') and not path:find('/idleanims/', 1, true) then
+                    local stem = path:match('([^/]+)%.kf$')
+                    if stem and not seen[stem] then seen[stem] = true table.insert(candidates, stem) end
+                end
+            end
+        end
+    end
+    table.sort(candidates)
+    log('candidates', #candidates .. ' group names from the folders of the skeleton and the first person')
+    return candidates
+end
+
+local function playingGroups(actor)
+    local out = {}
+    for _, name in ipairs(candidateGroups()) do
+        local ok, playing = pcall(animation.isPlaying, actor, name)
+        if ok and playing then table.insert(out, name) end
+    end
+    return #out > 0 and table.concat(out, '+') or '-'
+end
+
+local function sample(entry)
+    local actor = entry.actor
+    if not actor:isValid() then
+        log('sample', entry.label, 'invalid')
+        return
+    end
+    local p = actor.position
+    local distance = (p - self.position):length()
+    local parts = { 'sample', entry.label, string.format('t=%.2f', core.getRealTime() - trackStarted), groups(actor) }
+    table.insert(parts, 'playing=' .. playingGroups(actor))
+    table.insert(parts, string.format('pos=%.0f,%.0f,%.0f d=%.0f', p.x, p.y, p.z, distance))
+    local function try(text, fn)
+        local ok, value = pcall(fn)
+        table.insert(parts, text .. '=' .. (ok and tostring(value) or 'n/a'))
+    end
+    try('yaw', function() return string.format('%.2f', actor.rotation:getYaw()) end)
+    try('stance', function() return Actor.getStance(actor) end)
+    try('hp', function()
+        if actor == self.object then return number(health(actor)) end
+        local t = core.hud.target(actor)
+        return string.format('%.0f/%.0f', t.health, t.maxHealth)
+    end)
+    local id = formOf(actor)
+    if actor ~= self.object then
+        try('dead', function() return core.combat.isDead(id) end)
+        try('inCombat', function() return core.combat.inCombat(id) end)
+        try('target', function()
+            local t = core.combat.target(id)
+            return t == formOf(self.object) and 'player' or (t == '' and '-' or 'other')
+        end)
+    end
+    log(table.unpack(parts))
+end
+
+function handlers.track(args)
+    tracked = args.list or {}
+    trackEvery = args.every or 0.25
+    lastTrack = 0
+    trackStarted = core.getRealTime()
+    log('track', #tracked .. ' actors', 'every=' .. trackEvery)
+    return {}
+end
+
+function handlers.untrack()
+    tracked = {}
+    log('untrack')
+    return {}
+end
+
+-- A blank of the whole player-side state of the fight, for one actor (state of its fight and its animation, once)
+function handlers.actorState(args)
+    sample({ label = args.label or 'actor', actor = args.actor })
+    return {}
+end
+
+-- What the screen of V.A.T.S. would see: the state of the game's own V.A.T.S., and for one actor whether it can be a target, the angle
+-- to it from the camera and what the ray to its head hits
+function handlers.vatsInfo(args)
+    local ok, state = pcall(core.vats.state)
+    if ok then
+        log('vatsInfo', tostring(args.label or '-'), 'usable=' .. tostring(state.usable), 'open=' .. tostring(state.open),
+            'ap=' .. number(state.actionPoints) .. '/' .. number(state.maxActionPoints), 'cost=' .. number(state.cost),
+            'range=' .. tostring(state.range), 'ui=' .. tostring(I.UI.getMode()))
+    else
+        log('error', 'vatsInfo', tostring(state))
+    end
+    local actor = args.actor
+    local answer = {}
+    if actor then
+        local good, can = pcall(core.vats.canTarget, actor)
+        local from = camera.getPosition()
+        local head = actor.position + util.vector3(0, 0, 130)
+        local direction = (head - from):normalize()
+        local cosine = direction:dot(camera.viewportToWorldVector(util.vector2(0.5, 0.5)))
+        local ray = nearby.castRay(from, head, { ignore = self, collisionType = nearby.COLLISION_TYPE.Default })
+        log('vatsInfo', 'target', 'canTarget=' .. tostring(good and can or ('error ' .. tostring(can))), 'cosine=' .. string.format('%.3f', cosine),
+            'distance=' .. number((head - from):length(), 0), 'ray=' .. (ray.hitObject and tostring(ray.hitObject.recordId) or 'clear'))
+        -- whether the ray to the head hits nothing, or the character itself: a scenario that wants a target that V.A.T.S. can offer
+        -- tries another place when this is false (round 14D: the first place was inside a building)
+        answer.clear = ray.hitObject == nil or ray.hitObject == actor
+        answer.canTarget = good and can == true
+    end
+    return answer
+end
+
+-- The HUD's messages since the last call (the number, and the port's own words only when they are the one this round knows)
+function handlers.messages(args)
+    local ok, list = pcall(core.hud.takeMessages)
+    local n = ok and #list or -1
+    local known = false
+    if ok then for _, m in ipairs(list) do if m.text == 'No target in sight' then known = true end end end
+    log('messages', tostring(args.label or '-'), 'count=' .. n, 'noTargetInSight=' .. tostring(known))
+    return {}
+end
+
+-- V.A.T.S.: the same event the pad's bumper sends the screen
+function handlers.vats(args)
+    if args.button then
+        self:sendEvent('PadButton', { button = input.CONTROLLER_BUTTON[args.button] })
+        log('vats', 'pad', tostring(args.button))
+    else
+        self:sendEvent('OpenVats', { targets = args.targets })
+        log('vats', 'open', 'ui=' .. tostring(I.UI.getMode()))
+    end
+    return {}
+end
+
 return {
     engineHandlers = {
+        onFrame = function()
+            local now = core.getRealTime()
+            if wantedMode ~= nil and camera.getMode() ~= wantedMode then
+                modeForced = modeForced + 1
+                if modeForced <= 3 then log('camera', 'mode forced back', 'from=' .. tostring(camera.getMode()), 'to=' .. tostring(wantedMode)) end
+                camera.setMode(wantedMode, true)
+            end
+            if moving then
+                if now >= moving.untilAt then
+                    self.controls.movement, self.controls.sideMovement, self.controls.run, self.controls.sneak = 0, 0, false, crouch == true
+                    moving = nil
+                    log('move', 'done')
+                else
+                    self.controls.movement, self.controls.sideMovement = moving.forward, moving.side
+                    self.controls.run, self.controls.sneak = moving.run, moving.sneak or crouch == true
+                end
+            elseif crouch ~= nil then
+                self.controls.sneak = crouch
+            end
+            if #tracked > 0 and now - lastTrack >= trackEvery then
+                lastTrack = now
+                for _, entry in ipairs(tracked) do sample(entry) end
+            end
+        end,
         onUpdate = function()
             answerBox()
             local now = core.getRealTime()

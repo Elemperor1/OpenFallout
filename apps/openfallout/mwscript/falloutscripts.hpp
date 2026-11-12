@@ -1579,8 +1579,16 @@ namespace OFScript
             int mAnimationType = -1;
         };
         HeldWeapon heldWeapon(const OFWorld::Ptr& actor);
+        /// Whether the player holds the weapon out (or the fists, when it has none), as `core.combat.setDrawn` says
+        bool isPlayerWeaponDrawn() { return mPlayer != 0 && mEquipment.weaponDrawn(mPlayer); }
+        /// How many shots (or blows) the player has made: the body of the player plays the attack of the weapon when this
+        /// goes up
+        unsigned playerShots() const { return mPlayerShots.load(); }
         /// The character goes for the player
         void fightPlayer(const OFWorld::Ptr& actor);
+        /// A character that has started a fight or died looks at what it has to do: one with no package has no mind
+        /// until then, and the mind is what has it fight, and what has its body fall
+        void wakeMind(FalloutScript::FormId actor) { evaluatePackage(actor); }
         /// The character attacks the target with the weapon it holds, as far as its skill allows it to hit. A
         /// weapon that has no ammunition left is put away and the character takes another.
         FireResult attack(const OFWorld::Ptr& attacker, const OFWorld::Ptr& target);
@@ -2932,6 +2940,8 @@ namespace OFScript
         /// The seconds until a character can attack again
         std::mutex mFireMutex;
         std::map<FalloutScript::FormId, float> mFireCooldowns;
+        /// The shots the player has made, for the body that shows them
+        std::atomic<unsigned> mPlayerShots{ 0 };
         /// The sound of a shot of the weapon that the attacker holds, or the click of it when it has no ammunition: the
         /// player hears the sound made for it (a 2D one) and the rest are heard from where they stand. Main thread.
         void playWeaponSound(FalloutScript::FormId attacker, FalloutScript::FormId weapon, bool dryFire);

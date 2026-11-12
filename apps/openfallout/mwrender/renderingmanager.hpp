@@ -377,6 +377,8 @@ namespace OFRender
         /// The look and armor (see FalloutScripts::playerBodyRevision) that was last tried; a look that cannot be made is
         /// not tried again until it changes
         std::optional<std::uint64_t> mPlayerBodyTried;
+        /// The shots of the player that the body has been told of
+        unsigned mPlayerShotsSeen = 0;
         /// What a conversation does to the view (see updateDialogueCamera)
         struct DialogueView
         {

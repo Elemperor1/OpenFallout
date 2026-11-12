@@ -21,6 +21,7 @@ printed = {}
 quit_called = false
 paused = false
 sent_to_player = {}
+asked_log = {}
 globals_table = { GameHour = 8 }
 teleports = {}
 object_cells = {}
@@ -30,10 +31,22 @@ print = function(...)
     for i = 1, select('#', ...) do parts[#parts + 1] = tostring((select(i, ...))) end
     printed[#printed + 1] = table.concat(parts, '\\t')
 end
+local vector_methods = {}
+local vec3
+vec3 = function(x, y, z)
+    return setmetatable({ x = x, y = y, z = z }, {
+        __add = function(a, b) return vec3(a.x + b.x, a.y + b.y, a.z + b.z) end,
+        __sub = function(a, b) return vec3(a.x - b.x, a.y - b.y, a.z - b.z) end,
+        __mul = function(a, k) return vec3(a.x * k, a.y * k, a.z * k) end,
+    })
+end
 local player = {
-    position = { x = 10, y = 20, z = 30 },
+    position = vec3(10, 20, 30),
     cell = { isExterior = true, gridX = 0, gridY = 0, worldSpaceId = 'w' },
-    sendEvent = function(self, name, data) sent_to_player[#sent_to_player + 1] = { name = name, data = data } end,
+    sendEvent = function(self, name, data)
+        sent_to_player[#sent_to_player + 1] = { name = name, data = data }
+        asked_log[#asked_log + 1] = data.what
+    end,
     teleport = function(self, cell, pos, options) teleports[#teleports + 1] = { cell = cell, pos = pos, options = options } end,
 }
 package.preload['openfallout.core'] = function()
@@ -45,8 +58,11 @@ package.preload['openfallout.core'] = function()
     }
 end
 package.preload['openfallout.util'] = function()
-    return { vector3 = function(x, y, z) return { x = x, y = y, z = z } end,
-             transform = { rotateZ = function(a) return { yaw = a } end } }
+    return { vector3 = vec3, transform = { rotateZ = function(a) return { yaw = a } end } }
+end
+created = {}
+package.preload['openfallout.types'] = function()
+    return { Actor = { inventory = function(actor) return { owner = actor } end } }
 end
 package.preload['openfallout.world'] = function()
     return {
@@ -347,6 +363,81 @@ class ScenarioPlayer(unittest.TestCase):
         self.assertTrue(any(line.startswith("ROUND\terror\tscenario") and "boom" in line for line in lines))
         self.assertTrue(any(line.startswith("ROUND\tdone\terror") for line in lines))
 
+    def test_the_player_is_0x14_and_placed_references_are_written_as_form_ids(self):
+        # the combat calls name the player 0x14 (the games' own number), and a placed reference "0x..." as a form id
+        self.start("return function(r) r.log(r.form(r.player()), r.form({ id = '0x1629a4' }), r.form({ id = 'FormId:0x55' }), "
+                   "r.form(nil) == '') end")
+        self.tick(4)
+        self.assertIn("ROUND\tnote\tFormId:0x14\tFormId:0x1629a4\tFormId:0x55\ttrue", self.lines())
+
+    def test_fight_starts_it_between_two_objects_and_says_the_state(self):
+        self.start("return function(r) "
+                   "local calls = {} "
+                   "r.core.combat = { start = function(a, b) calls[#calls + 1] = a .. '>' .. b end, "
+                   "inCombat = function() return true end, target = function() return 'FormId:0x14' end } "
+                   "r.fight({ id = '0x1629a4' }, r.player(), 'g1') "
+                   "r.log(calls[1]) end")
+        self.tick(4)
+        lines = self.lines()
+        self.assertIn("ROUND\tfight\tok\tg1\tinCombat=true target=FormId:0x14", lines)
+        self.assertIn("ROUND\tnote\tFormId:0x1629a4>FormId:0x14", lines)
+
+    def test_a_fight_that_did_not_begin_is_a_failed_step(self):
+        self.start("return function(r) "
+                   "r.core.combat = { start = function(a, b) end, "
+                   "inCombat = function() return false end, target = function() return '' end } "
+                   "r.fight({ id = '0x1629a4' }, r.player(), 'dead one') end")
+        self.tick(4)
+        self.assertTrue(any(line.startswith("ROUND\terror\tfight\tthe fight did not begin") for line in self.lines()))
+
+    def test_enemy_makes_two_factions_enemies_and_says_so(self):
+        self.start("return function(r) "
+                   "local calls = {} "
+                   "r.core.combat = { setEnemy = function(a, b) calls[#calls + 1] = a .. '~' .. b end } "
+                   "r.enemy('FormId:0x1101f42', 'FormId:0x101b2a4', 'pg') "
+                   "r.core.combat = {} "
+                   "r.enemy('a', 'b', 'missing') "
+                   "r.log(calls[1]) end")
+        self.tick(4)
+        lines = self.lines()
+        self.assertIn("ROUND\tenemy\tok\tpg\tFormId:0x1101f42\tFormId:0x101b2a4", lines)
+        self.assertIn("ROUND\tnote\tFormId:0x1101f42~FormId:0x101b2a4", lines)
+        self.assertTrue(any(line.startswith("ROUND\terror\tenemy") for line in lines))
+
+    def test_place_puts_an_object_in_a_direction_and_faces_the_player(self):
+        self.start("return function(r) "
+                   "local o = { teleport = function(self, cell, pos, options) teleports[#teleports + 1] = { pos = pos, options = options } end } "
+                   "r.place(o, { dist = 700, bearing = 0, label = 'v' }) "
+                   "r.place(o, { dist = 100, bearing = math.pi / 2, yaw = 2 }) end")
+        self.tick(4)
+        self.assertEqual(self.lua.eval("#teleports"), 2)
+        self.assertAlmostEqual(self.lua.eval("teleports[1].pos.y"), 20 + 700)   # north of the player at (10, 20)
+        self.assertAlmostEqual(self.lua.eval("teleports[1].pos.x"), 10)
+        self.assertAlmostEqual(self.lua.eval("teleports[1].options.rotation.yaw"), 3.14159265, places=5)   # it looks back at the player
+        self.assertAlmostEqual(self.lua.eval("teleports[2].pos.x"), 110)       # east
+        self.assertEqual(self.lua.eval("teleports[2].options.rotation.yaw"), 2)
+        self.assertTrue(self.lua.eval("teleports[2].options.onGround"))
+        self.assertIn("ROUND\tplace\tok\tv\tdist=700 bearing=0.00", self.lines())
+
+    def test_put_at_goes_to_the_cell_of_the_position(self):
+        self.start("return function(r) "
+                   "local o = { teleport = function(self, cell, pos, options) teleports[#teleports + 1] = { cell = cell, pos = pos, options = options } end } "
+                   "r.putAt(o, { pos = { 8200, -4100, 5 }, yaw = 1, label = 'there' }) end")
+        self.tick(4)
+        self.assertEqual(self.lua.eval("teleports[1].cell.grid"), "2,-2")
+        self.assertEqual(self.lua.eval("teleports[1].pos.z"), 5)
+        self.assertIn("ROUND\tputAt\tok\tthere\tpos=8200,-4100", self.lines())
+
+    def test_the_questions_of_the_fight_go_to_the_player_script(self):
+        self.start("return function(r) r.drawn(true) r.fire('x', nil) r.vatsInfo('v', nil) r.state('s', nil) end")
+        self.tick(4)
+        for _ in range(8):
+            self.tick(0.5)
+        log = self.lua.eval("asked_log")
+        self.assertEqual([log[index] for index in range(1, len(log) + 1)], ["drawn", "fire", "vatsInfo", "actorState"])
+        self.assertTrue(any(line.startswith("ROUND\tbegin") for line in self.lines()))
+        self.assertTrue(any(line.startswith("ROUND\tdone\tend") for line in self.lines()))
+
     def test_the_time_limit(self):
         self.start("return { limit = 20, run = function(r) r.wait(1000) end }")
         self.tick(4)
@@ -371,8 +462,14 @@ print = function(...)
     for i = 1, select('#', ...) do parts[#parts + 1] = tostring((select(i, ...))) end
     printed[#printed + 1] = table.concat(parts, '\\t')
 end
-local vec = function(x, y, z) return setmetatable({ x = x, y = y, z = z }, { __add = function(a, b) return vec(a.x + b.x, a.y + b.y, a.z + b.z) end,
-    __sub = function(a, b) return vec(a.x - b.x, a.y - b.y, a.z - b.z) end }) end
+local vector_methods = {
+    length = function(a) return math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z) end,
+    normalize = function(a) local n = math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z) return vec(a.x / n, a.y / n, a.z / n) end,
+    dot = function(a, b) return a.x * b.x + a.y * b.y + a.z * b.z end,
+}
+vec = function(x, y, z) return setmetatable({ x = x, y = y, z = z }, { __add = function(a, b) return vec(a.x + b.x, a.y + b.y, a.z + b.z) end,
+    __sub = function(a, b) return vec(a.x - b.x, a.y - b.y, a.z - b.z) end, __index = vector_methods }) end
+function make_actor(x, y, z) return { position = vec(x, y, z), recordId = 'ganger' } end
 yaw, pitch = 0, 0
 package.preload['openfallout.core'] = function()
     return { getRealTime = function() return clock end, getRealFrameDuration = function() return 0.0001 end,
@@ -384,14 +481,20 @@ end
 package.preload['openfallout.camera'] = function()
     return { getPosition = function() return vec(100, 200, 364) end, getYaw = function() return yaw end, getPitch = function() return pitch end,
              setYaw = function(v) yaw = v end, setPitch = function(v) pitch = v end, getMode = function() return 1 end,
-             setMode = function() end, MODE = { FirstPerson = 1 } }
+             setMode = function() end, MODE = { FirstPerson = 1 }, viewportToWorldVector = function() return vec(0, 1, 0) end }
 end
 package.preload['openfallout.debug'] = function() return { takeScreenshot = function() takeScreenshot_calls = takeScreenshot_calls + 1 end } end
 package.preload['openfallout.nearby'] = function()
     return { COLLISION_TYPE = { HeightMap = 4 }, actors = {},
              castRay = function(from, to, options) return { hit = true, hitPos = vec(from.x, from.y, 55) } end }
 end
-package.preload['openfallout.util'] = function() return { vector3 = vec } end
+package.preload['openfallout.util'] = function() return { vector3 = vec, vector2 = function(x, y) return { x = x, y = y } end } end
+package.preload['openfallout.input'] = function() return { CONTROLLER_BUTTON = { Y = 12, X = 11 } } end
+package.preload['openfallout.animation'] = function() return { BONE_GROUP = {} } end
+package.preload['openfallout.types'] = function() return { Actor = {} } end
+package.preload['openfallout.interfaces'] = function()
+    return { UI = { getMode = function() return 'none' end }, Controls = { overrideMovementControls = function() end } }
+end
 function load_player() return load(player_source)() end
 """
 
@@ -507,10 +610,72 @@ class PlayerScript(unittest.TestCase):
         self.tick_frames(0.5)
         self.assertEqual(self.quiet().open, False)
 
+    def vats_stand_in(self, hit):
+        self.lua.execute(f"""
+            local core = require('openfallout.core')
+            core.vats = {{ state = function() return {{ usable = true, open = false, actionPoints = 80, maxActionPoints = 80,
+                                                       cost = 17, range = 700 }} end,
+                          canTarget = function() return true end }}
+            local nearby = require('openfallout.nearby')
+            nearby.castRay = function(from, to, options) return {{ hitObject = {hit} }} end
+        """)
+        actor = self.lua.eval("make_actor(100, 900, 300)")
+        self.ask("vatsInfo", label="v", actor=actor)
+        answers = self.lua.eval("answers")
+        return answers[len(answers)].data.result
+
+    def test_vats_info_says_when_the_ray_to_the_head_is_clear(self):
+        result = self.vats_stand_in("nil")
+        self.assertTrue(result.clear)
+        self.assertTrue(result.canTarget)
+        self.assertTrue(any(line.startswith("ROUND\tvatsInfo\tv\tusable=true") and "ap=80.0/80.0" in line for line in self.lines()))
+        self.assertTrue(any(line.startswith("ROUND\tvatsInfo\ttarget\tcanTarget=true") and line.endswith("ray=clear")
+                            for line in self.lines()))
+
+    def test_vats_info_says_what_is_in_the_way(self):
+        result = self.vats_stand_in("{ recordId = 'FormId:0x10243e' }")
+        self.assertFalse(result.clear)
+        self.assertTrue(any(line.endswith("ray=FormId:0x10243e") for line in self.lines()))
+
     def test_unknown_question_is_answered_with_an_error(self):
         self.ask("nonsense")
         self.assertTrue(any(line.startswith("ROUND\terror\tnonsense") for line in self.lines()))
         self.assertEqual(self.lua.eval("#answers"), 1)
+
+
+class RoundFiles(unittest.TestCase):
+    ROUNDS = SCRIPTS.parent / "rounds"
+    SCENARIOS = SCRIPTS.parent / "scenarios"
+
+    def test_every_round_names_a_scenario_that_exists_and_variants_with_names(self):
+        import json
+        files = sorted(self.ROUNDS.glob("*.json"))
+        self.assertGreaterEqual(len(files), 5)
+        for path in files:
+            config = json.loads(path.read_text(encoding="utf-8"))
+            if "scenario" in config:
+                self.assertTrue((path.parent / config["scenario"]).resolve().is_file(), f"{path.name}: {config['scenario']}")
+            names = [variant.get("name") for variant in config.get("variants", [])]
+            self.assertTrue(all(names), f"{path.name}: a variant has no name")
+            self.assertEqual(len(names), len(set(names)), f"{path.name}: two variants have one name")
+            for variant in config.get("variants", []):
+                for key, value in variant.get("env", {}).items():
+                    self.assertIsInstance(value, str, f"{path.name}: {key}")
+
+    @unittest.skipUnless(LuaRuntime, "needs lupa")
+    def test_every_script_and_scenario_is_valid_lua(self):
+        lua = LuaRuntime(unpack_returned_tuples=True)
+        load = lua.eval("function(source, name) local f, err = load(source, name) return err end")
+        for path in sorted(SCRIPTS.glob("*.lua")) + sorted(self.SCENARIOS.glob("*.lua")):
+            self.assertIsNone(load(path.read_text(encoding="utf-8"), path.name), path.name)
+
+    def test_the_arms_tuning_round_moves_the_arms_by_one_variable(self):
+        import json
+        config = json.loads((self.ROUNDS / "m14-arms-tune.json").read_text(encoding="utf-8"))
+        for variant in config["variants"]:
+            words = variant["env"]["OPENFALLOUT_FIRSTPERSON_ARMS"].split()
+            self.assertEqual(len(words), 6, variant["name"])       # x y z yaw pitch roll
+            [float(word) for word in words]
 
 
 if __name__ == "__main__":

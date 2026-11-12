@@ -2,6 +2,7 @@
 """Tests of round/round.py, the runner of the scripted checks: the settings merge, the reading of the log, the order of the
 screenshots, the command line, and a whole run against a stand-in for the engine (a script that writes a log and a picture)."""
 import contextlib
+import functools
 import importlib.util
 import io
 import json
@@ -11,6 +12,7 @@ import struct
 import sys
 import tempfile
 import textwrap
+import threading
 import time
 import unittest
 import zlib
@@ -22,6 +24,11 @@ spec = importlib.util.spec_from_file_location("round_runner", HERE / "round" / "
 round_runner = importlib.util.module_from_spec(spec)
 sys.modules["round_runner"] = round_runner
 spec.loader.exec_module(round_runner)
+
+
+def runs_of(tmp):
+    """The folders of the runs under `<tmp>/out` (the guards keep their own files in `guard/` next to them)."""
+    return [path for path in (tmp / "out").iterdir() if path.name != "guard"]
 
 
 def tiny_png(path):
@@ -52,6 +59,17 @@ class Settings(unittest.TestCase):
         base = {"A": {"k": "1"}}
         round_runner.merge_settings(base, {"A": {"k": "2"}})
         self.assertEqual(base, {"A": {"k": "1"}})
+
+
+class SafeName(unittest.TestCase):
+    def test_a_plus_and_a_minus_do_not_give_the_same_name(self):
+        self.assertEqual(round_runner.safe_name("yaw+90"), "yawplus90")
+        self.assertEqual(round_runner.safe_name("yaw-90"), "yaw-90")
+        self.assertNotEqual(round_runner.safe_name("pitch+90"), round_runner.safe_name("pitch-90"))
+
+    def test_other_characters_become_a_dash(self):
+        self.assertEqual(round_runner.safe_name("a b/c"), "a-b-c")
+        self.assertEqual(round_runner.safe_name("C1_fight.3"), "C1_fight.3")
 
 
 class Log(unittest.TestCase):
@@ -432,13 +450,13 @@ class WholeRun(unittest.TestCase):
         (tmp / "profile.json").write_text(json.dumps(profile))
         (tmp / "r.json").write_text(json.dumps({"name": "fake", "scenario": "s.lua", "variants": [{"name": "one"}, {"name": "two"}],
                                                 **({"allow_missing_content": True} if allow else {})}))
-        code = round_runner.main(["--profile", str(tmp / "profile.json"), "run", str(tmp / "r.json"), "--parallel", "2", *extra])
+        code = round_runner.main(["--profile", str(tmp / "profile.json"), "run", str(tmp / "r.json"), "--parallel", "1", *extra])
         return tmp, code
 
     def test_passing_run(self):
         tmp, code = self.run_round(0)
         self.assertEqual(code, 0)
-        (run,) = list((tmp / "out").iterdir())
+        (run,) = runs_of(tmp)
         report = json.loads((run / "one" / "report.json").read_text())
         self.assertEqual(report["verdict"], "PASS")
         self.assertEqual([s["name"] for s in report["shots"]], ["first", "second"])
@@ -451,7 +469,7 @@ class WholeRun(unittest.TestCase):
     def test_a_crash_after_the_scenario_ended_is_a_note(self):
         tmp, code = self.run_round(3)
         self.assertEqual(code, 0)
-        (run,) = list((tmp / "out").iterdir())
+        (run,) = runs_of(tmp)
         report = json.loads((run / "one" / "report.json").read_text())
         self.assertEqual(report["verdict"], "PASS")
         self.assertEqual(report["exit_status"], 3)
@@ -461,7 +479,7 @@ class WholeRun(unittest.TestCase):
     def test_a_screenshot_that_was_asked_for_and_never_written_fails_the_round(self):
         tmp, code = self.run_round(0, written=1)
         self.assertEqual(code, 1)
-        (run,) = list((tmp / "out").iterdir())
+        (run,) = runs_of(tmp)
         report = json.loads((run / "one" / "report.json").read_text())
         self.assertEqual(report["verdict"], "FAIL")
         self.assertEqual(report["missing_shots"], ["second"])
@@ -470,10 +488,11 @@ class WholeRun(unittest.TestCase):
 
     def test_on_a_mac_a_round_that_could_not_measure_the_focus_does_not_pass(self):
         # no `lsappinfo` here, so every sample is empty: the round is not a proof of anything
-        with mock.patch.object(round_runner, "IS_MAC", True), mock.patch.object(round_runner.shutil, "which", return_value=None):
+        with mock.patch.object(round_runner, "IS_MAC", True), mock.patch.object(round_runner.shutil, "which", return_value=None), \
+                mock.patch.object(round_runner, "make_system", return_value=round_runner.roundguard.System()):
             tmp, code = self.run_round(0)
         self.assertEqual(code, 1)
-        (run,) = list((tmp / "out").iterdir())
+        (run,) = runs_of(tmp)
         report = json.loads((run / "one" / "report.json").read_text())
         self.assertEqual(report["verdict"], "FAIL")
         self.assertIn("NOT MEASURED", (run / "one" / "report.md").read_text())
@@ -486,13 +505,13 @@ class WholeRun(unittest.TestCase):
     def test_a_variant_filter_runs_only_that_variant(self):
         tmp, code = self.run_round(0, extra=("--variant", "two"))
         self.assertEqual(code, 0)
-        (run,) = list((tmp / "out").iterdir())
+        (run,) = runs_of(tmp)
         self.assertEqual([p.name for p in run.iterdir() if p.is_dir()], ["two"])
 
     def test_an_engine_that_ends_before_the_scenario_fails(self):
         tmp, code = self.run_round(3, done=False)
         self.assertEqual(code, 1)
-        (run,) = list((tmp / "out").iterdir())
+        (run,) = runs_of(tmp)
         report = json.loads((run / "one" / "report.json").read_text())
         self.assertEqual(report["verdict"], "FAIL")
         self.assertIn("before the scenario finished", report["exit_note"])
@@ -506,7 +525,7 @@ class WholeRun(unittest.TestCase):
         # the save of a play session wants the plugin of the play, a script file: harmless
         tmp, code = self.run_round(0, missing=("play.omwscripts",))
         self.assertEqual(code, 0)
-        (run,) = list((tmp / "out").iterdir())
+        (run,) = runs_of(tmp)
         report = json.loads((run / "one" / "report.json").read_text())
         self.assertEqual((report["verdict"], report["content_not_loaded"], report["content_not_loaded_serious"]),
                          ("PASS", ["play.omwscripts"], []))
@@ -514,14 +533,14 @@ class WholeRun(unittest.TestCase):
         # a game plugin that is not loaded can change the world the save is in
         tmp, code = self.run_round(0, missing=("play.omwscripts", "Mod.esp"))
         self.assertEqual(code, 1)
-        (run,) = list((tmp / "out").iterdir())
+        (run,) = runs_of(tmp)
         report = json.loads((run / "one" / "report.json").read_text())
         self.assertEqual((report["verdict"], report["content_not_loaded_serious"]), ("FAIL", ["Mod.esp"]))
         self.assertIn("the round fails", (run / "one" / "report.md").read_text())
         # unless the round file allows it
         tmp, code = self.run_round(0, missing=("Mod.esp",), allow=True)
         self.assertEqual(code, 0)
-        (run,) = list((tmp / "out").iterdir())
+        (run,) = runs_of(tmp)
         self.assertIn("allowed by the round file", (run / "one" / "report.md").read_text())
 
     def test_missing_content_is_read_from_the_log(self):
@@ -537,7 +556,7 @@ class WholeRun(unittest.TestCase):
         tmp, code = self.run_round(0, linger=120)
         self.assertLess(time.monotonic() - started, 60)
         self.assertEqual(code, 0)
-        (run,) = list((tmp / "out").iterdir())
+        (run,) = runs_of(tmp)
         report = json.loads((run / "one" / "report.json").read_text())
         self.assertEqual((report["verdict"], report["stopped_by_runner"], report["timed_out"]), ("PASS", True, False))
         self.assertIn("the runner stopped the engine", (run / "one" / "report.md").read_text())
@@ -570,7 +589,7 @@ class WholeRun(unittest.TestCase):
 
     def test_a_finished_round_has_no_log_tail(self):
         tmp, code = self.run_round(0)
-        (run,) = list((tmp / "out").iterdir())
+        (run,) = runs_of(tmp)
         self.assertNotIn("Last lines of the log", (run / "one" / "report.md").read_text())
 
     def test_log_tail(self):
@@ -580,3 +599,334 @@ class WholeRun(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StandInSystem(round_runner.roundguard.System):
+    """A computer with a window system whose answers the test decides: the heartbeat asks `ping` and reads `pid`."""
+    name = "stand-in"
+    heartbeat = True
+
+    def __init__(self, ping=lambda: True, pid=100):
+        self.ping_function, self.pid = ping, pid
+
+    def ping(self): return self.ping_function()
+    def window_server_pid(self): return self.pid
+    def runningboardd_log(self): return "runningboardd evidence"
+
+
+class GuardedRun(unittest.TestCase):
+    """The guards around a whole round: the heartbeat, the kill switch, the lock, the pre-flight, one engine at a time."""
+    ENGINE = WholeRun.ENGINE
+    make_engine = WholeRun.make_engine
+    HANGING = """
+        import pathlib, sys, time
+        args = sys.argv[1:]
+        config = pathlib.Path(args[args.index("--config") + 1])
+        (config / "openfallout.log").write_text("[10:00:00.000 I] start\\n[10:00:00.100 I] Headless: activation policy accessory set\\n")
+        time.sleep(120)
+    """
+
+    def prepare(self, body=None, variants=("one", "two")):
+        tmp = Path(tempfile.mkdtemp(prefix="round-guard-"))
+        body = body or self.ENGINE.replace("@STATUS@", "0").replace("@DONE@", "True").replace("@WRITTEN@", "2") \
+            .replace("@MISSING@", "[]").replace("@LINGER@", "0")
+        engine = self.make_engine(tmp, body)
+        (tmp / "s.lua").write_text("return function(r) end")
+        profile = {"engine": str(engine), "resources": str(tmp), "games": {"nv": {"data": [str(tmp)], "content": ["FalloutNV.esm"]}},
+                   "out": str(tmp / "out")}
+        (tmp / "profile.json").write_text(json.dumps(profile))
+        (tmp / "r.json").write_text(json.dumps({"name": "fake", "scenario": "s.lua", "variants": [{"name": v} for v in variants]}))
+        return tmp
+
+    def run_with(self, tmp, system, *extra):
+        argv = ["--profile", str(tmp / "profile.json"), "run", str(tmp / "r.json"), *extra]
+        quick = functools.partial(round_runner.roundguard.Heartbeat, interval=0.05, stall=0.4, first_answer=0.8, pid_interval=0.1)
+        with mock.patch.object(round_runner, "make_system", return_value=system), \
+                mock.patch.object(round_runner.roundguard, "Heartbeat", quick):
+            return round_runner.main(argv)
+
+    def test_a_healthy_round_reports_the_window_server_and_keeps_evidence(self):
+        tmp = self.prepare()
+        code = self.run_with(tmp, StandInSystem())
+        self.assertEqual(code, 0)
+        (run,) = runs_of(tmp)
+        report = json.loads((run / "one" / "report.json").read_text())
+        self.assertEqual((report["verdict"], report["guard_tripped"]), ("PASS", None))
+        self.assertEqual((report["window_server"]["start"], report["window_server"]["same"]), (100, True))
+        self.assertEqual(report["evidence"], ["runningboardd-last-5m.log"])
+        self.assertIn("WindowServer same pid: yes (pid 100)", (run / "summary.md").read_text())
+        self.assertIn("WindowServer same pid: yes (pid 100)", (run / "one" / "report.md").read_text())
+        # the guards' own files: the engine ended, the lock is released, the rest is noted
+        self.assertTrue((tmp / "out" / "guard" / "last-heavy.json").exists())
+
+    def test_a_window_system_that_stops_answering_kills_the_engine_and_ends_the_round(self):
+        tmp = self.prepare(self.HANGING)
+        release = threading.Event()
+        calls = {"n": 0}
+
+        def ping():
+            calls["n"] += 1
+            if calls["n"] <= 2:                       # the test call and the first heartbeat answer, then it hangs
+                return True
+            release.wait(60)
+            return True
+        started = time.monotonic()
+        try:
+            code = self.run_with(tmp, StandInSystem(ping=ping))
+        finally:
+            release.set()
+        self.assertLess(time.monotonic() - started, 40)         # the engine sleeps for 120 s: it was killed, not waited for
+        self.assertEqual(code, 3)
+        (run,) = runs_of(tmp)
+        report = json.loads((run / "one" / "report.json").read_text())
+        self.assertEqual(report["verdict"], "FAIL")
+        self.assertIn("WindowServer has not answered", report["guard_tripped"])
+        self.assertIn("STOPPED BY A GUARD", (run / "one" / "report.md").read_text())
+        self.assertEqual(report["headless_policy"], "accessory set")
+        self.assertFalse((run / "two").exists())                # the round ended: the second variant never started
+        summary = (run / "summary.md").read_text()
+        self.assertIn("STOPPED BY A GUARD", summary)
+        self.assertIn("not run: two", summary)
+
+    def test_another_window_server_process_ends_the_round(self):
+        tmp = self.prepare(self.HANGING)
+        changed = threading.Event()
+        threading.Timer(1.5, changed.set).start()        # WindowServer is killed and started again while the engine runs
+        system = StandInSystem()
+        system.window_server_pid = lambda: 28288 if changed.is_set() else 690
+        code = self.run_with(tmp, system)
+        self.assertEqual(code, 3)
+        (run,) = runs_of(tmp)
+        report = json.loads((run / "one" / "report.json").read_text())
+        self.assertIn("another process (pid 690, now 28288)", report["guard_tripped"])
+        self.assertIn("WindowServer same pid: NO (690 -> 28288)", (run / "summary.md").read_text())
+
+    def test_the_kill_switch_ends_a_running_engine(self):
+        tmp = self.prepare(self.HANGING)
+        threading.Timer(1.5, lambda: roundguard_state(tmp).stop("test")).start()
+        started = time.monotonic()
+        code = self.run_with(tmp, round_runner.roundguard.System())
+        self.assertLess(time.monotonic() - started, 40)
+        self.assertEqual(code, 3)
+        (run,) = runs_of(tmp)
+        self.assertIn("kill switch", json.loads((run / "one" / "report.json").read_text())["guard_tripped"])
+
+    def test_the_kill_switch_refuses_a_round_before_it_starts(self):
+        tmp = self.prepare()
+        roundguard_state(tmp).stop()
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            code = self.run_with(tmp, round_runner.roundguard.System())
+        self.assertEqual(code, 4)
+        self.assertEqual(runs_of(tmp), [])
+        self.assertIn("kill switch is set", stderr.getvalue())
+
+    def test_a_window_system_that_cannot_be_asked_refuses_the_round(self):
+        tmp = self.prepare()
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            code = self.run_with(tmp, StandInSystem(ping=lambda: False))
+        self.assertEqual(code, 4)
+        self.assertEqual(runs_of(tmp), [])
+        self.assertIn("did not answer the heartbeat's test call", stderr.getvalue())
+
+    def test_a_second_round_or_build_is_refused_while_one_holds_the_lock(self):
+        tmp = self.prepare()
+        stderr = io.StringIO()
+        with round_runner.roundguard.Lock(roundguard_state(tmp).lock_file, "build"):
+            with contextlib.redirect_stderr(stderr):
+                code = self.run_with(tmp, round_runner.roundguard.System())
+        self.assertEqual(code, 4)
+        self.assertIn("build, pid", stderr.getvalue())
+        self.assertEqual(runs_of(tmp), [])
+
+    def test_a_warning_is_in_the_summary_and_does_not_stop_the_round(self):
+        tmp = self.prepare()
+        system = StandInSystem()
+        system.strict = True
+        system.free_bytes = lambda: 1 * round_runner.roundguard.GIB
+        code = self.run_with(tmp, system)
+        self.assertEqual(code, 0)
+        (run,) = runs_of(tmp)
+        self.assertIn("pre-flight warning: only 1.0 GB of memory", (run / "summary.md").read_text())
+
+    def test_parallel_above_one_runs_the_variants_one_after_the_other(self):
+        tmp = self.prepare()
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = self.run_with(tmp, round_runner.roundguard.System(), "--parallel", "3")
+        self.assertEqual(code, 0)
+        self.assertIn("one after the other", out.getvalue())
+        (run,) = runs_of(tmp)
+        self.assertTrue((run / "one" / "report.json").exists() and (run / "two" / "report.json").exists())
+
+    def test_the_rest_after_a_build_is_waited_out_on_a_mac_only(self):
+        state = round_runner.roundguard.State(Path(tempfile.mkdtemp(prefix="guard-rest-")))
+        state.heavy_ended("build")
+        slept = []
+        clock = {"now": 0.0}
+
+        def sleep(seconds):
+            slept.append(seconds)
+            clock["now"] += seconds
+        waited = round_runner.wait_settled(state, StandInSystem(), sleep=sleep, clock=lambda: clock["now"])      # StandIn does not settle
+        self.assertEqual((waited, slept), (0.0, []))
+        resting = StandInSystem()
+        resting.settles = True
+        waited = round_runner.wait_settled(state, resting, seconds=5, sleep=sleep, clock=lambda: clock["now"])
+        self.assertGreater(waited, 3)
+        self.assertAlmostEqual(sum(slept), waited, delta=1.5)
+        # the kill switch ends the rest at once
+        state.heavy_ended("run")
+        state.stop()
+        slept.clear()
+        round_runner.wait_settled(state, resting, sleep=sleep, clock=lambda: clock["now"])
+        self.assertEqual(slept, [])
+
+    def test_the_engine_is_started_with_the_least_that_it_asks_of_the_window_system(self):
+        mac = round_runner.engine_environment({}, True)
+        self.assertEqual((mac["OPENFALLOUT_HEADLESS"], mac["SDL_VIDEO_ALLOW_SCREENSAVER"], mac["OPENFALLOUT_HEADLESS_POLICY"]),
+                         ("1", "1", "accessory"))
+        self.assertNotIn("OPENFALLOUT_HEADLESS_POLICY", {k: v for k, v in round_runner.engine_environment({}, False).items()
+                                                         if k not in os.environ})
+        # the round or the variant has the last word
+        self.assertEqual(round_runner.engine_environment({"OPENFALLOUT_HEADLESS_POLICY": "foreground"}, True)["OPENFALLOUT_HEADLESS_POLICY"],
+                         "foreground")
+        self.assertEqual(round_runner.DEFAULT_SETTINGS["Video"]["framerate limit"], "20")
+        self.assertEqual(round_runner.FOCUS_INTERVAL, 5.0)
+
+    def test_the_policy_of_the_log_and_the_text_of_the_pid(self):
+        self.assertEqual(round_runner.headless_policy("a\n[10:00:00.100 I] Headless: activation policy accessory set\n"), "accessory set")
+        self.assertEqual(round_runner.headless_policy("Headless: activation policy prohibited refused"), "prohibited refused")
+        self.assertIsNone(round_runner.headless_policy("nothing"))
+        self.assertEqual(round_runner.window_server_text(None), "not measured")
+        self.assertEqual(round_runner.window_server_text({"start": None, "end": None, "same": None}), "not measured")
+        self.assertEqual(round_runner.window_server_text({"start": 1, "end": None, "same": False}), "NO (1 -> gone)")
+
+
+class GuardedBuild(unittest.TestCase):
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="build-guard-"))
+        (self.tmp / "profile.json").write_text(json.dumps({"out": str(self.tmp / "out")}))
+        self.argv = ["--profile", str(self.tmp / "profile.json"), "build", "--repo", str(self.tmp), "--ref", "x"]
+
+    def build(self, *extra, system=None):
+        with mock.patch.object(round_runner, "make_system", return_value=system or round_runner.roundguard.System()), \
+                mock.patch.object(round_runner, "build_engine", return_value=0) as built:
+            code = round_runner.main(self.argv + list(extra))
+        return code, built
+
+    def test_a_build_is_held_to_six_jobs_and_notes_when_it_ended(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code, built = self.build("--jobs", "12")
+        self.assertEqual(code, 0)
+        self.assertEqual(built.call_args[0][1], 6)
+        self.assertIn("held to 6", out.getvalue())
+        self.assertTrue((self.tmp / "out" / "guard" / "last-heavy.json").exists())
+        code, built = self.build("--jobs", "12", "--allow-heavy")
+        self.assertEqual(built.call_args[0][1], 12)
+        code, built = self.build()
+        self.assertLessEqual(built.call_args[0][1], 6)
+
+    def test_a_build_is_refused_by_the_kill_switch_and_by_a_round_that_holds_the_lock(self):
+        state = roundguard_state(self.tmp)
+        state.stop()
+        with contextlib.redirect_stderr(io.StringIO()):
+            code, built = self.build()
+        self.assertEqual(code, 4)
+        built.assert_not_called()
+        state.resume()
+        with round_runner.roundguard.Lock(state.lock_file, "round x"), contextlib.redirect_stderr(io.StringIO()):
+            code, built = self.build()
+        self.assertEqual(code, 4)
+        built.assert_not_called()
+
+    def test_preflight_stop_resume_and_ack_panic(self):
+        base = ["--profile", str(self.tmp / "profile.json")]
+        with mock.patch.object(round_runner, "make_system", return_value=round_runner.roundguard.System()), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(round_runner.main(base + ["preflight"]), 0)
+            self.assertEqual(round_runner.main(base + ["stop", "--note", "test"]), 0)
+            self.assertTrue(roundguard_state(self.tmp).stopped())
+            self.assertEqual(round_runner.main(base + ["preflight"]), 4)
+            self.assertEqual(round_runner.main(base + ["resume"]), 0)
+            self.assertFalse(roundguard_state(self.tmp).stopped())
+            self.assertEqual(round_runner.main(base + ["ack-panic", "--note", "looked at it"]), 0)
+            self.assertIsNotNone(roundguard_state(self.tmp).acknowledged())
+
+
+class BuildAndRunAfterTheWait(unittest.TestCase):
+    def test_a_stop_asked_for_during_the_wait_for_rest_starts_nothing(self):
+        tmp = Path(tempfile.mkdtemp(prefix="stop-wait-"))
+        profile = tmp / "profile.json"
+        profile.write_text(json.dumps({"engine": str(tmp / "engine"), "out": str(tmp / "out")}), encoding="utf-8")
+        args = mock.Mock(profile=str(profile), out=None, jobs=2, allow_heavy=False)
+        state = round_runner.roundguard.State(tmp / "out")
+
+        def stops(_state, _system):
+            state.stop("asked during the wait")
+            return 3.0
+
+        system = mock.Mock(settles=True)
+        with mock.patch.object(round_runner, "make_system", return_value=system), \
+                mock.patch.object(round_runner, "check_computer", return_value=([], [])), \
+                mock.patch.object(round_runner, "wait_settled", side_effect=stops), \
+                mock.patch.object(round_runner, "build_engine") as built, contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(round_runner.command_build(args), 4)
+        built.assert_not_called()
+
+
+class GuardRoot(unittest.TestCase):
+    def test_a_run_keeps_the_guards_of_its_profile_whatever_folder_its_results_go_to(self):
+        tmp = Path(tempfile.mkdtemp(prefix="guard-root-"))
+        profile = tmp / "profile.json"
+        profile.write_text(json.dumps({"out": str(tmp / "a")}), encoding="utf-8")
+        args = mock.Mock(profile=str(profile), out=str(tmp / "b"))
+        self.assertEqual(round_runner.guard_root(args, with_out=False), tmp / "a")
+        # the commands about the guards take the folder they are told
+        self.assertEqual(round_runner.guard_root(args), tmp / "b")
+
+
+class StopEngine(unittest.TestCase):
+    """The end of an engine: a polite stop that the guard can cut short, and a kill that says whether the process is gone."""
+
+    @staticmethod
+    def stubborn():
+        """A process in its own group that ignores SIGTERM (an engine waiting for a window system)."""
+        import subprocess
+        code = "import signal, sys, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); print('up', flush=True); time.sleep(60)"
+        process = subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE, start_new_session=True)
+        process.stdout.readline()                                    # the handler is set
+        return process
+
+    def test_a_guard_that_trips_cuts_the_polite_stop_short(self):
+        process = self.stubborn()
+        guard = mock.Mock()
+        guard.problem.return_value = "the window system stopped answering"
+        began = time.monotonic()
+        gone, tripped = round_runner.stop_engine(process, guard, patience=30.0)
+        self.assertTrue(gone)
+        self.assertEqual(tripped, "the window system stopped answering")
+        self.assertLess(time.monotonic() - began, 10)
+        self.assertIsNotNone(process.poll())
+
+    def test_a_stop_that_is_not_answered_in_time_kills(self):
+        process = self.stubborn()
+        gone, tripped = round_runner.stop_engine(process, None, patience=1.0)
+        self.assertTrue(gone)
+        self.assertIsNone(tripped)
+        self.assertIsNotNone(process.poll())
+
+    def test_an_engine_that_is_not_reaped_is_not_taken_for_gone(self):
+        import subprocess
+        process = mock.Mock(pid=2 ** 22 + 12345)
+        process.wait.side_effect = subprocess.TimeoutExpired("engine", 10)
+        with mock.patch.object(round_runner.os, "killpg"):
+            self.assertFalse(round_runner.kill_engine(process))
+        with mock.patch.object(round_runner.os, "killpg", side_effect=ProcessLookupError):
+            self.assertTrue(round_runner.kill_engine(process))
+
+
+def roundguard_state(tmp):
+    """The guards' state of the folder of results `<tmp>/out`."""
+    return round_runner.roundguard.State(tmp / "out")

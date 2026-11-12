@@ -83,6 +83,9 @@ namespace OFMechanics
         constexpr int failuresBeforeJump = 2;
         // The navigator is asked for paths that end at the nearest place within this distance of the target
         constexpr float endTolerance = 96.f;
+        // The walk in a straight line where the navigator has no path looks at the way from this far above the floor
+        constexpr float straightKneeHeight = 35.f;
+        constexpr float straightChestHeight = 100.f;
         /// How near to a door a character that goes through it has arrived
         constexpr float doorArrival = 96.f;
         // A follower asks for a new path when the one it follows has gone this far from where its path ends
@@ -488,7 +491,12 @@ namespace OFMechanics
         /// The body of an actor that died falls, and what walks is no longer stopped by it
         void fall(Frame& frame, FalloutActors::Mind& mind)
         {
-            if (auto* animation = dynamic_cast<OFRender::FalloutActorAnimation*>(frame.mWorld.getAnimation(mind.mPtr)))
+            auto* animation = dynamic_cast<OFRender::FalloutActorAnimation*>(frame.mWorld.getAnimation(mind.mPtr));
+            // (round 14A: the bodies of two characters that were shot dead stood upright with their weapons out)
+            Log(Debug::Info) << mind.mPtr.getCellRef().getRefId() << " dies: "
+                             << (animation != nullptr ? "its body falls" : "it has no body of Fallout to fall")
+                             << (mind.mSeenAlive ? "" : ", at once (it was dead when it came into view)");
+            if (animation != nullptr)
                 animation->die(!mind.mSeenAlive);
             frame.mWorld.setObjectCollision(mind.mPtr, false);
         }
@@ -921,6 +929,49 @@ namespace OFMechanics
             return true;
         }
 
+        /// Whether the actor can walk the straight line to the place on the floor that the world has under it (see
+        /// falloutStraightWalkable): used where the navigator has no path, because its mesh has holes and islands
+        /// (round 10P: a vault of Fallout 3) or the target stands off it (the pistol raider in round 10O)
+        bool walksStraight(OFBase::World& world, const osg::Vec3f& from, const osg::Vec3f& to)
+        {
+            const auto floor = [&world](float x, float y, float last) -> std::optional<float> {
+                const osg::Vec3f above(x, y, last + groundProbeUp);
+                const float reach = groundProbeUp + groundProbeDown;
+                const float distance = world.getDistToNearestRayHit(above, osg::Vec3f(0.f, 0.f, -1.f), reach);
+                if (distance >= reach)
+                    return std::nullopt;
+                return above.z() - distance;
+            };
+            // The knees and the chest of the walker
+            const auto blocked = [&world](const osg::Vec3f& a, const osg::Vec3f& b) {
+                return falloutSegmentBlocked(
+                    a, b,
+                    [&world](const osg::Vec3f& start, const osg::Vec3f& direction, float longest) {
+                        return world.getDistToNearestRayHit(start, direction, longest);
+                    },
+                    { straightKneeHeight, straightChestHeight });
+            };
+            return falloutStraightWalkable(from, to, floor, blocked);
+        }
+
+        /// The actor goes to the place in a straight line, which the world lets it walk
+        Walk straightWalk(FalloutActors::Mind& mind, const osg::Vec3f& destination, const char* why)
+        {
+            static int said = 0;
+            if (said < 40)
+            {
+                ++said;
+                Log(Debug::Info) << mind.mPtr.getCellRef().getRefId() << " walks straight to " << destination.x() << ","
+                                 << destination.y() << "," << destination.z() << " (" << why
+                                 << "): the floor is there and nothing is in the way";
+            }
+            mind.mWaypoints.clear();
+            mind.mWaypoints.push_back(destination);
+            mind.mPartial = false;
+            mind.mPathStatus.clear();
+            return Walk::Moving;
+        }
+
         /// Asks the navigator for the path from where the actor is to the place. Success when it has waypoints.
         Walk buildPath(const Frame& frame, FalloutActors::Mind& mind, const osg::Vec3f& destination)
         {
@@ -942,7 +993,15 @@ namespace OFMechanics
             {
                 case DetourNavigator::Status::Success:
                     if (!mind.mWaypoints.empty())
+                    {
+                        // The mesh ends where the nearest of its places to the target is: when the target stands off it
+                        // (up to the tolerance), the character goes on in a straight line from there
+                        const osg::Vec3f last = mind.mWaypoints.back();
+                        if (distanceAcross(last, destination) > waypointDistance
+                            && walksStraight(frame.mWorld, last, destination))
+                            mind.mWaypoints.push_back(destination);
                         return Walk::Moving;
+                    }
                     mind.mPathStatus = "the path has no waypoints";
                     return Walk::Failed;
                 case DetourNavigator::Status::PartialPath:
@@ -952,6 +1011,8 @@ namespace OFMechanics
                     if (mind.mWaypoints.empty() || (start - mind.mWaypoints.back()).length() < waypointDistance)
                     {
                         mind.mWaypoints.clear();
+                        if (walksStraight(frame.mWorld, start, destination))
+                            return straightWalk(mind, destination, "the path goes nowhere from here");
                         mind.mPathStatus
                             = "the path goes nowhere from here (another island of the mesh, or a part of "
                               "it that is not made)";
@@ -964,6 +1025,8 @@ namespace OFMechanics
                     return Walk::Waiting;
                 default:
                     mind.mPathStatus = DetourNavigator::getMessage(status);
+                    if (walksStraight(frame.mWorld, start, destination))
+                        return straightWalk(mind, destination, DetourNavigator::getMessage(status));
                     Log(Debug::Verbose) << "No path for " << mind.mPtr.getCellRef().getRefId() << " from " << start.x()
                                         << "," << start.y() << " to " << destination.x() << "," << destination.y()
                                         << ": " << DetourNavigator::getMessage(status);
@@ -1720,6 +1783,8 @@ namespace OFMechanics
             if (!sharesSpace(mind.mPtr, stance.mTarget))
             {
                 // The target is somewhere it can not go to
+                Log(Debug::Info) << mind.mPtr.getCellRef().getRefId()
+                                 << " ends its fight: its target is in another space";
                 scripts.endFight(mind.mPtr);
                 over();
                 return false;
@@ -1792,6 +1857,9 @@ namespace OFMechanics
                     if (stance.mFlee)
                     {
                         // It is far enough away: the fight is over for it
+                        Log(Debug::Info) << mind.mPtr.getCellRef().getRefId()
+                                         << " ends its fight: it lost its nerve and is far enough away ("
+                                         << static_cast<int>(away) << " units)";
                         scripts.endFight(mind.mPtr);
                         over();
                         return false;

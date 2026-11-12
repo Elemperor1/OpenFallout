@@ -12,15 +12,21 @@ errors, whether the engine ever became the frontmost application (macOS), the sc
     round.py run rounds/m13-mountains.json                 runs the round (the variants of the file, `--parallel` at a time)
     round.py run --scenario scenarios/smoke.lua --game nv --save latest
     round.py check                                         what a run would use, without starting the engine
+    round.py preflight                                     what the guards say about this computer now (starts nothing)
+    round.py stop | resume                                 the kill switch: stops a running round and refuses new ones | lifts it
+    round.py ack-panic                                     after somebody has looked at a panic: the pre-flight stops warning about it
 
 The round file is JSON: `name`, `game` (nv, fo3 or ttw: a key of the profile's `games`), `scenario` (a Lua file, relative to
 the round file), `save` (a file, "latest" for the newest save of the profile's `saves` folder, or none: then `start` is a cell
 for `--start`), `settings` ({"Section": {"key": "value"}} merged over the profile's settings file), `resolution`,
 `framerate`, `limit` (seconds), `env` (environment variables of the engine), `variants` (a list of {"name", "settings", "env"}: one
 engine start each) and `extra_args`.
+
+The guards (roundguard.py) keep a round and a build from loading a computer somebody works at: one lock for a build or a run, a
+pre-flight that refuses on a stressed computer, a WindowServer heartbeat that ends the engine at once when the window system stops
+answering, a kill-switch file and a time limit. See scripts/openfallout/round/README.md, "Guards".
 """
 import argparse
-import concurrent.futures
 import json
 import os
 import platform
@@ -36,6 +42,9 @@ import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import roundguard  # noqa: E402  (next to this file)
+
 SAVE_SUFFIXES = (".fos", ".ess", ".omwsave", ".fo3save")
 ROOT = HERE.parents[2]
 PROFILE_DEFAULT = Path(os.environ.get("OPENFALLOUT_ROUND_PROFILE", Path.home() / ".config" / "openfallout-rounds.json"))
@@ -43,10 +52,15 @@ IS_MAC = platform.system() == "Darwin"
 IS_WINDOWS = os.name == "nt"
 
 # What every run changes in the settings, under what the round file asks for: a plain window of a fixed size (a screenshot is
-# exactly that many pixels), no vsync and a low frame rate limit (it is a check, not a game, and it shares the computer)
+# exactly that many pixels), no vsync and a low frame rate limit (it is a check, not a game, and it shares the computer; every
+# frame of a hidden window still asks the window system for a flush, so fewer frames ask less of it)
 DEFAULT_SETTINGS = {
-    "Video": {"window mode": "2", "vsync mode": "0", "framerate limit": "30", "resolution x": "1280", "resolution y": "720"},
+    "Video": {"window mode": "2", "vsync mode": "0", "framerate limit": "20", "resolution x": "1280", "resolution y": "720"},
 }
+
+# How often the runner asks which application is frontmost (`lsappinfo`, two processes each time): often enough to see a run take
+# the focus, rarely enough not to add to the load of a computer that is already busy
+FOCUS_INTERVAL = 5.0
 
 LOG_LINE = re.compile(r"^\[[\d:. ]+ ?([A-Z])\] ?(.*)$")
 ROUND_LINE = re.compile(r"ROUND\t(.*)$")
@@ -167,7 +181,7 @@ def front_pid():
 
 
 class FocusSampler(threading.Thread):
-    """Once a second, while the engine runs, notes whether it is the frontmost application. A headless run must never be:
+    """Every few seconds (`FOCUS_INTERVAL`), while the engine runs, notes whether it is the frontmost application. A headless run must never be:
     that is what takes the keyboard of the person at the computer."""
 
     def __init__(self, pid, sample=front_pid):
@@ -184,7 +198,7 @@ class FocusSampler(threading.Thread):
                 self.samples += 1
                 if found == self.pid:
                     self.front += 1
-            self.stop_event.wait(1.0)
+            self.stop_event.wait(FOCUS_INTERVAL)
 
     def stop(self):
         self.stop_event.set()
@@ -254,7 +268,7 @@ def collect_shots(userdata, shots_dir, names, width=1280):
         if index >= len(files):
             written.append((number, name, None))
             continue
-        safe = re.sub(r"[^A-Za-z0-9_.-]+", "-", name) or "shot"
+        safe = safe_name(name) or "shot"
         written.append((number, name, convert_picture(files[index], shots_dir / f"{number:02d}-{safe}.jpg", width)))
     return written, max(0, len(files) - len(names))
 
@@ -492,25 +506,61 @@ class Pictures:
         return self.done and self.saved >= self.asked
 
 
-def stop_engine(process):
-    """Asks the engine's process group to quit (a polite SIGTERM, the engine quits on its own way), and ends it if it does not."""
+def kill_engine(process):
+    """Ends the engine's process group at once (SIGKILL): an engine that waits for a window system that does not answer cannot act on
+    a polite SIGTERM, and every second it stays is a second more that it holds up. Gives whether the engine is confirmed gone (the
+    process was reaped): on a stalled system it may not be, and the runner must not take that for an end."""
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        return True
+    try:
+        process.wait(timeout=10)
+        return True
+    except subprocess.TimeoutExpired:
+        return False
+
+
+def stop_engine(process, guard=None, patience=30.0):
+    """Asks the engine's process group to quit (a polite SIGTERM, the engine quits on its own way), and ends it if it does not within
+    `patience` seconds, or at once when the guard trips while it waits (the kill switch, a window system that stopped answering).
+    Gives (the engine is confirmed gone, the reason that the guard gave while it waited or None)."""
     try:
         os.killpg(process.pid, signal.SIGTERM)
     except ProcessLookupError:
-        return
-    try:
-        process.wait(timeout=30)
-    except subprocess.TimeoutExpired:
-        os.killpg(process.pid, signal.SIGKILL)
-        process.wait()
+        return True, None
+    waited = 0.0
+    while waited < patience:
+        try:
+            process.wait(timeout=0.5)
+            return True, None
+        except subprocess.TimeoutExpired:
+            waited += 0.5
+        tripped = guard.problem() if guard is not None else None
+        if tripped:
+            return kill_engine(process), tripped
+    return kill_engine(process), None
 
 
-def run_engine(command, run_dir, limit, env_extra=None, priority="low"):
-    """Starts the engine at low priority and waits for it; gives (exit status, seconds, focus sampler, timed out, ended early).
-    The run ends when the engine does, when the scenario ended and its pictures are written (`ended early`: the runner stops
-    the engine, which would otherwise wait out a delay made for slow pictures) or when `limit` seconds are over."""
+def engine_environment(extra, is_mac):
+    """The environment of the engine: the environment of the runner, a headless run that asks the window system for as little as it
+    can (SDL is told to leave the screensaver alone, which on macOS is a power assertion `PreventUserIdleDisplaySleep` held for the whole
+    run; the application is an accessory one: no Dock icon, no menu bar, never frontmost), and what the round and the variant say
+    over that (`"OPENFALLOUT_HEADLESS_POLICY": "foreground"` keeps the engine an ordinary application)."""
+    env = {"OPENFALLOUT_HEADLESS": "1", "SDL_VIDEO_ALLOW_SCREENSAVER": "1"}
+    if is_mac:
+        env["OPENFALLOUT_HEADLESS_POLICY"] = "accessory"
+    env.update(extra or {})
+    return dict(os.environ, **env)
+
+
+def run_engine(command, run_dir, limit, env_extra=None, priority="low", guard=None):
+    """Starts the engine at low priority and waits for it; gives (exit status, seconds, focus sampler, timed out, ended early,
+    guard reason). The run ends when the engine does, when the scenario ended and its pictures are written (`ended early`: the runner
+    stops the engine, which would otherwise wait out a delay made for slow pictures), when `limit` seconds are over, or when the guard
+    says so (the window system stopped answering, the kill switch, the wall-time limit of the round): then the engine is killed at once."""
     import pty
-    env = dict(os.environ, OPENFALLOUT_HEADLESS="1", **(env_extra or {}))
+    env = engine_environment(env_extra, IS_MAC)
     prefix = priority_prefix(priority)
     # The engine shows a dialog instead of logging a fatal error when stdin is not a terminal, and a dialog is a window
     master, slave = pty.openpty()
@@ -522,23 +572,41 @@ def run_engine(command, run_dir, limit, env_extra=None, priority="low"):
     sampler.start()
     pictures = Pictures(run_dir / "config" / "openfallout.log")
     timed_out = ended_early = False
+    tripped = None
+    gone = True
     while True:
         try:
             process.wait(timeout=0.5)
             break
         except subprocess.TimeoutExpired:
             pass
+        tripped = guard.problem() if guard is not None else None
+        if tripped:
+            gone = kill_engine(process)
+            break
         if pictures.poll():
             ended_early = True
-            stop_engine(process)
+            gone, tripped = stop_engine(process, guard)
             break
         if time.monotonic() - started >= limit:
             timed_out = True
-            stop_engine(process)
+            gone, tripped = stop_engine(process, guard)
             break
+    if not gone:
+        # The process was not reaped after a SIGKILL (a stalled system): another build or round must not start on top of it, so the
+        # kill switch is set, which every later one is refused for until somebody has looked and resumed
+        reason = f"the engine (pid {process.pid}) did not end after SIGKILL; look at the process list, then run `round.py resume`"
+        print(reason, flush=True)
+        # The round is not a pass with an engine that may still run: the reason is the guard's, which the report and the exit say
+        tripped = tripped or reason
+        if guard is not None:
+            try:
+                guard.state.stop(reason + "\n")
+            except roundguard.Refused as refused:
+                print("; ".join(refused.reasons), flush=True)
     sampler.stop()
     os.close(master)
-    return process.returncode, time.monotonic() - started, sampler, timed_out, ended_early
+    return process.returncode, time.monotonic() - started, sampler, timed_out, ended_early, tripped
 
 
 def missing_content(text):
@@ -552,8 +620,18 @@ def log_tail(text, count=8):
     return [line.split("]", 1)[-1].strip()[:200] for line in text.splitlines() if line.strip()][-count:]
 
 
+def window_server_text(window_server):
+    """`yes (pid 690)`, `NO (690 -> 28288)` or `not measured`, for the report and the summary."""
+    if not window_server or window_server.get("same") is None:
+        return "not measured"
+    if window_server["same"]:
+        return f"yes (pid {window_server['start']})"
+    return f"NO ({window_server['start']} -> {window_server['end'] if window_server['end'] is not None else 'gone'})"
+
+
 def write_report(run_dir, config, variant, status, seconds, sampler, timed_out, lines, problems, levels, shots, extra_shots,
-                 command, tail=(), content_missing=(), ended_early=False):
+                 command, tail=(), content_missing=(), ended_early=False, guard_reason=None, window_server=None, policy=None,
+                 evidence=()):
     name = variant.get("name", "run")
     errors = [line for line in lines if line.startswith("error")]
     # The scenario ended (`done end`): what the round asked is answered, so a crash while the engine quits (a known fault of
@@ -581,11 +659,16 @@ def write_report(run_dir, config, variant, status, seconds, sampler, timed_out, 
     # On a Mac the focus is the point of a headless run: a run that could not measure it proves nothing, so it does not pass
     if (sampler.available and sampler.front) or (IS_MAC and not sampler.available):
         verdict = "FAIL"
+    # A guard that ended the engine (the window system stopped answering, the kill switch, the time limit) fails the round, whatever the log says
+    if guard_reason:
+        verdict = "FAIL"
+        exit_note = f"; STOPPED BY A GUARD: {guard_reason}"
     report = {"round": config["name"], "variant": name, "verdict": verdict, "exit_status": status, "exit_note": exit_note.lstrip("; "), "finished": finished,
               "seconds": round(seconds, 1),
               "timed_out": timed_out, "stopped_by_runner": ended_early, "focus_samples": sampler.samples, "focus_front": sampler.front,
               "warnings": levels["W"], "errors": levels["E"], "scenario_errors": errors, "missing_shots": missing,
               "content_not_loaded": not_loaded, "content_not_loaded_serious": serious,
+              "guard_tripped": guard_reason, "window_server": window_server, "headless_policy": policy, "evidence": list(evidence),
               "shots": [{"n": n, "name": shot, "file": str(path) if path else None} for n, shot, path in shots],
               "round_lines": lines, "command": command}
     (run_dir / "report.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
@@ -593,6 +676,10 @@ def write_report(run_dir, config, variant, status, seconds, sampler, timed_out, 
            f"- exit status {status}{' (timed out and stopped)' if timed_out else ''}, {seconds:.0f} s, "
            f"scenario {'finished' if finished else 'NOT finished'}",
            f"- focus: {focus}",
+           *([f"- STOPPED BY A GUARD, the engine was killed: {guard_reason}"] if guard_reason else []),
+           *([f"- WindowServer same pid: {window_server_text(window_server)}"] if window_server else []),
+           *([f"- activation policy: {policy}"] if policy else []),
+           *([f"- evidence copied to diagnostics/: {', '.join(evidence)}"] if evidence else []),
            f"- log: {levels['W']} warnings, {levels['E']} errors; scenario errors: {len(errors)}" + exit_note,
            f"- screenshots: {sum(1 for s in shots if s[2])} of {len(shots)}" + (f" ({extra_shots} more than the scenario took)" if extra_shots else "") +
            (f"; MISSING, so the round fails: {', '.join(missing)}" if missing else ""),
@@ -611,55 +698,163 @@ def write_report(run_dir, config, variant, status, seconds, sampler, timed_out, 
     return report
 
 
-def run_variant(profile, config, variant, out_dir, save, priority="low"):
-    name = re.sub(r"[^A-Za-z0-9_.-]+", "-", variant.get("name", "run"))
+def headless_policy(text):
+    """`accessory set` (or `refused`) from the engine's log line `Headless: activation policy accessory set`, None when it has none."""
+    match = re.search(r"Headless: activation policy (\w+) (set|refused)", text)
+    return f"{match.group(1)} {match.group(2)}" if match else None
+
+
+def safe_name(text):
+    """A name for a folder or a file: what is not a letter, a digit or `_.-` becomes `-`, and a plus sign becomes `plus` first, so that
+    two variants named `yaw+90` and `yaw-90` do not share a folder (round 14F: the first was never run)."""
+    return re.sub(r"[^A-Za-z0-9_.-]+", "-", str(text).replace("+", "plus"))
+
+
+def run_variant(profile, config, variant, out_dir, save, priority="low", guard=None, system=None):
+    name = safe_name(variant.get("name", "run"))
     run_dir = out_dir / name
     prepare_run(profile, config, variant, run_dir, save)
     command = engine_command(profile, config, run_dir, save)
     env = {**config.get("env", {}), **variant.get("env", {})}
-    status, seconds, sampler, timed_out, ended_early = run_engine(command, run_dir, config["limit"] + 30, env, priority)
+    began = time.time()
+    status, seconds, sampler, timed_out, ended_early, tripped = run_engine(command, run_dir, config["limit"] + 30, env, priority, guard)
     log = run_dir / "config" / "openfallout.log"
     text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
     (run_dir / "openfallout.log").write_text(text, encoding="utf-8")
     lines = round_lines(text)
     shots, extra = collect_shots(run_dir / "userdata", run_dir / "shots", shot_names(lines), config.get("shot_width", 1280))
+    # What an investigation of a stalled window system would want, kept with the run (a Mac: the new crash reports and the log of runningboardd)
+    evidence = roundguard.collect_evidence(system, run_dir, began) if system is not None and system.heartbeat else []
     return write_report(run_dir, config, variant, status, seconds, sampler, timed_out, lines, log_problems(text),
                         count_levels(text), shots, extra, command, tail=log_tail(text),
-                        content_missing=missing_content(text), ended_early=ended_early)
+                        content_missing=missing_content(text), ended_early=ended_early, guard_reason=tripped,
+                        window_server=guard.window_server() if guard is not None else None, policy=headless_policy(text),
+                        evidence=evidence)
+
+
+def make_system():
+    """What the guards read from this computer (a Mac: memory, swap, thermal state, processes, crash reports, WindowServer)."""
+    return roundguard.default_system(IS_MAC)
+
+
+def guard_root(args, with_out=True):
+    """The folder of the guards' files (lock, kill switch, acknowledgement): the folder of the results that the profile names, or the
+    `--out` of the commands that are about the guards (`preflight`, `stop`, `resume`, `ack-panic`). A run passes `with_out=False`: its
+    `--out` moves its results only, and a build and a run of one profile must meet the same lock."""
+    path = Path(args.profile)
+    profile = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    out = (getattr(args, "out", None) if with_out else None) or profile.get("out")
+    return absolute(out) if out else Path(tempfile.gettempdir()) / "openfallout-rounds"
+
+
+def check_computer(system, state, heartbeat=True):
+    """The pre-flight: prints what it read and what worries it, and gives the reasons to refuse (an empty list: go on). With `heartbeat`
+    the window system is asked once on the way: a heartbeat that cannot reach it would guard nothing."""
+    refusals, warnings, facts = roundguard.preflight(system, state)
+    if heartbeat and system.heartbeat:
+        answered = roundguard.try_ping(system.ping)
+        facts["window system"] = "answers" if answered else "NO ANSWER"
+        if not answered:
+            refusals.append("WindowServer did not answer the heartbeat's test call within 10 s (or the call cannot be made): "
+                            "the guard that ends the engine when the window system stops answering would not work")
+    print(roundguard.describe_preflight(refusals, warnings, facts), flush=True)
+    return refusals, warnings
+
+
+def wait_settled(state, system, seconds=roundguard.SETTLE_SECONDS, sleep=time.sleep, clock=time.monotonic):
+    """Gives the computer a rest after a build or a run that ended a moment ago (a Mac only): waits out what is left of `seconds`."""
+    if not system.settles:
+        return 0.0
+    remaining = state.settle_remaining(seconds=seconds)
+    if remaining <= 0:
+        return 0.0
+    print(f"waiting {remaining:.0f} s: a build or a round ended a moment ago, and the computer is given a rest before the next one", flush=True)
+    until = clock() + remaining
+    while clock() < until and not state.stopped():
+        sleep(min(1.0, max(0.0, until - clock())))
+    return remaining
+
+
+def refusal_exit(refusals):
+    print("REFUSED, nothing was started:\n" + "\n".join(f"  - {reason}" for reason in refusals), file=sys.stderr, flush=True)
+    return 4
 
 
 def command_run(args):
     if IS_WINDOWS:
         sys.exit("round.py run works on macOS and Linux only: it gives the engine a pseudo-terminal and stops it by process group")
+    if args.parallel != 1:
+        print(f"--parallel {args.parallel}: the variants run one after the other (never more than one engine at a time)", flush=True)
     profile = load_profile(args.profile)
     config = load_round(args.round, args)
     save = resolve_save(config, profile)
     out_root = absolute(args.out or profile.get("out") or Path(tempfile.gettempdir()) / "openfallout-rounds")
-    out_dir = out_root / (time.strftime("%Y%m%d-%H%M%S-") + config["name"])
-    out_dir.mkdir(parents=True)
+    # The guards' files stay in one place whatever folder this run puts its results in: a build and a run of one profile must meet the
+    # same lock, kill switch and acknowledgement (`--out` moves the results only)
+    state, system = roundguard.State(guard_root(args, with_out=False)), make_system()
     variants = config["variants"]
     if args.variant:
         variants = [v for v in variants if v.get("name") in args.variant]
         if not variants:
             sys.exit(f"no variant named {', '.join(args.variant)} in round {config['name']}")
-    print(f"round {config['name']}: {len(variants)} start(s), {args.parallel} at a time, results in {out_dir}", flush=True)
-    results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.parallel)) as pool:
-        futures = {pool.submit(run_variant, profile, config, v, out_dir, save, args.priority): v for v in variants}
-        for future in concurrent.futures.as_completed(futures):
-            report = future.result()
+    try:
+        with roundguard.Lock(state.lock_file, f"round {config['name']}"):
+            refusals, warnings = check_computer(system, state)
+            if refusals:
+                return refusal_exit(refusals)
+            wait_settled(state, system)
+            if state.stopped():
+                return refusal_exit([f"the kill switch was set while the round waited ({state.stop_file})"])
+            return run_round(args, profile, config, save, out_root, variants, state, system, warnings)
+    except roundguard.Refused as refused:
+        return refusal_exit(refused.reasons)
+
+
+def run_round(args, profile, config, save, out_root, variants, state, system, warnings=()):
+    """The round itself, under the lock and after the pre-flight: the variants one after the other, with the heartbeat watching the window
+    system and the kill switch and the time limit watching the clock."""
+    out_dir = out_root / (time.strftime("%Y%m%d-%H%M%S-") + config["name"])
+    out_dir.mkdir(parents=True)
+    heartbeat = roundguard.Heartbeat(system.ping, system.window_server_pid) if system.heartbeat else None
+    guard = roundguard.RunGuard(state, heartbeat, wall_seconds=args.wall)
+    if heartbeat is not None:
+        heartbeat.start()
+    print(f"round {config['name']}: {len(variants)} start(s), one at a time, results in {out_dir}; "
+          f"kill switch: touch {state.stop_file}", flush=True)
+    results, skipped = [], []
+    try:
+        for index, variant in enumerate(variants):
+            if index and system.settles:
+                time.sleep(roundguard.VARIANT_GAP_SECONDS)
+            if guard.problem():
+                skipped.append(variant.get("name", "run"))
+                continue
+            report = run_variant(profile, config, variant, out_dir, save, args.priority, guard, system)
             results.append(report)
             print(f"  {report['variant']}: {report['verdict']} in {report['seconds']} s, "
                   f"{len(report['shots'])} shot(s), {report['errors']} E / {report['warnings']} W", flush=True)
+    finally:
+        if heartbeat is not None:
+            heartbeat.stop()
+        state.heavy_ended("round")
     rows = ["# Round " + config["name"], "", "| variant | verdict | seconds | shots | errors | warnings | focus |", "|---|---|---|---|---|---|---|"]
     for report in sorted(results, key=lambda r: r["variant"]):
         focus = f"{report['focus_front']}/{report['focus_samples']}" if report["focus_samples"] else "-"
         rows.append(f"| {report['variant']} | {report['verdict']} | {report['seconds']} | "
                     f"{sum(1 for s in report['shots'] if s['file'])}/{len(report['shots'])} | {report['errors']} | "
                     f"{report['warnings']} | {focus} |")
+    rows.append("")
+    rows.append(f"- WindowServer same pid: {window_server_text(guard.window_server())}")
+    rows.extend(f"- pre-flight warning: {warning}" for warning in warnings)
+    if guard.tripped:
+        rows.append(f"- STOPPED BY A GUARD, the engine was killed and the round ended: {guard.tripped}")
+    if skipped:
+        rows.append(f"- not run: {', '.join(skipped)}")
     (out_dir / "summary.md").write_text("\n".join(rows) + "\n", encoding="utf-8")
     print("\n".join(rows))
     print(f"summary: {out_dir / 'summary.md'}")
+    if guard.tripped:
+        return 3
     return 0 if all(r["verdict"] == "PASS" for r in results) else 1
 
 
@@ -717,7 +912,32 @@ def command_check(args):
 
 
 def command_build(args):
-    """Brings one persistent folder up to a commit and builds the engine in it: only what changed is compiled."""
+    """Brings one persistent folder up to a commit and builds the engine in it: only what changed is compiled. At most six jobs, at low
+    priority, under the same lock as a run, and only on a computer the pre-flight accepts."""
+    jobs = args.jobs or min(roundguard.MAX_BUILD_JOBS, os.cpu_count() or 4)
+    if jobs > roundguard.MAX_BUILD_JOBS and not args.allow_heavy:
+        print(f"--jobs {jobs}: held to {roundguard.MAX_BUILD_JOBS}, a bigger build slows a computer somebody works at to a crawl for as long "
+              f"as it lasts (`--allow-heavy` when the computer is free to be used up)", flush=True)
+        jobs = roundguard.MAX_BUILD_JOBS
+    state, system = roundguard.State(guard_root(args)), make_system()
+    try:
+        with roundguard.Lock(state.lock_file, "build"):
+            refusals, _ = check_computer(system, state, heartbeat=False)
+            if refusals:
+                return refusal_exit(refusals)
+            wait_settled(state, system)
+            # A stop asked for while the build waited for the computer's rest ends the wait: it must not then start the build
+            if state.stopped():
+                return refusal_exit([f"the kill switch was set while the build waited ({state.stop_file})"])
+            try:
+                return build_engine(args, jobs)
+            finally:
+                state.heavy_ended("build")
+    except roundguard.Refused as refused:
+        return refusal_exit(refused.reasons)
+
+
+def build_engine(args, jobs):
     repo, worktree, build = Path(args.repo).resolve(), Path(args.worktree).resolve(), Path(args.build_dir).resolve()
     prefix = priority_prefix("low")
     started = time.monotonic()
@@ -741,10 +961,45 @@ def command_build(args):
         launcher = ["-DCMAKE_C_COMPILER_LAUNCHER=ccache", "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache"] if shutil.which("ccache") else []
         run("cmake", *generator, "-S", str(worktree), "-B", str(build), "-DCMAKE_BUILD_TYPE=Release", *launcher,
             "-DBUILD_LAUNCHER=OFF", "-DBUILD_WIZARD=OFF", "-DBUILD_OPENCS=OFF", *args.cmake_arg)
-    run(*prefix, "cmake", "--build", str(build), "--target", "openfallout", "-j", str(args.jobs or os.cpu_count() or 4))
+    run(*prefix, "cmake", "--build", str(build), "--target", "openfallout", "-j", str(jobs))
     seconds = time.monotonic() - started
     (build / "round-build.json").write_text(json.dumps({"commit": commit, "seconds": round(seconds, 1)}), encoding="utf-8")
     print(f"built {commit[:10]} in {seconds:.0f} s: {build / 'openfallout'}")
+    return 0
+
+
+def command_preflight(args):
+    """What the guards say about this computer now. Reads the state of the computer and asks the window system once; starts no engine
+    and no build."""
+    state, system = roundguard.State(guard_root(args)), make_system()
+    refusals, _ = check_computer(system, state)
+    return 4 if refusals else 0
+
+
+def command_stop(args):
+    state = roundguard.State(guard_root(args))
+    try:
+        state.stop(args.note or "")
+    except roundguard.Refused as refused:
+        return refusal_exit(refused.reasons)
+    print(f"kill switch set: {state.stop_file}. A round that is running ends its engine at once, and no round or build starts, until `round.py resume`.")
+    return 0
+
+
+def command_resume(args):
+    state = roundguard.State(guard_root(args))
+    state.resume()
+    print(f"kill switch lifted ({state.stop_file} removed)")
+    return 0
+
+
+def command_ack_panic(args):
+    state = roundguard.State(guard_root(args))
+    try:
+        state.acknowledge(args.note or "")
+    except roundguard.Refused as refused:
+        return refusal_exit(refused.reasons)
+    print(f"panic acknowledged ({state.ack_file}): the pre-flight stops warning about the panic reports up to now")
     return 0
 
 
@@ -771,9 +1026,12 @@ def main(argv=None):
         sp.add_argument("--limit", type=int)
         sp.add_argument("--out")
         sp.add_argument("--variant", action="append", help="only this variant (repeat for more)")
-        sp.add_argument("--parallel", type=int, default=1, help="how many engine starts at a time")
+        sp.add_argument("--parallel", type=int, default=1, help="ignored above 1: the variants run one after the other, never more than one engine at a time")
         sp.add_argument("--priority", choices=("low", "normal"), default="low",
                         help="low (the default) keeps the run out of the way of whoever uses the computer")
+        if name == "run":
+            sp.add_argument("--wall", type=float, default=roundguard.WALL_SECONDS,
+                            help="seconds for the whole round, all its variants; the engine is killed when they are over (default %(default)s)")
         sp.set_defaults(handler=handler)
 
     sp = sub.add_parser("build", help="incremental build of the engine in one persistent folder")
@@ -781,9 +1039,23 @@ def main(argv=None):
     sp.add_argument("--worktree", default=str(ROOT.parent / "round-worktree"))
     sp.add_argument("--build-dir", default=str(ROOT.parent / "round-build"))
     sp.add_argument("--ref", help="the commit, branch or origin/<branch> to build")
-    sp.add_argument("--jobs", type=int)
+    sp.add_argument("--jobs", type=int, help=f"compile jobs (default and highest {roundguard.MAX_BUILD_JOBS})")
+    sp.add_argument("--allow-heavy", action="store_true", help=f"allow more than {roundguard.MAX_BUILD_JOBS} jobs: only when the computer is free to be used up")
     sp.add_argument("--cmake-arg", action="append", default=[], help="an argument of the first cmake configuration")
     sp.set_defaults(handler=command_build)
+
+    sp = sub.add_parser("preflight", help="what the guards say about this computer now (starts nothing)")
+    sp.add_argument("--out", help="the folder of the results (where the guards keep their files)")
+    sp.set_defaults(handler=command_preflight)
+
+    for name, handler, text in (("stop", command_stop, "set the kill switch: a round that runs ends its engine, none starts"),
+                                ("resume", command_resume, "lift the kill switch"),
+                                ("ack-panic", command_ack_panic, "say that the last panic has been looked at, so that rounds may start")):
+        sp = sub.add_parser(name, help=text)
+        sp.add_argument("--out", help="the folder of the results (where the guards keep their files)")
+        if name != "resume":
+            sp.add_argument("--note", help="a word for the file (who looked, or why)")
+        sp.set_defaults(handler=handler)
 
     args = parser.parse_args(argv)
     return args.handler(args)

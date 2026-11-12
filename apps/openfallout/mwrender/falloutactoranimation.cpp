@@ -9,6 +9,7 @@
 #include <mutex>
 #include <set>
 #include <sstream>
+#include <utility>
 #include <vector>
 
 #include <osg/ComputeBoundsVisitor>
@@ -30,6 +31,8 @@
 #include <components/vfs/pathutil.hpp>
 #include <components/vfs/recursivedirectoryiterator.hpp>
 
+#include "../mwbase/environment.hpp"
+#include "../mwbase/mechanicsmanager.hpp"
 #include "../mwmechanics/character.hpp"
 #include "../mwworld/class.hpp"
 #include "../mwworld/refdata.hpp"
@@ -248,7 +251,12 @@ namespace OFRender
     void FalloutActorAnimation::die(bool fallen)
     {
         if (mFall != nullptr || mObjectRoot == nullptr || mObjectRoot->getNumParents() == 0)
+        {
+            if (mFall == nullptr)
+                Log(Debug::Info) << mPtr.getCellRef().getRefId() << " cannot fall: "
+                                 << (mObjectRoot == nullptr ? "its body is not made" : "its body is in no scene");
             return;
+        }
         // What it did stops where it is
         if (mAdvanceCallback != nullptr)
         {
@@ -275,6 +283,55 @@ namespace OFRender
         runAnimation(duration);
         watchPose(duration);
         logPose(duration);
+        logWeapon(duration);
+    }
+
+    void FalloutActorAnimation::logWeapon(float duration)
+    {
+        if (!mDrawn || mWeaponLooks >= 2)
+            return;
+        mWeaponTime += duration;
+        if (mWeaponTime < (mWeaponLooks == 0 ? 1.f : 5.f))
+            return;
+        ++mWeaponLooks;
+        sayWeapon(mWeaponLooks == 1 ? "a second after it was taken out" : "five seconds after it was taken out");
+    }
+
+    void FalloutActorAnimation::sayWeapon(const char* when)
+    {
+        // Only for the first few weapons of a run: the lines are for reading what the hand holds and where it points
+        static std::atomic<int> sSaid{ 0 };
+        if (!mDrawn || mObjectRoot == nullptr || sSaid.fetch_add(1) >= 24)
+            return;
+        std::ostringstream out;
+        out << std::fixed << std::setprecision(1);
+        out << "Weapon of " << mPtr.getCellRef().getRefId() << ", " << when << ": ";
+        if (mWeaponNode == nullptr || mWeaponParent == nullptr)
+        {
+            out << "none on the hand (type " << mWeaponType << ")";
+            Log(Debug::Info) << out.str();
+            return;
+        }
+        out << "on " << mWeaponParent->getName() << ", parents " << mWeaponNode->getNumParents() << ", node mask "
+            << mWeaponNode->getNodeMask() << ", gait " << static_cast<int>(mGait) << ", aim group "
+            << (mAimGroup.empty() ? "none" : mAimGroup) << (!mAimGroup.empty() && isPlaying(mAimGroup) ? " (plays)" : " (not playing)");
+        const osg::NodePathList paths = mWeaponNode->getParentalNodePaths(mObjectRoot.get());
+        if (!paths.empty())
+        {
+            // The weapon's own axes in the frame of the character (it faces +Y, up is +Z): an end of the barrel is
+            // along one of them
+            const osg::Matrix toCharacter = osg::computeLocalToWorld(paths.front());
+            const osg::Vec3d x = osg::Matrix::transform3x3(osg::Vec3d(1, 0, 0), toCharacter);
+            const osg::Vec3d y = osg::Matrix::transform3x3(osg::Vec3d(0, 1, 0), toCharacter);
+            const osg::Vec3d z = osg::Matrix::transform3x3(osg::Vec3d(0, 0, 1), toCharacter);
+            const osg::Vec3d at = toCharacter.getTrans();
+            out << "; at (" << at.x() << ", " << at.y() << ", " << at.z() << ") in the character, its axes X ("
+                << x.x() << ", " << x.y() << ", " << x.z() << "), Y (" << y.x() << ", " << y.y() << ", " << y.z()
+                << "), Z (" << z.x() << ", " << z.y() << ", " << z.z() << ")";
+        }
+        const osg::BoundingSphere bound = mWeaponNode->getBound();
+        out << "; bound radius " << bound.radius();
+        Log(Debug::Info) << out.str();
     }
 
     void FalloutActorAnimation::logPose(float duration)
@@ -382,7 +439,9 @@ namespace OFRender
         if (mObjectRoot == nullptr)
             return;
 
-        const std::string skeleton = mPtr.getClass().getCorrectedModel(mPtr);
+        const std::string skeleton = mSkeletonOverride.empty()
+            ? std::string(mPtr.getClass().getCorrectedModel(mPtr).value())
+            : mSkeletonOverride;
         const std::string folder = falloutAnimationFolder(skeleton);
         if (folder.empty())
         {
@@ -423,6 +482,14 @@ namespace OFRender
         const FalloutLocomotion locomotion = chooseFalloutLocomotion(folder, files, female);
         mWalkGroup = addAnimation(locomotion.mWalk, skeleton);
         mRunGroup = addAnimation(locomotion.mRun, skeleton);
+        mWalkFile = locomotion.mWalk;
+        mRunFile = locomotion.mRun;
+        mMoveFolder = folder;
+        mFemale = female;
+        if (!mWalkGroup.empty())
+            mMoveGroups.emplace(mWalkFile, mWalkGroup);
+        if (!mRunGroup.empty())
+            mMoveGroups.emplace(mRunFile, mRunGroup);
         mGaits.mHasWalk = !mWalkGroup.empty();
         mGaits.mHasRun = !mRunGroup.empty();
         if (mGaits.mHasWalk)
@@ -451,7 +518,7 @@ namespace OFRender
         // the walking ones key at height 0: the skeleton file has "Bip01" at the standing height of the pelvis, so a
         // person that has not walked yet had that height twice and stood 61 to 67 units above the floor (found on the
         // Mac, round 11J)
-        if (mPtr.getType() == ESM4::Npc::sRecordId)
+        if (mPtr.getType() == ESM4::Npc::sRecordId && !mFirstPerson)
         {
             SceneUtil::FindByNameVisitor find("Bip01");
             mObjectRoot->accept(find);
@@ -477,15 +544,31 @@ namespace OFRender
         // place to another is a teleport and not a movement.
         constexpr float teleportSpeed = 3000.f;
         constexpr float smoothingTime = 0.2f;
-        const osg::Vec3f position = (mMotionSource.isEmpty() ? mPtr : mMotionSource).getRefData().getPosition().asVec3();
+        const OFWorld::Ptr& source = mMotionSource.isEmpty() ? mPtr : mMotionSource;
+        const ESM::Position& placed = source.getRefData().getPosition();
+        const osg::Vec3f position = placed.asVec3();
         if (mHasLastPosition && duration > 0.f)
         {
             const osg::Vec2f step(position.x() - mLastPosition.x(), position.y() - mLastPosition.y());
             const float speed = step.length() / duration;
+            const float blend = std::min(1.f, duration / smoothingTime);
             if (speed > teleportSpeed)
+            {
                 mSpeed = 0.f;
+                mForwardSpeed = 0.f;
+                mSideSpeed = 0.f;
+            }
             else
-                mSpeed += (speed - mSpeed) * std::min(1.f, duration / smoothingTime);
+            {
+                mSpeed += (speed - mSpeed) * blend;
+                // Which way that goes in relation to where the actor faces (the games name the movements ahead, back,
+                // left and right): the yaw turns clockwise from +Y
+                const float yaw = placed.rot[2];
+                const float ahead = (step.x() * std::sin(yaw) + step.y() * std::cos(yaw)) / duration;
+                const float across = (step.x() * std::cos(yaw) - step.y() * std::sin(yaw)) / duration;
+                mForwardSpeed += (ahead - mForwardSpeed) * blend;
+                mSideSpeed += (across - mSideSpeed) * blend;
+            }
         }
         mLastPosition = position;
         mHasLastPosition = true;
@@ -493,29 +576,117 @@ namespace OFRender
         // A character in a piece of furniture does not walk: its place changes by a few units when it is put on its
         // seat, which would play the walk over the pose of its seat
         setGait(mPoseKind != 0 ? FalloutGait::Idle : chooseFalloutGait(mSpeed, mGait, mGaits));
-
-        if (mGait == FalloutGait::Walk)
-            adjustSpeedMult(mWalkGroup, falloutAnimationSpeed(mSpeed, mGaits.mWalkVelocity));
-        else if (mGait == FalloutGait::Run)
-            adjustSpeedMult(mRunGroup, falloutAnimationSpeed(mSpeed, mGaits.mRunVelocity));
+        // A character of the world faces where it goes (it turns as it walks, so for a while the way it goes is to its
+        // side or behind it: round 14F saw walking backward and sideways); only the player's body strafes and steps back
+        mDirection = mMotionSource.isEmpty() ? FalloutDirection::Forward
+                                              : chooseFalloutDirection(mForwardSpeed, mSideSpeed, mDirection);
+        updateMovement();
     }
 
     void FalloutActorAnimation::setGait(FalloutGait gait)
     {
         if (gait == mGait)
             return;
-
-        // The idle animation plays on below the others, so the actor goes back to it when they stop
-        if (mGait == FalloutGait::Walk)
-            disable(mWalkGroup);
-        else if (mGait == FalloutGait::Run)
-            disable(mRunGroup);
-
-        const std::string& group = gait == FalloutGait::Walk ? mWalkGroup : mRunGroup;
-        if (gait != FalloutGait::Idle)
-            play(group, OFRender::AnimPriority(OFMechanics::Priority_Movement), OFRender::BlendMask_All, false, 1.f,
-                "start", "stop", 0.f, ~0u, false);
         mGait = gait;
+        // A weapon that was in sight and is not when the gait changes is what round 14E saw
+        if (mDrawn && mWeaponLooks >= 1)
+            sayWeapon("the gait changed");
+    }
+
+    void FalloutActorAnimation::updateMovement()
+    {
+        // What the actor does: stands (the idle plays on its own, or the sneaking idle over it), walks or runs
+        const OFWorld::Ptr& source = mMotionSource.isEmpty() ? mPtr : mMotionSource;
+        // Only the player's body is asked: the characters of the world have no stats of the engine's creatures to
+        // say whether they sneak (the stance of a Fallout character is its own, and nothing sets it for them yet)
+        bool sneak = false;
+        if (mPoseKind == 0 && !mMotionSource.isEmpty() && mMotionSource.getClass().isActor())
+        {
+            try
+            {
+                sneak = OFBase::Environment::get().getMechanicsManager()->isSneaking(source);
+            }
+            catch (const std::exception& error)
+            {
+                // A class with no stats (round 14F: "class does not have creature stats" ended the engine at the load of
+                // the first cell) does not sneak
+                static bool said = false;
+                if (!std::exchange(said, true))
+                    Log(Debug::Warning) << "Cannot tell whether " << mPtr.getCellRef().getRefId() << " sneaks: " << error.what();
+            }
+        }
+        const std::string_view prefix = mDrawn ? falloutWeaponPrefix(mWeaponType) : std::string_view();
+
+        // The file is chosen again only when what it is chosen for changes: the files of the folder are looked through
+        const MoveKey key{ mGait, mGait == FalloutGait::Idle ? FalloutDirection::Forward : mDirection, sneak,
+            std::string(prefix), true };
+        std::string wanted = mMoveFile;
+        if (!(key == mMoveKey))
+        {
+            mMoveKey = key;
+            wanted.clear();
+            const std::vector<std::string>& files = animationFilesOf(*mResourceSystem->getVFS(), mMoveFolder);
+            if (mGait == FalloutGait::Idle)
+            {
+                if (sneak)
+                    wanted = chooseFalloutSneakIdle(mMoveFolder, prefix, mFemale, files);
+            }
+            else
+            {
+                wanted = chooseFalloutMove(
+                    mMoveFolder, prefix, sneak, mDirection, mGait == FalloutGait::Run, mFemale, files);
+                // A creature has the forward ones only, found by other names
+                if (wanted.empty())
+                    wanted = mGait == FalloutGait::Run && mGaits.mHasRun ? mRunFile : mWalkFile;
+                if (wanted.empty())
+                    wanted = mGait == FalloutGait::Run ? mWalkFile : mRunFile;
+            }
+        }
+        if (sneak != mSneaking)
+        {
+            mSneaking = sneak;
+            Log(Debug::Info) << mPtr.getCellRef().getRefId() << (sneak ? " sneaks" : " stops sneaking");
+        }
+
+        if (wanted != mMoveFile)
+        {
+            // The idle animation plays on below, so the actor goes back to it when the movement stops
+            if (!mMoveGroup.empty())
+            {
+                disable(mMoveGroup);
+                mMoveGroup.clear();
+            }
+            mMoveFile = wanted;
+            if (!wanted.empty())
+            {
+                std::string group;
+                if (const auto known = mMoveGroups.find(wanted); known != mMoveGroups.end())
+                    group = known->second;
+                else
+                {
+                    group = addAnimation(wanted, mSkeletonPath);
+                    mMoveGroups.emplace(wanted, group);
+                }
+                if (!group.empty())
+                {
+                    play(group, OFRender::AnimPriority(OFMechanics::Priority_Movement), OFRender::BlendMask_All, false,
+                        1.f, "start", "stop", 0.f, ~0u, false);
+                    mMoveGroup = group;
+                }
+                if (mMovesSaid < 12)
+                {
+                    ++mMovesSaid;
+                    Log(Debug::Info) << "Movement of " << mPtr.getCellRef().getRefId() << ": " << wanted << " (gait "
+                                     << static_cast<int>(mGait) << ", direction " << static_cast<int>(mDirection)
+                                     << ", sneaks " << sneak << ", weapon prefix \"" << prefix << "\", "
+                                     << (group.empty() ? "no group" : "playing") << ")";
+                }
+            }
+        }
+
+        // The feet keep up with the ground: the animation plays as much faster or slower as the actor is
+        if (!mMoveGroup.empty() && mGait != FalloutGait::Idle)
+            adjustSpeedMult(mMoveGroup, falloutAnimationSpeed(mSpeed, getVelocity(mMoveGroup)));
     }
 
     osg::ref_ptr<osg::Node> FalloutActorAnimation::insertPart(std::string_view model, bool forHead)
@@ -653,6 +824,8 @@ namespace OFRender
         holsterWeapon();
         mWeaponType = animationType;
         mDrawn = true;
+        mWeaponTime = 0.f;
+        mWeaponLooks = 0;
 
         if (!model.empty())
         {
@@ -783,7 +956,8 @@ namespace OFRender
             return false;
         // A file that is the idle it stands in, or one of the gaits, is already what it plays: a one-shot of the same
         // group would end and take the group with it, and nothing starts it again
-        if (group == mDefaultIdleGroup || group == mWalkGroup || group == mRunGroup || group == mPoseGroup)
+        if (group == mDefaultIdleGroup || group == mWalkGroup || group == mRunGroup || group == mPoseGroup
+            || group == mMoveGroup)
             return true;
         // One that was playing and has not ended starts again
         if (isPlaying(group))

@@ -72,4 +72,27 @@ namespace
         EXPECT_EQ(Resource::getMeshOptimizationOptions(*vfs, folderWithDot) & changing, changing);
         EXPECT_EQ(Resource::getMeshOptimizationOptions(*vfs, noExtension) & changing, changing);
     }
+
+    TEST(ResourceMeshOptimization, leavesTheNodesThatAFalloutSkeletonAndAWeaponAreHeldByAlone)
+    {
+        // the node that a weapon is put on in a character's hands and the one a bullet comes out of hold no shape
+        EXPECT_TRUE(Resource::isReservedNodeName("Weapon"));
+        EXPECT_TRUE(Resource::isReservedNodeName("weapon"));
+        EXPECT_TRUE(Resource::isReservedNodeName("ProjectileNode"));
+        // the bones, the camera of the arms and what Morrowind names
+        EXPECT_TRUE(Resource::isReservedNodeName("Bip01 R Hand"));
+        EXPECT_TRUE(Resource::isReservedNodeName("Camera1st"));
+        EXPECT_TRUE(Resource::isReservedNodeName("Weapon Bone"));
+        EXPECT_TRUE(Resource::isReservedNodeName("Weapon_Bone"));
+        EXPECT_TRUE(Resource::isReservedNodeName("Tri Weapon Bone"));
+        EXPECT_TRUE(Resource::isReservedNodeName("Right Hand"));
+        // a name is reserved when it starts with a reserved one, however far the search has to go for it
+        EXPECT_TRUE(Resource::isReservedNodeName("Weapon Bone 01"));
+        EXPECT_TRUE(Resource::isReservedNodeName("WeaponMod"));
+
+        EXPECT_FALSE(Resource::isReservedNodeName(""));
+        EXPECT_FALSE(Resource::isReservedNodeName("Wea"));
+        EXPECT_FALSE(Resource::isReservedNodeName("Scene Root"));
+        EXPECT_FALSE(Resource::isReservedNodeName("10mmPistol"));
+    }
 }

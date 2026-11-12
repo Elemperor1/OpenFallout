@@ -29,6 +29,14 @@ namespace OFLua
             return id == 0 ? std::string() : ESM::RefId::formIdRefId(ESM::FormId::fromUint32(id)).serializeText();
         }
 
+        /// The player is 0x14 in the games' own files, and the reference of the player here has the number of the plugin
+        /// that holds it in front: a script that says 0x14 means the player (round 14D: a fight against "0x14" ended
+        /// half a second after it started, for there is no character of that number)
+        FormId playerOrSelf(FormId id)
+        {
+            return id == FalloutScript::playerReference ? scripts().playerReference() : id;
+        }
+
         FormId parseId(std::string_view text)
         {
             if (text.empty())
@@ -37,7 +45,7 @@ namespace OFLua
             const ESM::FormId* form = id.getIf<ESM::FormId>();
             if (form == nullptr)
                 throw std::runtime_error("\"" + std::string(text) + "\" is not a form id");
-            return form->toUint32();
+            return playerOrSelf(form->toUint32());
         }
     }
 
@@ -64,6 +72,8 @@ namespace OFLua
             row["crippled"] = result.mCrippled;
             return row;
         };
+        // The reference of the player, as the other functions here are told it
+        api["player"] = []() { return idText(scripts().playerReference()); };
         // Whom the character fights ("" when it is at peace)
         api["target"] = [](std::string_view actor) { return idText(scripts().combat().target(parseId(actor))); };
         api["inCombat"] = [](std::string_view actor) { return scripts().combat().inCombat(parseId(actor)); };
@@ -77,9 +87,18 @@ namespace OFLua
         };
         api["start"] = [](std::string_view actor, std::string_view target) {
             // A dead character fights no one and is not fought, and one that is out does not start a fight
-            FalloutScript::startFight(scripts().combat(), scripts().actors(), parseId(actor), parseId(target));
+            const FormId self = parseId(actor);
+            if (FalloutScript::startFight(scripts().combat(), scripts().actors(), self, parseId(target)))
+                scripts().wakeMind(self);
         };
         api["stop"] = [](std::string_view actor) { scripts().combat().stop(parseId(actor)); };
+        // Two factions are enemies, as SetEnemy of both says (rounds that need a character that attacks the player on
+        // sight: the data of the games has the Powder Gangers neutral to the player)
+        api["setEnemy"] = [](std::string_view first, std::string_view second) {
+            using Relation = FalloutScript::CombatState::Relation;
+            scripts().combat().setRelation(parseId(first), parseId(second), Relation::Enemy);
+            scripts().combat().setRelation(parseId(second), parseId(first), Relation::Enemy);
+        };
         api["isDead"] = [](std::string_view actor) { return scripts().actors().isDead(parseId(actor)); };
 
         // Whether the content is that of Fallout, which has combat to run (it is not for Morrowind's)

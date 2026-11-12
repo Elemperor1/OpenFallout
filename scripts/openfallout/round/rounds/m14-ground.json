@@ -1,0 +1,10 @@
+{
+  "name": "m14-ground",
+  "game": "nv",
+  "save": "latest",
+  "scenario": "../scenarios/m14_ground.lua",
+  "resolution": [1280, 720],
+  "framerate": 30,
+  "limit": 200,
+  "variants": [ { "name": "plain" } ]
+}

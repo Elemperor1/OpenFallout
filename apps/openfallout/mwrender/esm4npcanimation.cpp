@@ -33,11 +33,15 @@
 
 namespace OFRender
 {
-    ESM4NpcAnimation::ESM4NpcAnimation(
-        const OFWorld::Ptr& ptr, osg::ref_ptr<osg::Group> parentNode, Resource::ResourceSystem* resourceSystem)
+    ESM4NpcAnimation::ESM4NpcAnimation(const OFWorld::Ptr& ptr, osg::ref_ptr<osg::Group> parentNode,
+        Resource::ResourceSystem* resourceSystem, bool firstPerson)
         : FalloutActorAnimation(ptr, std::move(parentNode), resourceSystem)
     {
-        setObjectRoot(mPtr.getClass().getCorrectedModel(mPtr), true, true, false);
+        mFirstPerson = firstPerson;
+        if (firstPerson)
+            mSkeletonOverride = std::string(sFirstPersonSkeleton);
+        setObjectRoot(firstPerson ? mSkeletonOverride : std::string(mPtr.getClass().getCorrectedModel(mPtr).value()), true, true,
+            false);
         updateParts();
 
         // Only the characters of Fallout have animation files that are read
@@ -327,6 +331,37 @@ namespace OFRender
             images.mHairColour = osg::Vec3f(
                 traits.mHairColour.red / 255.f, traits.mHairColour.green / 255.f, traits.mHairColour.blue / 255.f);
 
+        // The hands of the first person show whatever the character wears: a piece that covers a hand (gloves, power
+        // armor) takes the race's hand out of the list for the third person, and the first-person file of that piece is
+        // not looked for here, so the race's own hand stays as the fallback (a review of the PR found the hand missing)
+        OFClass::FalloutNpcParts shown = parts;
+        if (mFirstPerson)
+        {
+            const OFClass::FalloutNpcParts bare = OFClass::falloutNpcParts(*race, isFemale, nullptr, {}, {});
+            // Which hand a file is for: the glove of the Pip-Boy is a worn piece that is the left hand of the first person, and a
+            // hand that it covers must not be drawn under it
+            const auto sideOf = [](const std::string& model) {
+                const std::string lower = Misc::StringUtils::lowerCase(model);
+                if (lower.find("left") != std::string::npos)
+                    return 1;
+                return lower.find("right") != std::string::npos ? 2 : 0;
+            };
+            for (const OFClass::FalloutNpcPart& hand : bare.mParts)
+            {
+                if (hand.mKind != OFClass::FalloutPartKind::Hand)
+                    continue;
+                const int side = sideOf(hand.mModel);
+                const bool listed = std::any_of(shown.mParts.begin(), shown.mParts.end(),
+                    [&](const OFClass::FalloutNpcPart& other) {
+                        if (!falloutIsFirstPersonPart(other.mKind == OFClass::FalloutPartKind::Hand, other.mModel))
+                            return false;
+                        return Misc::StringUtils::ciEqual(other.mModel, hand.mModel)
+                            || (side != 0 && sideOf(other.mModel) == side);
+                    });
+                if (!listed)
+                    shown.mParts.push_back(hand);
+            }
+        }
         std::size_t inserted = 0;
         std::size_t missing = 0;
         std::size_t morphed = 0;
@@ -336,8 +371,17 @@ namespace OFRender
         std::size_t wornSkin = 0;
         std::string hairTexture;
         std::string eyeTexture;
-        for (const OFClass::FalloutNpcPart& npcPart : parts.mParts)
+        for (const OFClass::FalloutNpcPart& listed : shown.mParts)
         {
+            OFClass::FalloutNpcPart npcPart = listed;
+            if (mFirstPerson)
+            {
+                // The arms of the first person: only the hands and the glove of the Pip-Boy, each from the file the games
+                // keep for the first person
+                if (!falloutIsFirstPersonPart(npcPart.mKind == OFClass::FalloutPartKind::Hand, npcPart.mModel))
+                    continue;
+                npcPart.mModel = falloutFirstPersonModel(npcPart.mModel);
+            }
             const osg::ref_ptr<osg::Node> part = insertPart(npcPart.mModel, npcPart.mForHead);
             if (part == nullptr)
             {
@@ -384,7 +428,8 @@ namespace OFRender
             std::ostringstream ref;
             ref << mPtr.getCellRef().getRefId();
             // (the stream of the log stays in the base that an earlier line left it in)
-            Log(Debug::Info) << std::dec << "Look of " << ref.str() << ": " << race->mEditorId
+            Log(Debug::Info) << std::dec << "Look of " << ref.str() << (mFirstPerson ? " (first person)" : "") << ": "
+                             << race->mEditorId
                              << (isFemale ? " female" : " male") << ", " << inserted << " parts"
                              << (missing != 0 ? " (" + std::to_string(missing) + " not found)" : std::string())
                              << ", hair " << (hair != nullptr ? hair->mEditorId : std::string("none"))

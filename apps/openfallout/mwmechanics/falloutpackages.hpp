@@ -2,6 +2,9 @@
 #define OPENFALLOUT_MWMECHANICS_FALLOUTPACKAGES_H
 
 #include <cstdint>
+#include <functional>
+#include <initializer_list>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -139,6 +142,30 @@ namespace OFMechanics
 
     /// The place `distance` from `from` toward `to`, or `to` if it is that close
     osg::Vec3f falloutStepToward(const osg::Vec3f& from, const osg::Vec3f& to, float distance);
+
+    /// How a straight walk is looked at: the height of the floor under a place (the last height is where the feet were
+    /// a step before; nothing when there is no floor within reach), and whether the world is in the way between two
+    /// points (the knees and the chest of the walker are asked about)
+    using FalloutFloorProbe = std::function<std::optional<float>(float x, float y, float lastHeight)>;
+    using FalloutWayProbe = std::function<bool(const osg::Vec3f& from, const osg::Vec3f& to)>;
+
+    /// The distance from a start along a direction to the first thing the world has there, or `longest` when there is
+    /// nothing within it
+    using FalloutRayProbe = std::function<float(const osg::Vec3f& start, const osg::Vec3f& direction, float longest)>;
+
+    /// Whether the world is in the way between two points at the height of the walker's knees and chest (the heights
+    /// are above the points). A ray starts one unit before the point it leaves and a hit counts when it is before the
+    /// end less one unit, so the unit that the tolerance of an end leaves is the start of the next segment's ray: a
+    /// thin wall between two probes is not missed.
+    bool falloutSegmentBlocked(const osg::Vec3f& from, const osg::Vec3f& to, const FalloutRayProbe& ray,
+        std::initializer_list<float> heights);
+
+    /// Whether an actor can walk the straight line from one place to another when the navigator has no path for it (a
+    /// vault whose mesh has holes and islands, a target that stands where the mesh is not): there is floor under every
+    /// `step` units of the line, the floor does not rise or fall more than `stepHeight` between two of those, and the
+    /// way between two of them is clear. A line longer than `longest` is not tried.
+    bool falloutStraightWalkable(const osg::Vec3f& from, const osg::Vec3f& to, const FalloutFloorProbe& floor,
+        const FalloutWayProbe& blocked, float step = 50.f, float stepHeight = 70.f, float longest = 3000.f);
 
     /// What an actor that meets the player on its way remembers: how long it has waited for the player to move, and
     /// whether it has waited long enough and goes on

@@ -155,6 +155,59 @@ namespace OFMechanics
         return from + way * (distance / length);
     }
 
+    bool falloutSegmentBlocked(const osg::Vec3f& from, const osg::Vec3f& to, const FalloutRayProbe& ray,
+        std::initializer_list<float> heights)
+    {
+        const osg::Vec3f way = to - from;
+        const float length = way.length();
+        // (a segment that is only a little long is looked at too: the walk ends with the part of a step that is left, and a
+        // wall may stand in it)
+        if (length < 1e-3f)
+            return false;
+        const osg::Vec3f direction = way / length;
+        for (const float height : heights)
+        {
+            const osg::Vec3f start = from + osg::Vec3f(0.f, 0.f, height) - direction;
+            if (ray(start, direction, length + 1.f) < length)
+                return true;
+        }
+        return false;
+    }
+
+    bool falloutStraightWalkable(const osg::Vec3f& from, const osg::Vec3f& to, const FalloutFloorProbe& floor,
+        const FalloutWayProbe& blocked, float step, float stepHeight, float longest)
+    {
+        const osg::Vec2f across(to.x() - from.x(), to.y() - from.y());
+        const float length = across.length();
+        if (length > longest)
+            return false;
+        // The feet on the floor where the walk starts
+        const std::optional<float> start = floor(from.x(), from.y(), from.z());
+        if (!start)
+            return false;
+        osg::Vec3f last(from.x(), from.y(), *start);
+        if (length < 1.f)
+            return true;
+        const osg::Vec2f direction = across / length;
+        for (float along = step;; along += step)
+        {
+            const float at = std::min(along, length);
+            const float x = from.x() + direction.x() * at;
+            const float y = from.y() + direction.y() * at;
+            const std::optional<float> height = floor(x, y, last.z());
+            if (!height || std::abs(*height - last.z()) > stepHeight)
+                return false;
+            const osg::Vec3f next(x, y, *height);
+            if (blocked(last, next))
+                return false;
+            last = next;
+            // The floor that the walk ends on is the destination's floor: a lower floor under a place upstairs or on a
+            // platform goes to its coordinates and no further (the actor would arrive under it and never be there)
+            if (at >= length)
+                return std::abs(last.z() - to.z()) <= stepHeight;
+        }
+    }
+
     bool falloutYields(FalloutYield& state, bool nearPlayer, bool inTheWay, float duration, float patience)
     {
         // A step that would bring the actor within the distance blocks it before it is near the player

@@ -77,6 +77,14 @@ namespace OFRender
         /// one.
         void startAnimations(bool female);
 
+        /// The skeleton that is not the actor's own: the arms of the first person have one of their own, with the
+        /// animations beside it. It is the path that the object root was made from. Empty for the skeleton of the
+        /// actor's model.
+        std::string mSkeletonOverride;
+        /// The arms that the player sees through their own eyes: their skeleton hangs from the camera and not from the
+        /// floor, so it is not lowered to it
+        bool mFirstPerson = false;
+
         /// Adds a model to the actor and returns the node that it is, null when there is no model. A model that is not
         /// skinned names the bone it is put on in its file; one that does not (a hat) and is for the head
         /// (`forHead`), with its vertices around the origin of the head, is put on the head bone.
@@ -100,9 +108,19 @@ namespace OFRender
         /// Says in the log where the bones of the actor stand a second into its idle (the first few actors only)
         void logPose(float duration);
 
+        /// Says in the log, a second and five seconds after a weapon was taken out, whether it is still on the hand and
+        /// which way it points (the first few weapons only): round 14E found the pistol of the player in its hand
+        /// pointing across the body at rest, and gone while it walked
+        void logWeapon(float duration);
+        /// The same, at once, when the gait of an actor with a weapon out changes
+        void sayWeapon(const char* when);
+
         /// The gait that the speed at which the actor was moved calls for
         void updateGait(float duration);
         void setGait(FalloutGait gait);
+        /// The animation for the way the actor moves now (the gait, the direction it goes in relative to where it
+        /// faces, whether it sneaks, the weapon it holds): the old one stops and the new one plays over the idle
+        void updateMovement();
 
         osg::ref_ptr<AdvanceCallback> mAdvanceCallback;
         /// The transform that the body falls with, when it has died
@@ -136,10 +154,43 @@ namespace OFRender
         /// How long the idle has played, and whether the bones were said
         float mPoseTime = 0.f;
         bool mPoseLogged = false;
+        /// Seconds since the weapon was taken out, and how many of its two looks were made
+        float mWeaponTime = 0.f;
+        int mWeaponLooks = 0;
 
         OFWorld::Ptr mMotionSource;
         std::string mWalkGroup;
         std::string mRunGroup;
+        /// The files of the forward walk and run (those of mWalkGroup and mRunGroup), the folder of the skeleton, the
+        /// sex of the actor, the groups made of the files of the other ways to move (by file), and the one that plays
+        /// as the movement now with the file it was made from (empty when the actor stands in its idle)
+        std::string mWalkFile;
+        std::string mRunFile;
+        std::string mMoveFolder;
+        bool mFemale = false;
+        std::map<std::string, std::string> mMoveGroups;
+        std::string mMoveGroup;
+        std::string mMoveFile;
+        /// What the file was chosen for (gait, direction, sneaking, weapon prefix), so that it is not chosen again each
+        /// frame
+        struct MoveKey
+        {
+            FalloutGait mGait = FalloutGait::Idle;
+            FalloutDirection mDirection = FalloutDirection::Forward;
+            bool mSneak = false;
+            std::string mPrefix;
+            bool mValid = false;
+            bool operator==(const MoveKey&) const = default;
+        };
+        MoveKey mMoveKey;
+        /// How fast the actor goes ahead of where it faces and to its right (units a second, smoothed), and the
+        /// direction that makes
+        float mForwardSpeed = 0.f;
+        float mSideSpeed = 0.f;
+        FalloutDirection mDirection = FalloutDirection::Forward;
+        /// Whether the actor sneaked the last time it was asked, and how many movement files were said in the log
+        bool mSneaking = false;
+        int mMovesSaid = 0;
         FalloutGaits mGaits;
         FalloutGait mGait = FalloutGait::Idle;
         /// The speed (units a second, across the ground) at which the actor is moved, smoothed over a few frames
