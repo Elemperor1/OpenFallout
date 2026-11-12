@@ -796,7 +796,7 @@ namespace Resource
                 "Left Upper Leg",
                 "Right Clavicle",
                 "Left Clavicle",
-                "Weapon Bone",
+                "Weapon",
                 "Tail",
                 "Bip01",
                 "Root Bone",
@@ -812,8 +812,10 @@ namespace Resource
                 "Left_Forearm",
                 "Right_Upper_Arm",
                 "Left_Clavicle",
-                "Weapon_Bone",
                 "Root_Bone",
+                // the node of a Fallout weapon that a bullet comes out of: it holds no shape, so it would be taken
+                // away with the empty nodes unless the optimizer is told to leave it
+                "ProjectileNode",
             };
 
             std::vector<std::string> result;
@@ -833,6 +835,17 @@ namespace Resource
         }
     }
 
+    bool isReservedNodeName(std::string_view name)
+    {
+        if (name.empty())
+            return false;
+
+        static const std::vector<std::string> reservedNames = makeSortedReservedNames();
+
+        const auto it = Misc::partialBinarySearch(reservedNames.begin(), reservedNames.end(), name);
+        return it != reservedNames.end();
+    }
+
     osg::ref_ptr<osg::Node> load(VFS::Path::NormalizedView normalizedFilename, const VFS::Manager* vfs,
         Resource::ImageManager* imageManager, Resource::NifFileManager* nifFileManager,
         Resource::BgsmFileManager* materialMgr)
@@ -847,16 +860,7 @@ namespace Resource
     class CanOptimizeCallback : public SceneUtil::Optimizer::IsOperationPermissibleForObjectCallback
     {
     public:
-        bool isReservedName(const std::string& name) const
-        {
-            if (name.empty())
-                return false;
-
-            static const std::vector<std::string> reservedNames = makeSortedReservedNames();
-
-            const auto it = Misc::partialBinarySearch(reservedNames.begin(), reservedNames.end(), name);
-            return it != reservedNames.end();
-        }
+        bool isReservedName(const std::string& name) const { return isReservedNodeName(name); }
 
         bool isOperationPermissibleForObjectImplementation(
             const SceneUtil::Optimizer* optimizer, const osg::Drawable* node, unsigned int option) const override

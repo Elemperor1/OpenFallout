@@ -60,6 +60,11 @@ namespace Resource
     /// are made in.
     unsigned int getMeshOptimizationOptions(const VFS::Manager& vfs, VFS::Path::NormalizedView path);
 
+    /// Whether the optimizer leaves a node of this name alone: a node that a part is put on or a bullet comes out of
+    /// (a bone, the "Weapon" of a Fallout skeleton, a weapon's "ProjectileNode") holds no shape of its own and would
+    /// be taken away as an empty node. A name matches when it starts with one of the reserved ones.
+    bool isReservedNodeName(std::string_view name);
+
     /// @brief Handles loading and caching of scenes, e.g. .nif files or .osg files
     /// @note Some methods of the scene manager can be used from any thread, see the methods documentation for more
     /// details.
