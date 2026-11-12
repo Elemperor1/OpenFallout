@@ -35,6 +35,16 @@ The launcher (`openfallout-launcher`) has a Data Files page that writes these li
 
 starts a new game of the game you pointed it at: its opening scene, the making of the character and the first quest. How far the engine plays from there is in the [roadmap](gap-audit-and-roadmap.md); it is not a finished game yet. Without these options the main menu opens, and *New Game* does the same. `--start <cell>` (for example `--start WastelandNV:-18,0`, a worldspace and the cell's grid position, or the name of an interior cell) opens a cell directly, which is what the project's own test runs do. `--load-savegame <file>` loads a save.
 
+### On a Mac: start it through `open`
+
+macOS turns on Game Mode (the game gets the CPU and GPU first, and the wireless controller and audio a faster link) only for a game that the system itself started, so not for a binary started from a terminal. The app declares that it supports Game Mode (`LSSupportsGameMode` in its `Info.plist`). To play, or to measure the frame rate, start the app bundle through `open` with the helper:
+
+    scripts/openfallout/mac_launch.py --app /Applications/OpenFallout.app -- --skip-menu --new-game
+
+Everything after `--` goes to the engine as it is, so `--config <folder>` and `--user-data <folder>` run it apart from your usual settings and saves. Standard output and error go to `openfallout.stdout.log` and `openfallout.stderr.log` in the current folder (`--stdout` and `--stderr` choose other files), `--env NAME=VALUE` sets an environment variable for the game (as often as needed) and `--metal-hud` shows the Metal performance HUD. The helper waits until the game has quit. Its exit status is that of `open`, which says whether the game could be started but not how it ended: the log says that. `open` starts the program that the bundle names as its executable; when that is not `openfallout` (a package built with the launcher starts `openfallout-launcher`), the helper says so, and the arguments go to that program.
+
+Starting the binary directly (`/Applications/OpenFallout.app/Contents/MacOS/openfallout ...`, or `openfallout` from a build folder) works as before, and is what the probe and autoplay tools keep doing; Game Mode stays off then.
+
 ## Game controller
 
 A controller that the operating system shows as a game controller (Xbox, PlayStation and Switch Pro pads, by cable or Bluetooth) is read through SDL, as in OpenMW, and `[Input] enable controller` is on by default. The first hour of play with a pad found the menus clumsy (the D-pad moved the lit row, but A clicked where the pointer had been left), and the buttons below are the answer to that; the next round with a pad in hand will tell whether they feel right. Each press that a Fallout screen acts on is logged as `Pad: screen=... button=... key=...` (the first 200 of a run). The engine logs every key, button and stick that it hears as `Input: ...` lines in the log of the run (the first presses and a sample of the sticks), so a report of a pad that did nothing can say which side missed the press.

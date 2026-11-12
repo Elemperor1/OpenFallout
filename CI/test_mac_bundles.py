@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+import plistlib
 import shutil
 import subprocess
 import tempfile
@@ -118,6 +119,35 @@ endif()
 
     def test_game_and_editor(self):
         self.check_bundles(game=True, editor=True, qt=True)
+
+
+class MacInfoPlistTests(unittest.TestCase):
+    """Render the Info.plist templates with CMake's configure_file, as the build does."""
+
+    def render(self, template):
+        temporary = tempfile.TemporaryDirectory(prefix="mac plist ")
+        self.addCleanup(temporary.cleanup)
+        output = Path(temporary.name) / "Info.plist"
+        script = Path(temporary.name) / "render.cmake"
+        script.write_text(f'set(OPENFALLOUT_VERSION "0.1.0")\n'
+                          f'configure_file("{ROOT / "files/mac" / template}" "{output}")\n')
+        result = subprocess.run(["cmake", "-P", str(script)], text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        with output.open("rb") as file:
+            return plistlib.load(file)
+
+    def test_game_plist_supports_game_mode(self):
+        plist = self.render("openfallout-Info.plist.in")
+        self.assertIs(plist.get("LSSupportsGameMode"), True)
+        self.assertEqual(plist.get("LSApplicationCategoryType"), "public.app-category.role-playing-games")
+        self.assertIs(plist.get("NSHighResolutionCapable"), True)
+        self.assertEqual(plist.get("CFBundleShortVersionString"), "0.1.0")
+        self.assertNotIn("LSRequiresCarbon", plist)
+
+    def test_editor_plist_has_no_carbon_key(self):
+        plist = self.render("openfallout-cs-Info.plist.in")
+        self.assertNotIn("LSRequiresCarbon", plist)
+        self.assertIs(plist.get("NSHighResolutionCapable"), True)
 
 
 if __name__ == "__main__":
