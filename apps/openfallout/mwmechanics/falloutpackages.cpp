@@ -155,6 +155,38 @@ namespace OFMechanics
         return from + way * (distance / length);
     }
 
+    bool falloutStraightWalkable(const osg::Vec3f& from, const osg::Vec3f& to, const FalloutFloorProbe& floor,
+        const FalloutWayProbe& blocked, float step, float stepHeight, float longest)
+    {
+        const osg::Vec2f across(to.x() - from.x(), to.y() - from.y());
+        const float length = across.length();
+        if (length > longest)
+            return false;
+        // The feet on the floor where the walk starts
+        const std::optional<float> start = floor(from.x(), from.y(), from.z());
+        if (!start)
+            return false;
+        osg::Vec3f last(from.x(), from.y(), *start);
+        if (length < 1.f)
+            return true;
+        const osg::Vec2f direction = across / length;
+        for (float along = step;; along += step)
+        {
+            const float at = std::min(along, length);
+            const float x = from.x() + direction.x() * at;
+            const float y = from.y() + direction.y() * at;
+            const std::optional<float> height = floor(x, y, last.z());
+            if (!height || std::abs(*height - last.z()) > stepHeight)
+                return false;
+            const osg::Vec3f next(x, y, *height);
+            if (blocked(last, next))
+                return false;
+            last = next;
+            if (at >= length)
+                return true;
+        }
+    }
+
     bool falloutYields(FalloutYield& state, bool nearPlayer, bool inTheWay, float duration, float patience)
     {
         // A step that would bring the actor within the distance blocks it before it is near the player

@@ -2,6 +2,8 @@
 #define OPENFALLOUT_MWMECHANICS_FALLOUTPACKAGES_H
 
 #include <cstdint>
+#include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -139,6 +141,19 @@ namespace OFMechanics
 
     /// The place `distance` from `from` toward `to`, or `to` if it is that close
     osg::Vec3f falloutStepToward(const osg::Vec3f& from, const osg::Vec3f& to, float distance);
+
+    /// How a straight walk is looked at: the height of the floor under a place (the last height is where the feet were
+    /// a step before; nothing when there is no floor within reach), and whether the world is in the way between two
+    /// points (the knees and the chest of the walker are asked about)
+    using FalloutFloorProbe = std::function<std::optional<float>(float x, float y, float lastHeight)>;
+    using FalloutWayProbe = std::function<bool(const osg::Vec3f& from, const osg::Vec3f& to)>;
+
+    /// Whether an actor can walk the straight line from one place to another when the navigator has no path for it (a
+    /// vault whose mesh has holes and islands, a target that stands where the mesh is not): there is floor under every
+    /// `step` units of the line, the floor does not rise or fall more than `stepHeight` between two of those, and the
+    /// way between two of them is clear. A line longer than `longest` is not tried.
+    bool falloutStraightWalkable(const osg::Vec3f& from, const osg::Vec3f& to, const FalloutFloorProbe& floor,
+        const FalloutWayProbe& blocked, float step = 50.f, float stepHeight = 70.f, float longest = 3000.f);
 
     /// What an actor that meets the player on its way remembers: how long it has waited for the player to move, and
     /// whether it has waited long enough and goes on

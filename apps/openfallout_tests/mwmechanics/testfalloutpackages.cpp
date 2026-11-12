@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <optional>
 
 #include <osg/Math>
 
@@ -297,5 +298,49 @@ namespace
         EXPECT_EQ(falloutFirstPlugin({ "a.omwscripts", "Fallout3.esm" }), 1);
         EXPECT_EQ(falloutFirstPlugin({ "noextension", "x.ESP", "y.esm" }), 1);
         EXPECT_EQ(falloutFirstPlugin({ "x.esl" }), 0);
+    }
+
+    TEST(FalloutPackagesTest, aStraightWalkOnLevelFloorWithNothingInTheWayCanBeWalked)
+    {
+        const auto floor = [](float, float, float) -> std::optional<float> { return 0.f; };
+        const auto clear = [](const osg::Vec3f&, const osg::Vec3f&) { return false; };
+        EXPECT_TRUE(falloutStraightWalkable(osg::Vec3f(0, 0, 0), osg::Vec3f(1000, 0, 0), floor, clear));
+        EXPECT_TRUE(falloutStraightWalkable(osg::Vec3f(0, 0, 0), osg::Vec3f(30, 40, 0), floor, clear));
+        // a place that is the same place
+        EXPECT_TRUE(falloutStraightWalkable(osg::Vec3f(5, 5, 0), osg::Vec3f(5, 5, 90), floor, clear));
+    }
+
+    TEST(FalloutPackagesTest, aStraightWalkIsNotMadeWhereThereIsNoFloorOrTheFloorJumps)
+    {
+        const auto clear = [](const osg::Vec3f&, const osg::Vec3f&) { return false; };
+        // a hole between 400 and 500 on the way
+        const auto hole = [](float x, float, float) -> std::optional<float> {
+            if (x > 400.f && x < 500.f)
+                return std::nullopt;
+            return 0.f;
+        };
+        EXPECT_FALSE(falloutStraightWalkable(osg::Vec3f(0, 0, 0), osg::Vec3f(1000, 0, 0), hole, clear));
+        // a wall of floor that rises 100 units
+        const auto wall = [](float x, float, float) -> std::optional<float> { return x > 400.f ? 100.f : 0.f; };
+        EXPECT_FALSE(falloutStraightWalkable(osg::Vec3f(0, 0, 0), osg::Vec3f(1000, 0, 0), wall, clear));
+        // a slope that rises 30 units for every 50 is walked, and one of 80 for every 50 is not
+        const auto gentle = [](float x, float, float) -> std::optional<float> { return x * 0.6f; };
+        EXPECT_TRUE(falloutStraightWalkable(osg::Vec3f(0, 0, 0), osg::Vec3f(1000, 0, 600), gentle, clear));
+        const auto steep = [](float x, float, float) -> std::optional<float> { return x * 1.6f; };
+        EXPECT_FALSE(falloutStraightWalkable(osg::Vec3f(0, 0, 0), osg::Vec3f(1000, 0, 1600), steep, clear));
+        // nothing under where the walker starts
+        const auto none = [](float, float, float) -> std::optional<float> { return std::nullopt; };
+        EXPECT_FALSE(falloutStraightWalkable(osg::Vec3f(0, 0, 0), osg::Vec3f(100, 0, 0), none, clear));
+    }
+
+    TEST(FalloutPackagesTest, aStraightWalkIsNotMadeThroughAWallOrOverTheLimit)
+    {
+        const auto floor = [](float, float, float) -> std::optional<float> { return 0.f; };
+        const auto wall = [](const osg::Vec3f& from, const osg::Vec3f& to) { return from.x() < 600.f && to.x() >= 600.f; };
+        EXPECT_FALSE(falloutStraightWalkable(osg::Vec3f(0, 0, 0), osg::Vec3f(1000, 0, 0), floor, wall));
+        EXPECT_TRUE(falloutStraightWalkable(osg::Vec3f(0, 0, 0), osg::Vec3f(500, 0, 0), floor, wall));
+        const auto clear = [](const osg::Vec3f&, const osg::Vec3f&) { return false; };
+        EXPECT_FALSE(falloutStraightWalkable(osg::Vec3f(0, 0, 0), osg::Vec3f(3500, 0, 0), floor, clear));
+        EXPECT_TRUE(falloutStraightWalkable(osg::Vec3f(0, 0, 0), osg::Vec3f(3500, 0, 0), floor, clear, 50.f, 70.f, 4000.f));
     }
 }
