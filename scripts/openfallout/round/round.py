@@ -600,7 +600,10 @@ def run_engine(command, run_dir, limit, env_extra=None, priority="low", guard=No
         # The round is not a pass with an engine that may still run: the reason is the guard's, which the report and the exit say
         tripped = tripped or reason
         if guard is not None:
-            guard.state.stop(reason + "\n")
+            try:
+                guard.state.stop(reason + "\n")
+            except roundguard.Refused as refused:
+                print("; ".join(refused.reasons), flush=True)
     sampler.stop()
     os.close(master)
     return process.returncode, time.monotonic() - started, sampler, timed_out, ended_early, tripped
@@ -970,7 +973,10 @@ def command_preflight(args):
 
 def command_stop(args):
     state = roundguard.State(guard_root(args))
-    state.stop(args.note or "")
+    try:
+        state.stop(args.note or "")
+    except roundguard.Refused as refused:
+        return refusal_exit(refused.reasons)
     print(f"kill switch set: {state.stop_file}. A round that is running ends its engine at once, and no round or build starts, until `round.py resume`.")
     return 0
 
@@ -984,7 +990,10 @@ def command_resume(args):
 
 def command_ack_panic(args):
     state = roundguard.State(guard_root(args))
-    state.acknowledge(args.note or "")
+    try:
+        state.acknowledge(args.note or "")
+    except roundguard.Refused as refused:
+        return refusal_exit(refused.reasons)
     print(f"panic acknowledged ({state.ack_file}): the pre-flight stops warning about the panic reports up to now")
     return 0
 

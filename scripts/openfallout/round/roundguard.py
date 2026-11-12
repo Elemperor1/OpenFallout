@@ -298,9 +298,21 @@ class State:
     def stopped(self):
         return self.stop_file.exists()
 
-    def stop(self, note=""):
+    def _write(self, path, text):
+        """Writes one of the guards' files in a folder that is the user's own and not through a link that somebody else planted (the
+        folder may be in a shared temporary folder): a refusal, not a write, when it is not so."""
         self.folder.mkdir(parents=True, exist_ok=True)
-        self.stop_file.write_text(note or "stopped\n", encoding="utf-8")
+        if os.stat(self.folder).st_uid != os.getuid():
+            raise Refused([f"the folder of the guards ({self.folder}) belongs to another user"])
+        try:
+            descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+        except OSError as error:
+            raise Refused([f"{path} cannot be written safely: {error.strerror}"])
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(text)
+
+    def stop(self, note=""):
+        self._write(self.stop_file, note or "stopped\n")
 
     def resume(self):
         try:
@@ -315,12 +327,14 @@ class State:
             return None
 
     def acknowledge(self, note=""):
-        self.folder.mkdir(parents=True, exist_ok=True)
-        self.ack_file.write_text((note or "looked at") + "\n", encoding="utf-8")
+        self._write(self.ack_file, (note or "looked at") + "\n")
 
     def heavy_ended(self, kind, now=None):
-        self.folder.mkdir(parents=True, exist_ok=True)
-        self.heavy_file.write_text(json.dumps({"kind": kind, "ended": time.time() if now is None else now}), encoding="utf-8")
+        # (the rest after a heavy thing is advice: a file that cannot be written safely is no reason to fail what just ended)
+        try:
+            self._write(self.heavy_file, json.dumps({"kind": kind, "ended": time.time() if now is None else now}))
+        except Refused:
+            pass
 
     def settle_remaining(self, now=None, seconds=SETTLE_SECONDS):
         """Seconds still to wait since the last build or run ended (0 when none, or long ago)."""

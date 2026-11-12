@@ -349,6 +349,17 @@ namespace
             osg::Vec3f(0, 0, 0), osg::Vec3f(0.5f, 0, 0), probeFor(0.2f), { 35.f }));
     }
 
+    TEST(FalloutPackagesTest, aStraightWalkEndsOnTheFloorOfItsDestination)
+    {
+        const auto floor = [](float, float, float) -> std::optional<float> { return 0.f; };
+        const auto clear = [](const osg::Vec3f&, const osg::Vec3f&) { return false; };
+        // the destination is a floor above the one that the line follows: it is not reached by walking this line
+        EXPECT_FALSE(falloutStraightWalkable(osg::Vec3f(0, 0, 0), osg::Vec3f(400, 0, 300), floor, clear));
+        EXPECT_FALSE(falloutStraightWalkable(osg::Vec3f(0, 0, 0), osg::Vec3f(400, 0, -300), floor, clear));
+        // a destination a little above the floor (a target's height, a step) is on it
+        EXPECT_TRUE(falloutStraightWalkable(osg::Vec3f(0, 0, 0), osg::Vec3f(400, 0, 40), floor, clear));
+    }
+
     TEST(FalloutPackagesTest, aStraightWalkIsNotMadeWhereThereIsNoFloorOrTheFloorJumps)
     {
         const auto clear = [](const osg::Vec3f&, const osg::Vec3f&) { return false; };

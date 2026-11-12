@@ -201,8 +201,10 @@ namespace OFMechanics
             if (blocked(last, next))
                 return false;
             last = next;
+            // The floor that the walk ends on is the destination's floor: a lower floor under a place upstairs or on a
+            // platform goes to its coordinates and no further (the actor would arrive under it and never be there)
             if (at >= length)
-                return true;
+                return std::abs(last.z() - to.z()) <= stepHeight;
         }
     }
 

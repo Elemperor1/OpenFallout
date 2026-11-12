@@ -149,6 +149,20 @@ class StateAndLock(unittest.TestCase):
         self.assertIn("cannot be opened safely", refused.exception.reasons[0])
         self.assertEqual(target.read_text(encoding="utf-8"), "keep me")
 
+    def test_the_kill_switch_and_the_acknowledgement_do_not_write_through_a_link(self):
+        target = self.tmp / "precious.txt"
+        target.write_text("keep me", encoding="utf-8")
+        self.state.folder.mkdir(parents=True, exist_ok=True)
+        self.state.stop_file.symlink_to(target)
+        self.state.ack_file.symlink_to(target)
+        with self.assertRaises(roundguard.Refused):
+            self.state.stop("note")
+        with self.assertRaises(roundguard.Refused):
+            self.state.acknowledge("note")
+        self.state.heavy_file.symlink_to(target)
+        self.state.heavy_ended("build")                       # advice only: no failure, and nothing written
+        self.assertEqual(target.read_text(encoding="utf-8"), "keep me")
+
     def test_the_lock_is_held_by_one_at_a_time_and_says_by_whom(self):
         with roundguard.Lock(self.state.lock_file, "build"):
             with self.assertRaises(roundguard.Refused) as refused:
