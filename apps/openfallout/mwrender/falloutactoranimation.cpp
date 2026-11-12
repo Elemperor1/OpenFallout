@@ -576,7 +576,10 @@ namespace OFRender
         // A character in a piece of furniture does not walk: its place changes by a few units when it is put on its
         // seat, which would play the walk over the pose of its seat
         setGait(mPoseKind != 0 ? FalloutGait::Idle : chooseFalloutGait(mSpeed, mGait, mGaits));
-        mDirection = chooseFalloutDirection(mForwardSpeed, mSideSpeed, mDirection);
+        // A character of the world faces where it goes (it turns as it walks, so for a while the way it goes is to its
+        // side or behind it: round 14F saw walking backward and sideways); only the player's body strafes and steps back
+        mDirection = mMotionSource.isEmpty() ? FalloutDirection::Forward
+                                              : chooseFalloutDirection(mForwardSpeed, mSideSpeed, mDirection);
         updateMovement();
     }
 
