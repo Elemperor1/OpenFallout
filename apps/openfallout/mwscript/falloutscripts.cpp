@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <limits>
 #include <optional>
+#include <set>
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm/refid.hpp>
@@ -3383,7 +3384,15 @@ namespace OFScript
                 break;
         }
         if (!FalloutScript::FightAI::attacksOnSight(traits.mAggression, standing))
+        {
+            // Said once for each character (round 14A: armed characters near the player that never went for it)
+            static std::set<FalloutScript::FormId> told;
+            if (told.insert(self).second)
+                Log(Debug::Info) << FalloutScript::hex(self) << " does not attack the player on sight: aggression "
+                                 << static_cast<int>(traits.mAggression) << ", standing "
+                                 << (standing == Standing::Enemy ? "enemy" : standing == Standing::Ally ? "ally" : "neutral");
             return false;
+        }
         radius = traits.mRadius;
         return true;
     }

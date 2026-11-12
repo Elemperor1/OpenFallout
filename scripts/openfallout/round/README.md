@@ -84,6 +84,16 @@ as well.
 | `r.boxes(false)` | a message box that the game opens covers the picture and nobody clicks it in a round, so it is answered with its first button after a second (`ROUND box` lines name its number, form and buttons, never its text; a `shot` line says `box=<number>` when one is open as the picture is taken); `r.boxes(false)` leaves the boxes open, `r.boxes(true)` answers again |
 | `r.log(...)` | a note |
 | `r.world`, `r.core`, `r.util`, `r.player()`, `r.lookup(form)` | the Lua modules and helpers, for steps of your own |
+| `r.spawn{ record, bearing, dist, pos, yaw, count, label }`, `r.place(object, { dist, bearing, pos, yaw, label })`, `r.putAt(object, { pos, yaw, label })`, `r.give(record, count[, actor])` | M14: make an object of a record, put one at `dist` units from the player along `bearing` (radians, 0 north; it looks at the player unless `yaw`), or at a place of the player's worldspace, put items in an inventory |
+| `r.equip([record[, pick]])`, `r.drawn(on)`, `r.weapon(label)`, `r.inventory(label[, actor])`, `r.god(on)` | the weapon of the player: put one of the Pip-Boy's list in the hand (the first ranged one with rounds when no record is given), out or away, what the rules say of it, what an actor carries, god mode |
+| `r.fire(label[, target])`, `r.shoot{ shots, interval, target, shotName }`, `r.aimAt(object, label[, up])`, `r.use(on)` | the player shoots (at what the camera ray hits, or at `target`), turns the camera at an object |
+| `r.move{ forward, side, run, sneak, seconds }`, `r.crouch(on)`, `r.mode(label)`, `r.status(label)`, `r.hp()` | walk, run or sneak for some seconds, crouch, the stance and the sneak meter's word, the player's health |
+| `r.fight(actor, target[, label])`, `r.peace(actor)`, `r.state(label, actor)`, `r.track({{label, actor}...}, every)`, `r.untrack()` | start or end a fight of the engine (the player is `0x14`, as in the games), say what an actor is doing, sample the animation groups that play on actors now and then |
+| `r.vatsInfo(label[, actor])`, `r.vats([button])`, `r.messages(label)` | V.A.T.S.: its state, whether an actor can be a target and whether the ray to its head is clear (`clear` in the answer), open it or press its pad buttons, the notices the HUD gave |
+
+`scenarios/m14_fight.lua` (`rounds/m14-fight.json`) is the survey of moving and fighting in New Vegas (first and third person, a fight with two
+armed Powder Gangers, V.A.T.S., sneaking up on one), `scenarios/m14_arms.lua` (`rounds/m14-arms.json`, and `m14-arms-tune.json` with
+`OPENFALLOUT_FIRSTPERSON_ARMS` variants) the pictures of the player's arms in the first person.
 
 `scenarios/smoke.lua` is the smallest scenario; `scenarios/m13_mountains.lua` with `rounds/m13-mountains.json` is the check of the
 distant land of New Vegas in seven variants of `game lod debug`. Its places are in the Mojave and the save can be anywhere:

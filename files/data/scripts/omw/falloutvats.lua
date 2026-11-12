@@ -151,13 +151,25 @@ local function inView()
                 local direction = (head - from):normalize()
                 local cosine = direction:dot(forward)
                 if cosine >= viewCosine then
-                    local ray = nearby.castRay(from, head, { ignore = self, collisionType = nearby.COLLISION_TYPE.Default })
-                    if ray.hitObject == nil or ray.hitObject == actor then
+                    -- The character is in sight when any part of it is: the head, else the chest, else the legs (a low
+                    -- wall or a crate in front of the head does not hide the rest of the body)
+                    local blocked
+                    local seen = false
+                    for _, height in ipairs({ headHeight, headHeight * 0.65, headHeight * 0.3 }) do
+                        local point = actor.position + v3(0, 0, height)
+                        local ray = nearby.castRay(from, point, { ignore = self, collisionType = nearby.COLLISION_TYPE.Default })
+                        if ray.hitObject == nil or ray.hitObject == actor then
+                            seen = true
+                            break
+                        end
+                        blocked = blocked or { object = ray.hitObject, position = ray.hitPos, point = point }
+                    end
+                    if seen then
                         found[#found + 1] = { actor = actor, cosine = cosine }
                     elseif #why < 8 then
                         why[#why + 1] = string.format('%s %.0f units: something is in the way (%s at %.0f,%.0f,%.0f; the head is at %.0f,%.0f,%.0f)',
-                            tostring(actor.recordId), distance, tostring(ray.hitObject.recordId or ray.hitObject),
-                            ray.hitPos.x, ray.hitPos.y, ray.hitPos.z, head.x, head.y, head.z)
+                            tostring(actor.recordId), distance, tostring(blocked.object.recordId or blocked.object),
+                            blocked.position.x, blocked.position.y, blocked.position.z, head.x, head.y, head.z)
                     end
                 elseif #why < 8 and distance < 3000 then
                     why[#why + 1] = string.format('%s %.0f units: outside the view (cosine %.2f, needs %.2f)',

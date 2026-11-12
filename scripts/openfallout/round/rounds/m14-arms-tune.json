@@ -1,0 +1,17 @@
+{
+  "name": "m14-arms-tune",
+  "game": "nv",
+  "save": "latest",
+  "scenario": "../scenarios/m14_arms.lua",
+  "resolution": [1280, 720],
+  "framerate": 30,
+  "limit": 300,
+  "variants": [
+    { "name": "back-20", "env": { "OPENFALLOUT_FIRSTPERSON_ARMS": "0 -20 0 0 0 0" } },
+    { "name": "down-15", "env": { "OPENFALLOUT_FIRSTPERSON_ARMS": "0 0 -15 0 0 0" } },
+    { "name": "yaw-90", "env": { "OPENFALLOUT_FIRSTPERSON_ARMS": "0 0 0 -90 0 0" } },
+    { "name": "yaw+90", "env": { "OPENFALLOUT_FIRSTPERSON_ARMS": "0 0 0 90 0 0" } },
+    { "name": "pitch-90", "env": { "OPENFALLOUT_FIRSTPERSON_ARMS": "0 0 0 0 -90 0" } },
+    { "name": "pitch+90", "env": { "OPENFALLOUT_FIRSTPERSON_ARMS": "0 0 0 0 90 0" } }
+  ]
+}

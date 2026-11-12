@@ -11,6 +11,7 @@
 local core = require('openfallout.core')
 local util = require('openfallout.util')
 local world = require('openfallout.world')
+local types = require('openfallout.types')
 
 local function log(...) print('ROUND', ...) end
 
@@ -230,6 +231,149 @@ function r.speed(scale)
     local ok, err = pcall(function() world.setSimulationTimeScale(scale) end)
     return outcome('speed', ok, err, string.format('%.2f', scale))
 end
+
+-- ---- M14 additions: characters, weapons, the fight -------------------------------------------------------------------------
+-- Records are given as "FormId:0x..." (core.getFormId) or { file, id }; objects are the ones these steps return.
+
+local function recordOf(record)
+    if type(record) == 'table' then return core.getFormId(record[1], record[2]) end
+    return record
+end
+
+local function form(object)
+    if object == nil then return '' end
+    local id = tostring(object.id)
+    -- a placed reference's id is "0x..." and the combat calls want it as core.getFormId writes it
+    if id:sub(1, 2) == '0x' then id = 'FormId:' .. id end
+    -- the player's own reference has no form id of the content; the games call it 0x14
+    if object == player() then id = 'FormId:0x14' end
+    return id
+end
+
+-- Makes a character (or any object) of the given record and puts it in the world: `pos` is a position, or `dist` and `yaw` put it
+-- that far from the player along the direction `yaw` (radians, 0 north, as the Lua API turns things); the cell is the player's.
+-- Gives the object (or nil), logs the record, the form id and the place.
+function r.spawn(o)
+    local label = o.label or '-'
+    local object
+    local ok, err = pcall(function()
+        local p = player()
+        local pos = o.pos and util.vector3(o.pos[1], o.pos[2], o.pos[3] or p.position.z)
+            or (p.position + util.vector3(math.sin(o.bearing or 0), math.cos(o.bearing or 0), 0) * (o.dist or 1000))
+        object = world.createObject(recordOf(o.record), o.count)
+        local options = {}
+        if o.yaw then options.rotation = util.transform.rotateZ(o.yaw) end
+        object:teleport(p.cell, pos, options)
+    end)
+    if ok then log('spawn', label, 'ok', 'id=' .. tostring(object.id), describe(object)) else log('error', 'spawn', label, tostring(err)) end
+    return ok and object or nil
+end
+
+-- Puts an object (a character that stands in the world already, or one that r.spawn made) at `dist` units from the player along
+-- the direction `bearing` (radians, 0 north), in the player's cell; `yaw` turns it (default: facing the player)
+function r.place(object, o)
+    local ok, err = pcall(function()
+        local p = player()
+        local pos = o.pos and util.vector3(o.pos[1], o.pos[2], o.pos[3] or p.position.z)
+            or (p.position + util.vector3(math.sin(o.bearing or 0), math.cos(o.bearing or 0), 0) * (o.dist or 1000))
+        local yaw = o.yaw
+        if yaw == nil then
+            local d = p.position - pos
+            yaw = math.atan2(d.x, d.y)
+        end
+        object:teleport(p.cell, pos, { rotation = util.transform.rotateZ(yaw), onGround = true })
+    end)
+    return outcome('place', ok, err, tostring(o.label or '-'), o.dist and string.format('dist=%.0f bearing=%.2f', o.dist, o.bearing or 0) or '-')
+end
+
+-- Puts an object (a character from some other place of the world, say) at a position `pos` = { x, y, z } of the same worldspace as
+-- the player's, whatever cell that is; `yaw` turns it (0 faces north)
+function r.putAt(object, o)
+    local ok, err = pcall(function()
+        local p = player()
+        local cell = world.getExteriorCell(math.floor(o.pos[1] / 4096), math.floor(o.pos[2] / 4096), p.cell)
+        object:teleport(cell, util.vector3(o.pos[1], o.pos[2], o.pos[3] or p.position.z),
+            { rotation = util.transform.rotateZ(o.yaw or 0), onGround = true })
+    end)
+    return outcome('putAt', ok, err, tostring(o.label or '-'), string.format('pos=%.0f,%.0f', o.pos[1], o.pos[2]))
+end
+
+-- Puts `count` items of a record into the inventory of an actor (the player by default)
+function r.give(record, count, actor, label)
+    local ok, err = pcall(function()
+        world.createObject(recordOf(record), count or 1):moveInto(types.Actor.inventory(actor or player()))
+    end)
+    return outcome('give', ok, err, tostring(label or record), tostring(count or 1))
+end
+
+-- The player's weapon, ammunition and what is in the hand; `weapon{label}` logs it, `equip(record)` puts a weapon of the inventory in the hand
+function r.weapon(label) return ask('weapon', { label = label }) end
+-- `equip(record)`: the weapon with that record in the hand; without one, the first ranged weapon that has rounds (`pick`: the nth)
+function r.equip(record, pick) return ask('equip', { form = record and recordOf(record) or nil, pick = pick }) end
+-- What an actor carries as the Pip-Boy lists it (the player when `actor` is left out): one line for each weapon and ammunition
+function r.inventory(label, actor) return ask('inventory', { label = label, holder = actor and form(actor) or nil }) end
+function r.god(on) return ask('god', { on = on }) end
+function r.drawn(on) return ask('drawn', { on = on }) end
+function r.fire(label, target) return ask('fire', { label = label, target = target }) end
+function r.aimAt(target, label, up) return ask('aimAt', { target = target, label = label, up = up }) end
+function r.move(o) return ask('move', o) end
+function r.crouch(on) return ask('crouch', { on = on }) end
+function r.use(on) return ask('use', { on = on }) end
+function r.status(label) return ask('status', { label = label }) end
+function r.mode(label) return ask('mode', { label = label }) end
+function r.actorState(label, actor) return ask('actorState', { label = label, actor = actor }) end
+function r.vatsInfo(label, actor) return ask('vatsInfo', { label = label, actor = actor }) end
+function r.messages(label) return ask('messages', { label = label }) end
+-- The player's health as the player script reads it (nil when the stats are not there)
+function r.hp() local reply = ask('status', { label = 'hp' }) return reply and reply.hp end
+function r.vats(button) return ask('vats', { button = button }) end
+-- Animation sampling: `list` is { { label = 'player', actor = obj }, ... }; one `ROUND sample` line each `every` seconds
+function r.track(list, every) return ask('track', { list = list, every = every }) end
+function r.untrack() return ask('untrack', {}) end
+
+-- The fight of the engine (core.combat): the actor fights the target (objects)
+function r.fight(actor, target, label)
+    local ok, err = pcall(function() core.combat.start(form(actor), form(target)) end)
+    local state = ''
+    if ok then
+        local good, text = pcall(function()
+            return string.format('inCombat=%s target=%s', tostring(core.combat.inCombat(form(actor))), core.combat.target(form(actor)))
+        end)
+        state = good and text or tostring(text)
+    end
+    return outcome('fight', ok, err, tostring(label or '-'), state)
+end
+
+function r.peace(actor, label)
+    local ok, err = pcall(function() core.combat.stop(form(actor)) end)
+    return outcome('peace', ok, err, tostring(label or '-'))
+end
+
+-- The fight state of an actor, once, in a line: the engine's own words for whom it fights, whether it is dead, its health
+function r.state(label, actor) return ask('actorState', { label = label, actor = actor }) end
+
+-- Time spent on the shots of the player: `shots` shots, one each `interval` seconds, each at what the camera ray hits (or `target`),
+-- a picture each `shotEvery` shots when `shotName` is given; stops at once when the target is dead. Gives how many were fired.
+function r.shoot(o)
+    local fired = 0
+    for i = 1, o.shots or 1 do
+        local row = r.fire(o.label or 'shot', o.target)
+        if row and row.fired then fired = fired + 1 end
+        if o.shotName and (i % (o.shotEvery or 1) == 0) then r.shot(o.shotName .. i, false) end
+        if o.target then
+            local good, dead = pcall(core.combat.isDead, form(o.target))
+            if good and dead then break end
+        end
+        r.wait(o.interval or 1)
+    end
+    log('shoot', tostring(o.label or '-'), 'fired=' .. fired)
+    return fired
+end
+
+function r.inspect(label, actor) return r.inventory(label, actor) end
+
+r.form = form
+r.types = types
 
 r.world = world
 r.core = core

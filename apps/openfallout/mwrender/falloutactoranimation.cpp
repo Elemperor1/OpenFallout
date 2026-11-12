@@ -280,6 +280,55 @@ namespace OFRender
         runAnimation(duration);
         watchPose(duration);
         logPose(duration);
+        logWeapon(duration);
+    }
+
+    void FalloutActorAnimation::logWeapon(float duration)
+    {
+        if (!mDrawn || mWeaponLooks >= 2)
+            return;
+        mWeaponTime += duration;
+        if (mWeaponTime < (mWeaponLooks == 0 ? 1.f : 5.f))
+            return;
+        ++mWeaponLooks;
+        sayWeapon(mWeaponLooks == 1 ? "a second after it was taken out" : "five seconds after it was taken out");
+    }
+
+    void FalloutActorAnimation::sayWeapon(const char* when)
+    {
+        // Only for the first few weapons of a run: the lines are for reading what the hand holds and where it points
+        static std::atomic<int> sSaid{ 0 };
+        if (!mDrawn || mObjectRoot == nullptr || sSaid.fetch_add(1) >= 24)
+            return;
+        std::ostringstream out;
+        out << std::fixed << std::setprecision(1);
+        out << "Weapon of " << mPtr.getCellRef().getRefId() << ", " << when << ": ";
+        if (mWeaponNode == nullptr || mWeaponParent == nullptr)
+        {
+            out << "none on the hand (type " << mWeaponType << ")";
+            Log(Debug::Info) << out.str();
+            return;
+        }
+        out << "on " << mWeaponParent->getName() << ", parents " << mWeaponNode->getNumParents() << ", node mask "
+            << mWeaponNode->getNodeMask() << ", gait " << static_cast<int>(mGait) << ", aim group "
+            << (mAimGroup.empty() ? "none" : mAimGroup) << (!mAimGroup.empty() && isPlaying(mAimGroup) ? " (plays)" : " (not playing)");
+        const osg::NodePathList paths = mWeaponNode->getParentalNodePaths(mObjectRoot.get());
+        if (!paths.empty())
+        {
+            // The weapon's own axes in the frame of the character (it faces +Y, up is +Z): an end of the barrel is
+            // along one of them
+            const osg::Matrix toCharacter = osg::computeLocalToWorld(paths.front());
+            const osg::Vec3d x = osg::Matrix::transform3x3(osg::Vec3d(1, 0, 0), toCharacter);
+            const osg::Vec3d y = osg::Matrix::transform3x3(osg::Vec3d(0, 1, 0), toCharacter);
+            const osg::Vec3d z = osg::Matrix::transform3x3(osg::Vec3d(0, 0, 1), toCharacter);
+            const osg::Vec3d at = toCharacter.getTrans();
+            out << "; at (" << at.x() << ", " << at.y() << ", " << at.z() << ") in the character, its axes X ("
+                << x.x() << ", " << x.y() << ", " << x.z() << "), Y (" << y.x() << ", " << y.y() << ", " << y.z()
+                << "), Z (" << z.x() << ", " << z.y() << ", " << z.z() << ")";
+        }
+        const osg::BoundingSphere bound = mWeaponNode->getBound();
+        out << "; bound radius " << bound.radius();
+        Log(Debug::Info) << out.str();
     }
 
     void FalloutActorAnimation::logPose(float duration)
@@ -523,6 +572,9 @@ namespace OFRender
             play(group, OFRender::AnimPriority(OFMechanics::Priority_Movement), OFRender::BlendMask_All, false, 1.f,
                 "start", "stop", 0.f, ~0u, false);
         mGait = gait;
+        // A weapon that was in sight and is not when the gait changes is what round 14E saw
+        if (mDrawn && mWeaponLooks >= 1)
+            sayWeapon("the gait changed");
     }
 
     osg::ref_ptr<osg::Node> FalloutActorAnimation::insertPart(std::string_view model, bool forHead)
@@ -660,6 +712,8 @@ namespace OFRender
         holsterWeapon();
         mWeaponType = animationType;
         mDrawn = true;
+        mWeaponTime = 0.f;
+        mWeaponLooks = 0;
 
         if (!model.empty())
         {

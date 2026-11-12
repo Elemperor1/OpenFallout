@@ -1,0 +1,10 @@
+{
+  "name": "m14-fight",
+  "game": "nv",
+  "save": "latest",
+  "scenario": "../scenarios/m14_fight.lua",
+  "resolution": [1280, 720],
+  "framerate": 30,
+  "limit": 900,
+  "variants": [ { "name": "plain" } ]
+}

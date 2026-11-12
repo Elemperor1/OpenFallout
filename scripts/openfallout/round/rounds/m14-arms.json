@@ -1,0 +1,10 @@
+{
+  "name": "m14-arms",
+  "game": "nv",
+  "save": "latest",
+  "scenario": "../scenarios/m14_arms.lua",
+  "resolution": [1280, 720],
+  "framerate": 30,
+  "limit": 300,
+  "variants": [ { "name": "plain" } ]
+}

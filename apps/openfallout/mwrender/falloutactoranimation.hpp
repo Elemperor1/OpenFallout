@@ -108,6 +108,13 @@ namespace OFRender
         /// Says in the log where the bones of the actor stand a second into its idle (the first few actors only)
         void logPose(float duration);
 
+        /// Says in the log, a second and five seconds after a weapon was taken out, whether it is still on the hand and
+        /// which way it points (the first few weapons only): round 14E found the pistol of the player in its hand
+        /// pointing across the body at rest, and gone while it walked
+        void logWeapon(float duration);
+        /// The same, at once, when the gait of an actor with a weapon out changes
+        void sayWeapon(const char* when);
+
         /// The gait that the speed at which the actor was moved calls for
         void updateGait(float duration);
         void setGait(FalloutGait gait);
@@ -144,6 +151,9 @@ namespace OFRender
         /// How long the idle has played, and whether the bones were said
         float mPoseTime = 0.f;
         bool mPoseLogged = false;
+        /// Seconds since the weapon was taken out, and how many of its two looks were made
+        float mWeaponTime = 0.f;
+        int mWeaponLooks = 0;
 
         OFWorld::Ptr mMotionSource;
         std::string mWalkGroup;
