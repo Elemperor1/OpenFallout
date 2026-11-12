@@ -128,4 +128,31 @@ of the two ways a number was taken with.
 
 ## Baseline
 
-BASELINE-PLACEHOLDER
+First baseline, 2026-11-12, taken when this page was written.
+
+- Engine: Release build of the `mac-first` integration branch at `1458af4f6b` (the commit of the page, `706738d83e`, adds
+  only this page and the script), Homebrew libraries (OSG, SDL2, LuaJIT, FFmpeg), Bullet, MyGUI and RecastNavigation built
+  from source, with the local Apple-bundling switch of the development builds (no app package), so started directly: Game
+  Mode off.
+- Machine: Apple M3 Pro (12 cores), 18 GiB memory, macOS 27.2.1 (26B131), running on battery (checked after the runs;
+  a later baseline should say whether it was on mains power, and compare like with like).
+- Method: `mac_measure.py run all --repeat 3` (windowed 1280x720, in the background, no vsync, no frame-rate limit, game
+  masters only); the numbers are the medians of the three runs of each scene (`compare` gives the same table).
+- Conditions: the runs started after no compiler had run for a minute, but the computer was in use (load averages
+  between 4.7 and 19 at the starts and ends of the runs, other agents' work and the owner's own) and a compiler was
+  running at the start or end of 2 of the 18 runs (`nv-interior` 1, `nv-exterior` 1). The spread between the three runs
+  of a scene (largest over smallest) was 2-38 % for the standing median frame time (the interiors, at 3-4 ms, spread
+  most), 11-59 % for the turning median, 7-47 % for cell-load time and at most 3 % for peak memory: a difference between
+  two baselines smaller than the spread of that scene is noise.
+
+| scene | stand p50 / p95 ms | turn p50 / p95 / p99 ms | cell load s (min-max) | footprint MiB | peak MiB |
+|---|---:|---:|---:|---:|---:|
+| `nv-interior` | 3.3 / 8.3 | 2.6 / 5.9 / 8.4 | 0.72 (0.71-0.80) | 1490 | 1493 |
+| `nv-exterior` | 8.9 / 13.6 | 12.2 / 18.9 / 25.3 | 2.66 (2.54-3.10) | 2019 | 2099 |
+| `nv-busy` | 12.1 / 16.8 | 10.5 / 15.1 / 21.5 | 2.54 (2.45-2.62) | 1997 | 2106 |
+| `fo3-interior` | 4.1 / 8.1 | 12.5 / 17.1 / 19.8 | 1.13 (1.08-1.16) | 1822 | 1906 |
+| `fo3-exterior` | 8.3 / 12.6 | 8.1 / 10.3 / 15.9 | 2.59 (2.16-2.81) | 2063 | 2091 |
+| `fo3-busy` | 8.3 / 12 | 4.3 / 7 / 8.8 | 2.99 (2.60-3.82) | 1819 | 1878 |
+
+The interiors draw in 3-4 ms when standing; `fo3-interior` costs about three times as much while
+turning as while standing (why was not looked into). The busy New Vegas exterior is the slowest scene standing (12 ms, about 80 frames a second).
