@@ -318,6 +318,13 @@ return { limit = 900, delay = 4, run = function(r)
     r.status('E standing at 3 m')
     r.actorState('E e1 standing', e1)
     r.shot('E_standing_3m', false)
+    -- the stealth lines come every three seconds: the player that stands (not hidden by sneaking) is looked at twice, and the character
+    -- that sees it goes for it (round 14F: crouched with a high Sneak the player was never seen, standing nothing was said)
+    r.wait(4)
+    r.actorState('E e1 standing, later', e1)
+    r.shot('E_standing_3m_later', false)
+    r.wait(4)
+    r.actorState('E e1 standing, much later', e1)
     end
     if RUN.D then
     ---------------------------------------------------------------- D: V.A.T.S.

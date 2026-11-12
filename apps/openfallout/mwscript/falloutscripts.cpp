@@ -6,7 +6,9 @@
 #include <cstdlib>
 #include <limits>
 #include <optional>
+#include <map>
 #include <set>
+#include <sstream>
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm/refid.hpp>
@@ -3385,12 +3387,28 @@ namespace OFScript
         }
         if (!FalloutScript::FightAI::attacksOnSight(traits.mAggression, standing))
         {
-            // Said once for each character (round 14A: armed characters near the player that never went for it)
-            static std::set<FalloutScript::FormId> told;
-            if (told.insert(self).second)
-                Log(Debug::Info) << FalloutScript::hex(self) << " does not attack the player on sight: aggression "
-                                 << static_cast<int>(traits.mAggression) << ", standing "
-                                 << (standing == Standing::Enemy ? "enemy" : standing == Standing::Ally ? "ally" : "neutral");
+            // Said once for each character and again when what it rests on changes (round 14F: the Powder Gangers were
+            // made enemies of the player and the line was not said again, so it could not tell whether that took)
+            static std::map<FalloutScript::FormId, std::string> told;
+            std::ostringstream reason;
+            reason << "aggression " << static_cast<int>(traits.mAggression) << ", standing "
+                   << (standing == Standing::Enemy ? "enemy" : standing == Standing::Ally ? "ally" : "neutral");
+            const auto factionsOf = [this](FalloutScript::FormId who) {
+                std::ostringstream text;
+                std::vector<std::pair<FalloutScript::FormId, int>> list;
+                if (!mActors.factions(who, list))
+                    return std::string("none known");
+                for (const auto& [faction, rank] : list)
+                    text << FalloutScript::hex(faction) << ' ';
+                return text.str();
+            };
+            reason << "; its factions " << factionsOf(self) << "; the player's " << factionsOf(mPlayer);
+            std::string& last = told[self];
+            if (last != reason.str())
+            {
+                last = reason.str();
+                Log(Debug::Info) << FalloutScript::hex(self) << " does not attack the player on sight: " << last;
+            }
             return false;
         }
         radius = traits.mRadius;
