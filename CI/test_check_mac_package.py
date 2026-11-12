@@ -39,6 +39,12 @@ def write_plist(app, **keys):
         plistlib.dump(keys, file)
 
 
+# stand-ins for the two LuaJIT builds: the hardened-runtime one (LUAJIT_ENABLE_OSX_HRT) switches write protection of
+# MAP_JIT memory per thread, the default one flips page protection with mprotect
+LUAJIT_HRT = ("#include <pthread.h>\nint luaL_newstate(void) { pthread_jit_write_protect_np(1); return 0; }\n")
+LUAJIT_MPROTECT = ("#include <sys/mman.h>\nint luaL_newstate(void) { return mprotect(0, 0, PROT_READ); }\n")
+
+
 def sign(path, *options):
     subprocess.run(["codesign", "--force", "--sign", "-", *options, str(path)], check=True, capture_output=True)
 
@@ -46,19 +52,27 @@ def sign(path, *options):
 class StandIn:
     """OpenFallout.app as the packaging block lays it out, with tiny programs in place of the real ones."""
 
-    def __init__(self, root, system_openal=False, sign_engine=True, game_keys=None, engine_keys=None, hardened=None):
-        """hardened: None signs plain ad hoc; a dict of entitlements signs the engine with the hardened runtime."""
+    def __init__(self, root, system_openal=False, sign_engine=True, game_keys=None, engine_keys=None, hardened=None,
+                 luajit=LUAJIT_HRT):
+        """hardened: None signs plain ad hoc; a dict of entitlements signs the engine with the hardened runtime.
+        luajit: the source of the bundled LuaJIT stand-in (LUAJIT_HRT or LUAJIT_MPROTECT)."""
         self.app = root / "OpenFallout.app"
         contents = self.app / "Contents"
         frameworks = contents / "Frameworks"
         openal = frameworks / "libopenal.1.25.0.dylib"
         compile_c(openal, "int alGetError(void) { return 0; }\n", "-dynamiclib",
                   "-install_name", "@executable_path/../Frameworks/libopenal.1.25.0.dylib")
+        lua = frameworks / "libluajit-5.1.2.1.1767980792.dylib"
+        compile_c(lua, luajit, "-dynamiclib", "-mmacosx-version-min=14.0",
+                  "-install_name", "@rpath/libluajit-5.1.2.1.1767980792.dylib")
         engine = contents / "MacOS/openfallout"
+        uses_lua = ["-Wl,-rpath,@executable_path/../Frameworks", str(lua)]
         if system_openal:
-            compile_c(engine, "int main(void) { return 0; }\n", "-framework", "OpenAL")
+            compile_c(engine, "int luaL_newstate(void);\nint main(void) { return luaL_newstate(); }\n",
+                      "-framework", "OpenAL", *uses_lua)
         else:
-            compile_c(engine, "int alGetError(void);\nint main(void) { return alGetError(); }\n", str(openal))
+            compile_c(engine, "int alGetError(void);\nint luaL_newstate(void);\n"
+                      "int main(void) { return alGetError() + luaL_newstate(); }\n", str(openal), *uses_lua)
         compile_c(contents / "MacOS/openfallout-launcher", "int main(void) { return 0; }\n")
         nested = contents / "Helpers/OpenFallout Engine.app"
         compile_c(nested / "Contents/MacOS/OpenFallout Engine", "int main(void) { return 0; }\n")
@@ -68,7 +82,7 @@ class StandIn:
                     CFBundleIdentifier="org.openfallout.openfallout.engine", CFBundlePackageType="APPL",
                     **(GAME_KEYS if engine_keys is None else engine_keys))
         # inside out, as SignMacApplications does
-        for item in (openal, contents / "MacOS/openfallout-launcher"):
+        for item in (openal, lua, contents / "MacOS/openfallout-launcher"):
             sign(item)
         if hardened is None:
             sign(engine)
@@ -154,7 +168,8 @@ class PackageCheckTests(unittest.TestCase):
         self.assertIn("FAIL smoke: not started", output)
 
     def test_hardened_engine_with_library_validation_disabled_passes_the_static_step(self):
-        app = StandIn(self.root, hardened={"com.apple.security.cs.disable-library-validation": True}).app
+        app = StandIn(self.root, hardened={"com.apple.security.cs.disable-library-validation": True,
+                                           "com.apple.security.cs.allow-jit": True}).app
         status, output = run_check(app, "--smoke", "skip")
         self.assertEqual(status, 0, output)
         self.assertIn("PASS library-validation: hardened runtime, library validation disabled by entitlement", output)
@@ -163,6 +178,55 @@ class PackageCheckTests(unittest.TestCase):
         app = StandIn(self.root).app
         _, output = run_check(app, "--smoke", "skip")
         self.assertIn("PASS library-validation: no hardened runtime", output)
+
+    def test_plain_ad_hoc_engine_expects_the_compiler_on(self):
+        app = StandIn(self.root).app
+        status, output = run_check(app, "--smoke", "skip")
+        self.assertEqual(status, 0, output)
+        self.assertIn("PASS luajit: Contents/Frameworks/libluajit-5.1.2.1.1767980792.dylib is a hardened-runtime build "
+                      "(MAP_JIT); no hardened runtime, so the compiler is expected on", output)
+
+    def hardened(self, luajit, *keys):
+        granted = {"com.apple.security.cs.disable-library-validation": True}
+        granted.update({f"com.apple.security.cs.{key}": True for key in keys})
+        return StandIn(self.root, hardened=granted, luajit=luajit).app
+
+    def test_default_luajit_under_allow_jit_would_crash_and_is_not_started(self):
+        app = self.hardened(LUAJIT_MPROTECT, "allow-jit")
+        # no real `open` may run if the step lets the smoke through: a stub that fails stands in for it
+        stub = self.root / "bin/open"
+        stub.parent.mkdir()
+        stub.write_text("#!/bin/sh\nexit 1\n")
+        stub.chmod(0o755)
+        with unittest.mock.patch.dict(os.environ, {"PATH": f"{stub.parent}{os.pathsep}{os.environ['PATH']}"}):
+            status, output = run_check(app, "--smoke", "run", "--work", self.root / "work")
+        self.assertEqual(status, 1, output)
+        self.assertIn("FAIL luajit: Contents/Frameworks/libluajit-5.1.2.1.1767980792.dylib is a default build (mprotect, "
+                      "no LUAJIT_ENABLE_OSX_HRT); under the hardened runtime without allow-unsigned-executable-memory "
+                      "the engine is killed at its first compiled trace (Code Signature Invalid)", output)
+        self.assertIn("FAIL smoke: not started, see the luajit step", output)
+        self.assertFalse((self.root / "work").exists())
+
+    def test_hrt_luajit_with_allow_jit_expects_the_compiler_on(self):
+        status, output = run_check(self.hardened(LUAJIT_HRT, "allow-jit"), "--smoke", "skip")
+        self.assertEqual(status, 0, output)
+        self.assertIn("is a hardened-runtime build (MAP_JIT); hardened runtime with allow-jit, so the compiler is "
+                      "expected on", output)
+
+    def test_hrt_luajit_without_allow_jit_means_compiler_off(self):
+        app = self.hardened(LUAJIT_HRT)
+        status, output = run_check(app, "--smoke", "skip")
+        self.assertEqual(status, 1, output)
+        self.assertIn("hardened runtime without allow-jit (MAP_JIT memory is refused), so the compiler will be off, "
+                      "not on as expected", output)
+        status, output = run_check(app, "--smoke", "skip", "--expect-jit", "off")
+        self.assertEqual(status, 0, output)
+
+    def test_default_luajit_with_unsigned_executable_memory_expects_on(self):
+        status, output = run_check(self.hardened(LUAJIT_MPROTECT, "allow-unsigned-executable-memory"), "--smoke", "skip")
+        self.assertEqual(status, 0, output)
+        self.assertIn("is a default build (mprotect, no LUAJIT_ENABLE_OSX_HRT); hardened runtime with "
+                      "allow-unsigned-executable-memory, so the compiler is expected on", output)
 
     def test_missing_engine_app_fails_layout(self):
         app = StandIn(self.root).app

@@ -13,6 +13,10 @@
 #                                  reports the problem without starting the app.
 #   OPENFALLOUT_CODESIGN_TEAM_ID   Team identifier. When set, each signed bundle must verify against a Developer ID
 #                                  requirement for that team.
+#   OPENFALLOUT_CODESIGN_LOCAL_TEST  LOCAL TEST ONLY, accepted only with identity "-": adds
+#                                  files/mac/local-hardened-test.entitlements (library validation off) to each app's
+#                                  entitlements, so that a hardened ad hoc package starts on a Mac without a
+#                                  certificate. The JIT rules of the hardened runtime are the same; never ship it.
 # Neither value is printed.
 #
 # Entitlements: CPACK_OPENFALLOUT_ENTITLEMENTS holds one entitlements file per entry of CPACK_OPENFALLOUT_APPLICATIONS
@@ -77,6 +81,25 @@ if (APPLE)
         set(${result_var} "${sorted}" PARENT_SCOPE)
     endfunction()
 
+    set(LOCAL_TEST "$ENV{OPENFALLOUT_CODESIGN_LOCAL_TEST}")
+    if (LOCAL_TEST AND NOT SIGNING_IDENTITY STREQUAL "-")
+        message(FATAL_ERROR "OPENFALLOUT_CODESIGN_LOCAL_TEST turns library validation off and is for hardened ad hoc "
+                            "test packages only (OPENFALLOUT_CODESIGN_IDENTITY=-); it is refused with any other identity")
+    endif()
+
+    # The app's entitlements plus the local-test overlay, written next to the staged apps (never into the source tree).
+    function(openfallout_local_test_entitlements app_name release_file result_var)
+        file(READ "${release_file}" release)
+        file(READ "${CMAKE_CURRENT_LIST_DIR}/../files/mac/local-hardened-test.entitlements" overlay)
+        string(REGEX MATCH "<dict>(.*)</dict>" overlay_dict "${overlay}")
+        string(FIND "${release}" "</dict>" dict_end REVERSE)
+        string(SUBSTRING "${release}" 0 ${dict_end} head)
+        string(SUBSTRING "${release}" ${dict_end} -1 tail)
+        set(merged "${CPACK_TEMPORARY_INSTALL_DIRECTORY}/${app_name}.local-test.entitlements")
+        file(WRITE "${merged}" "${head}${CMAKE_MATCH_1}${tail}")
+        set(${result_var} "${merged}" PARENT_SCOPE)
+    endfunction()
+
     list(LENGTH CPACK_OPENFALLOUT_APPLICATIONS APPLICATION_COUNT)
     list(LENGTH CPACK_OPENFALLOUT_ENTITLEMENTS ENTITLEMENTS_COUNT)
     if (NOT SIGNING_IDENTITY STREQUAL "" AND NOT APPLICATION_COUNT EQUAL ENTITLEMENTS_COUNT)
@@ -102,6 +125,10 @@ if (APPLE)
         list(GET CPACK_OPENFALLOUT_ENTITLEMENTS ${APP_INDEX} APP_ENTITLEMENTS)
         if (NOT EXISTS "${APP_ENTITLEMENTS}")
             message(FATAL_ERROR "Entitlements file for ${app_name} not found: ${APP_ENTITLEMENTS}")
+        endif()
+        if (LOCAL_TEST)
+            message(STATUS "LOCAL TEST signature for ${app_name}: hardened ad hoc with library validation off")
+            openfallout_local_test_entitlements("${app_name}" "${APP_ENTITLEMENTS}" APP_ENTITLEMENTS)
         endif()
 
         openfallout_nested_code("${FULL_APP_PATH}" NESTED_CODE)

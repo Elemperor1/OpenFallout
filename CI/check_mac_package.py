@@ -15,6 +15,12 @@ PATH is OpenFallout-*.dmg or OpenFallout.app. The steps run in this order and ea
   library-validation  when the engine has the hardened runtime, every Mach-O file in the app has its Team ID (or
                the engine's entitlements turn library validation off); otherwise the loader would refuse the bundled
                libraries and the game would crash at start, so the smoke step is not started
+  luajit       from the bundled LuaJIT build (hardened-runtime build with MAP_JIT, or the default mprotect one) and the
+               engine's signature and entitlements, the compiler state the signature allows: on, off (the hardened
+               runtime refuses MAP_JIT memory without allow-jit, LuaJIT then turns its compiler off), or a crash (an
+               mprotect build under the hardened runtime without allow-unsigned-executable-memory is killed at its
+               first compiled trace: "Code Signature Invalid"). It fails on a crash, and on "off" when --expect-jit is on;
+               the smoke step is then not started. See docs/openfallout/mac-luajit.md.
   smoke        the engine app is started through scripts/openfallout/mac_launch.py on the synthetic Fallout plugin, with
                a hidden window (--headless, SDL_MAC_BACKGROUND_APP=1) and its own --config/--user-data folders; it passes
                when the log shows the cell loaded, a Lua script ran, the LuaJIT compiler state that the engine logs is
@@ -201,6 +207,56 @@ def check_library_validation(app):
         raise StepFailed(f"{ENGINE} has Team ID {team} and library validation, but these are signed by another team "
                          f"or none: {', '.join(refused)}")
     return f"hardened runtime, every Mach-O file signed by team {team}"
+
+
+# ------------------------------------------------------------------------------------------------------------- luajit
+
+ALLOW_JIT = "com.apple.security.cs.allow-jit"
+ALLOW_UNSIGNED = "com.apple.security.cs.allow-unsigned-executable-memory"
+HRT_SYMBOL = "_pthread_jit_write_protect_np"
+
+
+def bundled_library(app, binary, pattern, what):
+    """The file inside the app that the binary loads for the first linked library matching pattern."""
+    libraries = linked_libraries(binary)
+    names = [name for name in libraries if re.search(pattern, name)]
+    if not names:
+        raise StepFailed(f"{relative(binary, app)} links no {what} (otool -L lists {', '.join(libraries)})")
+    contents = (app / "Contents").resolve()
+    for candidate in resolve(names[0], binary):
+        candidate = candidate.resolve()
+        if candidate.is_file() and contents in candidate.parents:
+            return candidate
+    raise StepFailed(f"{relative(binary, app)} links {names[0]}, which is not a file inside the bundle")
+
+
+def check_luajit(app, expect_jit):
+    engine = app / ENGINE
+    if not engine.is_file():
+        raise StepFailed(f"{ENGINE} is missing")
+    library = bundled_library(app, engine, r"libluajit[^/]*\.dylib$", "LuaJIT")
+    name = relative(library, app.resolve())
+    hrt = HRT_SYMBOL in run(["nm", "-u", library]).stdout.split()
+    build = "a hardened-runtime build (MAP_JIT)" if hrt else "a default build (mprotect, no LUAJIT_ENABLE_OSX_HRT)"
+    hardened, _ = signing_details(engine)
+    granted = entitlements(engine) if hardened else {}
+    if not hardened:
+        expected, why = "on", "no hardened runtime"
+    elif granted.get(ALLOW_UNSIGNED) is True:
+        expected, why = "on", "hardened runtime with allow-unsigned-executable-memory"
+    elif hrt and granted.get(ALLOW_JIT) is True:
+        expected, why = "on", "hardened runtime with allow-jit"
+    elif hrt:
+        expected, why = "off", "hardened runtime without allow-jit (MAP_JIT memory is refused)"
+    else:
+        raise StepFailed(f"{name} is {build}; under the hardened runtime without allow-unsigned-executable-memory the "
+                         f"engine is killed at its first compiled trace (Code Signature Invalid). Ship a "
+                         f"LUAJIT_ENABLE_OSX_HRT build with allow-jit (docs/openfallout/mac-luajit.md)")
+    # "on" only says that the signature allows the compiler; the engine may still run without it, which the smoke
+    # step sees. "off" is certain.
+    if expect_jit == "on" and expected == "off":
+        raise StepFailed(f"{name} is {build}; {why}, so the compiler will be {expected}, not {expect_jit} as expected")
+    return f"{name} is {build}; {why}, so the compiler is expected {expected}"
 
 
 # --------------------------------------------------------------------------------------------------------- info.plist
@@ -422,6 +478,8 @@ def check_app(app, options, dmg_ok=True):
     results.append(report("openal", check_openal, app))
     loadable = report("library-validation", check_library_validation, app)
     results.append(loadable)
+    jit_ok = report("luajit", check_luajit, app, options.expect_jit)
+    results.append(jit_ok)
     if options.smoke == "skip":
         results.append(skip("smoke", "--smoke skip"))
     elif not layout_ok:
@@ -430,6 +488,9 @@ def check_app(app, options, dmg_ok=True):
     elif not loadable:
         results.append(False)
         print("FAIL smoke: not started, the engine could not load its libraries (see library-validation)")
+    elif not jit_ok:
+        results.append(False)
+        print("FAIL smoke: not started, see the luajit step")
     else:
         results.append(report_smoke(app, options))
     return all(results)

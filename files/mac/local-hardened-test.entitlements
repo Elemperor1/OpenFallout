@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+    LOCAL TEST ONLY. Added on top of an app's entitlements when the package is signed hardened ad hoc
+    (OPENFALLOUT_CODESIGN_IDENTITY=- and OPENFALLOUT_CODESIGN_LOCAL_TEST=1), so that a hardened build can start on a
+    Mac without a signing certificate: an ad hoc signature has no Team ID, and library validation would refuse every
+    bundled library. The rules for JIT memory are the same with or without it. Never ship this key: the signer refuses
+    it with a real identity and CI/test_mac_bundles.py checks that the release entitlements do not carry it.
+-->
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>

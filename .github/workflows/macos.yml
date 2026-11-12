@@ -45,7 +45,7 @@ jobs:
         path: |
           /tmp/Qt
           /tmp/openmw-deps
-        key: macos-deps-${{ inputs.image }}-${{ runner.arch }}-${{ steps.deps-manifest.outputs.digest }}-${{ hashFiles('CI/macos/deps_versions.sh', 'CI/macos/fetch_deps_manifest.sh', 'CI/before_install.macos.sh') }}
+        key: macos-deps-${{ inputs.image }}-${{ runner.arch }}-${{ steps.deps-manifest.outputs.digest }}-${{ hashFiles('CI/macos/deps_versions.sh', 'CI/macos/fetch_deps_manifest.sh', 'CI/before_install.macos.sh', 'CI/macos/build_luajit_hrt.sh', 'CI/macos/luajit-osx-hrt-void-return.patch') }}
 
     - name: Install Building Dependencies
       if: steps.deps-cache.outputs.cache-hit != 'true'

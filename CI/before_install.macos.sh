@@ -23,4 +23,7 @@ echo "${HASH:?}  ${FILE:?}" | sha512sum
     mv $DEPS_DIR/openmw-deps-pre/*/ $DEPS_DIR/openmw-deps/ && \
     rmdir $DEPS_DIR/openmw-deps-pre
 
+# LuaJIT for the hardened runtime (allow-jit); see the script and docs/openfallout/mac-luajit.md
+./CI/macos/build_luajit_hrt.sh "$DEPS_DIR/openmw-deps"
+
 command -v cmake >/dev/null 2>&1 || brew install cmake
