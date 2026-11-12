@@ -2879,6 +2879,8 @@ namespace OFScript
             osg::Vec3f mPosition;
             float mRadius = 0.f;
             ESM::FormId mController;
+            /// The reference that is the marker (one that is disabled is not heard)
+            FalloutScript::FormId mReference = 0;
         };
         struct MusicPlayback
         {
@@ -2973,7 +2975,11 @@ namespace OFScript
             struct Line
             {
                 std::string mVoice;
+                std::string mText;
                 float mSeconds = 0.f;
+                /// The topic and the record of the speaker, for the stations that say their lines where they are
+                FalloutScript::FormId mTopic = 0;
+                FalloutScript::FormId mSpeakerBase = 0;
             };
             FalloutScript::FormId mStation = 0;
             std::vector<Line> mLines;
@@ -2987,6 +2993,8 @@ namespace OFScript
             FalloutScript::FormId mNextTopic = 0;
             /// The stations that are placed as things in a room (the reach is a cell) and say their lines from where they are
             std::map<FalloutScript::FormId, float> mRoomRest;
+            /// The topic that goes on from what a station in a room said (0: the next chain starts at RadioHello)
+            std::map<FalloutScript::FormId, FalloutScript::FormId> mRoomTopic;
             std::set<FalloutScript::FormId> mRoomInReach;
             float mGain = 0.f;
             bool mDialogueOnly = false;

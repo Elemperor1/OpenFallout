@@ -167,6 +167,14 @@ namespace OFScript
                 sound->fadeMusicTrack(mMusicPlayback.mScriptTrack, 0.f, 1.f, true);
             if (sound->isMusicPlaying())
                 sound->stopMusic();
+            // The music of the place is quiet while the track plays, now: the update of the music does not run while a menu
+            // is open (a script of a menu may call PlayMusic), so it is not left for it
+            if (mMusicPlayback.mTrack != 0)
+                sound->fadeMusicTrack(mMusicPlayback.mTrack, 0.f, 1.f, true);
+            mMusicPlayback.mTrack = 0;
+            mMusicPlayback.mMixer.stopAll(*sound, 1.f);
+            mMusicPlayback.mStemKey.clear();
+            mMusicPlayback.mStems.clear();
             mMusicPlayback.mScriptTrack = sound->startMusicTrack(
                 file, FalloutScript::Music::gainOfDb(music->mDb), 1.f, music->mLoop);
             logMusic("a script plays " + music->mEditorId + ": " + std::string(file.value())

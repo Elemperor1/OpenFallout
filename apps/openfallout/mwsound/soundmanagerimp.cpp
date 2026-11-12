@@ -365,14 +365,18 @@ namespace OFSound
         const VFS::Path::Normalized& file = record->mFiles.size() == 1
             ? record->mFiles.front()
             : record->mFiles[std::uniform_int_distribution<std::size_t>(0, record->mFiles.size() - 1)(mSoundRandom)];
-        const MusicTrackId id = startTrack(file, record->mData.staticGain(), fadeIn, true, Type::Sfx);
+        // The loop has the pitch of its record, and is heard through the effects of the environment unless the record
+        // ignores them
+        const float pitch = record->mData.pitch(std::uniform_real_distribution<float>(0.f, 1.f)(mSoundRandom));
+        const bool environment = (record->mData.mFlags & FalloutScript::SoundData::EnvironmentIgnored) == 0;
+        const MusicTrackId id = startTrack(file, record->mData.staticGain(), fadeIn, true, Type::Sfx, pitch, environment);
         if (id != 0)
             ++mFalloutPlayed[record->mEditorId];
         return id;
     }
 
-    SoundManager::MusicTrackId SoundManager::startTrack(
-        VFS::Path::NormalizedView filename, float gain, float fadeIn, bool loop, Type type)
+    SoundManager::MusicTrackId SoundManager::startTrack(VFS::Path::NormalizedView filename, float gain, float fadeIn,
+        bool loop, Type type, float pitch, bool environment)
     {
         if (!mOutput->isInitialized() || filename.value().empty())
             return 0;
@@ -393,7 +397,8 @@ namespace OFSound
         track->init([&] {
             SoundParams params;
             params.mBaseVolume = volumeFromType(type);
-            params.mFlags = PlayMode::NoEnvNoScaling | type | Play_2D;
+            params.mPitch = pitch;
+            params.mFlags = (environment ? PlayMode::NoScaling : PlayMode::NoEnvNoScaling) | type | Play_2D;
             // The track starts silent when it fades in, so that it is not heard at full volume before the fade begins
             params.mFadeVolume = fadeIn > 0.f ? 0.f : gain;
             return params;

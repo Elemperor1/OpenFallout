@@ -267,6 +267,7 @@ namespace OFScript
                         placed.mPosition = reference->mPos.asVec3();
                         placed.mRadius = reference->mAudioMarker.mRadius;
                         placed.mController = reference->mAudioLocation;
+                        placed.mReference = reference->mId.toUint32();
                         markers.push_back(placed);
                     }
                     if (!markers.empty())
@@ -276,6 +277,8 @@ namespace OFScript
                 }
                 for (const MusicMarker& candidate : found->second)
                 {
+                    if (isDisabled(candidate.mReference))
+                        continue;
                     const float distance = (candidate.mPosition - at).length();
                     if (distance >= candidate.mRadius)
                         continue;

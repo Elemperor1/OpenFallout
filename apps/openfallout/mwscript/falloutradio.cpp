@@ -65,6 +65,7 @@ namespace OFScript
         stopRadioVoice();
         radio.mReceiver.reset();
         radio.mRoomRest.clear();
+        radio.mRoomTopic.clear();
         radio.mRoomInReach.clear();
         radio.mRest = 0.f;
         radio.mUntilLook = 0.f;
@@ -179,7 +180,10 @@ namespace OFScript
         {
             RadioPlayback::Line said;
             said.mVoice = voiceFile(line.mSpeaker != 0 ? line.mSpeaker : station, line);
+            said.mText = line.mText;
             said.mSeconds = lineSeconds(line.mText);
+            said.mTopic = topic;
+            said.mSpeakerBase = line.mSpeakerBase != 0 ? line.mSpeakerBase : base.toUint32();
             result.push_back(std::move(said));
         }
         if (view.mLines.empty())
@@ -472,13 +476,29 @@ namespace OFScript
                 [&](const Saying& other) { return other.mReference == station.mReference; });
             if (saying)
                 continue;
-            FalloutScript::FormId topic;
+            // What it says goes on through the topics the responses offer, as the tuned station's does (the topic of
+            // a chain is kept for it)
+            FalloutScript::FormId& chain = radio.mRoomTopic[station.mReference];
+            FalloutScript::FormId next = 0;
+            const std::vector<RadioPlayback::Line> steps = radioStep(station.mReference, chain, next);
+            const bool said = !steps.empty();
+            chain = said ? next : 0;
+            rest = !said ? radioNothingRest : (next != 0 ? 0.f : radioRest);
+            if (said)
             {
-                const std::lock_guard lock(mDialogueMutex);
-                topic = mDialogue.findTopic(radioTopic);
+                std::vector<SaidLine> lines;
+                for (const RadioPlayback::Line& step : steps)
+                {
+                    SaidLine& line = lines.emplace_back();
+                    line.mVoice = step.mVoice;
+                    line.mText = step.mText;
+                    line.mSeconds = step.mSeconds;
+                    line.mTopic = step.mTopic;
+                    line.mSpeakerBase = step.mSpeakerBase;
+                }
+                lines.back().mEnd = true;
+                startSaying(station.mReference, std::move(lines));
             }
-            const bool said = topic != 0 && sayTopic(station.mReference, topic, 0, false, true);
-            rest = said ? radioRest : radioNothingRest;
             logRadio(station.mName + " in the room says " + (said ? "a chain" : "nothing"));
         }
     }

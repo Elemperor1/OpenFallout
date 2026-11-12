@@ -858,6 +858,9 @@ namespace OFScript
                 = [this](const FalloutScript::Block& block) { return menuBlockRuns(block); };
             mQuests.updateMenu(frametime, filter);
             mObjects.updateMenu(filter);
+            // The radio goes on while a menu is open (the Pip-Boy is where it is tuned): a line that ends is followed by the
+            // next
+            updateRadio(frametime);
             return;
         }
         // A move of the player that was made since the last pass is over for the scripts when this pass has run

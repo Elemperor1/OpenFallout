@@ -132,7 +132,10 @@ namespace OFSound
         FalloutSounds* falloutSounds();
         Sound* playFalloutRecord(const FalloutSound& record, const OFWorld::ConstPtr& reference, float volume,
             Type type, PlayMode mode, const osg::Vec3f* position = nullptr);
-        MusicTrackId startTrack(VFS::Path::NormalizedView filename, float gain, float fadeIn, bool loop, Type type);
+        /// `pitch` and `environment` (heard through the environment's effects, such as underwater) are for the loops of the
+        /// sound records of Fallout, which have a pitch of their own and may ask to be heard as they are
+        MusicTrackId startTrack(VFS::Path::NormalizedView filename, float gain, float fadeIn, bool loop, Type type,
+            float pitch = 1.f, bool environment = false);
         Sound* playSound3DAt(const osg::Vec3f& position, SoundBuffer* sfx, float volume, float pitch, Type type,
             PlayMode mode, const FalloutScript::SoundData& curve);
 
