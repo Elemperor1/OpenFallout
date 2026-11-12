@@ -2476,17 +2476,18 @@ namespace OFScript
         ESM::FormId base;
         if (actor == 0 || actor == mPlayer || !baseOf(actor, base) || base.isZeroOrUnset())
             return false;
-        // The flag is part of the base data, which a template can give
+        // The flag is part of the base data, which a template can give (a levelled list of characters gives the one that
+        // the cell shows for this reference)
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
-        {
-            const ESM4::Npc* owner = templateOwner(mStore, npc, ESM4::Npc::Template_UseBaseData);
-            return owner != nullptr && (owner->mBaseConfig.fo3.flags & ESM4::Npc::FO3_Essential) != 0;
-        }
+            return (templateRecordOf(mStore, *npc, ESM4::Npc::Template_UseBaseData, seed).mBaseConfig.fo3.flags
+                       & ESM4::Npc::FO3_Essential)
+                != 0;
         if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
-        {
-            const ESM4::Creature* owner = templateOwner(mStore, creature, ESM4::Creature::Template_UseBaseData);
-            return owner != nullptr && (owner->mBaseConfig.fo3.flags & ESM4::Creature::FO3_Essential) != 0;
-        }
+            return (templateRecordOf(mStore, *creature, ESM4::Creature::Template_UseBaseData, seed)
+                           .mBaseConfig.fo3.flags
+                       & ESM4::Creature::FO3_Essential)
+                != 0;
         return false;
     }
 
@@ -3681,16 +3682,14 @@ namespace OFScript
         };
         if (base.isZeroOrUnset())
             return true;
+        // A record that takes its factions from a template has those of the template, and a levelled list of
+        // characters in the place of the template gives the character that the cell shows for this reference (round 14G:
+        // the placed Powder Gangers are such records and had no factions at all, so no faction said they were enemies)
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
-        {
-            if (const ESM4::Npc* owner = templateOwner(mStore, npc, ESM4::Npc::Template_UseFactions))
-                take(owner->mFactions);
-        }
+            take(templateRecordOf(mStore, *npc, ESM4::Npc::Template_UseFactions, seed).mFactions);
         else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
-        {
-            if (const ESM4::Creature* owner = templateOwner(mStore, creature, ESM4::Creature::Template_UseFactions))
-                take(owner->mFactions);
-        }
+            take(templateRecordOf(mStore, *creature, ESM4::Creature::Template_UseFactions, seed).mFactions);
         return true;
     }
 
