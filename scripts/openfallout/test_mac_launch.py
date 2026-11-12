@@ -66,6 +66,12 @@ class MacLaunchTests(unittest.TestCase):
         self.assertEqual(envs, ["OSG_NOTIFY_LEVEL=DEBUG", "MTL_HUD_ENABLED=1"])
         self.assertEqual(argv[-1], "--args")
 
+    def test_background_keeps_the_app_from_coming_to_the_front(self):
+        result, argv = self.launch("--app", str(self.app), "--background", "--", "--skip-menu")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(argv[:3], ["-n", "-W", "-g"])
+        self.assertEqual(argv[-2:], ["--args", "--skip-menu"])
+
     def test_logs_default_to_the_current_folder(self):
         _, argv = self.launch("--app", str(self.app))
         self.assertEqual(argv[argv.index("--stdout") + 1], str(self.root / "openfallout.stdout.log"))

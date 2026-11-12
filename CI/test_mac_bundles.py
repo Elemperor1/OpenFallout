@@ -19,6 +19,7 @@ ENTITLEMENTS = {
     "OpenFallout.app": "openfallout.entitlements",
     "OpenFallout-CS.app": "openfallout-cs.entitlements",
 }
+LOCAL_TEST_ENTITLEMENTS = ROOT / "files/mac/local-hardened-test.entitlements"
 
 
 class MacBundleTests(unittest.TestCase):
@@ -140,7 +141,7 @@ endif()
                 (engine / "MacOS/OpenFallout Engine").write_bytes(MACHO)
         return stage
 
-    def sign(self, root, bundles, **environment):
+    def sign(self, root, bundles, expect_status=0, **environment):
         """Run the CPack signing script and return every recorded codesign call."""
         stage = self.stage(root, bundles)
         binary = root / "bin"
@@ -160,8 +161,8 @@ endif()
             f"-DCPACK_TEMPORARY_INSTALL_DIRECTORY={stage}",
             "-P", str(ROOT / "cmake/SignMacApplications.cmake"),
         ], env=env, text=True, capture_output=True)
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.output = result.stdout + result.stderr
+        self.assertEqual(result.returncode != 0, expect_status != 0, self.output)
         self.app_root = stage / "ALL_IN_ONE"
         if not signing_log.exists():
             return []
@@ -226,8 +227,52 @@ endif()
             with open(ROOT / "files/mac" / name, "rb") as entitlements:
                 values = plistlib.load(entitlements)
             self.assertNotIn("com.apple.security.get-task-allow", values, name)
+            # turning library validation off is for local hardened tests only (LOCAL_TEST_ENTITLEMENTS)
+            self.assertNotIn("com.apple.security.cs.disable-library-validation", values, name)
         game = (ROOT / "files/mac/openfallout.entitlements").read_text()
         self.assertIn("LUAJIT ENTITLEMENT", game)
+
+    def test_game_entitlements_allow_jit_for_the_hardened_runtime_luajit(self):
+        # the decision recorded in docs/openfallout/mac-luajit.md: a LUAJIT_ENABLE_OSX_HRT build with allow-jit;
+        # writable-and-executable memory is not granted
+        with open(ROOT / "files/mac/openfallout.entitlements", "rb") as entitlements:
+            values = plistlib.load(entitlements)
+        self.assertIs(values.get("com.apple.security.cs.allow-jit"), True)
+        self.assertNotIn("com.apple.security.cs.allow-unsigned-executable-memory", values)
+
+    def test_local_test_entitlements_only_turn_library_validation_off(self):
+        with open(LOCAL_TEST_ENTITLEMENTS, "rb") as entitlements:
+            values = plistlib.load(entitlements)
+        self.assertEqual(values, {"com.apple.security.cs.disable-library-validation": True})
+
+    def test_local_test_adds_the_overlay_to_hardened_ad_hoc_executables_only(self):
+        temporary = tempfile.TemporaryDirectory(prefix="mac signing ")
+        self.addCleanup(temporary.cleanup)
+        calls = self.sign(Path(temporary.name), ["OpenFallout.app"], OPENFALLOUT_CODESIGN_IDENTITY="-",
+                          OPENFALLOUT_CODESIGN_LOCAL_TEST="1")
+        app = str(self.app_root / "OpenFallout.app")
+        executables = [app, app + "/Contents/MacOS/helper", app + "/Contents/Helpers/OpenFallout Engine.app"]
+        with open(ROOT / "files/mac/openfallout.entitlements", "rb") as release:
+            expected = dict(plistlib.load(release), **{"com.apple.security.cs.disable-library-validation": True})
+        for call in (call for call in calls if "--sign" in call):
+            self.assertEqual(call[call.index("--options") + 1], "runtime")
+            if call[-1] in executables:
+                used = call[call.index("--entitlements") + 1]
+                self.assertNotEqual(Path(used).parent, ROOT / "files/mac")
+                with open(used, "rb") as entitlements:
+                    self.assertEqual(plistlib.load(entitlements), expected)
+            else:
+                self.assertNotIn("--entitlements", call)
+        self.assertIn("LOCAL TEST", self.output)
+
+    def test_local_test_is_refused_with_a_real_identity(self):
+        temporary = tempfile.TemporaryDirectory(prefix="mac signing ")
+        self.addCleanup(temporary.cleanup)
+        calls = self.sign(Path(temporary.name), ["OpenFallout.app"], expect_status=1,
+                          OPENFALLOUT_CODESIGN_IDENTITY=IDENTITY, OPENFALLOUT_CODESIGN_LOCAL_TEST="1")
+        self.assertEqual([call for call in calls if "--sign" in call], [])
+        self.assertIn("OPENFALLOUT_CODESIGN_LOCAL_TEST", self.output)
+        self.assertNotIn(IDENTITY, self.output)
 
     def test_identity_never_uses_deep_or_prints_secrets(self):
         calls = self.sign_with_identity(["OpenFallout.app", "OpenFallout-CS.app"],

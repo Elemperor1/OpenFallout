@@ -26,6 +26,8 @@ file(GLOB UNITTEST_SRC_FILES
     mwgui/tooltips.cpp
     mwgui/weightedsearch.cpp
 
+    mwinput/testtriggerfeel.cpp
+
     mwlua/testobjectcache.cpp
 
     mwmechanics/testfalloutpackages.cpp

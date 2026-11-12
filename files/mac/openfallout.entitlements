@@ -8,9 +8,13 @@
 <plist version="1.0">
 <dict>
     <!--
-        LUAJIT ENTITLEMENT: the entitlement LuaJIT needs under the hardened runtime goes here, once decided
-        (com.apple.security.cs.allow-jit with a LUAJIT_ENABLE_OSX_HRT build, or
-        com.apple.security.cs.allow-unsigned-executable-memory with today's build).
+        LUAJIT ENTITLEMENT: LuaJIT is built with LUAJIT_ENABLE_OSX_HRT (CI/macos/build_luajit_hrt.sh), so it maps its
+        machine code with MAP_JIT and switches write protection per thread, which the hardened runtime allows with
+        allow-jit alone. Decision and evidence: docs/openfallout/mac-luajit.md. Do not swap this for
+        allow-unsigned-executable-memory without redoing that evidence; a LuaJIT built without the flag is killed at
+        its first compiled trace under allow-jit, and CI/check_mac_package.py fails such a package before starting it.
     -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
 </dict>
 </plist>

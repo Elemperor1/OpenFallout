@@ -45,7 +45,7 @@ jobs:
         path: |
           /tmp/Qt
           /tmp/openmw-deps
-        key: macos-deps-${{ inputs.image }}-${{ runner.arch }}-${{ steps.deps-manifest.outputs.digest }}-${{ hashFiles('CI/macos/deps_versions.sh', 'CI/macos/fetch_deps_manifest.sh', 'CI/before_install.macos.sh') }}
+        key: macos-deps-${{ inputs.image }}-${{ runner.arch }}-${{ steps.deps-manifest.outputs.digest }}-${{ hashFiles('CI/macos/deps_versions.sh', 'CI/macos/fetch_deps_manifest.sh', 'CI/before_install.macos.sh', 'CI/macos/build_luajit_hrt.sh', 'CI/macos/luajit-osx-hrt-void-return.patch') }}
 
     - name: Install Building Dependencies
       if: steps.deps-cache.outputs.cache-hit != 'true'
@@ -131,6 +131,27 @@ jobs:
           echo "Disk-image creation is busy; retrying in 10 seconds ($attempt/3)"
           sleep 10
         done
+
+    - name: Test the packaged-app check
+      run: python3 -m unittest discover -s CI -p test_check_mac_package.py -v
+
+    # Local mode: the ad hoc signature is accepted and Gatekeeper is not asked. The smoke step starts the game from the
+    # disk image with a hidden window; a runner that gives it no OpenGL context reports it as skipped, and then the
+    # smoke step is run on the development Mac before a tag is pushed (`--smoke run`).
+    - name: Check the packaged app
+      run: |
+        dmg=$(ls build/OpenFallout-*.dmg | head -n 1)
+        python3 CI/check_mac_package.py "$dmg" --mode local --smoke auto --work "$RUNNER_TEMP/package-check"
+
+    - name: Store the packaged-app check logs
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: openfallout-macos-package-check-${{ env.DMG_IDENTIFIER }}-${{ github.sha }}
+        path: |
+          ${{ runner.temp }}/package-check/config/openfallout.log
+          ${{ runner.temp }}/package-check/*.log
+        if-no-files-found: ignore
 
     - name: Store dmg
       uses: actions/upload-artifact@v7

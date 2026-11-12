@@ -6,7 +6,7 @@ macOS only gives Game Mode to a game that LaunchServices started; a binary start
 standard output and error. This helper wraps it:
 
     scripts/openfallout/mac_launch.py [--app BUNDLE] [--stdout FILE] [--stderr FILE] [--env NAME=VALUE]...
-                                      [--metal-hud] [--] [engine arguments...]
+                                      [--metal-hud] [--background] [--] [engine arguments...]
 
 By default it opens OpenFallout.app/Contents/Helpers/OpenFallout Engine.app in /Applications: a small app nested in
 the package whose program runs the engine of the outer app (the outer app's own program is the Qt launcher).
@@ -37,8 +37,8 @@ def bundle_executable(app):
         return None
 
 
-def build_command(app, stdout, stderr, env, engine_args):
-    command = ["open", "-n", "-W", "--stdout", str(stdout), "--stderr", str(stderr)]
+def build_command(app, stdout, stderr, env, engine_args, background=False):
+    command = ["open", "-n", "-W", *(["-g"] if background else []), "--stdout", str(stdout), "--stderr", str(stderr)]
     for assignment in env:
         command += ["--env", assignment]
     return command + ["-a", str(app), "--args", *engine_args]
@@ -59,6 +59,8 @@ def main(argv=None):
     parser.add_argument("--stderr", default="openfallout.stderr.log", help="file for standard error")
     parser.add_argument("--env", action="append", default=[], metavar="NAME=VALUE",
                         help="environment variable for the app (repeatable)")
+    parser.add_argument("--background", action="store_true",
+                        help="do not bring the app to the front (`open -g`), for checks run while someone uses the Mac")
     parser.add_argument("--metal-hud", action="store_true", help="show the Metal performance HUD (MTL_HUD_ENABLED=1)")
     options = parser.parse_args(argv)
 
@@ -69,7 +71,8 @@ def main(argv=None):
               file=sys.stderr)
 
     stdout, stderr = Path(options.stdout).absolute(), Path(options.stderr).absolute()
-    command = build_command(Path(options.app).absolute(), stdout, stderr, env, engine_args)
+    command = build_command(Path(options.app).absolute(), stdout, stderr, env, engine_args,
+                            options.background)
     return subprocess.run(command).returncode
 
 
