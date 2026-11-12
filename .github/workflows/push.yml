@@ -305,6 +305,8 @@ jobs:
     #     name: build_artifact.7z
 
   MacOS:
+    # Keep check names independent of the runner label (CI/harness_release.py matches them).
+    name: MacOS (${{ matrix.args.image }})
     needs: Changes
     if: ${{ !cancelled() && needs.Changes.outputs.code != 'false' && (github.event_name != 'workflow_dispatch' || !inputs.validate-release) }}
     strategy:
@@ -312,10 +314,13 @@ jobs:
       matrix:
         args:
           - image: macos-26
+            runner: blacksmith-6vcpu-macos-26
+          # Blacksmith macOS runners are Apple Silicon only, so the Intel build stays GitHub-hosted.
           - image: macos-26-intel
     uses: ./.github/workflows/macos.yml
     with:
       image: ${{ matrix.args.image }}
+      runner: ${{ matrix.args.runner }}
 
   Windows:
     needs: Changes
@@ -324,7 +329,7 @@ jobs:
       fail-fast: true
       matrix:
         image:
-        - "2022"
+        - "2025"
 
     uses: ./.github/workflows/windows.yml
     with:
@@ -335,6 +340,6 @@ jobs:
     name: Windows release packaging
     uses: ./.github/workflows/windows.yml
     with:
-      image: "2022"
+      image: "2025"
       build-type: Release
       package: true

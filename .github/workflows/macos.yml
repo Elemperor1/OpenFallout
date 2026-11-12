@@ -10,11 +10,15 @@ on:
         description: MacOS Runner image
         required: true
         type: string
+      runner:
+        description: Runner label, when it differs from the image name
+        default: ""
+        type: string
 
 jobs:
   MacOS:
     name: ${{ inputs.image }}
-    runs-on: ${{ inputs.image }}
+    runs-on: ${{ inputs.runner || inputs.image }}
     steps:
     - uses: actions/checkout@v7
     - run: echo "CMAKE_BUILD_TYPE=${{ inputs.build-type }}" >> "$GITHUB_ENV"
