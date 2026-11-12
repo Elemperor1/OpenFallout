@@ -649,7 +649,7 @@ namespace OFSound
     }
 
     Sound* SoundManager::playSound3D(const OFWorld::ConstPtr& ptr, SoundBuffer* sfx, float volume, float pitch,
-        Type type, PlayMode mode, float offset, const FalloutScript::SoundData* curve)
+        Type type, PlayMode mode, float offset, const FalloutScript::SoundData* curve, bool flat)
     {
         if (!mOutput->isInitialized())
             return nullptr;
@@ -664,7 +664,9 @@ namespace OFSound
 
         bool played;
         SoundPtr sound = getSoundRef();
-        if (!(mode & PlayMode::NoPlayerLocal) && ptr == OFMechanics::getPlayer())
+        // A sound that is flat (a record of Fallout that says it is two-dimensional) is not placed, but it still belongs to
+        // the reference, so that stopping the reference's sounds or unloading its cell stops it
+        if (flat || (!(mode & PlayMode::NoPlayerLocal) && ptr == OFMechanics::getPlayer()))
         {
             sound->init([&] {
                 SoundParams params;
@@ -825,9 +827,9 @@ namespace OFSound
 
         const float pitch = data.pitch(std::uniform_real_distribution<float>(0.f, 1.f)(mSoundRandom));
         const float gain = volume * data.staticGain();
-        Sound* result = reference.isEmpty() || data.isTwoDimensional()
-            ? playSound(sfx, gain, pitch, type, mode, 0.f)
-            : playSound3D(reference, sfx, gain, pitch, type, mode, 0.f, &data);
+        Sound* result = reference.isEmpty() ? playSound(sfx, gain, pitch, type, mode, 0.f)
+                                            : playSound3D(reference, sfx, gain, pitch, type, mode, 0.f, &data,
+                                                data.isTwoDimensional());
         if (result != nullptr)
             ++mFalloutPlayed[record.mEditorId];
         return result;
