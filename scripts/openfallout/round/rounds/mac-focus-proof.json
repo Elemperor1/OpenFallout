@@ -11,7 +11,10 @@
   "limit": 90,
   "variants": [
     {
-      "name": "hidden"
+      "name": "hidden",
+      "env": {
+        "OPENFALLOUT_HEADLESS_POLICY": "foreground"
+      }
     },
     {
       "name": "accessory",

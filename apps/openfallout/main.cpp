@@ -410,7 +410,13 @@ int runApplication(int argc, char* argv[])
     for (int i = 1; i < argc; ++i)
         headlessArgument = headlessArgument || std::string_view(argv[i]) == "--headless";
     if (headlessArgument)
+    {
         SDL_SetHint("SDL_MAC_BACKGROUND_APP", "1");
+        // SDL keeps the screen awake by default, and on macOS that is a power assertion (PreventUserIdleDisplaySleep) held for the
+        // whole run: a hidden window has no screen to keep awake, and the assertion is one more thing the power daemon, and
+        // everything that waits for it, has to carry
+        SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
+    }
 
 #ifdef __APPLE__
     setenv("OSG_GL_TEXTURE_STORAGE", "OFF", 0);

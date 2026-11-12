@@ -10,7 +10,8 @@ round is one step of the scenario, the questions that need different settings ar
 ```
 scripts/openfallout/round/round.py profile --engine <build>/openfallout    once per computer: writes ~/.config/openfallout-rounds.json
 scripts/openfallout/round/round.py build --ref origin/<branch>              incremental build in one persistent folder
-scripts/openfallout/round/round.py run scripts/openfallout/round/rounds/m13-mountains.json --parallel 3
+scripts/openfallout/round/round.py run scripts/openfallout/round/rounds/m13-mountains.json
+scripts/openfallout/round/round.py preflight                                what the guards say about this computer now (starts nothing)
 ```
 
 ## What a run does
@@ -25,7 +26,7 @@ scripts/openfallout/round/round.py run scripts/openfallout/round/rounds/m13-moun
 2. Starts the engine at low priority (`taskpolicy -b` on macOS, `nice -n 10` elsewhere) with `OPENFALLOUT_HEADLESS=1`, the
    game's data folders and plugins of the profile, `--skip-menu --headless --no-grab`, `--load-savegame <the copy>` (or
    `--start <cell>`), and the content file `round.omwscripts` (the scenario player).
-3. On macOS it asks `lsappinfo` once a second which application is frontmost: a run in which the engine ever was fails, because
+3. On macOS it asks `lsappinfo` every 5 s which application is frontmost: a run in which the engine ever was fails, because
    that is what takes the keyboard of the person at the computer.
 4. Stops the engine when `limit` seconds are over, then writes `report.md` and `report.json` (the verdict, exit status, the `ROUND`
    lines of the log, the first ten distinct warnings and errors with their counts, the focus count) and copies the screenshots
@@ -54,9 +55,9 @@ round's). Edit it by hand for Tale of Two Wastelands (`data` = the New Vegas fol
 | `scenario` | the Lua file of the scenario, relative to the round file or to this folder |
 | `save` | a file, or `"latest"`; without it `start` (a cell for `--start`, with `new_game` for `--new-game`) |
 | `settings` | `{"Section": {"key": "value"}}` for every variant, for example `{"Terrain": {"game lod": "true"}}` |
-| `resolution`, `framerate` | the size of the window (so of the screenshot) and the frame rate limit (defaults 1280x720 and 30) |
+| `resolution`, `framerate` | the size of the window (so of the screenshot) and the frame rate limit (defaults 1280x720 and 20) |
 | `limit` | seconds after which the engine is stopped (300) |
-| `variants` | a list of `{"name", "settings"}`: one engine start each; `--parallel N` runs N at a time, `--variant name` only that one |
+| `variants` | a list of `{"name", "settings"}`: one engine start each, one after the other (never two engines at a time; `--parallel` above 1 is ignored), `--variant name` only that one |
 | `extra_args` | more arguments for the engine |
 | `allow_missing_content` | accept a save that wants a game plugin (`.esm`, `.esp`) the run does not load; without it such a round fails (a missing `.omwscripts`, such as the plugin of a play session, is a note) |
 
@@ -118,7 +119,7 @@ cd <the repository>
 python3 scripts/openfallout/round/round.py build --repo . --ref origin/<branch> \
     --worktree ../round-worktree --build-dir ../round-build --cmake-arg ...    # the arguments of your last configuration
 python3 scripts/openfallout/round/round.py profile --engine ../round-build/OpenFallout.app/Contents/MacOS/openfallout
-python3 scripts/openfallout/round/round.py run scripts/openfallout/round/rounds/mac-focus-proof.json --parallel 1
+python3 scripts/openfallout/round/round.py run scripts/openfallout/round/rounds/mac-focus-proof.json
 ```
 
 An existing worktree and build folder can be given to `build` (`--worktree`, `--build-dir`): it checks the ref out in the worktree and
@@ -127,3 +128,37 @@ application off the desktop (`hidden`: only the hidden window, `accessory` and `
 `OPENFALLOUT_HEADLESS_POLICY` sets, which makes the application one that cannot be made the frontmost). Its summary table has the
 focus column: `0/N` is what a headless run must show. While it runs, use the computer as usual; if a window appears, a Dock icon
 bounces or a key goes missing, say which variant it was (they run one after the other, about a minute each).
+
+## Guards
+
+On 2026-11-12 a Mac panicked during a round. WindowServer was blocked for 40 s behind a stuck system daemon (`runningboardd`), the
+watchdog killed it, its replacement never finished starting, and `watchdogd` brought the machine down 120 s later. No build was
+running; the hidden engine was one of the processes that were stuck, and why the daemon stalled was not found (the one lead is a
+lock wait in the kernel's network code). A hidden engine is still a client of the window system: every frame asks it for a flush.
+The guards (`roundguard.py`, tests in `test_roundguard.py` and `test_round.py`) follow from that. They are meant to stay out of the
+way: they refuse only where a round cannot do its work, and warn about the rest.
+
+- **One heavy thing at a time.** `build` and `run` take the same lock (`<out>/guard/round.lock`); the second is refused with the name
+  of the holder. On a Mac a run waits out 15 s after a build or a run that ended a moment ago. The variants of a round run one after the
+  other (`--parallel` above 1 is ignored). A build is held to six jobs and runs at low priority (`--allow-heavy` lifts it).
+- **Pre-flight** (`round.py preflight` prints it without starting anything; every build and run does it first). It reads the free memory,
+  the swap, the thermal state, the load, the processes (a build, the game, GeForce NOW, browser helpers), the crash reports (a
+  WindowServer report since the boot, a panic or reset report nobody has acknowledged: `round.py ack-panic`) and the WindowServer
+  process, and **warns** about each; the warnings are kept in the summary. It **refuses** only when the kill switch is set or there is
+  no WindowServer to ask (a run also asks it once, and refuses when the call is not answered: a heartbeat that cannot reach it would
+  guard nothing).
+- **Heartbeat** (Mac). One thread of the runner asks WindowServer for the windows on screen (`CGWindowListCopyWindowInfo`) every
+  2 s, and reads its pid every 10 s: no process is spawned for it. When an answer is more than 10 s late, never came, or the pid is
+  another one (WindowServer was killed and started again), the engine's process group gets SIGKILL at once, the round ends, and the
+  report says `STOPPED BY A GUARD` (exit status 3). Every report and the summary say `WindowServer same pid: yes (pid N)`.
+- **Kill switch and time limit.** `round.py stop` (or `touch <out>/guard/STOP`) ends a running engine at once and refuses new rounds and
+  builds until `round.py resume`. `--wall <seconds>` (default 3600) ends the engine when the whole round takes longer.
+- **A smaller engine.** On a Mac the engine is started as an accessory application (`OPENFALLOUT_HEADLESS_POLICY=accessory`: no Dock icon,
+  no menu bar, never frontmost; `"OPENFALLOUT_HEADLESS_POLICY": "foreground"` in the round's or the variant's `env` keeps the old
+  behaviour), without the display-sleep power assertion that SDL takes (`SDL_VIDEO_ALLOW_SCREENSAVER=1`, also set by the engine itself
+  when it is headless), at 20 frames per second and with the focus asked every 5 s. The report says which policy the engine set
+  (`activation policy: accessory set`).
+- **Evidence for next time.** When the computer has a window system to watch, each run keeps in `<run>/diagnostics/` the crash reports
+  that appeared during it (WindowServer, `.panic`, reset counters) and the last five minutes of the log of `runningboardd`.
+
+None of this can prevent a hang inside the kernel; it ends the load of the round quickly and leaves the evidence.
