@@ -324,6 +324,25 @@ namespace OFLua
             }
             return rows;
         };
+        // The stations of the radio that are in reach: id, name, whether it is tuned and how well it is heard (0 to 1)
+        api["radio"] = [lua]() {
+            sol::table rows(lua, sol::create);
+            int index = 1;
+            for (const OFScript::FalloutScripts::PipboyStation& station : scripts().pipboyRadio())
+            {
+                sol::table row(lua, sol::create);
+                row["id"] = idText(station.mStation);
+                row["name"] = station.mName;
+                row["tuned"] = station.mTuned;
+                row["signal"] = station.mSignal;
+                rows[index++] = row;
+            }
+            return rows;
+        };
+        // Tunes the station (none turns the radio off); false when the station is not in reach
+        api["tuneRadio"] = [](sol::optional<std::string_view> station) {
+            return scripts().tuneRadio(station ? parseId(*station) : 0);
+        };
         // What a holder carries (the player when none is named): id, name, count, weight, value, the tab it is listed
         // under ("weapons", "apparel", "aid", "misc" or "ammo"), whether it is worn or held, and for weapons the
         // damage and for armor its rating and threshold. Also what the lists and cards of the Pip-Boy need: a key

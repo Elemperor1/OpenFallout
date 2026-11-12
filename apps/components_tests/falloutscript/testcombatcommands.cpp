@@ -681,4 +681,31 @@ namespace
                 Relation::Neutral);
         }
     }
+
+    TEST(FalloutScriptCombatCommandsTest, a_faction_stands_to_a_character_by_the_factions_of_the_character)
+    {
+        using Relation = CombatState::Relation;
+        const auto standing = [](Relation toMutants, Relation toGang) {
+            Runner setup;
+            setup.mWorld.mFactions[ghoul] = { { mutants, 0 }, { gang, 0 } };
+            setup.mWorld.mRecorded[{ vault, mutants }] = toMutants;
+            setup.mWorld.mRecorded[{ vault, gang }] = toGang;
+            return FalloutScript::relationOfFaction(setup.mCombat, setup.mActors, setup.mWorld, vault, ghoul);
+        };
+        // The same order as for two characters: an ally, then a friend, then an enemy
+        EXPECT_EQ(standing(Relation::Neutral, Relation::Enemy), Relation::Enemy);
+        EXPECT_EQ(standing(Relation::Friend, Relation::Enemy), Relation::Friend);
+        EXPECT_EQ(standing(Relation::Ally, Relation::Enemy), Relation::Ally);
+        EXPECT_EQ(standing(Relation::Neutral, Relation::Neutral), Relation::Neutral);
+        // No faction, or a character that is in none, is neutral to it; a faction is kin to itself
+        Runner setup;
+        EXPECT_EQ(FalloutScript::relationOfFaction(setup.mCombat, setup.mActors, setup.mWorld, 0, ghoul),
+            Relation::Neutral);
+        EXPECT_EQ(FalloutScript::relationOfFaction(setup.mCombat, setup.mActors, setup.mWorld, vault, raider),
+            Relation::Neutral);
+        // (the factions of a character are kept once they are asked for: another setup has the one that is kin)
+        Runner kin;
+        kin.mWorld.mFactions[raider] = { { vault, 0 } };
+        EXPECT_EQ(FalloutScript::relationOfFaction(kin.mCombat, kin.mActors, kin.mWorld, vault, raider), Relation::Ally);
+    }
 }

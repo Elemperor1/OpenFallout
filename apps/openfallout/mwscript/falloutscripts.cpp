@@ -394,6 +394,22 @@ namespace OFScript
                 call.mReference, FalloutScript::formArgument(call, 0), 0, FalloutScript::intArgument(call, 1) != 0);
             return 0.0;
         });
+        // The radio: a station is on the air from the start when its record says it broadcasts all the time, and otherwise
+        // when a script puts it there
+        mInterpreter.setHandler("SetBroadcastState", [this](FalloutScript::CallContext& call) {
+            setRadioBroadcast(call.mReference, FalloutScript::intArgument(call, 0) != 0);
+            return 0.0;
+        });
+        mInterpreter.setHandler("GetBroadcastState",
+            [this](FalloutScript::CallContext& call) { return radioBroadcast(call.mReference) ? 1.0 : 0.0; });
+        mInterpreter.setHandler("PipBoyRadioOff", [this](FalloutScript::CallContext&) {
+            runOnMainThread([this] { tuneRadio(0); });
+            return 0.0;
+        });
+        mInterpreter.setHandler("ForceRadioStationUpdate", [this](FalloutScript::CallContext&) {
+            runOnMainThread([this] { mRadioPlayback.mUntilLook = 0.f; });
+            return 0.0;
+        });
         mInterpreter.setHandler("SayTo", [this](FalloutScript::CallContext& call) {
             sayTopic(call.mReference, FalloutScript::formArgument(call, 1), FalloutScript::formArgument(call, 0),
                 FalloutScript::intArgument(call, 2) != 0);
@@ -674,6 +690,13 @@ namespace OFScript
         mActors.clear();
         mEquipment.clear();
         mCombat.clear();
+        resetMusic();
+        resetAmbient();
+        resetRadio();
+        {
+            const std::lock_guard lock(mRadioMutex);
+            mRadioBroadcast.clear();
+        }
         mOpenStates.clear();
         mDoorsWithoutCollision.clear();
         mItemHolders.clear();
@@ -835,6 +858,9 @@ namespace OFScript
                 = [this](const FalloutScript::Block& block) { return menuBlockRuns(block); };
             mQuests.updateMenu(frametime, filter);
             mObjects.updateMenu(filter);
+            // The radio goes on while a menu is open (the Pip-Boy is where it is tuned): a line that ends is followed by the
+            // next
+            updateRadio(frametime);
             return;
         }
         // A move of the player that was made since the last pass is over for the scripts when this pass has run
@@ -882,6 +908,9 @@ namespace OFScript
                 mActorValues.restore(mPlayer, AV::actionPoints, gain);
         }
         updateBreath(frametime);
+        updateMusic(frametime);
+        updateAmbient(frametime);
+        updateRadio(frametime);
         mHudTime += frametime;
         raiseCombatEvents(frametime);
         updateProgress(frametime);

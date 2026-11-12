@@ -2221,7 +2221,9 @@ namespace OFWorld
         stairs = false;
         if (actor.isEmpty() || !actor.isInCell())
             return -1;
-        // An actor with its feet in water has the material of water
+        // An actor with its feet in water has the material of water. "In water" is the port's choice, the water over a
+        // twentieth of the actor's height (about the ankle, 0.05; isWading is the knee, 0.25): the executable's own
+        // threshold was not read
         constexpr int waterMaterial = 8;
         if (isUnderwater(actor, 0.05f))
             return waterMaterial;

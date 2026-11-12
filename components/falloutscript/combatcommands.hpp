@@ -30,6 +30,11 @@ namespace FalloutScript
     CombatState::Relation relationOfActors(
         CombatState& combat, ActorState& actors, CombatWorld& world, FormId actor, FormId target);
 
+    /// How a faction stands to the target by the target's factions (the rule of relationOfActors, for a faction alone):
+    /// what the media location controllers of New Vegas choose their music by
+    CombatState::Relation relationOfFaction(
+        CombatState& combat, ActorState& actors, CombatWorld& world, FormId faction, FormId target);
+
     /// Whether the actor can start a fight against the target: neither is dead and the actor is not out (unconscious)
     bool mayStartFight(const CombatState& combat, const ActorState& actors, FormId actor, FormId target);
 

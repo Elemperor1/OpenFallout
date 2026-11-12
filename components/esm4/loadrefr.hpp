@@ -69,10 +69,12 @@ namespace ESM4
 
     struct RadioStationData
     {
-        float rangeRadius;
+        /// Whether the reference has the subrecord (XRDO) at all: a radio station placed in the world has it
+        bool present = false;
+        float rangeRadius = 0.f;
         // 0 radius, 1 everywhere, 2 worldspace and linked int, 3 linked int, 4 current cell only
-        std::uint32_t broadcastRange;
-        float staticPercentage;
+        std::uint32_t broadcastRange = 0;
+        float staticPercentage = 0.f;
         ESM::FormId posReference; // only used if broadcastRange == 0
     };
 
@@ -124,6 +126,19 @@ namespace ESM4
         std::int32_t mCount = 1; // only if > 1
 
         ESM::FormId mAudioLocation;
+
+        /// An audio marker of New Vegas (MMRK): the place that its media location controller (CNAM, above) plays
+        /// music at, out to a radius (XRDS). The two trigger shares (MNAM, NNAM: 0.33 and 0.67 in the game's files)
+        /// say how far in the middle and inner layers come in, BNAM is a flag of the marker.
+        struct AudioMarker
+        {
+            bool mIsMarker = false;
+            float mRadius = 0.f;
+            float mLayer2Trigger = 0.f;
+            float mLayer3Trigger = 0.f;
+            std::uint32_t mFlags = 0;
+        };
+        AudioMarker mAudioMarker;
 
         RadioStationData mRadio;
 

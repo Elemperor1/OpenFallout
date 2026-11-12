@@ -100,6 +100,8 @@ local info, markers = nil, {}
 local marked = {}
 local named = nil
 local quests = {}
+local stations = {}
+local stationsKey = nil
 -- The place and the size of the picture of the world: the units of the file (the picture may be moved and zoomed)
 local zoom, moveX, moveY = MAP.startZoom, 0, 0
 local objectivesFor = nil
@@ -426,6 +428,56 @@ local function fillQuests()
     fillObjectives()
 end
 
+-- ---- Radio ----
+
+-- The stations in reach, after a first row that turns the radio off. Picking a row tunes the station (the executables'
+-- radio tab does not have this first row's words in anything that was read: the page names it itself)
+local RADIO_OFF = 'Radio Off'
+
+local function radioKey(list)
+    local parts = {}
+    for _, station in ipairs(list) do
+        parts[#parts + 1] = station.id .. (station.tuned and '*' or '')
+    end
+    return table.concat(parts, ',')
+end
+
+local function fillRadio()
+    stations = pipboy.radio()
+    stationsKey = radioKey(stations)
+    local picked = 1
+    for index, station in ipairs(stations) do
+        if station.tuned then picked = index + 1 end
+    end
+    -- The square of the row that is tuned is filled
+    local rows = { { string = RADIO_OFF, _ShowEmptyMarker = true, _selected = picked == 1 } }
+    for index, station in ipairs(stations) do
+        rows[index + 1] = { string = station.name, _ShowEmptyMarker = true, _selected = station.tuned and true or false }
+    end
+    lists.radio.rows(rows)
+    lists.radio.select(picked, true)
+end
+
+-- Each frame the radio tab is shown: the list follows the stations that are in reach, and the row that is picked is tuned
+local function pollRadio()
+    local current = pipboy.radio()
+    if radioKey(current) ~= stationsKey then
+        fillRadio()
+        return
+    end
+    local row = lists.radio.selected()
+    if row <= 0 then return end
+    local station = row > 1 and stations[row - 1] or nil
+    local tunedNow
+    for _, entry in ipairs(current) do
+        if entry.tuned then tunedNow = entry.id end
+    end
+    if (station and station.id or nil) ~= tunedNow then
+        pipboy.tuneRadio(station and station.id or nil)
+        stationsKey = nil
+    end
+end
+
 -- ---- The page ----
 
 local function fillHeadline()
@@ -442,7 +494,9 @@ local function fill()
     fillWorld()
     fillQuests()
     lists.notes.rows({})
-    lists.radio.rows({})
+    -- A radio tab that cannot be filled does not take the other tabs with it
+    local filled, problem = pcall(fillRadio)
+    if not filled then print('data menu radio: ' .. tostring(problem)) end
     shown:batch(function()
         shown:set('MM_DataRect', 'visible', TABS[tabIndex].key == 'quests' and #quests > 0)
     end)
@@ -489,7 +543,7 @@ local function open()
     zoom = MAP.startZoom
     opened:batch(function()
         -- The lists that can be picked from take the pointer (the objectives are only read)
-        for _, name in ipairs({ 'MM_QuestsList', 'MM_NotesList' }) do
+        for _, name in ipairs({ 'MM_QuestsList', 'MM_NotesList', 'MM_RadioStationList' }) do
             opened:set(name, '_enabled', true)
         end
         -- The picture of the world takes the pointer (the file leaves out `target`, which a hot rectangle has by default
@@ -565,6 +619,10 @@ function module.update()
     if not shown then return end
     shown:checkSize()
     if TABS[tabIndex].key == 'quests' then fillObjectives() end
+    if TABS[tabIndex].key == 'radio' then
+        local polled, problem = pcall(pollRadio)
+        if not polled then print('data menu radio: ' .. tostring(problem)) end
+    end
 end
 
 -- What a key does while the page is there: [ and ] go to the tab before and after, the arrows and pages pick a quest,

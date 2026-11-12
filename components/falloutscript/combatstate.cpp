@@ -145,6 +145,12 @@ namespace FalloutScript
         return result;
     }
 
+    std::vector<std::pair<FormId, FormId>> CombatState::fights() const
+    {
+        const std::lock_guard lock(mMutex);
+        return { mTargets.begin(), mTargets.end() };
+    }
+
     void CombatState::setAlert(FormId actor, bool alert)
     {
         const std::lock_guard lock(mMutex);

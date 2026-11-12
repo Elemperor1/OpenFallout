@@ -126,6 +126,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testhungerstage.cpp
     esm4/testimagespace.cpp
     esm4/testidlemusic.cpp
+    esm4/testmusicrecords.cpp
     esm4/testimagespacemodifier.cpp
     esm4/testimpactdata.cpp
     esm4/testimpactdataset.cpp
@@ -213,6 +214,9 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testderivedstats.cpp
     falloutscript/testfalldamage.cpp
     falloutscript/testfootsteps.cpp
+    falloutscript/testambient.cpp
+    falloutscript/testradio.cpp
+    falloutscript/testmusic.cpp
     falloutscript/testhardcore.cpp
     falloutscript/testequipment.cpp
     falloutscript/testfightai.cpp

@@ -115,34 +115,72 @@ namespace OFScript
     bool FalloutScripts::isMusicPlaying()
     {
         OFBase::SoundManager* manager = OFBase::Environment::get().getSoundManager();
-        return manager != nullptr && std::this_thread::get_id() == mMainThread && manager->isMusicPlaying();
+        if (manager == nullptr || std::this_thread::get_id() != mMainThread)
+            return false;
+        // Music is the track of a script, the one of the place, the layers of a media set and the playlist
+        return manager->isMusicPlaying()
+            || (mMusicPlayback.mScriptTrack != 0 && manager->isMusicTrackPlaying(mMusicPlayback.mScriptTrack))
+            || (mMusicPlayback.mTrack != 0 && manager->isMusicTrackPlaying(mMusicPlayback.mTrack))
+            || mMusicPlayback.mMixer.playing(*manager);
     }
 
     bool FalloutScripts::playMusic(FalloutScript::FormId track)
     {
         const ESM::FormId id = ESM::FormId::fromUint32(track);
-        const ESM4::Music* record = id.isZeroOrUnset() ? nullptr : mStore.get<ESM4::Music>().search(id);
-        if (record == nullptr || record->mMusicFile.empty())
-            return false;
         const Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem();
-        if (resources == nullptr)
+        if (id.isZeroOrUnset() || resources == nullptr)
             return false;
-        // The file is named from the folder of the music, as the sound records name theirs from the folder of the
-        // sounds
-        constexpr VFS::Path::NormalizedView musicDir("music");
-        constexpr VFS::Path::ExtensionView mp3("mp3");
-        const VFS::Path::Normalized path = Misc::ResourceHelpers::correctResourcePath(
-            { { musicDir } }, VFS::Path::toNormalized(record->mMusicFile), *resources->getVFS(), mp3);
-        if (!resources->getVFS()->exists(path))
         {
-            Log(Debug::Warning) << "The music " << record->mEditorId << " has no file " << path;
+            // The records of music, with the tracks they name (a folder names all the mp3 files in it)
+            const std::lock_guard lock(mMusicMutex);
+            if (!mMusicPlayback.mRecords)
+                mMusicPlayback.mRecords = std::make_unique<OFSound::FalloutMusicRecords>(*resources->getVFS(), mStore);
+        }
+        OFSound::FalloutMusic* record = mMusicPlayback.mRecords->find(id);
+        if (record == nullptr)
+            return false;
+        if (record->mFiles.empty())
+        {
+            Log(Debug::Warning) << "The music " << record->mEditorId << " has no file";
             return false;
         }
-        Log(Debug::Info) << "Script music: " << record->mEditorId << " plays " << path;
-        // The track replaces what plays, with the fade of the sound manager, and the playlist goes on when it ends
-        runOnMainThread([path] {
-            if (OFBase::SoundManager* manager = OFBase::Environment::get().getSoundManager())
-                manager->streamMusic(path, OFSound::MusicType::MWScript);
+        // The track replaces what plays, with a fade, as loud as the record says (ANAM), looping when it says so. The
+        // music of the place comes back after it.
+        runOnMainThread([this, id] {
+            OFBase::SoundManager* sound = OFBase::Environment::get().getSoundManager();
+            OFSound::FalloutMusic* music = mMusicPlayback.mRecords ? mMusicPlayback.mRecords->find(id) : nullptr;
+            if (sound == nullptr || music == nullptr || music->mFiles.empty())
+                return;
+            const auto random = [this](int low, int high) {
+                return std::uniform_int_distribution<int>(low, high)(mMusicPlayback.mRandom);
+            };
+            if (!music->mStarted)
+            {
+                music->mStarted = true;
+                music->mLast = FalloutScript::Music::firstTrack(music->mFiles.size(), random);
+            }
+            const auto index = FalloutScript::Music::nextTrack(music->mFiles.size(), music->mLast, random);
+            if (!index)
+                return;
+            const VFS::Path::Normalized& file = music->mFiles[*index];
+            if (mMusicPlayback.mScriptTrack != 0)
+                sound->fadeMusicTrack(mMusicPlayback.mScriptTrack, 0.f, 1.f, true);
+            if (sound->isMusicPlaying())
+                sound->stopMusic();
+            // The music of the place is quiet while the track plays, now: the update of the music does not run while a menu
+            // is open (a script of a menu may call PlayMusic), so it is not left for it
+            if (mMusicPlayback.mTrack != 0)
+                sound->fadeMusicTrack(mMusicPlayback.mTrack, 0.f, 1.f, true);
+            mMusicPlayback.mTrack = 0;
+            // (and the director is told that what it played was cut short, as when a script track blocks it)
+            mMusicPlayback.mDirector.reset();
+            mMusicPlayback.mMixer.stopAll(*sound, 1.f);
+            mMusicPlayback.mStemKey.clear();
+            mMusicPlayback.mStems.clear();
+            mMusicPlayback.mScriptTrack = sound->startMusicTrack(
+                file, FalloutScript::Music::gainOfDb(music->mDb), 1.f, music->mLoop);
+            logMusic("a script plays " + music->mEditorId + ": " + std::string(file.value())
+                + (music->mLoop ? ", loops" : ""));
         });
         return true;
     }
