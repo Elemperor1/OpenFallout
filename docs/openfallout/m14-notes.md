@@ -30,6 +30,16 @@ A hidden scripted round (the scenario and its round steps live on the Mac that r
 
 PR 2 of M14 puts the weapon in the hand of the player's body (`FalloutPlayerBody::setWeapon`, `attack`; `FalloutScripts::isPlayerWeaponDrawn`, `playerShots`) and adds the log lines above, so that round 14B can say why.
 
+## Rounds 14B to 14E (2026-11-12): what the rounds found, and what was done
+
+- **The Mac panic of 14B** was not the build and not the engine's doing alone: WindowServer's main thread was blocked behind `runningboardd` (stuck in the kernel), launchd killed it and the replacement never started. The rounds now run behind guards (`scripts/openfallout/round/roundguard.py`, README "Guards": one lock, a pre-flight that warns, a WindowServer heartbeat that kills the engine, a kill switch, the accessory activation policy, builds held to 6 jobs).
+- **First-person arms** (`FalloutPlayerBody::buildArms`, `placeArms`): the skeleton of `meshes/characters/_1stperson` with the race's `...hand1st` hands (and the Pip-Boy glove) hangs from the camera in the first-person render bin and field of view, shows when a weapon is out, and plays the weapon's equip, aim and attack files. There is no first-person model of a gun: the games draw the same model as in the third person. Its place is the skeleton's `Camera1st` node at the camera, and `OPENFALLOUT_FIRSTPERSON_ARMS="x y z yaw pitch roll"` moves it for tuning (`rounds/m14-arms-tune.json`).
+- **A fight against the player ended after half a second** because the scenario named the player `0x14`, as the games do, and the engine's reference of the player has the number of its plugin in front. `core.combat` now takes a plain `0x14` for the player and has `core.combat.player()`.
+- **Bodies that were shot dead stood upright:** a character with no package has no mind (the object that runs its fall) until something gives it one, and nothing did when it was struck. `FalloutScripts::wakeMind` makes the mind when a blow starts a fight or kills.
+- **V.A.T.S. "No target in sight"** was the round standing inside the Prospector Saloon (round 14D logged the base record of what the ray hit: the building's collision). The test place was moved and the screen now asks about the head, chest and legs. The round steps (`r.place`, `r.vatsInfo`, ...) that made the 14A scenarios are in `scripts/openfallout/round/scripts` with tests.
+- **Logs for the next round:** `units apart: stealth ...` (what a watcher makes of the player), `does not attack the player on sight`, `Weapon of ...` (where the weapon in a hand is and which way it points, a second after it was taken out and when the gait changes).
+- **Third person, seen in 14D/14E:** the pistol is on the hand, held flat at the hip pointing forward, and is not seen while the body walks (from behind) or in the crouched idle; the skeleton has no `Weapon` node, so the weapon sits on `Bip01 R Hand` without the attach pose; the body does not crouch when sneaking.
+
 ## Not done yet
 
 NPC falls (nothing launches a character off the ground yet: they are put on the ground a ray finds, so a fall cannot happen), the animation groups, first-person arms, V.A.T.S. camera, detection and sneak, effects, the navigator mesh in interiors. These want rounds on the Mac.
