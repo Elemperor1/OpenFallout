@@ -25,7 +25,9 @@ jobs:
   Windows:
     name: windows-${{ inputs.image }}
 
-    runs-on: blacksmith-4vcpu-windows-${{ inputs.image }}
+    # Test builds keep every core busy, so they get 8 vCPU. Release packaging builds
+    # with --parallel 2 to stay within memory, so more cores would sit idle there.
+    runs-on: blacksmith-${{ inputs.package && '4' || '8' }}vcpu-windows-${{ inputs.image }}
 
     env:
       archive: FAILEDTODOWNLOAD
