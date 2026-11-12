@@ -28,6 +28,7 @@
 #include "bindingsmanager.hpp"
 #include "inputlog.hpp"
 #include "mousemanager.hpp"
+#include "sdltriggerdevice.hpp"
 
 namespace OFInput
 {
@@ -95,6 +96,13 @@ namespace OFInput
         }
 
         mBindingsManager->setJoystickDeadZone(Settings::input().mJoystickDeadZone);
+    }
+
+    ControllerManager::~ControllerManager()
+    {
+        // A DualSense keeps a resistance it was given: the game does not leave it behind
+        if (mTriggerDevice != nullptr && mTriggerDevice->supported())
+            mTriggerDevice->clear(TriggerFeel::Trigger::Right);
     }
 
     void ControllerManager::logSticks(float dt)
@@ -372,6 +380,10 @@ namespace OFInput
     void ControllerManager::controllerRemoved(const SDL_ControllerDeviceEvent& arg)
     {
         mBindingsManager->controllerRemoved(arg);
+        // The pad in use may be gone: its triggers are found again on the next frame
+        mTriggerDevice.reset();
+        mTriggerController = nullptr;
+        mTriggerPlanner.forget();
     }
 
     bool ControllerManager::gamepadToGuiControl(const SDL_ControllerButtonEvent& arg)
@@ -607,6 +619,48 @@ namespace OFInput
         const auto motor = static_cast<Uint16>(std::clamp(strength, 0.f, 1.f) * 65535.f);
         const auto milliseconds = static_cast<Uint32>(std::clamp(seconds, 0.f, 10.f) * 1000.f);
         SDL_GameControllerRumble(cntrl, motor, motor, milliseconds);
+    }
+
+    TriggerDevice* ControllerManager::triggerDevice()
+    {
+        SDL_GameController* cntrl = mBindingsManager->getControllerOrNull();
+        if (cntrl != mTriggerController)
+        {
+            mTriggerController = cntrl;
+            mTriggerDevice = cntrl != nullptr ? std::make_unique<SdlTriggerDevice>(cntrl) : nullptr;
+            mTriggerPlanner.forget();
+        }
+        return mTriggerDevice.get();
+    }
+
+    void ControllerManager::updateTriggers(
+        const TriggerFeel::Situation& situation, const std::optional<TriggerFeel::Weapon>& weapon)
+    {
+        mTriggerSituation = situation;
+        mTriggerFeel = weapon ? TriggerFeel::forWeapon(*weapon) : TriggerFeel::Feel{};
+        TriggerDevice* device = triggerDevice();
+        if (device == nullptr || !device->supported())
+            return;
+        const TriggerFeel::Command command = mTriggerPlanner.update(situation, mTriggerFeel.mResistance);
+        switch (command.mKind)
+        {
+            case TriggerFeel::Command::Kind::Set:
+                device->setResistance(TriggerFeel::Trigger::Right, command.mResistance);
+                break;
+            case TriggerFeel::Command::Kind::Clear:
+                device->clear(TriggerFeel::Trigger::Right);
+                break;
+            case TriggerFeel::Command::Kind::None:
+                break;
+        }
+    }
+
+    void ControllerManager::weaponFired()
+    {
+        if (!Settings::input().mGamepadRumble || !TriggerFeel::Planner::pulseAllowed(mTriggerSituation))
+            return;
+        if (TriggerDevice* device = triggerDevice(); device != nullptr && device->pulseSupported())
+            device->pulse(TriggerFeel::Trigger::Right, mTriggerFeel.mShot);
     }
 
     float ControllerManager::getAxisValue(SDL_GameControllerAxis axis) const

@@ -12,6 +12,7 @@
 #include <components/esm4/loadnote.hpp>
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadrefr.hpp>
+#include <components/esm4/loadweap.hpp>
 #include <components/falloutscript/actorvalues.hpp>
 #include <components/falloutscript/derivedstats.hpp>
 #include <components/falloutscript/falldamage.hpp>
@@ -23,6 +24,7 @@
 #include "../mwbase/mechanicsmanager.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
+#include "../mwinput/triggerfeel.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
 #include "../mwworld/esmstore.hpp"
@@ -155,6 +157,35 @@ namespace OFScript
         if (OFBase::InputManager* input = OFBase::Environment::get().getInputManager())
             input->rumble(static_cast<float>(gameSetting("fRumblePainStrength", 0.5)),
                 static_cast<float>(gameSetting("fRumblePainTime", 0.2)));
+    }
+
+    void FalloutScripts::updateTriggerFeel()
+    {
+        OFBase::InputManager* input = OFBase::Environment::get().getInputManager();
+        if (input == nullptr)
+            return;
+        std::optional<OFInput::TriggerFeel::Weapon> weapon;
+        bool drawn = false;
+        if (mPlayer != 0 && !mActors.isDead(mPlayer))
+        {
+            drawn = mEquipment.weaponDrawn(mPlayer);
+            const FalloutScript::FormId held = mEquipment.weapon(mPlayer);
+            const ESM4::Weapon* record = held != 0
+                ? mStore.get<ESM4::Weapon>().search(ESM::RefId::formIdRefId(ESM::FormId::fromUint32(held)))
+                : nullptr;
+            if (record != nullptr && record->mHasGameData)
+            {
+                weapon.emplace();
+                weapon->mAnimationType = record->mGame.mAnimationType;
+                weapon->mAutomatic = (record->mGame.mFlags1 & ESM4::Weapon::GameData::Automatic) != 0;
+                weapon->mRumbleLeft = record->mGame.mRumbleLeftMotor;
+                weapon->mRumbleRight = record->mGame.mRumbleRightMotor;
+                weapon->mRumbleSeconds = record->mGame.mRumbleDuration;
+            }
+            else
+                weapon.emplace(); // the hands
+        }
+        input->setTriggerState(weapon, drawn, menuOpen(0));
     }
 
     void FalloutScripts::jumped(const OFWorld::Ptr& ptr)

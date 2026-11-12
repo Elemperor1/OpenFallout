@@ -178,6 +178,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testtree.cpp
     esm4/testvoicetype.cpp
     esm4/testwater.cpp
+    esm4/testweapongamedata.cpp
     esm4/testweather.cpp
     esm4/testwornarmor.cpp
     esm4/testwornarmorcensus.cpp
