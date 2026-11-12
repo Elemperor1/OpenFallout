@@ -462,4 +462,126 @@ namespace
         EXPECT_NEAR(moved.y(), before.y(), 1e-9);
         EXPECT_NEAR(moved.z(), before.z(), 1e-9);
     }
+
+    class OpenFalloutRenderChooseFalloutMove : public Test
+    {
+    protected:
+        const std::string mFolder = "meshes/characters/_male/";
+        // what the folders of the games have: the movements of a weapon in locomotion, those of sneaking beside the skeleton
+        const std::vector<std::string> mFiles = { "meshes/characters/_male/locomotion/mtforward.kf",
+            "meshes/characters/_male/locomotion/mtfastforward.kf", "meshes/characters/_male/locomotion/mtbackward.kf",
+            "meshes/characters/_male/locomotion/mtleft.kf", "meshes/characters/_male/locomotion/mtfastleft.kf",
+            "meshes/characters/_male/locomotion/1hpforward.kf", "meshes/characters/_male/locomotion/1hpfastforward.kf",
+            "meshes/characters/_male/locomotion/1hpbackward.kf", "meshes/characters/_male/locomotion/2haforward.kf",
+            "meshes/characters/_male/locomotion/2hafastbackward.kf", "meshes/characters/_male/sneakmtforward.kf",
+            "meshes/characters/_male/sneakmtfastforward.kf", "meshes/characters/_male/sneakmtbackward.kf",
+            "meshes/characters/_male/sneakmtidle.kf", "meshes/characters/_male/sneak2hhforward.kf",
+            "meshes/characters/_male/sneak1hmidle.kf" };
+    };
+
+    TEST_F(OpenFalloutRenderChooseFalloutMove, walksAndRunsWithTheHandsFreeByTheMovementFiles)
+    {
+        EXPECT_EQ(chooseFalloutMove(mFolder, "", false, FalloutDirection::Forward, false, false, mFiles),
+            "meshes/characters/_male/locomotion/mtforward.kf");
+        EXPECT_EQ(chooseFalloutMove(mFolder, "", false, FalloutDirection::Forward, true, false, mFiles),
+            "meshes/characters/_male/locomotion/mtfastforward.kf");
+        EXPECT_EQ(chooseFalloutMove(mFolder, "", false, FalloutDirection::Left, false, false, mFiles),
+            "meshes/characters/_male/locomotion/mtleft.kf");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutMove, takesTheMovementOfTheWeaponThatIsHeld)
+    {
+        EXPECT_EQ(chooseFalloutMove(mFolder, "1hp", false, FalloutDirection::Forward, false, false, mFiles),
+            "meshes/characters/_male/locomotion/1hpforward.kf");
+        EXPECT_EQ(chooseFalloutMove(mFolder, "1hp", false, FalloutDirection::Backward, false, false, mFiles),
+            "meshes/characters/_male/locomotion/1hpbackward.kf");
+        EXPECT_EQ(chooseFalloutMove(mFolder, "2ha", false, FalloutDirection::Backward, true, false, mFiles),
+            "meshes/characters/_male/locomotion/2hafastbackward.kf");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutMove, fallsBackToTheMovementOfTheHandsFreeWhenTheWeaponHasNoSuchFile)
+    {
+        // 2ha has no slow walk to the left and no run to the left: mt has them
+        EXPECT_EQ(chooseFalloutMove(mFolder, "2ha", false, FalloutDirection::Left, false, false, mFiles),
+            "meshes/characters/_male/locomotion/mtleft.kf");
+        EXPECT_EQ(chooseFalloutMove(mFolder, "2ha", false, FalloutDirection::Left, true, false, mFiles),
+            "meshes/characters/_male/locomotion/mtfastleft.kf");
+        // a direction that nothing has is the forward one
+        EXPECT_EQ(chooseFalloutMove(mFolder, "1hp", false, FalloutDirection::Right, false, false, mFiles),
+            "meshes/characters/_male/locomotion/1hpforward.kf");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutMove, sneaksWithTheSneakingFilesWhateverIsHeld)
+    {
+        EXPECT_EQ(chooseFalloutMove(mFolder, "", true, FalloutDirection::Forward, false, false, mFiles),
+            "meshes/characters/_male/sneakmtforward.kf");
+        EXPECT_EQ(chooseFalloutMove(mFolder, "1hp", true, FalloutDirection::Forward, true, false, mFiles),
+            "meshes/characters/_male/sneakmtfastforward.kf");
+        EXPECT_EQ(chooseFalloutMove(mFolder, "1hp", true, FalloutDirection::Backward, false, false, mFiles),
+            "meshes/characters/_male/sneakmtbackward.kf");
+        // a type with sneaking files of its own takes them
+        EXPECT_EQ(chooseFalloutMove(mFolder, "2hh", true, FalloutDirection::Forward, false, false, mFiles),
+            "meshes/characters/_male/sneak2hhforward.kf");
+        // a sneak that has no file for the way it goes walks the way it can
+        EXPECT_EQ(chooseFalloutMove(mFolder, "", true, FalloutDirection::Left, false, false, mFiles),
+            "meshes/characters/_male/sneakmtforward.kf");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutMove, walksWhenThereAreNoSneakingFiles)
+    {
+        const std::vector<std::string> files = { "meshes/creatures/dog/locomotion/mtforward.kf" };
+        EXPECT_EQ(chooseFalloutMove("meshes/creatures/dog/", "", true, FalloutDirection::Forward, false, false, files),
+            "meshes/creatures/dog/locomotion/mtforward.kf");
+        EXPECT_EQ(chooseFalloutMove("meshes/creatures/dog/", "", false, FalloutDirection::Forward, false, false, {}), "");
+        EXPECT_EQ(chooseFalloutMove("", "", false, FalloutDirection::Forward, false, false, files), "");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutMove, takesTheFolderOfTheSexFirstAndNeverThoseOfChildrenAndTheHurt)
+    {
+        const std::vector<std::string> files = { "meshes/characters/_male/locomotion/mtforward.kf",
+            "meshes/characters/_male/locomotion/female/mtforward.kf",
+            "meshes/characters/_male/locomotion/male/mtforward.kf", "meshes/characters/_male/locomotion/hurt/mtleft.kf",
+            "meshes/characters/_male/locomotion/child/mtleft.kf" };
+        EXPECT_EQ(chooseFalloutMove(mFolder, "", false, FalloutDirection::Forward, false, true, files),
+            "meshes/characters/_male/locomotion/female/mtforward.kf");
+        EXPECT_EQ(chooseFalloutMove(mFolder, "", false, FalloutDirection::Forward, false, false, files),
+            "meshes/characters/_male/locomotion/male/mtforward.kf");
+        EXPECT_EQ(chooseFalloutMove(mFolder, "", false, FalloutDirection::Left, false, false, files),
+            "meshes/characters/_male/locomotion/male/mtforward.kf");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutMove, doesNotTakeAFileThatOnlyEndsLikeTheName)
+    {
+        // "mtforward" is not the end of the name of "sneakmtforward"
+        const std::vector<std::string> files = { "meshes/characters/_male/sneakmtforward.kf" };
+        EXPECT_EQ(chooseFalloutMove(mFolder, "", false, FalloutDirection::Forward, false, false, files), "");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutMove, sneakIdleIsThatOfTheWeaponOrTheHandsFree)
+    {
+        EXPECT_EQ(chooseFalloutSneakIdle(mFolder, "", false, mFiles), "meshes/characters/_male/sneakmtidle.kf");
+        EXPECT_EQ(chooseFalloutSneakIdle(mFolder, "1hm", false, mFiles), "meshes/characters/_male/sneak1hmidle.kf");
+        EXPECT_EQ(chooseFalloutSneakIdle(mFolder, "1hp", false, mFiles), "meshes/characters/_male/sneakmtidle.kf");
+        EXPECT_EQ(chooseFalloutSneakIdle(mFolder, "", false, {}), "");
+    }
+
+    TEST(OpenFalloutRenderChooseFalloutDirection, isTheAxisWithTheLargerShare)
+    {
+        EXPECT_EQ(chooseFalloutDirection(100.f, 10.f, FalloutDirection::Forward), FalloutDirection::Forward);
+        EXPECT_EQ(chooseFalloutDirection(-100.f, 10.f, FalloutDirection::Forward), FalloutDirection::Backward);
+        EXPECT_EQ(chooseFalloutDirection(5.f, 100.f, FalloutDirection::Forward), FalloutDirection::Right);
+        EXPECT_EQ(chooseFalloutDirection(5.f, -100.f, FalloutDirection::Forward), FalloutDirection::Left);
+    }
+
+    TEST(OpenFalloutRenderChooseFalloutDirection, keepsTheAxisItWasOnUntilTheOtherHasClearlyMore)
+    {
+        // on the diagonal it stays where it was
+        EXPECT_EQ(chooseFalloutDirection(100.f, 110.f, FalloutDirection::Forward), FalloutDirection::Forward);
+        EXPECT_EQ(chooseFalloutDirection(100.f, 110.f, FalloutDirection::Right), FalloutDirection::Right);
+        EXPECT_EQ(chooseFalloutDirection(-100.f, 110.f, FalloutDirection::Backward), FalloutDirection::Backward);
+        EXPECT_EQ(chooseFalloutDirection(100.f, -110.f, FalloutDirection::Left), FalloutDirection::Left);
+        // and leaves when the other has clearly more
+        EXPECT_EQ(chooseFalloutDirection(100.f, 200.f, FalloutDirection::Forward), FalloutDirection::Right);
+        EXPECT_EQ(chooseFalloutDirection(200.f, 100.f, FalloutDirection::Right), FalloutDirection::Forward);
+    }
 }

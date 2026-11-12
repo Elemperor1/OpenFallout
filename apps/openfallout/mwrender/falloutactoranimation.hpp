@@ -118,6 +118,9 @@ namespace OFRender
         /// The gait that the speed at which the actor was moved calls for
         void updateGait(float duration);
         void setGait(FalloutGait gait);
+        /// The animation for the way the actor moves now (the gait, the direction it goes in relative to where it
+        /// faces, whether it sneaks, the weapon it holds): the old one stops and the new one plays over the idle
+        void updateMovement();
 
         osg::ref_ptr<AdvanceCallback> mAdvanceCallback;
         /// The transform that the body falls with, when it has died
@@ -158,6 +161,24 @@ namespace OFRender
         OFWorld::Ptr mMotionSource;
         std::string mWalkGroup;
         std::string mRunGroup;
+        /// The files of the forward walk and run (those of mWalkGroup and mRunGroup), the folder of the skeleton, the
+        /// sex of the actor, the groups made of the files of the other ways to move (by file), and the one that plays
+        /// as the movement now with the file it was made from (empty when the actor stands in its idle)
+        std::string mWalkFile;
+        std::string mRunFile;
+        std::string mMoveFolder;
+        bool mFemale = false;
+        std::map<std::string, std::string> mMoveGroups;
+        std::string mMoveGroup;
+        std::string mMoveFile;
+        /// How fast the actor goes ahead of where it faces and to its right (units a second, smoothed), and the
+        /// direction that makes
+        float mForwardSpeed = 0.f;
+        float mSideSpeed = 0.f;
+        FalloutDirection mDirection = FalloutDirection::Forward;
+        /// Whether the actor sneaked the last time it was asked, and how many movement files were said in the log
+        bool mSneaking = false;
+        int mMovesSaid = 0;
         FalloutGaits mGaits;
         FalloutGait mGait = FalloutGait::Idle;
         /// The speed (units a second, across the ground) at which the actor is moved, smoothed over a few frames

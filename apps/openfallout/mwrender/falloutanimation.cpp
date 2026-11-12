@@ -1,6 +1,7 @@
 #include "falloutanimation.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <initializer_list>
 #include <iterator>
 
@@ -177,6 +178,129 @@ namespace OFRender
         const std::string run = choose({ "mtfastforward", "fastforward", "h2hfastforward" },
             [&](std::string_view name) { return goesForward(name) && has(name, "fast"); });
         return { walk, run };
+    }
+
+    FalloutDirection chooseFalloutDirection(float forward, float side, FalloutDirection current)
+    {
+        constexpr float sSwitchRatio = 1.4f;
+        const float ahead = std::abs(forward);
+        const float across = std::abs(side);
+        const bool alongFront = current == FalloutDirection::Forward || current == FalloutDirection::Backward;
+        // The axis the character moves along is kept until the other one has clearly more
+        const bool useFront = alongFront ? ahead * sSwitchRatio >= across : across * sSwitchRatio < ahead;
+        if (useFront)
+            return forward < 0.f ? FalloutDirection::Backward : FalloutDirection::Forward;
+        return side < 0.f ? FalloutDirection::Left : FalloutDirection::Right;
+    }
+
+    namespace
+    {
+        /// The path of the file `stem`.kf for a character: the folder for its sex below `locomotion` first, then the
+        /// folder of the skeleton and `locomotion` itself, then any other folder below, except those of children and of
+        /// the hurt. Empty when there is none.
+        std::string findMoveFile(
+            std::string_view folder, std::string_view stem, bool female, const std::vector<std::string>& files)
+        {
+            const std::string wanted = std::string(stem) + std::string(sExtension);
+            const std::string* best = nullptr;
+            int bestRank = 0;
+            for (const std::string& path : files)
+            {
+                if (!path.starts_with(folder) || !path.ends_with(wanted))
+                    continue;
+                std::string_view rest = std::string_view(path).substr(folder.size());
+                rest.remove_suffix(wanted.size());
+                // What is left is "" or the folders in front of the name, ending with a slash
+                if (!rest.empty() && !rest.ends_with('/'))
+                    continue;
+                rest.remove_suffix(rest.empty() ? 0 : 1);
+                int rank = 2;
+                if (rest.empty() || rest == "locomotion")
+                    rank = 1;
+                else if (rest == (female ? "locomotion/female" : "locomotion/male"))
+                    rank = 0;
+                else if (rest.find("child") != std::string_view::npos || rest.find("hurt") != std::string_view::npos)
+                    continue;
+                if (best == nullptr || rank < bestRank || (rank == bestRank && path < *best))
+                {
+                    best = &path;
+                    bestRank = rank;
+                }
+            }
+            return best == nullptr ? std::string() : *best;
+        }
+
+        std::string_view directionName(FalloutDirection direction)
+        {
+            switch (direction)
+            {
+                case FalloutDirection::Backward:
+                    return "backward";
+                case FalloutDirection::Left:
+                    return "left";
+                case FalloutDirection::Right:
+                    return "right";
+                case FalloutDirection::Forward:
+                    break;
+            }
+            return "forward";
+        }
+    }
+
+    std::string chooseFalloutMove(std::string_view folder, std::string_view prefix, bool sneak,
+        FalloutDirection direction, bool run, bool female, const std::vector<std::string>& files)
+    {
+        if (folder.empty())
+            return {};
+        const std::string fast = run ? "fast" : "";
+        const bool weapon = !prefix.empty() && prefix != "mt";
+        // A sneak that has no file for the way it goes sneaks the way it can before it stands up to walk: the sneaking
+        // files of both ways first, then the walking ones
+        for (const bool sneaking : { true, false })
+        {
+            if (sneaking && !sneak)
+                continue;
+            for (const FalloutDirection tried : { direction, FalloutDirection::Forward })
+            {
+                const std::string way = fast + std::string(directionName(tried));
+                std::vector<std::string> stems;
+                if (sneaking)
+                {
+                    if (weapon)
+                        stems.push_back("sneak" + std::string(prefix) + way);
+                    stems.push_back("sneakmt" + way);
+                }
+                else
+                {
+                    if (weapon)
+                        stems.push_back(std::string(prefix) + way);
+                    stems.push_back("mt" + way);
+                }
+                for (const std::string& stem : stems)
+                {
+                    std::string file = findMoveFile(folder, stem, female, files);
+                    if (!file.empty())
+                        return file;
+                }
+                if (tried == FalloutDirection::Forward)
+                    break;
+            }
+        }
+        return {};
+    }
+
+    std::string chooseFalloutSneakIdle(
+        std::string_view folder, std::string_view prefix, bool female, const std::vector<std::string>& files)
+    {
+        if (folder.empty())
+            return {};
+        if (!prefix.empty() && prefix != "mt")
+        {
+            std::string file = findMoveFile(folder, "sneak" + std::string(prefix) + "idle", female, files);
+            if (!file.empty())
+                return file;
+        }
+        return findMoveFile(folder, "sneakmtidle", female, files);
     }
 
     FalloutGait chooseFalloutGait(float speed, FalloutGait current, const FalloutGaits& gaits)
