@@ -66,6 +66,7 @@ if (APPLE)
     set(APP_BUNDLE_NAME "${CMAKE_PROJECT_NAME}.app")
 
     set(APP_BUNDLE_DIR "${OpenFallout_BINARY_DIR}/${APP_BUNDLE_NAME}")
+    set(OPENFALLOUT_ENGINE_APP_DIR "${APP_BUNDLE_DIR}/Contents/Helpers/OpenFallout Engine.app")
 endif (APPLE)
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/)
@@ -817,6 +818,13 @@ if (APPLE AND (BUILD_OPENFALLOUT OR BUILD_OPENCS))
     if (BUILD_OPENFALLOUT)
         list(APPEND CPACK_OPENFALLOUT_APPLICATIONS "${APP_BUNDLE_NAME}")
         list(APPEND CPACK_OPENFALLOUT_ENTITLEMENTS "${OpenFallout_SOURCE_DIR}/files/mac/openfallout.entitlements")
+        # The game is started through this nested app (Contents/Helpers) so that the Qt launcher stays the main
+        # executable of OpenFallout.app while `open` can still start the engine with Game Mode. Its executable is a
+        # small shim (apps/openfallout/macos) that replaces itself with Contents/MacOS/openfallout of the outer app.
+        configure_file("${OpenFallout_SOURCE_DIR}/files/mac/openfallout-engine-Info.plist.in"
+            "${OPENFALLOUT_ENGINE_APP_DIR}/Contents/Info.plist")
+        configure_file("${OpenFallout_SOURCE_DIR}/files/mac/openmw.icns"
+            "${OPENFALLOUT_ENGINE_APP_DIR}/Contents/Resources/OpenFallout.icns" COPYONLY)
         install(DIRECTORY "${APP_BUNDLE_DIR}" USE_SOURCE_PERMISSIONS DESTINATION "." COMPONENT Runtime)
     endif()
     if (BUILD_OPENCS)

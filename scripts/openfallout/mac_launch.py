@@ -5,9 +5,11 @@ macOS only gives Game Mode to a game that LaunchServices started; a binary start
 `open` is Apple's way to start a bundle from the command line and still pass arguments, environment variables and
 standard output and error. This helper wraps it:
 
-    scripts/openfallout/mac_launch.py [--app PATH] [--stdout FILE] [--stderr FILE] [--env NAME=VALUE]...
+    scripts/openfallout/mac_launch.py [--app BUNDLE] [--stdout FILE] [--stderr FILE] [--env NAME=VALUE]...
                                       [--metal-hud] [--] [engine arguments...]
 
+By default it opens OpenFallout.app/Contents/Helpers/OpenFallout Engine.app in /Applications: a small app nested in
+the package whose program runs the engine of the outer app (the outer app's own program is the Qt launcher).
 Everything after `--` goes to the engine unchanged (`--config`, `--user-data`, `--skip-menu`, `--start`, ...).
 The helper waits until the app has quit. Its exit status is that of `open`: non-zero when the app could not be
 started. `open` does not report the app's own exit code, so a caller that needs to know how the engine ended reads
@@ -21,8 +23,9 @@ import plistlib
 import subprocess
 import sys
 
-DEFAULT_APP = "/Applications/OpenFallout.app"
-ENGINE = "openfallout"
+# The Qt launcher is the main executable of OpenFallout.app; the nested engine app starts the engine.
+DEFAULT_APP = "/Applications/OpenFallout.app/Contents/Helpers/OpenFallout Engine.app"
+ENGINE_EXECUTABLES = ("OpenFallout Engine", "openfallout")
 
 
 def bundle_executable(app):
@@ -49,7 +52,9 @@ def main(argv=None):
         argv, engine_args = argv[:split], argv[split + 1:]
     parser = argparse.ArgumentParser(usage="%(prog)s [options] [-- engine arguments...]",
                                      description=__doc__.split("\n\n")[0])
-    parser.add_argument("--app", default=DEFAULT_APP, help="app bundle to start (default: %(default)s)")
+    parser.add_argument("--app", default=DEFAULT_APP,
+                        help="app bundle to start (default: %(default)s); the engine app of another copy, or "
+                             "OpenFallout.app itself to start the launcher")
     parser.add_argument("--stdout", default="openfallout.stdout.log", help="file for standard output")
     parser.add_argument("--stderr", default="openfallout.stderr.log", help="file for standard error")
     parser.add_argument("--env", action="append", default=[], metavar="NAME=VALUE",
@@ -59,8 +64,8 @@ def main(argv=None):
 
     env = options.env + (["MTL_HUD_ENABLED=1"] if options.metal_hud else [])
     executable = bundle_executable(options.app)
-    if executable not in (None, ENGINE):
-        print(f"mac_launch: {options.app} starts {executable}, not {ENGINE}; the engine arguments go to that program",
+    if executable is not None and executable not in ENGINE_EXECUTABLES:
+        print(f"mac_launch: {options.app} starts {executable}, not the engine; the engine arguments go to that program",
               file=sys.stderr)
 
     stdout, stderr = Path(options.stdout).absolute(), Path(options.stderr).absolute()

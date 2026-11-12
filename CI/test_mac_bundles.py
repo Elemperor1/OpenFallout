@@ -3,9 +3,9 @@
 import os
 import plistlib
 from pathlib import Path
-import plistlib
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parent.parent
 MACHO = bytes.fromhex("cffaedfe") + bytes(28)
 IDENTITY = "Developer ID Application: Example Studio (EXAMPLE123)"
 TEAM = "EXAMPLE123"
+ENGINE_APP = "OpenFallout.app/Contents/Helpers/OpenFallout Engine.app"
 ENTITLEMENTS = {
     "OpenFallout.app": "openfallout.entitlements",
     "OpenFallout-CS.app": "openfallout-cs.entitlements",
@@ -28,6 +29,8 @@ class MacBundleTests(unittest.TestCase):
         source, build = root / "source", root / "build"
         (source / "files/mac").mkdir(parents=True)
         (source / "files/mac/qt.conf").write_text("[Paths]\nPlugins=../PlugIns\n")
+        for name in ("openfallout-engine-Info.plist.in", "openmw.icns"):
+            shutil.copy(ROOT / "files/mac" / name, source / "files/mac")
         for name in ("README.md", "CHANGELOG.md", "LICENSE", "AUTHORS.md"):
             (source / name).touch()
         (source / "cmake").mkdir()
@@ -46,8 +49,10 @@ set(OpenFallout_SOURCE_DIR "${CMAKE_SOURCE_DIR}")
 set(OpenFallout_BINARY_DIR "${CMAKE_BINARY_DIR}")
 set(APP_BUNDLE_NAME "OpenFallout.app")
 set(APP_BUNDLE_DIR "${CMAKE_BINARY_DIR}/${APP_BUNDLE_NAME}")
+set(OPENFALLOUT_ENGINE_APP_DIR "${APP_BUNDLE_DIR}/Contents/Helpers/OpenFallout Engine.app")
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 set(CPACK_PACKAGE_VERSION "0.1.0")
+set(OPENFALLOUT_VERSION "0.1.0")
 set(OPENSCENEGRAPH_VERSION "3.6.5")
 set(USED_OSG_PLUGINS dummy)
 if(BUILD_OPENCS)
@@ -126,6 +131,13 @@ endif()
                 (contents / relative).write_bytes(data)
             (framework / "Versions/Current").symlink_to("A")
             (framework / "QtCore").symlink_to("Versions/Current/QtCore")
+            if bundle == "OpenFallout.app":
+                engine = contents / "Helpers/OpenFallout Engine.app/Contents"
+                (engine / "MacOS").mkdir(parents=True)
+                (engine / "Info.plist").write_text(
+                    "<plist><dict><key>CFBundleExecutable</key>"
+                    "<string>OpenFallout Engine</string></dict></plist>\n")
+                (engine / "MacOS/OpenFallout Engine").write_bytes(MACHO)
         return stage
 
     def sign(self, root, bundles, **environment):
@@ -174,6 +186,9 @@ endif()
                 "PlugIns/osgPlugins/osgdb_dds.so",
                 "PlugIns/platforms/libqcocoa.dylib",
             )]
+            if bundle == "OpenFallout.app":
+                # The engine app is signed as a bundle; its shim is sealed by that signature.
+                nested.append(app + "/Contents/Helpers/OpenFallout Engine.app")
             self.assertIn(app, targets)
             for item in nested:
                 self.assertEqual(targets.count(item), 1, item)
@@ -196,11 +211,14 @@ endif()
             entitlements = str(ROOT / "files/mac" / ENTITLEMENTS[bundle])
             # Executables carry their app's entitlements; libraries and plug-ins
             # take those of the process that loads them.
-            for target in (app, app + "/Contents/MacOS/helper"):
+            executables = [app, app + "/Contents/MacOS/helper"]
+            if bundle == "OpenFallout.app":
+                executables.append(app + "/Contents/Helpers/OpenFallout Engine.app")
+            for target in executables:
                 call = next(call for call in calls if call[-1] == target)
                 self.assertEqual(call[call.index("--entitlements") + 1], entitlements)
             for call in calls:
-                if call[-1].startswith(app + "/Contents/") and "/Contents/MacOS/" not in call[-1]:
+                if call[-1].startswith(app + "/Contents/") and call[-1] not in executables:
                     self.assertNotIn("--entitlements", call)
 
     def test_entitlements_files_are_release_safe(self):
@@ -237,6 +255,25 @@ endif()
     def test_identity_without_team_verifies_strictly(self):
         calls = self.sign_with_identity(["OpenFallout.app"])
         self.assertEqual(calls[-1], ["--verify", "--deep", "--strict", str(self.app_root / "OpenFallout.app")])
+
+    def test_game_bundle_holds_the_engine_app(self):
+        _, build = self.configure(game=True, editor=False, qt=False)
+        engine = build / ENGINE_APP
+        with (engine / "Contents/Info.plist").open("rb") as file:
+            plist = plistlib.load(file)
+        self.assertEqual(plist["CFBundleExecutable"], "OpenFallout Engine")
+        self.assertEqual(plist["CFBundleIdentifier"], "org.openfallout.openfallout.engine")
+        self.assertEqual(plist["CFBundlePackageType"], "APPL")
+        self.assertEqual(plist["CFBundleShortVersionString"], "0.1.0")
+        self.assertIs(plist.get("LSSupportsGameMode"), True)
+        self.assertEqual(plist.get("LSApplicationCategoryType"), "public.app-category.role-playing-games")
+        self.assertIs(plist.get("NSHighResolutionCapable"), True)
+        self.assertNotIn("LSRequiresCarbon", plist)
+        self.assertTrue((engine / "Contents/Resources" / plist["CFBundleIconFile"]).is_file())
+
+    def test_editor_only_has_no_engine_app(self):
+        _, build = self.configure(game=False, editor=True, qt=True)
+        self.assertFalse((build / ENGINE_APP).exists())
 
     def test_tools_only_without_qt(self):
         self.check_bundles(game=False, editor=False, qt=False)
@@ -281,6 +318,30 @@ class MacInfoPlistTests(unittest.TestCase):
         plist = self.render("openfallout-cs-Info.plist.in")
         self.assertNotIn("LSRequiresCarbon", plist)
         self.assertIs(plist.get("NSHighResolutionCapable"), True)
+
+
+@unittest.skipUnless(sys.platform == "darwin" and shutil.which("c++"), "needs macOS and a C++ compiler")
+class MacEngineShimTests(unittest.TestCase):
+    """Build the engine app's executable and run it inside a stand-in OpenFallout.app."""
+
+    def test_shim_runs_the_engine_of_the_outer_app(self):
+        temporary = tempfile.TemporaryDirectory(prefix="mac shim ")
+        self.addCleanup(temporary.cleanup)
+        app = Path(temporary.name).resolve() / "OpenFallout.app"
+        shim = app / "Contents/Helpers/OpenFallout Engine.app/Contents/MacOS/OpenFallout Engine"
+        shim.parent.mkdir(parents=True)
+        engine = app / "Contents/MacOS/openfallout"
+        engine.parent.mkdir(parents=True)
+        engine.write_text('#!/bin/sh\nprintf "%s\\n" "$0" "$@"\nexit 7\n')
+        engine.chmod(0o755)
+        result = subprocess.run(["c++", "-std=c++17", "-o", str(shim),
+                                 str(ROOT / "apps/openfallout/macos/engineappshim.cpp")],
+                                text=True, capture_output=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        result = subprocess.run([str(shim), "--config", "/a folder", "--skip-menu"], text=True, capture_output=True)
+        self.assertEqual(result.returncode, 7, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), [str(engine), "--config", "/a folder", "--skip-menu"])
 
 
 if __name__ == "__main__":

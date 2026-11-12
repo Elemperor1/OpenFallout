@@ -12,8 +12,8 @@
 # Neither value is printed.
 #
 # Entitlements: CPACK_OPENFALLOUT_ENTITLEMENTS holds one entitlements file per entry of CPACK_OPENFALLOUT_APPLICATIONS
-# (files/mac/*.entitlements). They are applied to the bundle and its helper executables only; libraries and plug-ins take
-# the entitlements of the process that loads them.
+# (files/mac/*.entitlements). They are applied to the bundle, its helper executables and the apps nested in
+# Contents/Helpers only; libraries and plug-ins take the entitlements of the process that loads them.
 
 # Obviously, we only need to run this on Apple targets.
 if (APPLE)
@@ -46,7 +46,10 @@ if (APPLE)
                 continue()
             endif()
             file(RELATIVE_PATH relative "${bundle_path}" "${candidate}")
-            if (relative MATCHES "^(.*\\.framework)/")
+            if (relative MATCHES "^(Contents/Helpers/[^/]+\\.app)/")
+                # A nested app (the engine app) is signed as a bundle, which seals its own executable.
+                set(candidate "${bundle_path}/${CMAKE_MATCH_1}")
+            elseif (relative MATCHES "^(.*\\.framework)/")
                 set(candidate "${bundle_path}/${CMAKE_MATCH_1}")
             endif()
             list(APPEND items "${candidate}")
@@ -101,7 +104,7 @@ if (APPLE)
         foreach (item IN LISTS NESTED_CODE ITEMS "${FULL_APP_PATH}")
             set(entitlement_args "")
             string(FIND "${item}" "${FULL_APP_PATH}/Contents/MacOS/" helper_position)
-            if (item STREQUAL FULL_APP_PATH OR helper_position EQUAL 0)
+            if (item STREQUAL FULL_APP_PATH OR helper_position EQUAL 0 OR item MATCHES "/Contents/Helpers/[^/]+\\.app$")
                 set(entitlement_args "--entitlements" "${APP_ENTITLEMENTS}")
             endif()
             execute_process(COMMAND "codesign" "--force" "--options" "runtime" "--timestamp" ${entitlement_args}

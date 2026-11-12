@@ -53,6 +53,12 @@ class MacLaunchTests(unittest.TestCase):
             "--args", "--config", "/tmp/cfg dir", "--user-data", "/tmp/data", "--skip-menu",
         ])
 
+    def test_opens_the_nested_engine_app_by_default(self):
+        result, argv = self.launch()
+        self.assertEqual(argv[argv.index("-a") + 1],
+                         "/Applications/OpenFallout.app/Contents/Helpers/OpenFallout Engine.app")
+        self.assertEqual(result.stderr, "")
+
     def test_passes_environment_variables_and_the_metal_hud(self):
         result, argv = self.launch("--app", str(self.app), "--env", "OSG_NOTIFY_LEVEL=DEBUG", "--metal-hud")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -77,9 +83,10 @@ class MacLaunchTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertIn("openfallout-launcher", result.stderr)
 
-        (contents / "Info.plist").write_bytes(plistlib.dumps({"CFBundleExecutable": "openfallout"}))
-        result, _ = self.launch("--app", str(self.app))
-        self.assertEqual(result.stderr, "")
+        for engine in ("openfallout", "OpenFallout Engine"):
+            (contents / "Info.plist").write_bytes(plistlib.dumps({"CFBundleExecutable": engine}))
+            result, _ = self.launch("--app", str(self.app))
+            self.assertEqual(result.stderr, "", engine)
 
 
 if __name__ == "__main__":
