@@ -332,6 +332,15 @@ namespace
                         { 35.f, 100.f });
             EXPECT_TRUE(met) << "a wall at " << wall << " was not met";
         }
+        // The walk ends with what is left of a step: a wall in a short last segment is met (a route of 100.5 units, a wall
+        // at 99.25, where the probe of 50 to 100 reaches no further than 99)
+        {
+            const auto floor = [](float, float, float) -> std::optional<float> { return 0.f; };
+            const auto blocked = [&probeFor](const osg::Vec3f& from, const osg::Vec3f& to) {
+                return falloutSegmentBlocked(from, to, probeFor(99.25f), { 35.f, 100.f });
+            };
+            EXPECT_FALSE(falloutStraightWalkable(osg::Vec3f(0, 0, 0), osg::Vec3f(100.5f, 0, 0), floor, blocked));
+        }
         // Nothing in the way, and a segment that is no longer than a unit
         EXPECT_FALSE(falloutSegmentBlocked(
             osg::Vec3f(0, 0, 0), osg::Vec3f(50, 0, 0), [](const osg::Vec3f&, const osg::Vec3f&, float longest) { return longest; },

@@ -338,14 +338,25 @@ namespace OFRender
         if (mFirstPerson)
         {
             const OFClass::FalloutNpcParts bare = OFClass::falloutNpcParts(*race, isFemale, nullptr, {}, {});
+            // Which hand a file is for: the glove of the Pip-Boy is a worn piece that is the left hand of the first person, and a
+            // hand that it covers must not be drawn under it
+            const auto sideOf = [](const std::string& model) {
+                const std::string lower = Misc::StringUtils::lowerCase(model);
+                if (lower.find("left") != std::string::npos)
+                    return 1;
+                return lower.find("right") != std::string::npos ? 2 : 0;
+            };
             for (const OFClass::FalloutNpcPart& hand : bare.mParts)
             {
                 if (hand.mKind != OFClass::FalloutPartKind::Hand)
                     continue;
+                const int side = sideOf(hand.mModel);
                 const bool listed = std::any_of(shown.mParts.begin(), shown.mParts.end(),
-                    [&hand](const OFClass::FalloutNpcPart& other) {
-                        return other.mKind == OFClass::FalloutPartKind::Hand
-                            && Misc::StringUtils::ciEqual(other.mModel, hand.mModel);
+                    [&](const OFClass::FalloutNpcPart& other) {
+                        if (!falloutIsFirstPersonPart(other.mKind == OFClass::FalloutPartKind::Hand, other.mModel))
+                            return false;
+                        return Misc::StringUtils::ciEqual(other.mModel, hand.mModel)
+                            || (side != 0 && sideOf(other.mModel) == side);
                     });
                 if (!listed)
                     shown.mParts.push_back(hand);

@@ -160,7 +160,9 @@ namespace OFMechanics
     {
         const osg::Vec3f way = to - from;
         const float length = way.length();
-        if (length <= 1.f)
+        // (a segment that is only a little long is looked at too: the walk ends with the part of a step that is left, and a
+        // wall may stand in it)
+        if (length < 1e-3f)
             return false;
         const osg::Vec3f direction = way / length;
         for (const float height : heights)

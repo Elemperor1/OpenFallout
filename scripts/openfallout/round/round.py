@@ -597,6 +597,8 @@ def run_engine(command, run_dir, limit, env_extra=None, priority="low", guard=No
         # kill switch is set, which every later one is refused for until somebody has looked and resumed
         reason = f"the engine (pid {process.pid}) did not end after SIGKILL; look at the process list, then run `round.py resume`"
         print(reason, flush=True)
+        # The round is not a pass with an engine that may still run: the reason is the guard's, which the report and the exit say
+        tripped = tripped or reason
         if guard is not None:
             guard.state.stop(reason + "\n")
     sampler.stop()
