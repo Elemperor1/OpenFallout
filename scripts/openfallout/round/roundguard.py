@@ -24,6 +24,7 @@ import ctypes
 import json
 import os
 import re
+import stat
 import subprocess
 import threading
 import time
@@ -296,14 +297,13 @@ class State:
     def heavy_file(self): return self.folder / "last-heavy.json"
 
     def stopped(self):
-        return self.stop_file.exists()
+        # A link in the place of the file counts (a dangling one is not "there" for exists()): somebody put it there to be seen
+        return self.stop_file.exists() or self.stop_file.is_symlink()
 
     def _write(self, path, text):
         """Writes one of the guards' files in a folder that is the user's own and not through a link that somebody else planted (the
         folder may be in a shared temporary folder): a refusal, not a write, when it is not so."""
-        self.folder.mkdir(parents=True, exist_ok=True)
-        if os.stat(self.folder).st_uid != os.getuid():
-            raise Refused([f"the folder of the guards ({self.folder}) belongs to another user"])
+        check_guard_folder(self.folder)
         try:
             descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
         except OSError as error:
@@ -345,6 +345,18 @@ class State:
         return max(0.0, ended + seconds - (time.time() if now is None else now))
 
 
+def check_guard_folder(folder):
+    """Makes the folder of the guards if it is not there, and refuses one that is a link or belongs to another user (it may be in a
+    shared temporary folder, where anybody can make it first)."""
+    folder = Path(folder)
+    folder.mkdir(parents=True, exist_ok=True)
+    found = os.lstat(folder)
+    if stat.S_ISLNK(found.st_mode):
+        raise Refused([f"the folder of the guards ({folder}) is a link"])
+    if found.st_uid != os.getuid():
+        raise Refused([f"the folder of the guards ({folder}) belongs to another user"])
+
+
 class Lock:
     """One lock for a build or a run: the second to ask is refused with the name of the holder."""
 
@@ -353,11 +365,9 @@ class Lock:
 
     def __enter__(self):
         import fcntl
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        # The folder is the user's own (a shared temporary folder is not a place to trust: somebody else may have made it), and the
-        # lock is not a link that somebody else planted (a link would have the runner truncate and write into its target)
-        if os.stat(self.path.parent).st_uid != os.getuid():
-            raise Refused([f"the folder of the guards ({self.path.parent}) belongs to another user"])
+        # The folder is the user's own and not a link (a shared temporary folder is not a place to trust: somebody else may have made
+        # it), and the lock is not a link that somebody else planted (a link would have the runner truncate and write into its target)
+        check_guard_folder(self.path.parent)
         try:
             descriptor = os.open(self.path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
         except OSError as error:

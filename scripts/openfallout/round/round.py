@@ -803,6 +803,8 @@ def command_run(args):
             if refusals:
                 return refusal_exit(refusals)
             wait_settled(state, system)
+            if state.stopped():
+                return refusal_exit([f"the kill switch was set while the round waited ({state.stop_file})"])
             return run_round(args, profile, config, save, out_root, variants, state, system, warnings)
     except roundguard.Refused as refused:
         return refusal_exit(refused.reasons)
@@ -924,6 +926,9 @@ def command_build(args):
             if refusals:
                 return refusal_exit(refusals)
             wait_settled(state, system)
+            # A stop asked for while the build waited for the computer's rest ends the wait: it must not then start the build
+            if state.stopped():
+                return refusal_exit([f"the kill switch was set while the build waited ({state.stop_file})"])
             try:
                 return build_engine(args, jobs)
             finally:

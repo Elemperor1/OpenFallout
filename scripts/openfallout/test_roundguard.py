@@ -163,6 +163,24 @@ class StateAndLock(unittest.TestCase):
         self.state.heavy_ended("build")                       # advice only: no failure, and nothing written
         self.assertEqual(target.read_text(encoding="utf-8"), "keep me")
 
+    def test_a_guard_folder_that_is_a_link_is_refused_and_a_link_for_the_stop_file_counts_as_set(self):
+        real = self.tmp / "elsewhere"
+        real.mkdir()
+        state = roundguard.State(self.tmp / "results")
+        (self.tmp / "results").mkdir()
+        state.folder.symlink_to(real)
+        with self.assertRaises(roundguard.Refused):
+            state.stop("note")
+        with self.assertRaises(roundguard.Refused):
+            with roundguard.Lock(state.lock_file, "round x"):
+                self.fail("a folder that is a link must be refused")
+        self.assertEqual(list(real.iterdir()), [])
+        # a dangling link where the kill switch goes is a kill switch that is set
+        other = roundguard.State(self.tmp / "other")
+        other.folder.mkdir(parents=True)
+        other.stop_file.symlink_to(self.tmp / "nowhere")
+        self.assertTrue(other.stopped())
+
     def test_the_lock_is_held_by_one_at_a_time_and_says_by_whom(self):
         with roundguard.Lock(self.state.lock_file, "build"):
             with self.assertRaises(roundguard.Refused) as refused:

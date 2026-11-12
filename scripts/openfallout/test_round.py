@@ -855,6 +855,27 @@ class GuardedBuild(unittest.TestCase):
             self.assertIsNotNone(roundguard_state(self.tmp).acknowledged())
 
 
+class BuildAndRunAfterTheWait(unittest.TestCase):
+    def test_a_stop_asked_for_during_the_wait_for_rest_starts_nothing(self):
+        tmp = Path(tempfile.mkdtemp(prefix="stop-wait-"))
+        profile = tmp / "profile.json"
+        profile.write_text(json.dumps({"engine": str(tmp / "engine"), "out": str(tmp / "out")}), encoding="utf-8")
+        args = mock.Mock(profile=str(profile), out=None, jobs=2, allow_heavy=False)
+        state = round_runner.roundguard.State(tmp / "out")
+
+        def stops(_state, _system):
+            state.stop("asked during the wait")
+            return 3.0
+
+        system = mock.Mock(settles=True)
+        with mock.patch.object(round_runner, "make_system", return_value=system), \
+                mock.patch.object(round_runner, "check_computer", return_value=([], [])), \
+                mock.patch.object(round_runner, "wait_settled", side_effect=stops), \
+                mock.patch.object(round_runner, "build_engine") as built, contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(round_runner.command_build(args), 4)
+        built.assert_not_called()
+
+
 class GuardRoot(unittest.TestCase):
     def test_a_run_keeps_the_guards_of_its_profile_whatever_folder_its_results_go_to(self):
         tmp = Path(tempfile.mkdtemp(prefix="guard-root-"))
