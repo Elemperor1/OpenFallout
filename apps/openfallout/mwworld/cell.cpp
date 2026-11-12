@@ -194,6 +194,10 @@ namespace OFWorld
             = resolveCellClimate(cell, world, [&](ESM::FormId id) { return worlds.search(ESM::RefId(id)); });
         if (!climate.isZeroOrUnset())
             mRegion = ESM::RefId(climate);
+        mMusic = cell.mMusic;
+        if (mMusic.isZeroOrUnset() && world != nullptr)
+            mMusic = world->mMusic;
+        mMusicType = cell.mMusicType;
         mDescription = getCellDescription(cell, world);
     }
 

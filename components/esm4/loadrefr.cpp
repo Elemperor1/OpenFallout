@@ -317,7 +317,22 @@ void ESM4::Reference::load(ESM4::Reader& reader)
             case ESM::fourCC("LNAM"): // lighting template formId
             case ESM::fourCC("XLIG"): // struct, FOV, fade, etc
             case ESM::fourCC("XEMI"): // LIGH formId
-            case ESM::fourCC("XRDS"): // Radius or Radiance
+            case ESM::fourCC("XRDS"): // Radius or Radiance: the radius of an audio marker
+                reader.get(mAudioMarker.mRadius);
+                break;
+            case ESM::fourCC("MMRK"): // FONV
+                mAudioMarker.mIsMarker = true;
+                reader.skipSubRecordData();
+                break;
+            case ESM::fourCC("BNAM"): // FONV: the flags of an audio marker
+                reader.get(mAudioMarker.mFlags);
+                break;
+            case ESM::fourCC("MNAM"): // FONV: the share at which the middle layer of an audio marker comes in
+                reader.get(mAudioMarker.mLayer2Trigger);
+                break;
+            case ESM::fourCC("NNAM"): // FONV: the share at which the inner layer comes in
+                reader.get(mAudioMarker.mLayer3Trigger);
+                break;
             case ESM::fourCC("XRGB"):
             case ESM::fourCC("XRGD"): // tangent data?
             case ESM::fourCC("XALP"): // alpha cutoff
@@ -371,10 +386,6 @@ void ESM4::Reference::load(ESM4::Reader& reader)
             case ESM::fourCC("XCLP"): // FO3
             case ESM::fourCC("SCDA"): // FO3
             case ESM::fourCC("RCLR"): // FO3
-            case ESM::fourCC("BNAM"): // FONV
-            case ESM::fourCC("MMRK"): // FONV
-            case ESM::fourCC("MNAM"): // FONV
-            case ESM::fourCC("NNAM"): // FONV
             case ESM::fourCC("XATO"): // FONV
             case ESM::fourCC("SCRV"): // FONV
             case ESM::fourCC("SCVR"): // FONV

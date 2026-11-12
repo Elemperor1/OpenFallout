@@ -125,6 +125,19 @@ namespace ESM4
 
         ESM::FormId mAudioLocation;
 
+        /// An audio marker of New Vegas (MMRK): the place that its media location controller (CNAM, above) plays
+        /// music at, out to a radius (XRDS). The two trigger shares (MNAM, NNAM: 0.33 and 0.67 in the game's files)
+        /// say how far in the middle and inner layers come in, BNAM is a flag of the marker.
+        struct AudioMarker
+        {
+            bool mIsMarker = false;
+            float mRadius = 0.f;
+            float mLayer2Trigger = 0.f;
+            float mLayer3Trigger = 0.f;
+            std::uint32_t mFlags = 0;
+        };
+        AudioMarker mAudioMarker;
+
         RadioStationData mRadio;
 
         TeleportDest mDoor;

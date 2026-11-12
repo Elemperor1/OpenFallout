@@ -60,6 +60,7 @@
 #include <components/falloutscript/limbs.hpp>
 #include <components/falloutscript/magic.hpp>
 #include <components/falloutscript/mapmarkers.hpp>
+#include <components/falloutscript/music.hpp>
 #include <components/falloutscript/messagecommands.hpp>
 #include <components/falloutscript/objectcommands.hpp>
 #include <components/falloutscript/objects.hpp>
@@ -91,6 +92,7 @@
 #include <osg/Vec3f>
 #include <osg/observer_ptr>
 
+#include "../mwsound/falloutmusic.hpp"
 #include "../mwworld/ptr.hpp"
 
 namespace ESM
@@ -2855,6 +2857,45 @@ namespace OFScript
         /// loses health (FalloutNV.exe 0x889930, Mac rounds 12BI and 12BM). It is full again as soon as the head is
         /// out.
         void updateBreath(float frametime);
+
+        /// The music of the place the player is in and of the fights (falloutmusic.cpp): Fallout 3's folders of tracks,
+        /// New Vegas's location sets and battle sets, and the music of a fight for both.
+        struct MusicMarker
+        {
+            osg::Vec3f mPosition;
+            float mRadius = 0.f;
+            ESM::FormId mController;
+        };
+        struct MusicPlayback
+        {
+            FalloutScript::Music::CombatMusic mCombat;
+            FalloutScript::Music::Director mDirector;
+            std::mt19937 mRandom{ std::random_device{}() };
+            std::unique_ptr<OFSound::FalloutMusicRecords> mRecords;
+            // The track of a music record that the director started
+            OFBase::SoundManager::MusicTrackId mTrack = 0;
+            bool mTrackLoops = false;
+            // The track that a script played (PlayMusic)
+            OFBase::SoundManager::MusicTrackId mScriptTrack = 0;
+            // New Vegas: the media set that plays from the media location controller of the audio marker the player is in
+            OFSound::MusicMixer mMixer;
+            std::map<ESM::RefId, std::vector<MusicMarker>> mMarkers;
+            ESM::FormId mController;
+            ESM::FormId mSet;
+            ESM::FormId mBattleSet;
+            std::string mStemKey;
+            std::vector<OFSound::MusicMixer::Stem> mStems;
+            float mStemFade = 1.f;
+            bool mTitleStopped = false;
+            bool mConfigured = false;
+            bool mScriptBlocked = false;
+            int mLogged = 0;
+        };
+        void updateMusic(float frametime);
+        void resetMusic();
+        void logMusic(const std::string& text);
+        MusicPlayback mMusicPlayback;
+        std::mutex mMusicMutex;
         /// The seconds that the player holds its breath
         double mostBreath();
         /// Whether the furniture is a bed that the actor would lie on

@@ -7,7 +7,8 @@ namespace OFSound
 {
     constexpr VFS::Path::NormalizedView battlePlaylist("battle");
     constexpr VFS::Path::NormalizedView explorePlaylist("explore");
-    constexpr VFS::Path::NormalizedView titleMusic("music/special/morrowind title.mp3");
+    // Data/Music/Special/MainTitle.mp3, the title music of both games (FalloutNV.exe 0x1076F3C)
+    constexpr VFS::Path::NormalizedView titleMusic("music/special/maintitle.mp3");
     constexpr VFS::Path::NormalizedView triumphMusic("music/special/mw_triumph.mp3");
     constexpr VFS::Path::NormalizedView deathMusic("music/special/mw_death.mp3");
 }

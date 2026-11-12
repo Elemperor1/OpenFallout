@@ -38,6 +38,7 @@
 #include "../mwrender/animation.hpp"
 
 #include "constants.hpp"
+#include "falloutmusic.hpp"
 #include "ffmpegdecoder.hpp"
 #include "headcache.hpp"
 #include "openaloutput.hpp"
@@ -344,6 +345,75 @@ namespace OFSound
             return params;
         }());
         mOutput->streamSound(std::move(decoder), mMusic.get());
+    }
+
+    SoundManager::MusicTrackId SoundManager::startMusicTrack(
+        VFS::Path::NormalizedView filename, float gain, float fadeIn, bool loop)
+    {
+        if (!mOutput->isInitialized() || filename.value().empty())
+            return 0;
+        DecoderPtr decoder = getStreamDecoder();
+        try
+        {
+            decoder->open(filename);
+        }
+        catch (const std::exception& e)
+        {
+            Log(Debug::Error) << "Failed to load audio from \"" << filename << "\": " << e.what();
+            return 0;
+        }
+        if (loop)
+            decoder = std::make_shared<LoopingDecoder>(std::move(decoder), filename);
+
+        StreamPtr track = getStreamRef();
+        track->init([&] {
+            SoundParams params;
+            params.mBaseVolume = volumeFromType(Type::Music);
+            params.mFlags = PlayMode::NoEnvNoScaling | Type::Music | Play_2D;
+            // The track starts silent when it fades in, so that it is not heard at full volume before the fade begins
+            params.mFadeVolume = fadeIn > 0.f ? 0.f : gain;
+            return params;
+        }());
+        if (!mOutput->streamSound(decoder, track.get()))
+        {
+            Log(Debug::Warning) << "The output did not start the music track " << filename;
+            return 0;
+        }
+        if (fadeIn > 0.f)
+            track->setFade(fadeIn, gain);
+
+        Stream* result = track.get();
+        const auto it = std::lower_bound(mActiveTracks.begin(), mActiveTracks.end(), track);
+        mActiveTracks.insert(it, std::move(track));
+        const MusicTrackId id = ++mLastMusicTrack;
+        mMusicTracks[id] = result;
+        Log(Debug::Verbose) << "Music track " << id << " plays " << filename << " (gain " << gain << ", fade in "
+                            << fadeIn << " s" << (loop ? ", loops" : "") << ")";
+        return id;
+    }
+
+    void SoundManager::fadeMusicTrack(MusicTrackId track, float gain, float seconds, bool stopAtEnd)
+    {
+        const auto found = mMusicTracks.find(track);
+        if (found == mMusicTracks.end())
+            return;
+        found->second->setFade(seconds, gain, stopAtEnd ? Play_StopAtFadeEnd : 0);
+    }
+
+    bool SoundManager::isMusicTrackPlaying(MusicTrackId track) const
+    {
+        const auto found = mMusicTracks.find(track);
+        return found != mMusicTracks.end() && mOutput->isStreamPlaying(found->second);
+    }
+
+    void SoundManager::stopMusicTrack(MusicTrackId track)
+    {
+        const auto found = mMusicTracks.find(track);
+        if (found == mMusicTracks.end())
+            return;
+        Stream* stream = found->second;
+        mMusicTracks.erase(found);
+        stopTrack(stream);
     }
 
     void SoundManager::advanceMusic(VFS::Path::NormalizedView filename, float fadeOut)
@@ -1300,15 +1370,16 @@ namespace OFSound
         while (trkiter != mActiveTracks.end())
         {
             Stream* sound = trkiter->get();
-            if (!mOutput->isStreamPlaying(sound))
+            if (!mOutput->isStreamPlaying(sound) || !sound->updateFade(duration))
             {
+                // A track that was faded out to stop is done too
+                for (auto music = mMusicTracks.begin(); music != mMusicTracks.end();)
+                    music = music->second == sound ? mMusicTracks.erase(music) : std::next(music);
                 mOutput->finishStream(sound);
                 trkiter = mActiveTracks.erase(trkiter);
             }
             else
             {
-                sound->updateFade(duration);
-
                 mOutput->updateStream(sound);
                 ++trkiter;
             }
@@ -1553,6 +1624,7 @@ namespace OFSound
         for (StreamPtr& sound : mActiveTracks)
             mOutput->finishStream(sound.get());
         mActiveTracks.clear();
+        mMusicTracks.clear();
         mLastWarmedCell = nullptr;
         mPlaybackPaused = false;
         std::fill(std::begin(mPausedSoundTypes), std::end(mPausedSoundTypes), 0);

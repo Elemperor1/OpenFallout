@@ -1,6 +1,7 @@
 #ifndef GAME_MWBASE_SOUNDMANAGER_H
 #define GAME_MWBASE_SOUNDMANAGER_H
 
+#include <cstdint>
 #include <memory>
 #include <set>
 #include <string>
@@ -129,6 +130,17 @@ namespace OFBase
 
         virtual bool isMusicPlaying() = 0;
         ///< Returns true if music is playing
+
+        /// A track of the music of a place of Fallout: played next to the music of the playlist and of scripts, with a
+        /// fade of its own, as loud as the music volume says times its gain, and looping when it is told to. The
+        /// layers of a New Vegas media set are several of them at once. 0 is no track.
+        using MusicTrackId = std::uint32_t;
+        virtual MusicTrackId startMusicTrack(VFS::Path::NormalizedView filename, float gain, float fadeIn, bool loop)
+            = 0;
+        /// Fades the track to the gain in the seconds; with `stopAtEnd` it stops when it has faded
+        virtual void fadeMusicTrack(MusicTrackId track, float gain, float seconds, bool stopAtEnd) = 0;
+        virtual bool isMusicTrackPlaying(MusicTrackId track) const = 0;
+        virtual void stopMusicTrack(MusicTrackId track) = 0;
 
         virtual void say(const OFWorld::ConstPtr& reference, VFS::Path::NormalizedView filename) = 0;
         ///< Make an actor say some text.

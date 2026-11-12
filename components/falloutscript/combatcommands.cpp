@@ -85,6 +85,34 @@ namespace FalloutScript
         return enemy ? CombatState::Relation::Enemy : CombatState::Relation::Neutral;
     }
 
+    CombatState::Relation relationOfFaction(
+        CombatState& combat, ActorState& actors, CombatWorld& world, FormId faction, FormId target)
+    {
+        std::vector<std::pair<FormId, int>> theirs;
+        if (faction == 0 || !actors.factions(target, theirs))
+            return CombatState::Relation::Neutral;
+        bool ally = false;
+        bool friendly = false;
+        bool enemy = false;
+        for (const auto& [second, secondRank] : theirs)
+        {
+            std::optional<CombatState::Relation> relation = factionRelation(combat, world, faction, second);
+            if (!relation && faction == second)
+                relation = CombatState::Relation::Ally;
+            if (relation == CombatState::Relation::Ally)
+                ally = true;
+            else if (relation == CombatState::Relation::Friend)
+                friendly = true;
+            else if (relation == CombatState::Relation::Enemy)
+                enemy = true;
+        }
+        if (ally)
+            return CombatState::Relation::Ally;
+        if (friendly)
+            return CombatState::Relation::Friend;
+        return enemy ? CombatState::Relation::Enemy : CombatState::Relation::Neutral;
+    }
+
     bool mayStartFight(const CombatState& combat, const ActorState& actors, FormId actor, FormId target)
     {
         return actor != 0 && target != 0 && actor != target && !actors.isDead(actor) && !actors.isDead(target)

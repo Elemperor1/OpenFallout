@@ -674,6 +674,7 @@ namespace OFScript
         mActors.clear();
         mEquipment.clear();
         mCombat.clear();
+        resetMusic();
         mOpenStates.clear();
         mDoorsWithoutCollision.clear();
         mItemHolders.clear();
@@ -882,6 +883,7 @@ namespace OFScript
                 mActorValues.restore(mPlayer, AV::actionPoints, gain);
         }
         updateBreath(frametime);
+        updateMusic(frametime);
         mHudTime += frametime;
         raiseCombatEvents(frametime);
         updateProgress(frametime);

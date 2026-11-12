@@ -18,6 +18,8 @@
 #include <components/esm3/readerscache.hpp>
 #include <components/esm3/typetraits.hpp>
 #include <components/esm4/common.hpp>
+#include <components/esm4/loadaloc.hpp>
+#include <components/esm4/loadmset.hpp>
 #include <components/esm4/reader.hpp>
 #include <components/esm4/readerutils.hpp>
 #include <components/files/configurationmanager.hpp>

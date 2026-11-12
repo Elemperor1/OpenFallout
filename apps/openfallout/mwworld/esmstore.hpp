@@ -129,6 +129,8 @@ namespace ESM4
     struct LoadScreen;
     struct LoadScreenType;
     struct MagicEffect;
+    struct MediaLocationController;
+    struct MediaSet;
     struct Message;
     struct MiscItem;
     struct MovableStatic;
@@ -201,7 +203,7 @@ namespace OFWorld
             Store<ESM4::ItemMod>, Store<ESM4::Key>, Store<ESM4::Land>, Store<ESM4::LandTexture>,
             Store<ESM4::LevelledCreature>, Store<ESM4::LevelledItem>, Store<ESM4::LevelledNpc>, Store<ESM4::Light>,
             Store<ESM4::LightingTemplate>, Store<ESM4::LoadScreen>, Store<ESM4::LoadScreenType>,
-            Store<ESM4::MagicEffect>, Store<ESM4::Message>, Store<ESM4::MiscItem>, Store<ESM4::MovableStatic>,
+            Store<ESM4::MagicEffect>, Store<ESM4::MediaLocationController>, Store<ESM4::MediaSet>, Store<ESM4::Message>, Store<ESM4::MiscItem>, Store<ESM4::MovableStatic>,
             Store<ESM4::Music>, Store<ESM4::Note>, Store<ESM4::Npc>, Store<ESM4::Outfit>, Store<ESM4::Perk>,
             Store<ESM4::Potion>, Store<ESM4::Projectile>, Store<ESM4::Quest>, Store<ESM4::Race>, Store<ESM4::Recipe>,
             Store<ESM4::RecipeCategory>, Store<ESM4::Reference>, Store<ESM4::Region>, Store<ESM4::Reputation>,

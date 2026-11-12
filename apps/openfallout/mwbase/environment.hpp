@@ -146,6 +146,9 @@ namespace OFBase
 
         void setFrameDuration(float value) { mFrameDuration = value; }
 
+        /// Whether there is an instance (there is none in the unit tests of the rules)
+        static bool exists() { return sThis != nullptr; }
+
         /// Return instance of this class.
         static const Environment& get()
         {

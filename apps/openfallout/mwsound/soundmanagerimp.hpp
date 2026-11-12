@@ -94,6 +94,8 @@ namespace OFSound
         TrackList mActiveTracks;
 
         StreamPtr mMusic;
+        std::map<MusicTrackId, Stream*> mMusicTracks;
+        MusicTrackId mLastMusicTrack = 0;
         MusicType mMusicType;
 
         bool mListenerUnderwater;
@@ -204,6 +206,11 @@ namespace OFSound
 
         bool isMusicPlaying() override;
         ///< Returns true if music is playing
+
+        MusicTrackId startMusicTrack(VFS::Path::NormalizedView filename, float gain, float fadeIn, bool loop) override;
+        void fadeMusicTrack(MusicTrackId track, float gain, float seconds, bool stopAtEnd) override;
+        bool isMusicTrackPlaying(MusicTrackId track) const override;
+        void stopMusicTrack(MusicTrackId track) override;
 
         void say(const OFWorld::ConstPtr& reference, VFS::Path::NormalizedView filename) override;
         ///< Make an actor say some text.
