@@ -35,6 +35,8 @@
 
 #include <components/sceneutil/workqueue.hpp>
 
+#include <components/sdlutil/desktopconventions.hpp>
+
 #include <components/translation/translation.hpp>
 
 #include <components/myguiplatform/additivelayer.hpp>
@@ -208,13 +210,14 @@ namespace OFGui
         , mVersionDescription(versionDescription)
         , mWindowVisible(true)
         , mCfgMgr(cfgMgr)
+        , mSdlWindow(window)
     {
         int w, h;
         SDL_GetWindowSize(window, &w, &h);
         int dw, dh;
         SDL_GL_GetDrawableSize(window, &dw, &dh);
 
-        mScalingFactor = Settings::gui().mScalingFactor * (dw / w);
+        mScalingFactor = SDLUtil::interfaceScale(Settings::gui().mScalingFactor, w, dw);
         constexpr VFS::Path::NormalizedView resourcePath("mygui");
         mGuiPlatform = std::make_unique<MyGUIPlatform::Platform>(viewer, guiRoot, resourceSystem->getImageManager(),
             resourceSystem->getVFS(), mScalingFactor, resourcePath, logpath / "MyGUI.log");
@@ -1355,6 +1358,18 @@ namespace OFGui
         }
 
         Settings::Manager::resetPendingChanges(filter);
+
+        // The interface is sized in points: on a display of another scaling (the window moved) it keeps its size
+        int pointsW, pointsH;
+        SDL_GetWindowSize(mSdlWindow, &pointsW, &pointsH);
+        const float scalingFactor = SDLUtil::interfaceScale(Settings::gui().mScalingFactor, pointsW, x);
+        if (scalingFactor != mScalingFactor)
+        {
+            Log(Debug::Info) << "Interface scale " << mScalingFactor << " -> " << scalingFactor << " (" << x
+                             << " pixels across " << pointsW << " points)";
+            mScalingFactor = scalingFactor;
+            mGuiPlatform->getRenderManagerPtr()->setScalingFactor(mScalingFactor);
+        }
 
         mGuiPlatform->getRenderManagerPtr()->setViewSize(x, y);
 

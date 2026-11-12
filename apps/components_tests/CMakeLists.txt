@@ -59,6 +59,8 @@ file(GLOB UNITTEST_SRC_FILES
     settings/testmanager.cpp
     settings/testvalues.cpp
 
+    sdlutil/testdesktopconventions.cpp
+
     shader/parsedefines.cpp
     shader/parsefors.cpp
     shader/parselinks.cpp

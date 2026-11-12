@@ -6,6 +6,7 @@
 #include <SDL_events.h>
 #include <SDL_version.h>
 
+#include "desktopconventions.hpp"
 #include "events.hpp"
 
 namespace osgViewer
@@ -43,6 +44,7 @@ namespace SDLUtil
 
     private:
         void handleWindowEvent(const SDL_Event& evt);
+        void handleDrawableResize();
 
         bool _handleWarpMotion(const SDL_MouseMotionEvent& evt);
         void _wrapMousePointer(const SDL_MouseMotionEvent& evt);
@@ -73,14 +75,17 @@ namespace SDLUtil
         bool mFirstMouseMove;
 
         Sint32 mMouseZ;
-        double mPendingWheelY;
+        WheelAccumulator mWheelY;
 
         bool mWindowHasFocus;
         bool mMouseInWindow;
         bool mHeadless;
 
-        Uint16 mScaleX;
-        Uint16 mScaleY;
+        float mScaleX;
+        float mScaleY;
+
+        /// A desktop shortcut (macOS: Command-Q, -H, -M, -W, Control-Command-F) is the menu bar's, not the game's
+        DesktopShortcutFilter mDesktopShortcuts;
     };
 
 }

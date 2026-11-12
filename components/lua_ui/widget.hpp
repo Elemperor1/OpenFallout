@@ -79,7 +79,7 @@ namespace LuaUi
         virtual MyGUI::IntSize calculateSize() const;
         virtual MyGUI::IntPoint calculatePosition(const MyGUI::IntSize& size) const;
         MyGUI::IntCoord calculateCoord() const;
-        void mouseWheel(MyGUI::Widget*, float, float, float, float);
+        void mouseWheel(MyGUI::Widget*, float, float, float, float, int, int);
 
         virtual bool isTextInput() { return false; }
         bool collectWarnings(Warnings& warnings, int depth, bool generateWarningStrings) const;
