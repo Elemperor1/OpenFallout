@@ -25,7 +25,7 @@ jobs:
   Windows:
     name: windows-${{ inputs.image }}
 
-    runs-on: windows-${{ inputs.image }}
+    runs-on: blacksmith-4vcpu-windows-${{ inputs.image }}
 
     env:
       archive: FAILEDTODOWNLOAD

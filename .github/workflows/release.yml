@@ -15,12 +15,13 @@ jobs:
       contents: write
     uses: ./.github/workflows/windows.yml
     with:
-      image: "2022"
+      image: "2025"
       build-type: Release
       package: true
       release: true
     secrets: inherit
   MacOS:
+    name: MacOS (${{ matrix.args.image }})
     permissions:
       contents: write
     strategy:
@@ -28,8 +29,11 @@ jobs:
       matrix:
         args:
           - image: macos-26
+            runner: blacksmith-6vcpu-macos-26
+          # Blacksmith macOS runners are Apple Silicon only, so the Intel build stays GitHub-hosted.
           - image: macos-26-intel
     uses: ./.github/workflows/macos.yml
     with:
       image: ${{ matrix.args.image }}
+      runner: ${{ matrix.args.runner }}
       build-type: Release

@@ -16,7 +16,7 @@ REPOSITORY = "Elemperor1/OpenFallout"
 MARKER = ".harness/openfallout-release.yaml"
 PLATFORM_JOBS = {
     "Ubuntu",
-    "Windows (2022) / windows-2022",
+    "Windows (2025) / windows-2025",
     "MacOS (macos-26) / macos-26",
     "MacOS (macos-26-intel) / macos-26-intel",
 }
