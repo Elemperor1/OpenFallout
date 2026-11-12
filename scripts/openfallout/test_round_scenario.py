@@ -382,6 +382,20 @@ class ScenarioPlayer(unittest.TestCase):
         self.assertIn("ROUND\tfight\tok\tg1\tinCombat=true target=FormId:0x14", lines)
         self.assertIn("ROUND\tnote\tFormId:0x1629a4>FormId:0x14", lines)
 
+    def test_enemy_makes_two_factions_enemies_and_says_so(self):
+        self.start("return function(r) "
+                   "local calls = {} "
+                   "r.core.combat = { setEnemy = function(a, b) calls[#calls + 1] = a .. '~' .. b end } "
+                   "r.enemy('FormId:0x1101f42', 'FormId:0x101b2a4', 'pg') "
+                   "r.core.combat = {} "
+                   "r.enemy('a', 'b', 'missing') "
+                   "r.log(calls[1]) end")
+        self.tick(4)
+        lines = self.lines()
+        self.assertIn("ROUND\tenemy\tok\tpg\tFormId:0x1101f42\tFormId:0x101b2a4", lines)
+        self.assertIn("ROUND\tnote\tFormId:0x1101f42~FormId:0x101b2a4", lines)
+        self.assertTrue(any(line.startswith("ROUND\terror\tenemy") for line in lines))
+
     def test_place_puts_an_object_in_a_direction_and_faces_the_player(self):
         self.start("return function(r) "
                    "local o = { teleport = function(self, cell, pos, options) teleports[#teleports + 1] = { pos = pos, options = options } end } "

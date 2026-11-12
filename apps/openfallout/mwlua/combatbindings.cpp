@@ -92,6 +92,13 @@ namespace OFLua
                 scripts().wakeMind(self);
         };
         api["stop"] = [](std::string_view actor) { scripts().combat().stop(parseId(actor)); };
+        // Two factions are enemies, as SetEnemy of both says (rounds that need a character that attacks the player on
+        // sight: the data of the games has the Powder Gangers neutral to the player)
+        api["setEnemy"] = [](std::string_view first, std::string_view second) {
+            using Relation = FalloutScript::CombatState::Relation;
+            scripts().combat().setRelation(parseId(first), parseId(second), Relation::Enemy);
+            scripts().combat().setRelation(parseId(second), parseId(first), Relation::Enemy);
+        };
         api["isDead"] = [](std::string_view actor) { return scripts().actors().isDead(parseId(actor)); };
 
         // Whether the content is that of Fallout, which has combat to run (it is not for Morrowind's)

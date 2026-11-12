@@ -281,6 +281,9 @@ return { limit = 900, delay = 4, run = function(r)
         r.log('E the placed ganger was not found: nothing to sneak up on')
         return
     end
+    -- the data has the Powder Gangers neutral to the player (round 14F: "does not attack the player on sight"), so the two factions are made
+    -- enemies, as a quest of the game does, and the character that notices the player goes for it
+    r.enemy('FormId:0x1101f42', 'FormId:0x101b2a4', 'Powder Gangers and the player')
     r.crouch(true)
     r.teleport{ pos = { ARENA_E.x, ARENA_E.y, ARENA_E.z }, yaw = 0, onGround = true, label = 'to the arena, crouched' }
     r.wait(6)

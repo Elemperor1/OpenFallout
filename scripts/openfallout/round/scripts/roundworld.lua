@@ -344,6 +344,12 @@ function r.fight(actor, target, label)
     return outcome('fight', ok, err, tostring(label or '-'), state)
 end
 
+-- Two factions (form ids) are enemies, both ways, as SetEnemy says; for a round with a character that attacks the player on sight
+function r.enemy(first, second, label)
+    local ok, err = pcall(function() core.combat.setEnemy(first, second) end)
+    return outcome('enemy', ok, err, tostring(label or '-'), tostring(first), tostring(second))
+end
+
 function r.peace(actor, label)
     local ok, err = pcall(function() core.combat.stop(form(actor)) end)
     return outcome('peace', ok, err, tostring(label or '-'))
