@@ -394,6 +394,22 @@ namespace OFScript
                 call.mReference, FalloutScript::formArgument(call, 0), 0, FalloutScript::intArgument(call, 1) != 0);
             return 0.0;
         });
+        // The radio: a station is on the air from the start when its record says it broadcasts all the time, and otherwise
+        // when a script puts it there
+        mInterpreter.setHandler("SetBroadcastState", [this](FalloutScript::CallContext& call) {
+            setRadioBroadcast(call.mReference, FalloutScript::intArgument(call, 0) != 0);
+            return 0.0;
+        });
+        mInterpreter.setHandler("GetBroadcastState",
+            [this](FalloutScript::CallContext& call) { return radioBroadcast(call.mReference) ? 1.0 : 0.0; });
+        mInterpreter.setHandler("PipBoyRadioOff", [this](FalloutScript::CallContext&) {
+            runOnMainThread([this] { tuneRadio(0); });
+            return 0.0;
+        });
+        mInterpreter.setHandler("ForceRadioStationUpdate", [this](FalloutScript::CallContext&) {
+            runOnMainThread([this] { mRadioPlayback.mUntilLook = 0.f; });
+            return 0.0;
+        });
         mInterpreter.setHandler("SayTo", [this](FalloutScript::CallContext& call) {
             sayTopic(call.mReference, FalloutScript::formArgument(call, 1), FalloutScript::formArgument(call, 0),
                 FalloutScript::intArgument(call, 2) != 0);
@@ -676,6 +692,11 @@ namespace OFScript
         mCombat.clear();
         resetMusic();
         resetAmbient();
+        resetRadio();
+        {
+            const std::lock_guard lock(mRadioMutex);
+            mRadioBroadcast.clear();
+        }
         mOpenStates.clear();
         mDoorsWithoutCollision.clear();
         mItemHolders.clear();
@@ -886,6 +907,7 @@ namespace OFScript
         updateBreath(frametime);
         updateMusic(frametime);
         updateAmbient(frametime);
+        updateRadio(frametime);
         mHudTime += frametime;
         raiseCombatEvents(frametime);
         updateProgress(frametime);

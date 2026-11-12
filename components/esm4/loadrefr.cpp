@@ -233,6 +233,7 @@ void ESM4::Reference::load(ESM4::Reader& reader)
             case ESM::fourCC("XRDO"): // FO3
             {
                 // FIXME: completely different meaning in FO4
+                mRadio.present = true;
                 reader.get(mRadio.rangeRadius);
                 reader.get(mRadio.broadcastRange);
                 reader.get(mRadio.staticPercentage);

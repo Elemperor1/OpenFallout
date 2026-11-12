@@ -58,6 +58,7 @@
 #include <components/falloutscript/itemmods.hpp>
 #include <components/falloutscript/itemuse.hpp>
 #include <components/falloutscript/ambient.hpp>
+#include <components/falloutscript/radio.hpp>
 #include <components/falloutscript/limbs.hpp>
 #include <components/falloutscript/magic.hpp>
 #include <components/falloutscript/mapmarkers.hpp>
@@ -399,6 +400,18 @@ namespace OFScript
             std::vector<PipboyObjective> mObjectives;
         };
         std::vector<PipboyQuest> pipboyQuests();
+        /// A station the Pip-Boy shows in the radio tab: those that are in reach
+        struct PipboyStation
+        {
+            FalloutScript::FormId mStation = 0;
+            std::string mName;
+            bool mTuned = false;
+            /// 0 to 1: how well it is heard
+            float mSignal = 0.f;
+        };
+        std::vector<PipboyStation> pipboyRadio();
+        /// Tunes the station (0 turns the radio off); false when it is not in reach
+        bool tuneRadio(FalloutScript::FormId station);
         /// A condition of a perk, as the level-up screen writes the list of what the perk asks for. It writes a line
         /// for two kinds (an actor value at a number, a perk the player has), and nothing for the others (the level,
         /// the sex, a quest), but they count in how it writes the rest.
@@ -2920,6 +2933,77 @@ namespace OFScript
         void resetAmbient();
         void logAmbient(const std::string& text);
         AmbientPlayback mAmbientPlayback;
+
+        /// The radio (falloutradio.cpp): the stations that are placed in the world, which of them the player has found and
+        /// has tuned, and what the tuned one is saying
+        struct RadioStation
+        {
+            FalloutScript::FormId mReference = 0;
+            FalloutScript::FormId mPositionReference = 0;
+            std::string mName;
+            FalloutScript::Radio::Reach mReach = FalloutScript::Radio::Reach::Everywhere;
+            float mRadius = 0.f;
+            float mStaticPercent = 0.f;
+            ESM::RefId mCell;
+            ESM::RefId mWorldspace;
+            bool mExterior = true;
+            /// Whether the station is on the air: those that the record says broadcast all the time are from the start, the
+            /// others when a script says so (SetBroadcastState)
+            bool mBroadcast = false;
+            /// A station that is not proxied for the Pip-Boy: only heard from the thing in the world that it is
+            bool mNonProxy = false;
+        };
+        struct RadioPlayback
+        {
+            FalloutScript::Radio::Receiver mReceiver;
+            std::vector<RadioStation> mStations;
+            bool mBuilt = false;
+            float mUntilLook = 0.f;
+            float mSinceLook = 0.f;
+            /// What the tuned station says now: the files of the lines of a chain, one after the other
+            struct Line
+            {
+                std::string mVoice;
+                float mSeconds = 0.f;
+            };
+            FalloutScript::FormId mStation = 0;
+            std::vector<Line> mLines;
+            std::size_t mNext = 0;
+            bool mStarted = false;
+            float mWait = 0.f;
+            OFBase::SoundManager::MusicTrackId mTrack = 0;
+            /// The seconds before a chain is looked for again (after one, or when none can be said)
+            float mRest = 0.f;
+            /// The topic that goes on from what was said (0: the next chain starts at RadioHello)
+            FalloutScript::FormId mNextTopic = 0;
+            /// The stations that are placed as things in a room (the reach is a cell) and say their lines from where they are
+            std::map<FalloutScript::FormId, float> mRoomRest;
+            std::set<FalloutScript::FormId> mRoomInReach;
+            float mGain = 0.f;
+            bool mDialogueOnly = false;
+            int mLogged = 0;
+        };
+        /// What the scripts ask of the radio, from any thread: whether a station is on the air (SetBroadcastState,
+        /// GetBroadcastState), the Pip-Boy's radio off, and the stations looked at again at once
+        void setRadioBroadcast(FalloutScript::FormId station, bool on);
+        bool radioBroadcast(FalloutScript::FormId station);
+        void updateRadio(float frametime);
+        void resetRadio();
+        void logRadio(const std::string& text);
+        void buildRadioStations();
+        /// The lines of the response that the station says for the topic (the topic RadioHello starts every chain). The
+        /// topic that goes on from it comes back in `next` (0 at the end of a chain): the first of the topics that the
+        /// response offers (TCLT) that has a response the station can say now.
+        std::vector<RadioPlayback::Line> radioStep(
+            FalloutScript::FormId station, FalloutScript::FormId topic, FalloutScript::FormId& next);
+        /// Whether the station has anything to say now (a response of RadioHello that it can say): the stations that have
+        /// none are not heard, as the quests that run them have not begun
+        bool radioCanSay(FalloutScript::FormId station);
+        void stopRadioVoice();
+        RadioPlayback mRadioPlayback;
+        std::mutex mRadioMutex;
+        /// The stations that a script put on or off the air, over what the record says
+        std::map<FalloutScript::FormId, bool> mRadioBroadcast;
         /// The seconds that the player holds its breath
         double mostBreath();
         /// Whether the furniture is a bed that the actor would lie on

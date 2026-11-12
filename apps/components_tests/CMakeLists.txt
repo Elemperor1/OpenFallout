@@ -215,6 +215,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testfalldamage.cpp
     falloutscript/testfootsteps.cpp
     falloutscript/testambient.cpp
+    falloutscript/testradio.cpp
     falloutscript/testmusic.cpp
     falloutscript/testhardcore.cpp
     falloutscript/testequipment.cpp

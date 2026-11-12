@@ -69,10 +69,12 @@ namespace ESM4
 
     struct RadioStationData
     {
-        float rangeRadius;
+        /// Whether the reference has the subrecord (XRDO) at all: a radio station placed in the world has it
+        bool present = false;
+        float rangeRadius = 0.f;
         // 0 radius, 1 everywhere, 2 worldspace and linked int, 3 linked int, 4 current cell only
-        std::uint32_t broadcastRange;
-        float staticPercentage;
+        std::uint32_t broadcastRange = 0;
+        float staticPercentage = 0.f;
         ESM::FormId posReference; // only used if broadcastRange == 0
     };
 
