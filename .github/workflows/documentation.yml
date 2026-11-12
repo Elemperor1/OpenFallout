@@ -15,7 +15,8 @@ concurrency:
 
 jobs:
   links:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    # Blacksmith sticky disks (Docker image cache) are shared, so only trusted master runs use them.
+    runs-on: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
