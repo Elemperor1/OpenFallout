@@ -222,12 +222,19 @@ return { limit = 900, delay = 4, run = function(r)
     local function shootAt(target, label, tag)
         r.log('C player shoots ' .. label)
         local effective = 0
-        for i = 1, 14 do
+        local missed = 0
+        for i = 1, 30 do
             r.aimAt(target, label)
-            -- what the camera's ray hits; when four shots found no damage the shots go at the character itself
-            local row = r.fire('C_' .. label .. '_shot_' .. i, (i > 4 and effective == 0) and target or nil)
-            if row and row.hit and (row.damage or 0) > 0 then effective = effective + 1 end
-            r.shot(tag .. i, false)
+            -- what the camera's ray hits; after a shot that did no damage the next one goes at the character itself (round 14F: the
+            -- ray went past the character 26 times of 28, so the one that did damage was followed by shots that did none)
+            local row = r.fire('C_' .. label .. '_shot_' .. i, (missed > 0) and target or nil)
+            if row and row.hit and (row.damage or 0) > 0 then
+                effective = effective + 1
+                missed = 0
+            else
+                missed = missed + 1
+            end
+            if i % 3 == 1 then r.shot(tag .. i, false) end
             r.wait(0.5)
             local ok, dead = pcall(r.core.combat.isDead, r.form(target))
             if ok and dead then break end
