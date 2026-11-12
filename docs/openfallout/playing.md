@@ -43,7 +43,7 @@ macOS turns on Game Mode (the game gets the CPU and GPU first, and the wireless 
 
 It opens the engine app in `/Applications/OpenFallout.app`; `--app <bundle>` opens another one (the engine app of a build folder, or `OpenFallout.app` itself to start the launcher). Everything after `--` goes to the engine as it is, so `--config <folder>` and `--user-data <folder>` run it apart from your usual settings and saves. Standard output and error go to `openfallout.stdout.log` and `openfallout.stderr.log` in the current folder (`--stdout` and `--stderr` choose other files), `--env NAME=VALUE` sets an environment variable for the game (as often as needed) and `--metal-hud` shows the Metal performance HUD. The helper waits until the game has quit. Its exit status is that of `open`, which says whether the game could be started but not how it ended: the log says that. When the bundle it opens does not start the engine, the helper says so.
 
-Whether Game Mode really turns on is checked by hand: start the game full screen through the helper and look for the Game Mode icon in the menu bar.
+Whether Game Mode really turns on is checked by hand: start the game full screen through the helper and look for the Game Mode icon in the menu bar. How to measure frame time, memory and CPU time on the fixed scenes is in [measuring.md](measuring.md).
 
 Starting the binary directly (`/Applications/OpenFallout.app/Contents/MacOS/openfallout ...`, or `openfallout` from a build folder) works as before, and is what the probe and autoplay tools keep doing; Game Mode stays off then.
 
