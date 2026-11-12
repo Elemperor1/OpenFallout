@@ -9,6 +9,7 @@
 #include "../mwbase/environment.hpp"
 #include "../mwbase/soundmanager.hpp"
 #include "../mwbase/world.hpp"
+#include "../mwscript/falloutscripts.hpp"
 #include "../mwworld/refdata.hpp"
 
 namespace OFSound
@@ -33,7 +34,10 @@ namespace OFSound
         // What the foot comes down on decides the sound (a character that is not on anything known is on concrete)
         bool stairs = false;
         const int material = world->getFloorMaterial(request.mActor, stairs);
-        const Steps::Surface surface = Steps::surfaceOfMaterial(material, true);
+        // (Fallout 3's table of materials has 32 entries, New Vegas's 36)
+        const OFBase::Environment& environment = OFBase::Environment::get();
+        const bool newVegas = !environment.hasFalloutScripts() || environment.getFalloutScripts()->isNewVegas();
+        const Steps::Surface surface = Steps::surfaceOfMaterial(material, newVegas);
         const Steps::Slot slot = request.mSlot ? *request.mSlot
                                                : Steps::chooseSlot(request.mFoot, request.mSneaking, stairs, request.mRunning);
         // New Vegas has the sounds of a jump, Fallout 3 does not (its table has no such slot)

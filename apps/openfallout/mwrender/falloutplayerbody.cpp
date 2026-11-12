@@ -239,9 +239,10 @@ namespace OFRender
     void FalloutPlayerBody::setArmsVisible(bool visible)
     {
         mArmsVisible = visible;
-        FalloutActorAnimation::setFirstPersonArmsShown(visible);
         if (visible)
             buildArms();
+        // The first-person sounds are the arms' (the body keeps its own quiet): they are only silenced when arms play
+        FalloutActorAnimation::setFirstPersonArmsShown(visible && mArms != nullptr);
         if (mArmsRoot != nullptr)
             mArmsRoot->setNodeMask(visible ? static_cast<unsigned>(Mask_FirstPerson) : 0u);
     }

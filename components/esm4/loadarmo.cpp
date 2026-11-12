@@ -213,15 +213,6 @@ void ESM4::Armor::load(ESM4::Reader& reader)
                 else
                     reader.skipSubRecordData();
                 break;
-            case ESM::fourCC("MODT"):
-            case ESM::fourCC("MO2B"):
-            case ESM::fourCC("MO3B"):
-            case ESM::fourCC("MO4B"):
-            case ESM::fourCC("MO2T"):
-            case ESM::fourCC("MO2S"):
-            case ESM::fourCC("MO3T"):
-            case ESM::fourCC("MO4T"):
-            case ESM::fourCC("MO4S"):
             case ESM::fourCC("SNAM"): // FONV
                 if (subHdr.dataSize == 12)
                 {
@@ -237,16 +228,25 @@ void ESM4::Armor::load(ESM4::Reader& reader)
                 else
                     reader.skipSubRecordData();
                 break;
-            case ESM::fourCC("OBND"):
-            case ESM::fourCC("RNAM"): // race formid
-            case ESM::fourCC("KSIZ"):
-            case ESM::fourCC("KWDA"):
-            case ESM::fourCC("TNAM"):
+            case ESM::fourCC("TNAM"): // the armor whose sounds this one uses
                 if (subHdr.dataSize == 4)
                     reader.getFormId(mTemplate);
                 else
                     reader.skipSubRecordData();
                 break;
+            case ESM::fourCC("MODT"):
+            case ESM::fourCC("MO2B"):
+            case ESM::fourCC("MO3B"):
+            case ESM::fourCC("MO4B"):
+            case ESM::fourCC("MO2T"):
+            case ESM::fourCC("MO2S"):
+            case ESM::fourCC("MO3T"):
+            case ESM::fourCC("MO4T"):
+            case ESM::fourCC("MO4S"):
+            case ESM::fourCC("OBND"):
+            case ESM::fourCC("RNAM"): // race formid
+            case ESM::fourCC("KSIZ"):
+            case ESM::fourCC("KWDA"):
             case ESM::fourCC("BAMT"):
             case ESM::fourCC("BIDS"):
             case ESM::fourCC("BMCT"):

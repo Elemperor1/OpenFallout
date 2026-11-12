@@ -34,9 +34,11 @@ namespace FalloutScript
     float SoundData::pitch(float unit) const
     {
         const float adjust = static_cast<float>(mFrequencyAdjustment) / 100.f;
-        if ((mFlags & RandomFrequencyShift) != 0)
-            return 1.f + std::abs(adjust) * (std::clamp(unit, 0.f, 1.f) * 2.f - 1.f);
-        return 1.f + adjust;
+        const float pitch = (mFlags & RandomFrequencyShift) != 0
+            ? 1.f + std::abs(adjust) * (std::clamp(unit, 0.f, 1.f) * 2.f - 1.f)
+            : 1.f + adjust;
+        // The output plays nothing at a pitch of zero or less (an adjustment of -100 or lower)
+        return std::max(pitch, minimumPitch);
     }
 
     SoundData soundDataFromBytes(const unsigned char* bytes, std::size_t size)

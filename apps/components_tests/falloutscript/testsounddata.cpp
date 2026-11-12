@@ -122,6 +122,19 @@ namespace
         EXPECT_NEAR(data.pitch(1.f), 1.04f, 1e-5f);
     }
 
+    TEST(FalloutScriptSoundDataTest, the_pitch_is_never_zero_or_less)
+    {
+        SoundData data;
+        data.mFrequencyAdjustment = -100;
+        EXPECT_FLOAT_EQ(data.pitch(0.5f), SoundData::minimumPitch);
+        data.mFrequencyAdjustment = -128;
+        EXPECT_FLOAT_EQ(data.pitch(0.5f), SoundData::minimumPitch);
+        data.mFlags = SoundData::RandomFrequencyShift;
+        EXPECT_FLOAT_EQ(data.pitch(0.f), SoundData::minimumPitch);
+        data.mFrequencyAdjustment = 127;
+        EXPECT_NEAR(data.pitch(1.f), 2.27f, 1e-5f);
+    }
+
     TEST(FalloutScriptSoundDataTest, the_flags_say_two_dimensional_and_looping)
     {
         SoundData data;
