@@ -1586,6 +1586,9 @@ namespace OFScript
         unsigned playerShots() const { return mPlayerShots.load(); }
         /// The character goes for the player
         void fightPlayer(const OFWorld::Ptr& actor);
+        /// A character that has started a fight or died looks at what it has to do: one with no package has no mind
+        /// until then, and the mind is what has it fight, and what has its body fall
+        void wakeMind(FalloutScript::FormId actor) { evaluatePackage(actor); }
         /// The character attacks the target with the weapon it holds, as far as its skill allows it to hit. A
         /// weapon that has no ammunition left is put away and the character takes another.
         FireResult attack(const OFWorld::Ptr& attacker, const OFWorld::Ptr& target);

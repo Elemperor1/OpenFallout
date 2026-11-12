@@ -2821,10 +2821,12 @@ namespace OFScript
             // A character that is hit fights back, and the attacker is in the fight too
             if (attacker != 0 && !tolerated)
             {
-                if (!mCombat.inCombat(victim))
-                    FalloutScript::startFight(mCombat, mActors, victim, attacker);
-                if (!mCombat.inCombat(attacker))
-                    FalloutScript::startFight(mCombat, mActors, attacker, victim);
+                // (a character with no package has no mind until it has one that is to fight: round 14D, a fight that
+                // was started stood still for want of one)
+                if (!mCombat.inCombat(victim) && FalloutScript::startFight(mCombat, mActors, victim, attacker))
+                    evaluatePackage(victim);
+                if (!mCombat.inCombat(attacker) && FalloutScript::startFight(mCombat, mActors, attacker, victim))
+                    evaluatePackage(attacker);
             }
             return result;
         }
@@ -2835,6 +2837,10 @@ namespace OFScript
         {
             // Of two blows that kill at once, the one that marks the death is the killing blow
             result.mKilled = mActors.setDead(victim, true, attacker, limb);
+            // The body falls by the mind of the character, which one with no package has not got until it is dead
+            // (round 14D: shot dead, two characters stood upright with their weapons out)
+            if (result.mKilled)
+                evaluatePackage(victim);
         }
         return result;
     }
