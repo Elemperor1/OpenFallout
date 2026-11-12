@@ -613,22 +613,31 @@ namespace OFRender
             }
         }
         const std::string_view prefix = mDrawn ? falloutWeaponPrefix(mWeaponType) : std::string_view();
-        const std::vector<std::string>& files = animationFilesOf(*mResourceSystem->getVFS(), mMoveFolder);
 
-        std::string wanted;
-        if (mGait == FalloutGait::Idle)
+        // The file is chosen again only when what it is chosen for changes: the files of the folder are looked through
+        const MoveKey key{ mGait, mGait == FalloutGait::Idle ? FalloutDirection::Forward : mDirection, sneak,
+            std::string(prefix), true };
+        std::string wanted = mMoveFile;
+        if (!(key == mMoveKey))
         {
-            if (sneak)
-                wanted = chooseFalloutSneakIdle(mMoveFolder, prefix, mFemale, files);
-        }
-        else
-        {
-            wanted = chooseFalloutMove(mMoveFolder, prefix, sneak, mDirection, mGait == FalloutGait::Run, mFemale, files);
-            // A creature has the forward ones only, found by other names
-            if (wanted.empty())
-                wanted = mGait == FalloutGait::Run && mGaits.mHasRun ? mRunFile : mWalkFile;
-            if (wanted.empty())
-                wanted = mGait == FalloutGait::Run ? mWalkFile : mRunFile;
+            mMoveKey = key;
+            wanted.clear();
+            const std::vector<std::string>& files = animationFilesOf(*mResourceSystem->getVFS(), mMoveFolder);
+            if (mGait == FalloutGait::Idle)
+            {
+                if (sneak)
+                    wanted = chooseFalloutSneakIdle(mMoveFolder, prefix, mFemale, files);
+            }
+            else
+            {
+                wanted = chooseFalloutMove(
+                    mMoveFolder, prefix, sneak, mDirection, mGait == FalloutGait::Run, mFemale, files);
+                // A creature has the forward ones only, found by other names
+                if (wanted.empty())
+                    wanted = mGait == FalloutGait::Run && mGaits.mHasRun ? mRunFile : mWalkFile;
+                if (wanted.empty())
+                    wanted = mGait == FalloutGait::Run ? mWalkFile : mRunFile;
+            }
         }
         if (sneak != mSneaking)
         {

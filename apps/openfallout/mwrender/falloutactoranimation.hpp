@@ -171,6 +171,18 @@ namespace OFRender
         std::map<std::string, std::string> mMoveGroups;
         std::string mMoveGroup;
         std::string mMoveFile;
+        /// What the file was chosen for (gait, direction, sneaking, weapon prefix), so that it is not chosen again each
+        /// frame
+        struct MoveKey
+        {
+            FalloutGait mGait = FalloutGait::Idle;
+            FalloutDirection mDirection = FalloutDirection::Forward;
+            bool mSneak = false;
+            std::string mPrefix;
+            bool mValid = false;
+            bool operator==(const MoveKey&) const = default;
+        };
+        MoveKey mMoveKey;
         /// How fast the actor goes ahead of where it faces and to its right (units a second, smoothed), and the
         /// direction that makes
         float mForwardSpeed = 0.f;
