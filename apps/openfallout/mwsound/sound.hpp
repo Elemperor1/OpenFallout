@@ -3,6 +3,8 @@
 
 #include <algorithm>
 
+#include <components/falloutscript/sounddata.hpp>
+
 #include "soundoutput.hpp"
 
 namespace OFSound
@@ -42,6 +44,11 @@ namespace OFSound
         float mFadeVolume = 1.0f;
         float mFadeTarget = 0.0f;
         float mFadeStep = 0.0f;
+        /// A sound record of Fallout 3 or New Vegas has its own curve of the volume over the distance, which is applied
+        /// here (the output's own model of distance is turned off for it): the gain at the distance of the listener
+        bool mUsesCurve = false;
+        FalloutScript::SoundData mCurve;
+        float mDistanceGain = 1.0f;
     };
 
     class SoundBase
@@ -64,6 +71,19 @@ namespace OFSound
         void setVolume(float volume) { mParams.mVolume = volume; }
         void setBaseVolume(float volume) { mParams.mBaseVolume = volume; }
         void setFadeout(float duration) { setFade(duration, 0.0, Play_StopAtFadeEnd); }
+
+        /// Has the sound heard by the curve of a sound record of Fallout, from where the listener is
+        void setDistanceCurve(const FalloutScript::SoundData& data)
+        {
+            mParams.mCurve = data;
+            mParams.mUsesCurve = true;
+        }
+        bool usesDistanceCurve() const { return mParams.mUsesCurve; }
+        void updateDistanceGain(const osg::Vec3f& listener)
+        {
+            if (mParams.mUsesCurve)
+                mParams.mDistanceGain = mParams.mCurve.distanceGain((mParams.mPos - listener).length());
+        }
 
         /// Fade to the given linear gain within the specified amount of time.
         /// Note that the fade gain is independent of the sound volume.
@@ -156,7 +176,10 @@ namespace OFSound
         const osg::Vec3f& getPosition() const { return mParams.mPos; }
         const osg::Vec3f& getLastPosition() const { return mParams.mLastPos; }
         const osg::Vec3f& getVelocity() const { return mParams.mVel; }
-        float getRealVolume() const { return mParams.mVolume * mParams.mBaseVolume * mParams.mFadeVolume; }
+        float getRealVolume() const
+        {
+            return mParams.mVolume * mParams.mBaseVolume * mParams.mFadeVolume * mParams.mDistanceGain;
+        }
         float getPitch() const { return mParams.mPitch; }
         float getMinDistance() const { return mParams.mMinDistance; }
         float getMaxDistance() const { return mParams.mMaxDistance; }

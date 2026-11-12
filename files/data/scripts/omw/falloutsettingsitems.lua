@@ -89,6 +89,9 @@ local function meter(key, word, count, default, binding)
 end
 
 local OFF_ON = { 'sOff', 'sOn' }
+-- the pad's vibration is an engine setting (bGamePadRumble), and its item is in the list only while a pad is plugged in
+local rumbleBinding = switch('rumble')
+rumbleBinding.pad = true
 -- The four colours of the HUD and of the Pip-Boy, in the order of their values (the game's code builds the words from the
 -- last to the first)
 local COLOURS = { 'sGreen', 'sBlue', 'sAmber', 'sWhite' }
@@ -154,7 +157,7 @@ M.groups = {
             -- the two items of the pad are in the list only while a pad is plugged in (the second value of the first is
             -- "the controller is enabled")
             toggle('disableController', 'sDisableXBoxController', OFF_ON, 1, { pad = true }),
-            toggle('rumble', 'sRumble', OFF_ON, 1, { pad = true }),
+            toggle('rumble', 'sRumble', OFF_ON, 1, rumbleBinding),
         },
     },
 }

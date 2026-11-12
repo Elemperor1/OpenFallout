@@ -2,6 +2,7 @@
 #define OPENFALLOUT_MWRENDER_FALLOUTACTORANIMATION_H
 
 #include <map>
+#include <memory>
 #include <string>
 #include <string_view>
 
@@ -68,6 +69,15 @@ namespace OFRender
         /// it goes on as it was. False when the files have nothing to play on its skeleton, or it is down.
         bool playIdle(const std::string& file);
 
+        /// What the armor that the actor wears adds to the sound of its steps (the executable's two extra sounds): 0
+        /// nothing, 1 heavy armor, 2 power armor
+        void setArmorSoundKind(int kind) { mArmorSounds = kind; }
+
+        /// Whether the arms that the player sees through their own eyes are in the scene. The sounds that the text keys
+        /// of an animation name come from the arms then, and from the body of the player (which keeps going when it is
+        /// not drawn, for its steps) when they are not, so that no sound is made twice.
+        static void setFirstPersonArmsShown(bool shown);
+
     protected:
         FalloutActorAnimation(
             const OFWorld::Ptr& ptr, osg::ref_ptr<osg::Group> parentNode, Resource::ResourceSystem* resourceSystem);
@@ -93,6 +103,20 @@ namespace OFRender
     private:
         class AdvanceCallback;
         class FallCallback;
+        class SoundKeys;
+
+        /// What an animation does at a text key that names a sound or a foot coming down (`Sound: <editor id>`, and
+        /// `Enum: Left`, `Right`, `BackLeft` and `BackRight`)
+        void playTextKeySound(std::string_view text);
+        /// The sound of a step of the foot (the value of the key) on the ground, with the armor's own sound
+        void playFootstep(int foot);
+        /// The sound of the creature for an event (the value of its `Enum` key, the type of its sound lists)
+        void playCreatureSound(int type);
+        /// The foley and armor sounds of what the actor wears (New Vegas: the value of the key `Enum: FoleyWalk` or
+        /// `ArmorRun`, the type of the sounds that the armor and its audio template list)
+        void playWornSound(int type);
+        std::unique_ptr<SoundKeys> mSoundKeys;
+        int mArmorSounds = 0;
 
         /// Adds the animation file to the actor and gives the name of its group, empty when it has nothing to play on
         /// this skeleton

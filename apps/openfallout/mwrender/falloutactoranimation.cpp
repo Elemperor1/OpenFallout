@@ -7,6 +7,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <random>
 #include <set>
 #include <sstream>
 #include <utility>
@@ -18,7 +19,10 @@
 #include <osg/Transform>
 
 #include <components/debug/debuglog.hpp>
+#include <components/esm4/loadarmo.hpp>
+#include <components/esm4/loadcrea.hpp>
 #include <components/esm4/loadnpc.hpp>
+#include <components/falloutscript/footsteps.hpp>
 #include <components/misc/resourcehelpers.hpp>
 #include <components/resource/resourcesystem.hpp>
 #include <components/resource/scenemanager.hpp>
@@ -33,8 +37,15 @@
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/mechanicsmanager.hpp"
+#include "../mwbase/soundmanager.hpp"
+#include "../mwbase/world.hpp"
+#include "../mwclass/esm4npc.hpp"
+#include "../mwmechanics/actorutil.hpp"
 #include "../mwmechanics/character.hpp"
+#include "../mwsound/falloutfootsteps.hpp"
 #include "../mwworld/class.hpp"
+#include "../mwworld/esmstore.hpp"
+#include "../mwworld/livecellref.hpp"
 #include "../mwworld/refdata.hpp"
 
 #include "blendmask.hpp"
@@ -236,16 +247,190 @@ namespace OFRender
         };
     }
 
+    /// Hands the text keys of the animations that name a sound to the actor
+    class FalloutActorAnimation::SoundKeys : public Animation::TextKeyListener
+    {
+    public:
+        explicit SoundKeys(FalloutActorAnimation& animation)
+            : mAnimation(animation)
+        {
+        }
+
+        void handleTextKey(std::string_view groupname, SceneUtil::TextKeyMap::ConstIterator key,
+            const SceneUtil::TextKeyMap& map) override
+        {
+            mAnimation.playTextKeySound(key->second);
+        }
+
+    private:
+        FalloutActorAnimation& mAnimation;
+    };
+
+    namespace
+    {
+        std::atomic<bool> sFirstPersonArmsShown{ false };
+    }
+
+    void FalloutActorAnimation::setFirstPersonArmsShown(bool shown)
+    {
+        sFirstPersonArmsShown = shown;
+    }
+
     FalloutActorAnimation::FalloutActorAnimation(
         const OFWorld::Ptr& ptr, osg::ref_ptr<osg::Group> parentNode, Resource::ResourceSystem* resourceSystem)
         : Animation(ptr, std::move(parentNode), resourceSystem)
+        , mSoundKeys(std::make_unique<SoundKeys>(*this))
     {
+        setTextKeyListener(mSoundKeys.get());
     }
 
     FalloutActorAnimation::~FalloutActorAnimation()
     {
+        setTextKeyListener(nullptr);
         if (mAdvanceCallback != nullptr)
             mInsert->removeUpdateCallback(mAdvanceCallback);
+    }
+
+    void FalloutActorAnimation::playTextKeySound(std::string_view text)
+    {
+        namespace Steps = FalloutScript::Footsteps;
+        OFBase::SoundManager* sound = OFBase::Environment::get().getSoundManager();
+        if (sound == nullptr || !sound->isEnabled())
+            return;
+        // The body of the player stands in for the player, and the arms are the player seen through their own eyes
+        const bool playerBody = !mFirstPerson && !mMotionSource.isEmpty() && mMotionSource == OFMechanics::getPlayer();
+        if (text.starts_with("sound: "))
+        {
+            // Of the player, the arms make the sounds that animations name while they show, and the body when they do
+            // not (the body goes on moving when it is not drawn)
+            if ((playerBody || mFirstPerson) && mFirstPerson != sFirstPersonArmsShown)
+                return;
+            std::string_view name = text.substr(7);
+            name = name.substr(0, name.find(' '));
+            const OFWorld::Ptr actor = playerBody || mFirstPerson ? OFMechanics::getPlayer() : mPtr;
+            sound->playFalloutSound(name, actor, 1.f, OFSound::Type::Sfx, OFSound::PlayMode::Normal);
+        }
+        else if (text.starts_with("enum: ") && !mFirstPerson)
+        {
+            const std::optional<int> index = Steps::enumKeyIndex(text.substr(6));
+            if (!index)
+                return;
+            if (mPtr.getType() == ESM4::Creature::sRecordId)
+                playCreatureSound(*index);
+            else if (*index <= static_cast<int>(Steps::EnumKey::BackRight))
+                playFootstep(*index);
+            else if (*index >= static_cast<int>(Steps::EnumKey::FoleySneak)
+                && *index <= static_cast<int>(Steps::EnumKey::ArmorRun))
+                playWornSound(*index);
+        }
+    }
+
+    void FalloutActorAnimation::playWornSound(int type)
+    {
+        namespace Steps = FalloutScript::Footsteps;
+        if (mFall != nullptr)
+            return;
+        OFBase::SoundManager* sound = OFBase::Environment::get().getSoundManager();
+        const OFWorld::ESMStore* store = OFBase::Environment::get().getESMStore();
+        if (sound == nullptr || store == nullptr)
+            return;
+        const bool playerBody = !mMotionSource.isEmpty() && mMotionSource == OFMechanics::getPlayer();
+        const OFWorld::Ptr actor = playerBody ? mMotionSource : mPtr;
+        static const Steps::Settings settings;
+        if (!Steps::isHeard(
+                settings, (sound->getListenerPosition() - actor.getRefData().getPosition().asVec3()).length()))
+            return;
+        thread_local std::minstd_rand random{ 0xf01e };
+        for (const ESM4::Armor* worn : OFClass::ESM4Npc::getEquippedArmor(mPtr))
+        {
+            // A piece with no sounds of its own has those of the audio template it names
+            const ESM4::Armor* source = worn;
+            if (source->mSounds.empty() && !source->mTemplate.isZeroOrUnset())
+                source = store->get<ESM4::Armor>().search(ESM::RefId::formIdRefId(source->mTemplate));
+            if (source == nullptr)
+                continue;
+            std::vector<const ESM4::Armor::WornSound*> matching;
+            std::vector<int> chances;
+            for (const ESM4::Armor::WornSound& candidate : source->mSounds)
+                if (candidate.mType == static_cast<std::uint32_t>(type))
+                {
+                    matching.push_back(&candidate);
+                    chances.push_back(candidate.mChance);
+                }
+            if (matching.empty())
+                continue;
+            const int pick = Steps::pickByChance(chances, std::uniform_real_distribution<float>(0.f, 1.f)(random));
+            if (pick >= 0)
+                sound->playFalloutSound(matching[static_cast<std::size_t>(pick)]->mSound, actor,
+                    Steps::stepVolume(settings, playerBody && OFBase::Environment::get().getWorld()->isFirstPerson(),
+                        std::uniform_real_distribution<float>(0.f, 1.f)(random)),
+                    OFSound::Type::Foot, OFSound::PlayMode::Overlap);
+            return;
+        }
+    }
+
+    void FalloutActorAnimation::playCreatureSound(int type)
+    {
+        namespace Steps = FalloutScript::Footsteps;
+        if (mFall != nullptr || type > static_cast<int>(Steps::EnumKey::Death))
+            return;
+        OFBase::SoundManager* sound = OFBase::Environment::get().getSoundManager();
+        const OFWorld::ESMStore* store = OFBase::Environment::get().getESMStore();
+        const OFWorld::LiveCellRef<ESM4::Creature>* ref = mPtr.get<ESM4::Creature>();
+        if (sound == nullptr || store == nullptr || ref == nullptr)
+            return;
+        // The sounds of the creature, or of the one that it takes its sounds from (CSCR)
+        const ESM4::Creature::CreatureSoundGroup* group = nullptr;
+        const ESM4::Creature* record = ref->mBase;
+        for (int depth = 0; depth < 4 && record != nullptr && group == nullptr; ++depth)
+        {
+            for (const ESM4::Creature::CreatureSoundGroup& candidate : record->mSoundGroups)
+                if (candidate.mType == static_cast<std::uint32_t>(type) && !candidate.mSounds.empty())
+                {
+                    group = &candidate;
+                    break;
+                }
+            if (group != nullptr || record->mSoundBase.isZeroOrUnset())
+                break;
+            record = store->get<ESM4::Creature>().search(ESM::RefId::formIdRefId(record->mSoundBase));
+        }
+        if (group == nullptr)
+            return;
+
+        thread_local std::minstd_rand random{ 0xc7ea };
+        std::vector<int> chances;
+        for (const ESM4::Creature::CreatureSound& candidate : group->mSounds)
+            chances.push_back(candidate.mChance);
+        const int pick = Steps::pickByChance(chances, std::uniform_real_distribution<float>(0.f, 1.f)(random));
+        if (pick < 0)
+            return;
+        const bool foot = type <= static_cast<int>(Steps::EnumKey::BackRight);
+        // A step is heard no farther than the INI says
+        if (foot)
+        {
+            static const Steps::Settings settings;
+            if (!Steps::isHeard(settings,
+                    (sound->getListenerPosition() - mPtr.getRefData().getPosition().asVec3()).length()))
+                return;
+        }
+        sound->playFalloutSound(group->mSounds[static_cast<std::size_t>(pick)].mSound, mPtr, 1.f,
+            foot ? OFSound::Type::Foot : OFSound::Type::Sfx,
+            foot ? OFSound::PlayMode::Overlap : OFSound::PlayMode::Normal);
+    }
+
+    void FalloutActorAnimation::playFootstep(int foot)
+    {
+        if (mFall != nullptr)
+            return;
+        const bool playerBody = !mMotionSource.isEmpty() && mMotionSource == OFMechanics::getPlayer();
+        OFSound::FootstepRequest request;
+        request.mActor = playerBody ? mMotionSource : mPtr;
+        request.mFoot = static_cast<FalloutScript::Footsteps::Foot>(foot);
+        request.mSneaking = mSneaking;
+        request.mRunning = mGait == FalloutGait::Run;
+        request.mPlayerInFirstPerson = playerBody && OFBase::Environment::get().getWorld()->isFirstPerson();
+        request.mArmor = mArmorSounds;
+        OFSound::playFootstep(request);
     }
 
     void FalloutActorAnimation::die(bool fallen)

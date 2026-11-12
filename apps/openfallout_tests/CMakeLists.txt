@@ -41,6 +41,7 @@ file(GLOB UNITTEST_SRC_FILES
     mwscript/testgameoptions.cpp
     mwscript/testscripts.cpp
 
+    mwsound/testfalloutsound.cpp
     mwsound/testheadcache.cpp
     mwsound/testwarmqueue.cpp
 )

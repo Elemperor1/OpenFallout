@@ -401,4 +401,70 @@ namespace NifBullet
     {
         return convert(shape, transform, pieces, 0);
     }
+
+    namespace
+    {
+        std::optional<std::uint32_t> materialOf(const Nif::bhkShape& shape, int depth)
+        {
+            if (depth > sMaxShapeDepth)
+                return std::nullopt;
+            const auto firstOf = [depth](const Nif::bhkShapeList& shapes) -> std::optional<std::uint32_t> {
+                for (const auto& child : shapes)
+                    if (!child.empty())
+                        if (const auto material = materialOf(child.get(), depth + 1))
+                            return material;
+                return std::nullopt;
+            };
+            switch (shape.mRecordType)
+            {
+                case Nif::RC_bhkMoppBvTreeShape:
+                {
+                    const auto& mopp = static_cast<const Nif::bhkMoppBvTreeShape&>(shape);
+                    return mopp.mShape.empty() ? std::nullopt : materialOf(mopp.mShape.get(), depth + 1);
+                }
+                case Nif::RC_bhkListShape:
+                {
+                    const auto& list = static_cast<const Nif::bhkListShape&>(shape);
+                    if (const auto material = firstOf(list.mSubshapes))
+                        return material;
+                    return list.mHavokMaterial.mMaterial;
+                }
+                case Nif::RC_bhkConvexListShape:
+                    return firstOf(static_cast<const Nif::bhkConvexListShape&>(shape).mSubShapes);
+                case Nif::RC_bhkConvexTransformShape:
+                {
+                    const auto& transformShape = static_cast<const Nif::bhkConvexTransformShape&>(shape);
+                    if (!transformShape.mShape.empty())
+                        if (const auto material = materialOf(transformShape.mShape.get(), depth + 1))
+                            return material;
+                    return transformShape.mHavokMaterial.mMaterial;
+                }
+                case Nif::RC_bhkPackedNiTriStripsShape:
+                {
+                    const auto& strips = static_cast<const Nif::bhkPackedNiTriStripsShape&>(shape);
+                    if (!strips.mSubshapes.empty())
+                        return strips.mSubshapes.front().mHavokMaterial.mMaterial;
+                    if (!strips.mData.empty() && !strips.mData->mSubshapes.empty())
+                        return strips.mData->mSubshapes.front().mHavokMaterial.mMaterial;
+                    return std::nullopt;
+                }
+                case Nif::RC_bhkNiTriStripsShape:
+                    return static_cast<const Nif::bhkNiTriStripsShape&>(shape).mHavokMaterial.mMaterial;
+                case Nif::RC_bhkBoxShape:
+                case Nif::RC_bhkConvexVerticesShape:
+                case Nif::RC_bhkCapsuleShape:
+                case Nif::RC_bhkSphereShape:
+                case Nif::RC_bhkCylinderShape:
+                case Nif::RC_bhkMultiSphereShape:
+                    return static_cast<const Nif::bhkSphereRepShape&>(shape).mHavokMaterial.mMaterial;
+                default:
+                    return std::nullopt;
+            }
+        }
+    }
+
+    std::optional<std::uint32_t> havokMaterialOf(const Nif::bhkShape& shape)
+    {
+        return materialOf(shape, 0);
+    }
 }

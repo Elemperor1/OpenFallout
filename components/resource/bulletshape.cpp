@@ -95,6 +95,7 @@ namespace Resource
         , mFileName(other.mFileName)
         , mFileHash(other.mFileHash)
         , mVisualCollisionType(other.mVisualCollisionType)
+        , mHavokMaterial(other.mHavokMaterial)
     {
     }
 

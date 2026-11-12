@@ -46,6 +46,10 @@ namespace OFInput
         // does, and is no click at the pointer. The stick moving the pointer lets the pick go (the last of the two
         // that was used is the one A goes to), and so does the end of the screens.
         void setPadPick(bool pick) { mPadPick = pick; }
+
+        /// Vibrates the pad (both motors) with the strength (0 to 1) for the seconds; nothing without a pad, with the
+        /// setting for it off, or with a strength or time of nothing
+        void rumble(float strength, float seconds);
         bool padPick() const { return mPadPick; }
 
         // The buttons that a script hears for the two triggers, which are axes of the pad (they are no SDL button)

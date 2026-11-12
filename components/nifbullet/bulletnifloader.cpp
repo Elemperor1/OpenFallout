@@ -625,6 +625,10 @@ namespace NifBullet
                         failure = convertHavokShape(body->mShape.get(), bodyTransform, pieces);
                         if (failure.empty())
                         {
+                            // What a foot comes down on: the material of the first solid body that has one
+                            if (mShape->mHavokMaterial < 0)
+                                if (const auto material = havokMaterialOf(body->mShape.get()))
+                                    mShape->mHavokMaterial = static_cast<int>(*material);
                             const osg::Matrixf nodeTransform = getWorldTransform(node, parent);
                             for (HavokPiece& piece : pieces)
                                 addChildShape(std::move(piece.mShape), piece.mTransform * nodeTransform, compound);

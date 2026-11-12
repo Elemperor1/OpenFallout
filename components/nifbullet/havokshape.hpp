@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -47,6 +48,11 @@ namespace NifBullet
     /// nothing).
     std::string convertHavokShape(
         const Nif::bhkShape& shape, const osg::Matrixf& transform, std::vector<HavokPiece>& pieces);
+
+    /// The Havok material of a shape (the number that the executables' table of the sounds of steps is indexed by: 0 is
+    /// stone, 2 dirt, 4 grass, 5 metal, 8 water, 9 wood, and so on): that of the first piece that has one. A packed
+    /// strip names its material in its first part. Empty when none of its pieces has a material.
+    std::optional<std::uint32_t> havokMaterialOf(const Nif::bhkShape& shape);
 }
 
 #endif

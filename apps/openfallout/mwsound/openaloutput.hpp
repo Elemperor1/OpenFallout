@@ -66,7 +66,7 @@ namespace OFSound
 
         void initCommon2D(ALuint source, const osg::Vec3f& pos, ALfloat gain, ALfloat pitch, bool loop, bool useenv);
         void initCommon3D(ALuint source, const osg::Vec3f& pos, const osg::Vec3f& vel, ALfloat mindist, ALfloat maxdist,
-            ALfloat gain, ALfloat pitch, bool loop, bool useenv);
+            ALfloat gain, ALfloat pitch, bool loop, bool useenv, ALfloat rolloff = 1.0f);
 
         void updateCommon(ALuint source, const osg::Vec3f& pos, const osg::Vec3f& vel, ALfloat maxdist, ALfloat gain,
             ALfloat pitch, bool useenv);

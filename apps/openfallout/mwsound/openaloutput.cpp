@@ -1145,11 +1145,11 @@ namespace OFSound
     }
 
     void OpenALOutput::initCommon3D(ALuint source, const osg::Vec3f& pos, const osg::Vec3f& vel, ALfloat mindist,
-        ALfloat maxdist, ALfloat gain, ALfloat pitch, bool loop, bool useenv)
+        ALfloat maxdist, ALfloat gain, ALfloat pitch, bool loop, bool useenv, ALfloat rolloff)
     {
         alSourcef(source, AL_REFERENCE_DISTANCE, mindist);
         alSourcef(source, AL_MAX_DISTANCE, maxdist);
-        alSourcef(source, AL_ROLLOFF_FACTOR, 1.0f);
+        alSourcef(source, AL_ROLLOFF_FACTOR, rolloff);
         alSourcei(source, AL_SOURCE_RELATIVE, AL_FALSE);
         alSourcei(source, AL_LOOPING, loop ? AL_TRUE : AL_FALSE);
         if (AL.SOFT_source_spatialize)
@@ -1252,7 +1252,7 @@ namespace OFSound
 
         initCommon3D(source, sound->getPosition(), sound->getVelocity(), sound->getMinDistance(),
             sound->getMaxDistance(), sound->getRealVolume(), getTimeScaledPitch(sound), sound->getIsLooping(),
-            sound->getUseEnv());
+            sound->getUseEnv(), sound->usesDistanceCurve() ? 0.0f : 1.0f);
         alSourcei(source, AL_BUFFER, GET_PTRID(data));
         alSourcef(source, AL_SEC_OFFSET, offset);
         if (getALError() != AL_NO_ERROR)

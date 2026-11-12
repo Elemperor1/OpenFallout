@@ -60,6 +60,11 @@ namespace Resource
 
         VisualCollisionType mVisualCollisionType = VisualCollisionType::None;
 
+        /// The Havok material of the solid collision shapes of the model, which Fallout 3 and New Vegas name what a foot
+        /// comes down on by (stone, dirt, metal, wood and so on, the index of the executables' tables). -1 when the model
+        /// has none.
+        int mHavokMaterial = -1;
+
         BulletShape() = default;
         // Note this is always a shallow copy and the copy will not autodelete underlying vertex data
         BulletShape(const BulletShape& other);

@@ -217,4 +217,37 @@ namespace
         EXPECT_EQ(creature.mFalloutStats.mHealth, 70);
         EXPECT_THAT(creature.mFalloutStats.mAttributes, ElementsAre(3, 4, 5, 6, 7, 8, 9));
     }
+
+    // CSDT starts a list of sounds for an event (the foot that comes down, idle, aware, attack, hit, death), and each CSDI
+    // after it with its CSDC chance is one sound of the list
+    TEST(ESM4CreatureTest, readsTheSoundListsOfACreatureOfFallout)
+    {
+        const std::string data = zString("EDID", "Gecko") + valueSubRecord<std::uint32_t>("CSDT", 0)
+            + valueSubRecord<std::uint32_t>("CSDI", 0x00ABC001) + valueSubRecord<std::uint8_t>("CSDC", 100)
+            + valueSubRecord<std::uint32_t>("CSDT", 6) + valueSubRecord<std::uint32_t>("CSDI", 0x00ABC002)
+            + valueSubRecord<std::uint8_t>("CSDC", 60) + valueSubRecord<std::uint32_t>("CSDI", 0x00ABC003)
+            + valueSubRecord<std::uint8_t>("CSDC", 40) + valueSubRecord<std::uint32_t>("CSCR", 0x00ABC004);
+        const ESM4::Creature creature = loadFromAFalloutFile<ESM4::Creature>("CREA", data);
+
+        ASSERT_EQ(creature.mSoundGroups.size(), 2u);
+        EXPECT_EQ(creature.mSoundGroups[0].mType, 0u);
+        ASSERT_EQ(creature.mSoundGroups[0].mSounds.size(), 1u);
+        EXPECT_EQ(creature.mSoundGroups[0].mSounds[0].mSound.toUint32(), 0x00ABC001u);
+        EXPECT_EQ(creature.mSoundGroups[0].mSounds[0].mChance, 100);
+        EXPECT_EQ(creature.mSoundGroups[1].mType, 6u);
+        ASSERT_EQ(creature.mSoundGroups[1].mSounds.size(), 2u);
+        EXPECT_EQ(creature.mSoundGroups[1].mSounds[0].mChance, 60);
+        EXPECT_EQ(creature.mSoundGroups[1].mSounds[1].mSound.toUint32(), 0x00ABC003u);
+        EXPECT_EQ(creature.mSoundGroups[1].mSounds[1].mChance, 40);
+        EXPECT_EQ(creature.mSoundBase.toUint32(), 0x00ABC004u);
+    }
+
+    TEST(ESM4CreatureTest, aSoundThatComesBeforeAnyListIsNotKept)
+    {
+        const std::string data
+            = zString("EDID", "Gecko") + valueSubRecord<std::uint32_t>("CSDI", 0x00ABC001);
+        const ESM4::Creature creature = loadFromAFalloutFile<ESM4::Creature>("CREA", data);
+
+        EXPECT_TRUE(creature.mSoundGroups.empty());
+    }
 }
