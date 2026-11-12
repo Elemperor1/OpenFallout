@@ -9,6 +9,7 @@
 #include <mutex>
 #include <set>
 #include <sstream>
+#include <utility>
 #include <vector>
 
 #include <osg/ComputeBoundsVisitor>
@@ -593,7 +594,24 @@ namespace OFRender
     {
         // What the actor does: stands (the idle plays on its own, or the sneaking idle over it), walks or runs
         const OFWorld::Ptr& source = mMotionSource.isEmpty() ? mPtr : mMotionSource;
-        const bool sneak = mPoseKind == 0 && OFBase::Environment::get().getMechanicsManager()->isSneaking(source);
+        // Only the player's body is asked: the characters of the world have no stats of the engine's creatures to
+        // say whether they sneak (the stance of a Fallout character is its own, and nothing sets it for them yet)
+        bool sneak = false;
+        if (mPoseKind == 0 && !mMotionSource.isEmpty() && mMotionSource.getClass().isActor())
+        {
+            try
+            {
+                sneak = OFBase::Environment::get().getMechanicsManager()->isSneaking(source);
+            }
+            catch (const std::exception& error)
+            {
+                // A class with no stats (round 14F: "class does not have creature stats" ended the engine at the load of
+                // the first cell) does not sneak
+                static bool said = false;
+                if (!std::exchange(said, true))
+                    Log(Debug::Warning) << "Cannot tell whether " << mPtr.getCellRef().getRefId() << " sneaks: " << error.what();
+            }
+        }
         const std::string_view prefix = mDrawn ? falloutWeaponPrefix(mWeaponType) : std::string_view();
         const std::vector<std::string>& files = animationFilesOf(*mResourceSystem->getVFS(), mMoveFolder);
 
