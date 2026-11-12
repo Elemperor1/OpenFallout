@@ -2,6 +2,8 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <set>
 #include <vector>
 
 namespace
@@ -69,6 +71,59 @@ namespace
         EXPECT_FALSE(signalOf(Reach::Worldspace, 0.f, 0.f, world, settings).mInRange);
         world.mSameWorldspace = true;
         EXPECT_TRUE(signalOf(Reach::Worldspace, 0.f, 0.f, world, settings).mInRange);
+    }
+
+    TEST(FalloutScriptRadioTest, aWorldspaceReachIsHeardIndoorsOnlyInTheInteriorsLinkedToItsWorldspace)
+    {
+        const Settings settings;
+        Where inside;
+        inside.mExterior = false;
+        EXPECT_FALSE(signalOf(Reach::Worldspace, 0.f, 0.f, inside, settings).mInRange);
+        inside.mSameWorldspace = true;
+        EXPECT_TRUE(signalOf(Reach::Worldspace, 0.f, 0.f, inside, settings).mInRange);
+        // (a station placed in an interior is heard where it is, whatever the worldspace)
+        Where here;
+        here.mExterior = false;
+        here.mSameCell = true;
+        EXPECT_TRUE(signalOf(Reach::Worldspace, 0.f, 0.f, here, settings).mInRange);
+    }
+
+    TEST(FalloutScriptRadioTest, aLinkedInteriorsReachIsHeardInTheCellAndTheInteriorsLinkedToIt)
+    {
+        const Settings settings;
+        Where linked;
+        linked.mExterior = false;
+        linked.mLinkedInterior = true;
+        EXPECT_TRUE(signalOf(Reach::LinkedInteriors, 0.f, 0.f, linked, settings).mInRange);
+        // (the current-cell reach does not go further than the cell)
+        EXPECT_FALSE(signalOf(Reach::CurrentCell, 0.f, 0.f, linked, settings).mInRange);
+        // (and out of doors it is heard in no cell but its own)
+        Where outsideLinked = outside(-1.f);
+        outsideLinked.mLinkedInterior = true;
+        EXPECT_FALSE(signalOf(Reach::LinkedInteriors, 0.f, 0.f, outsideLinked, settings).mInRange);
+    }
+
+    TEST(FalloutScriptRadioTest, theDoorsLinkTheInteriorsThatCanBeWalkedToWithoutGoingOutOfDoors)
+    {
+        Links<std::uint32_t> links;
+        // A vault: 1 - 2 - 3 (3 has a door out to worldspace 100), and a house 7 - 8 that opens on worldspace 200
+        links.addDoor(1, 2);
+        links.addDoor(3, 2);
+        links.addExit(3, 100);
+        links.addDoor(7, 8);
+        links.addExit(8, 200);
+        const Links<std::uint32_t>::Group vault = links.groupOf(1);
+        EXPECT_EQ(vault.mInteriors, (std::set<std::uint32_t>{ 1, 2, 3 }));
+        EXPECT_EQ(vault.mWorldspaces, (std::set<std::uint32_t>{ 100 }));
+        EXPECT_EQ(links.groupOf(3).mInteriors, vault.mInteriors);
+        const Links<std::uint32_t>::Group house = links.groupOf(8);
+        EXPECT_EQ(house.mInteriors, (std::set<std::uint32_t>{ 7, 8 }));
+        EXPECT_EQ(house.mWorldspaces, (std::set<std::uint32_t>{ 200 }));
+        // An interior with no doors is linked to itself only
+        EXPECT_EQ(links.groupOf(9).mInteriors, (std::set<std::uint32_t>{ 9 }));
+        EXPECT_TRUE(links.groupOf(9).mWorldspaces.empty());
+        EXPECT_FALSE(links.empty());
+        EXPECT_TRUE(Links<std::uint32_t>().empty());
     }
 
     TEST(FalloutScriptRadioTest, theVoiceIsTheVolumeOfTheRadioLessStaticAndQuieterInADialogue)

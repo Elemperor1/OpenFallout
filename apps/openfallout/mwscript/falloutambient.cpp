@@ -54,8 +54,9 @@ namespace OFScript
     void FalloutScripts::resetAmbient()
     {
         AmbientPlayback& ambient = mAmbientPlayback;
-        OFBase::SoundManager* sound
-            = OFBase::Environment::exists() ? OFBase::Environment::get().getSoundManager() : nullptr;
+        OFBase::SoundManager* sound = nullptr;
+        if (OFBase::Environment::exists())
+            sound = OFBase::Environment::get().getSoundManager();
         if (sound != nullptr)
             for (const auto& [id, loop] : ambient.mLoops)
                 if (loop.mTrack != 0)

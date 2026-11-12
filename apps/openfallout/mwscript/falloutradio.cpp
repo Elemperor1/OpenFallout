@@ -46,8 +46,9 @@ namespace OFScript
     void FalloutScripts::stopRadioVoice()
     {
         RadioPlayback& radio = mRadioPlayback;
-        OFBase::SoundManager* sound
-            = OFBase::Environment::exists() ? OFBase::Environment::get().getSoundManager() : nullptr;
+        OFBase::SoundManager* sound = nullptr;
+        if (OFBase::Environment::exists())
+            sound = OFBase::Environment::get().getSoundManager();
         if (sound != nullptr && radio.mTrack != 0)
             sound->stopMusicTrack(radio.mTrack);
         radio.mTrack = 0;
@@ -69,6 +70,10 @@ namespace OFScript
         radio.mUntilLook = 0.f;
         radio.mSinceLook = 0.f;
         radio.mDialogueOnly = false;
+        radio.mGroupCell = ESM::RefId();
+        radio.mGroup = {};
+        const std::lock_guard lock(mRadioMutex);
+        radio.mListing.clear();
     }
 
     void FalloutScripts::setRadioBroadcast(FalloutScript::FormId station, bool on)
@@ -95,8 +100,13 @@ namespace OFScript
         // (called with the radio mutex held)
         RadioPlayback& radio = mRadioPlayback;
         radio.mBuilt = true;
+        // The doors that lead from one cell to another (the cell and the door it opens on), for the stations that reach the
+        // interiors linked to a place
+        std::vector<std::pair<ESM::RefId, ESM::FormId>> doors;
         for (const ESM4::Reference& reference : mStore.get<ESM4::Reference>())
         {
+            if (!reference.mDoor.destDoor.isZeroOrUnset())
+                doors.emplace_back(reference.mParent, reference.mDoor.destDoor);
             if (!reference.mRadio.present)
                 continue;
             // A station is a talking activator that has the flag; the others that carry the subrecord are speakers
@@ -119,6 +129,21 @@ namespace OFScript
                 station.mWorldspace = station.mExterior ? cell->mParent : reference.mParent;
             }
             radio.mStations.push_back(std::move(station));
+        }
+        const auto& cells = mStore.get<ESM4::Cell>();
+        for (const auto& [cellId, destination] : doors)
+        {
+            const ESM4::Cell* from = cells.search(cellId);
+            if (from == nullptr || from->isExterior())
+                continue;
+            const ESM4::Reference* door = mStore.get<ESM4::Reference>().search(destination);
+            const ESM4::Cell* to = door != nullptr ? cells.search(door->mParent) : nullptr;
+            if (to == nullptr)
+                continue;
+            if (to->isExterior())
+                radio.mLinks.addExit(cellId, to->mParent);
+            else
+                radio.mLinks.addDoor(cellId, door->mParent);
         }
         logRadio("the world has " + std::to_string(radio.mStations.size()) + " radio station(s)");
     }
@@ -174,9 +199,9 @@ namespace OFScript
         return result;
     }
 
-    std::vector<FalloutScripts::PipboyStation> FalloutScripts::pipboyRadio()
+    void FalloutScripts::refreshRadioListing()
     {
-        std::vector<PipboyStation> result;
+        std::vector<PipboyStation> listing;
         const RadioPlayback& radio = mRadioPlayback;
         for (const RadioStation& station : radio.mStations)
         {
@@ -187,12 +212,38 @@ namespace OFScript
             shown.mName = station.mName;
             shown.mTuned = radio.mReceiver.tuned() == station.mReference;
             shown.mSignal = radio.mReceiver.signal(station.mReference).mStrength;
-            result.push_back(std::move(shown));
+            listing.push_back(std::move(shown));
         }
-        return result;
+        const std::lock_guard lock(mRadioMutex);
+        mRadioPlayback.mListing = std::move(listing);
+    }
+
+    std::vector<FalloutScripts::PipboyStation> FalloutScripts::pipboyRadio()
+    {
+        // (what the main thread listed at its last look: the Pip-Boy's scripts may ask from another thread)
+        const std::lock_guard lock(mRadioMutex);
+        return mRadioPlayback.mListing;
     }
 
     bool FalloutScripts::tuneRadio(FalloutScript::FormId station)
+    {
+        if (std::this_thread::get_id() == mMainThread)
+            return tuneRadioNow(station);
+        // The sounds and the receiver are the main thread's: it tunes when it next looks, and the answer is what it listed
+        // last
+        if (station != 0)
+        {
+            const std::lock_guard lock(mRadioMutex);
+            const auto& listing = mRadioPlayback.mListing;
+            if (std::none_of(listing.begin(), listing.end(),
+                    [station](const PipboyStation& shown) { return shown.mStation == station; }))
+                return false;
+        }
+        runOnMainThread([this, station] { tuneRadioNow(station); });
+        return true;
+    }
+
+    bool FalloutScripts::tuneRadioNow(FalloutScript::FormId station)
     {
         RadioPlayback& radio = mRadioPlayback;
         if (station == 0)
@@ -201,6 +252,7 @@ namespace OFScript
                 logRadio("the radio is turned off");
             radio.mReceiver.untune();
             stopRadioVoice();
+            refreshRadioListing();
             return true;
         }
         if (radio.mReceiver.tuned() == station)
@@ -211,6 +263,7 @@ namespace OFScript
         stopRadioVoice();
         radio.mRest = 0.f;
         logRadio("the radio is tuned to " + std::to_string(station));
+        refreshRadioListing();
         return true;
     }
 
@@ -249,18 +302,36 @@ namespace OFScript
             const osg::Vec3f at = player.getRefData().getPosition().asVec3();
             std::vector<Radio::Sighting> sightings;
             radio.mRoomInReach.clear();
-            const std::lock_guard lock(mRadioMutex);
+            if (!here->isExterior() && radio.mGroupCell != here->getId())
+            {
+                radio.mGroupCell = here->getId();
+                radio.mGroup = radio.mLinks.groupOf(here->getId());
+            }
+            // (the stations are only built once, so they are read without the lock; what a script says is on the air is read
+            // under it for a moment: the response conditions that are looked at below may ask a script for a broadcast)
             for (const RadioStation& station : radio.mStations)
             {
-                const auto set = mRadioBroadcast.find(station.mReference);
-                const bool onTheAir = set != mRadioBroadcast.end() ? set->second : station.mBroadcast;
+                bool onTheAir;
+                {
+                    const std::lock_guard lock(mRadioMutex);
+                    const auto set = mRadioBroadcast.find(station.mReference);
+                    onTheAir = set != mRadioBroadcast.end() ? set->second : station.mBroadcast;
+                }
                 if (!onTheAir || isDisabled(station.mReference))
                     continue;
                 Radio::Where where;
                 where.mExterior = here->isExterior();
                 where.mSameCell = here->getId() == station.mCell;
-                where.mSameWorldspace = here->isExterior() && station.mExterior && here->getWorldSpace() == station.mWorldspace;
-                if (station.mReach == Radio::Reach::Radius && where.mSameWorldspace)
+                if (here->isExterior())
+                    where.mSameWorldspace = station.mExterior && here->getWorldSpace() == station.mWorldspace;
+                else
+                {
+                    // Indoors: the interiors that a door joins to this one open on a worldspace, or are those of a station
+                    // that is placed in an interior
+                    where.mSameWorldspace = station.mExterior && radio.mGroup.mWorldspaces.count(station.mWorldspace) != 0;
+                    where.mLinkedInterior = !station.mExterior && radio.mGroup.mInteriors.count(station.mCell) != 0;
+                }
+                if (station.mReach == Radio::Reach::Radius && where.mExterior && where.mSameWorldspace)
                 {
                     // The distance is from the reference that the station names, or from the station
                     Place place;
@@ -309,6 +380,7 @@ namespace OFScript
                         break;
                 }
             }
+            refreshRadioListing();
         }
 
         // ---- What the tuned station says ----

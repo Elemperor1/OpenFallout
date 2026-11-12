@@ -842,6 +842,9 @@ namespace OFSound
             params.mFlags = mode | type | Play_3D;
             return params;
         }());
+        // The sound is heard by the curve of its record from where it is placed, as one of a reference is
+        sound->setDistanceCurve(curve);
+        sound->updateDistanceGain(mListenerPos);
         if (!mOutput->playSound3D(sound.get(), sfx->getHandle(), 0.f))
             return nullptr;
 

@@ -14,10 +14,13 @@ namespace FalloutScript::Radio
                 signal.mStrength = 1.f;
                 return signal;
             case Reach::Worldspace:
-                signal.mInRange = where.mSameWorldspace || !where.mExterior;
+                signal.mInRange = where.mSameWorldspace || where.mSameCell;
                 signal.mStrength = signal.mInRange ? 1.f : 0.f;
                 return signal;
             case Reach::LinkedInteriors:
+                signal.mInRange = where.mSameCell || (!where.mExterior && where.mLinkedInterior);
+                signal.mStrength = signal.mInRange ? 1.f : 0.f;
+                return signal;
             case Reach::CurrentCell:
                 signal.mInRange = where.mSameCell;
                 signal.mStrength = signal.mInRange ? 1.f : 0.f;

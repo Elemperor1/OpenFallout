@@ -65,6 +65,32 @@ namespace
         EXPECT_EQ(marker.mAudioMarker.mFlags, 1u);
     }
 
+    // The lighting subrecords of a reference (LNAM, XLIG, XEMI) are skipped whole, and are no radius: the subrecords after
+    // them are read where they begin
+    TEST(ESM4MusicRecordTest, lightingSubrecordsAreSkippedWholeAndGiveNoRadius)
+    {
+        const std::string data = valueSubRecord("NAME", std::uint32_t(0x23)) + subRecord("XLIG", bytePattern(16, 2))
+            + subRecord("LNAM", bytePattern(4, 1)) + subRecord("XEMI", bytePattern(4, 3))
+            + valueSubRecord<std::uint32_t>("XCNT", 5);
+        const std::vector<ESM4::Reference> records = loadRecords<ESM4::Reference>("REFR", record("REFR", 0x2001, data));
+        ASSERT_EQ(records.size(), 1u);
+        EXPECT_FLOAT_EQ(records[0].mAudioMarker.mRadius, 0.f);
+        EXPECT_EQ(records[0].mCount, 5);
+    }
+
+    TEST(ESM4MusicRecordTest, anAudioMarkerSubrecordOfAnotherSizeIsSkipped)
+    {
+        const std::string data = valueSubRecord("NAME", std::uint32_t(0x23)) + subRecord("XRDS", bytePattern(8, 1))
+            + subRecord("MNAM", bytePattern(2, 1)) + subRecord("BNAM", bytePattern(3, 1))
+            + valueSubRecord<std::uint32_t>("XCNT", 7);
+        const std::vector<ESM4::Reference> records = loadRecords<ESM4::Reference>("REFR", record("REFR", 0x2001, data));
+        ASSERT_EQ(records.size(), 1u);
+        EXPECT_FLOAT_EQ(records[0].mAudioMarker.mRadius, 0.f);
+        EXPECT_FLOAT_EQ(records[0].mAudioMarker.mLayer2Trigger, 0.f);
+        EXPECT_EQ(records[0].mAudioMarker.mFlags, 0u);
+        EXPECT_EQ(records[0].mCount, 7);
+    }
+
     TEST(ESM4MusicRecordTest, aReferenceWithoutMmrkIsNoAudioMarker)
     {
         const std::string data = valueSubRecord("NAME", std::uint32_t(0x23)) + valueSubRecord<float>("XRDS", 256.f);

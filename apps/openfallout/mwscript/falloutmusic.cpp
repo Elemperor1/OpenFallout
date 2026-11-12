@@ -75,7 +75,9 @@ namespace OFScript
     void FalloutScripts::resetMusic()
     {
         MusicPlayback& music = mMusicPlayback;
-        OFBase::SoundManager* sound = OFBase::Environment::exists() ? OFBase::Environment::get().getSoundManager() : nullptr;
+        OFBase::SoundManager* sound = nullptr;
+        if (OFBase::Environment::exists())
+            sound = OFBase::Environment::get().getSoundManager();
         if (sound != nullptr)
         {
             if (music.mTrack != 0)
@@ -163,13 +165,43 @@ namespace OFScript
             fighter.mStrength = static_cast<float>(std::max(mActorValues.current(attacker, AV::health), 0.0));
             fighters.push_back(fighter);
         }
+        // Fights that are not the player's: characters near the player that fight each other, with a friend of the player
+        // (a teammate, or one the player's faction stands by) among them
+        for (const auto& [actor, target] : mCombat.fights())
+        {
+            if (actor == mPlayer || target == mPlayer)
+                continue;
+            const OFWorld::Ptr reference = findReference(actor);
+            if (reference.isEmpty() || !reference.isInCell() || !reference.getRefData().isEnabled()
+                || activeCells.find(reference.getCell()) == activeCells.end())
+                continue;
+            FalloutScript::Music::Fighter fighter;
+            fighter.mInCombat = true;
+            fighter.mDistance = (reference.getRefData().getPosition().asVec3() - at).length();
+            fighter.mStrength = static_cast<float>(std::max(mActorValues.current(actor, AV::health), 0.0));
+            if (fighter.mDistance <= music.mNearRange)
+            {
+                const auto friendOfPlayer = [this](FalloutScript::FormId other) {
+                    if (mObjectState.teammate(other))
+                        return true;
+                    const auto relation = FalloutScript::relationOfActors(mCombat, mActors, *this, other, mPlayer);
+                    return relation == FalloutScript::CombatState::Relation::Ally
+                        || relation == FalloutScript::CombatState::Relation::Friend;
+                };
+                fighter.mAllyNear = friendOfPlayer(actor) || friendOfPlayer(target);
+            }
+            fighters.push_back(fighter);
+        }
         if (!music.mConfigured)
         {
             // The settings are read once, when the files of the game are loaded
             music.mConfigured = true;
-            music.mCombat = FalloutScript::Music::CombatMusic(combatSettings([this](const char* name, float fallback) {
-                return static_cast<float>(gameSetting(name, fallback));
-            }));
+            const FalloutScript::Music::CombatSettings settings
+                = combatSettings([this](const char* name, float fallback) {
+                      return static_cast<float>(gameSetting(name, fallback));
+                  });
+            music.mNearRange = settings.mNearOuter;
+            music.mCombat = FalloutScript::Music::CombatMusic(settings);
         }
         const bool wasInCombat = music.mCombat.on();
         const bool combat = music.mCombat.update(
@@ -208,52 +240,6 @@ namespace OFScript
         const bool placeHasTracks = place != nullptr && !place->mFiles.empty();
         const OFSound::FalloutMusic* battle = music.mRecords->find(battleMusic);
         const bool battleHasTracks = battle != nullptr && !battle->mFiles.empty();
-
-        // ---- Fallout 3's music, and the tracks of the records that New Vegas gives a file ----
-        {
-            FalloutScript::Music::DirectorInput input;
-            input.mSeconds = frametime;
-            input.mExplore = placeHasTracks ? placeMusic.toUint32() : 0;
-            input.mBattle = battleHasTracks ? battleMusic.toUint32() : 0;
-            input.mCombat = combat;
-            input.mBlocked = scriptMusic;
-            input.mPlaying = music.mTrack != 0 && sound->isMusicTrackPlaying(music.mTrack);
-            input.mLoops = music.mTrackLoops;
-            const FalloutScript::Music::DirectorAction action = music.mDirector.update(input, [&music] {
-                return std::uniform_real_distribution<double>(0.0, 1.0)(music.mRandom);
-            });
-            using Kind = FalloutScript::Music::DirectorAction::Kind;
-            if (action.mKind == Kind::FadeOut && music.mTrack != 0)
-            {
-                sound->fadeMusicTrack(music.mTrack, 0.f, action.mFade, true);
-                logMusic("fades out the track of " + std::to_string(action.mFade) + " s");
-            }
-            else if (action.mKind == Kind::Start)
-            {
-                OFSound::FalloutMusic* record = music.mRecords->find(ESM::FormId::fromUint32(action.mMusic));
-                if (record != nullptr && !record->mFiles.empty())
-                {
-                    const auto random = [&music](int low, int high) {
-                        return std::uniform_int_distribution<int>(low, high)(music.mRandom);
-                    };
-                    if (!record->mStarted)
-                    {
-                        record->mStarted = true;
-                        record->mLast = FalloutScript::Music::firstTrack(record->mFiles.size(), random);
-                    }
-                    if (const auto index
-                        = FalloutScript::Music::nextTrack(record->mFiles.size(), record->mLast, random))
-                    {
-                        const VFS::Path::Normalized& file = record->mFiles[*index];
-                        music.mTrack = sound->startMusicTrack(file, gainOfDb(record->mDb), action.mFade, record->mLoop);
-                        music.mTrackLoops = record->mLoop;
-                        logMusic(record->mEditorId + " starts " + std::string(file.value()) + " (" + std::to_string(*index + 1)
-                            + " of " + std::to_string(record->mFiles.size()) + ")"
-                            + (record->mLoop ? ", loops" : ""));
-                    }
-                }
-            }
-        }
 
         // ---- New Vegas's location sets and battle sets ----
         // The cell's own music record decides over the markers' sets; a cell that asks for no music (1NoMusic) has no music
@@ -352,6 +338,54 @@ namespace OFScript
                     sets.push_back(id);
             if (!sets.empty())
                 music.mBattleSet = sets[std::uniform_int_distribution<std::size_t>(0, sets.size() - 1)(music.mRandom)];
+        }
+
+        // ---- Fallout 3's music, and the tracks of the records that New Vegas gives a file ----
+        {
+            FalloutScript::Music::DirectorInput input;
+            input.mSeconds = frametime;
+            input.mExplore = placeHasTracks ? placeMusic.toUint32() : 0;
+            // The default battle music (DOBJ) is for a place that has no battle set of its own; with one, the set is the music of
+            // the fight
+            input.mBattle = battleHasTracks && music.mBattleSet.isZeroOrUnset() ? battleMusic.toUint32() : 0;
+            input.mCombat = combat;
+            input.mBlocked = scriptMusic;
+            input.mPlaying = music.mTrack != 0 && sound->isMusicTrackPlaying(music.mTrack);
+            input.mLoops = music.mTrackLoops;
+            const FalloutScript::Music::DirectorAction action = music.mDirector.update(input, [&music] {
+                return std::uniform_real_distribution<double>(0.0, 1.0)(music.mRandom);
+            });
+            using Kind = FalloutScript::Music::DirectorAction::Kind;
+            if (action.mKind == Kind::FadeOut && music.mTrack != 0)
+            {
+                sound->fadeMusicTrack(music.mTrack, 0.f, action.mFade, true);
+                logMusic("fades out the track of " + std::to_string(action.mFade) + " s");
+            }
+            else if (action.mKind == Kind::Start)
+            {
+                OFSound::FalloutMusic* record = music.mRecords->find(ESM::FormId::fromUint32(action.mMusic));
+                if (record != nullptr && !record->mFiles.empty())
+                {
+                    const auto random = [&music](int low, int high) {
+                        return std::uniform_int_distribution<int>(low, high)(music.mRandom);
+                    };
+                    if (!record->mStarted)
+                    {
+                        record->mStarted = true;
+                        record->mLast = FalloutScript::Music::firstTrack(record->mFiles.size(), random);
+                    }
+                    if (const auto index
+                        = FalloutScript::Music::nextTrack(record->mFiles.size(), record->mLast, random))
+                    {
+                        const VFS::Path::Normalized& file = record->mFiles[*index];
+                        music.mTrack = sound->startMusicTrack(file, gainOfDb(record->mDb), action.mFade, record->mLoop);
+                        music.mTrackLoops = record->mLoop;
+                        logMusic(record->mEditorId + " starts " + std::string(file.value()) + " (" + std::to_string(*index + 1)
+                            + " of " + std::to_string(record->mFiles.size()) + ")"
+                            + (record->mLoop ? ", loops" : ""));
+                    }
+                }
+            }
         }
 
         const ESM4::MediaSet* locationSet = music.mSet.isZeroOrUnset() ? nullptr : mStore.get<ESM4::MediaSet>().search(music.mSet);

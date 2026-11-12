@@ -2883,6 +2883,8 @@ namespace OFScript
         struct MusicPlayback
         {
             FalloutScript::Music::CombatMusic mCombat;
+            /// How near a fight must be to count for the music (fCombatMusicNearCombatOuterRadius)
+            float mNearRange = 3500.f;
             FalloutScript::Music::Director mDirector;
             std::mt19937 mRandom{ std::random_device{}() };
             std::unique_ptr<OFSound::FalloutMusicRecords> mRecords;
@@ -2958,6 +2960,13 @@ namespace OFScript
             FalloutScript::Radio::Receiver mReceiver;
             std::vector<RadioStation> mStations;
             bool mBuilt = false;
+            /// The interiors that the doors join and the worldspaces they open on (for the reaches that name linked
+            /// interiors), and the group of the cell the player is in
+            FalloutScript::Radio::Links<ESM::RefId> mLinks;
+            ESM::RefId mGroupCell;
+            FalloutScript::Radio::Links<ESM::RefId>::Group mGroup;
+            /// What the Pip-Boy lists: made by the main thread every look, read by whichever thread asks (the radio mutex)
+            std::vector<PipboyStation> mListing;
             float mUntilLook = 0.f;
             float mSinceLook = 0.f;
             /// What the tuned station says now: the files of the lines of a chain, one after the other
@@ -2989,6 +2998,10 @@ namespace OFScript
         bool radioBroadcast(FalloutScript::FormId station);
         void updateRadio(float frametime);
         void resetRadio();
+        /// Tunes the radio (the main thread)
+        bool tuneRadioNow(FalloutScript::FormId station);
+        /// Makes the list the Pip-Boy shows from the stations that are in reach (the main thread)
+        void refreshRadioListing();
         void logRadio(const std::string& text);
         void buildRadioStations();
         /// The lines of the response that the station says for the topic (the topic RadioHello starts every chain). The

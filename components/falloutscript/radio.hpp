@@ -37,16 +37,73 @@ namespace FalloutScript::Radio
         Radius = 0, // from the station (or from the reference it names) out to the radius, in exteriors only
         Everywhere = 1,
         Worldspace = 2, // the worldspace of the station and the interiors that are linked to it
-        LinkedInteriors = 3,
+        LinkedInteriors = 3, // the cell of the station and the interiors that are linked to it
         CurrentCell = 4,
+    };
+
+    /// The interiors that the doors of the world join to each other, and the worldspaces those doors lead out to. The
+    /// reaches that name linked interiors are read from it: an interior is linked to the interiors that can be walked to
+    /// from it without going out of doors, and to the worldspaces that the doors of those interiors open on. (`Id`
+    /// names a cell or a worldspace, and is ordered.)
+    template <class Id>
+    class Links
+    {
+    public:
+        struct Group
+        {
+            /// The interior itself and those that are linked to it
+            std::set<Id> mInteriors;
+            /// The worldspaces that a door of one of them opens on
+            std::set<Id> mWorldspaces;
+        };
+
+        /// A door of an interior that leads into another interior (the doors of the games go both ways: each has its own)
+        void addDoor(const Id& interior, const Id& other)
+        {
+            mDoors[interior].insert(other);
+            mDoors[other].insert(interior);
+        }
+
+        /// A door of an interior that leads out into a worldspace
+        void addExit(const Id& interior, const Id& worldspace) { mExits[interior].insert(worldspace); }
+
+        Group groupOf(const Id& interior) const
+        {
+            Group group;
+            std::vector<Id> open{ interior };
+            group.mInteriors.insert(interior);
+            while (!open.empty())
+            {
+                const Id cell = open.back();
+                open.pop_back();
+                if (const auto exits = mExits.find(cell); exits != mExits.end())
+                    group.mWorldspaces.insert(exits->second.begin(), exits->second.end());
+                const auto doors = mDoors.find(cell);
+                if (doors == mDoors.end())
+                    continue;
+                for (const Id& other : doors->second)
+                    if (group.mInteriors.insert(other).second)
+                        open.push_back(other);
+            }
+            return group;
+        }
+
+        bool empty() const { return mDoors.empty() && mExits.empty(); }
+
+    private:
+        std::map<Id, std::set<Id>> mDoors;
+        std::map<Id, std::set<Id>> mExits;
     };
 
     /// Where the player is, in relation to the station
     struct Where
     {
         bool mExterior = true;
+        /// Out of doors: in the worldspace of the station. Indoors: in an interior that is linked to that worldspace
         bool mSameWorldspace = false;
         bool mSameCell = false;
+        /// Indoors: in an interior that is linked to the (interior) cell of the station
+        bool mLinkedInterior = false;
         /// The distance from the player to the place the radius is measured from (the station, or the reference that it
         /// names), or a negative number when it cannot be measured (the other cell is not in the player's worldspace)
         float mDistance = -1.f;
