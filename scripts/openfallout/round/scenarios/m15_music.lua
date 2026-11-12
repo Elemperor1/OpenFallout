@@ -35,7 +35,9 @@ return { limit = 600, delay = 4, run = function(r)
     r.teleport{ pos = { HOUSE_FRONT.x, HOUSE_FRONT.y, HOUSE_FRONT.z }, worldspace = mojave, yaw = 0, onGround = true, label = 'house front' }
     r.wait(4)
     r.activate(HOUSE_DOOR, 'door in')
-    r.waitFor(function() return player.cell ~= nil and not player.cell.isExterior end, 40, 'interior')
+    if not r.waitFor(function() return player.cell ~= nil and not player.cell.isExterior end, 40, 'interior') then
+        error('B the door of the doctor\'s house did not take the player indoors')
+    end
     r.wait(10)
     r.settle(3, 30)
     r.eye('house')

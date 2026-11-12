@@ -154,7 +154,7 @@ namespace OFSound
         Sound* playSound(SoundBuffer* sfx, float volume, float pitch, Type type = Type::Sfx,
             PlayMode mode = PlayMode::Normal, float offset = 0);
         Sound* playSound3D(const OFWorld::ConstPtr& ptr, SoundBuffer* sfx, float volume, float pitch, Type type,
-            PlayMode mode, float offset, const FalloutScript::SoundData* curve = nullptr);
+            PlayMode mode, float offset, const FalloutScript::SoundData* curve = nullptr, bool flat = false);
 
         void updateSounds(float duration);
         void updateRegionSound(float duration);
