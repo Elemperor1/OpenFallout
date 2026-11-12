@@ -30,7 +30,8 @@ jobs:
   # Documentation-only changes skip the platform builds.  The job fails open to a full
   # build: a problem in it leaves "code" empty, which the jobs below read as "build".
   Changes:
-    runs-on: ubuntu-latest
+    # Blacksmith sticky disks (Docker image cache) are shared, so only trusted master runs use them.
+    runs-on: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }}
     outputs:
       code: ${{ steps.classify.outputs.code }}
 
@@ -74,7 +75,8 @@ jobs:
   Ubuntu:
     needs: Changes
     if: ${{ !cancelled() && needs.Changes.outputs.code != 'false' && (github.event_name != 'workflow_dispatch' || !inputs.validate-release) }}
-    runs-on: ubuntu-latest
+    # Blacksmith sticky disks (Docker image cache) are shared, so only trusted master runs use them.
+    runs-on: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && 'blacksmith-4vcpu-ubuntu-2404' || 'ubuntu-latest' }}
     env:
       # Collect coverage without optimizer-induced changes to executable lines.
       BUILD_TYPE: Debug
