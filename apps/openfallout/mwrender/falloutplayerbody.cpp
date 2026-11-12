@@ -47,6 +47,9 @@ namespace OFRender
     {
         clear();
         mRevision = revision;
+        // A new body holds nothing yet: the weapon in the hands is put in again
+        mDrawn = false;
+        mWeapon = 0;
         const OFWorld::ESMStore* store = OFBase::Environment::get().getESMStore();
         if (store == nullptr || mParent == nullptr)
             return false;
@@ -93,6 +96,24 @@ namespace OFRender
     bool FalloutPlayerBody::isDown() const
     {
         return mAnimation != nullptr && mAnimation->isDown();
+    }
+
+    void FalloutPlayerBody::setWeapon(bool drawn, std::uint32_t weapon, const std::string& model, int animationType)
+    {
+        if (mAnimation == nullptr || (drawn == mDrawn && (!drawn || weapon == mWeapon)))
+            return;
+        mDrawn = drawn;
+        mWeapon = weapon;
+        if (drawn)
+            mAnimation->drawWeapon(model, animationType);
+        else
+            mAnimation->holsterWeapon();
+    }
+
+    void FalloutPlayerBody::attack()
+    {
+        if (mAnimation != nullptr)
+            mAnimation->attack();
     }
 
     void FalloutPlayerBody::setPose(int entryKind)

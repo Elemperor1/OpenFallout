@@ -1032,6 +1032,12 @@ namespace OFRender
             return;
         // The player's eyes are where the camera is in the first person: the body would look out of its own head
         const bool visible = mCamera->getMode() != Camera::Mode::FirstPerson;
+        // The shots of the player are counted even where the body is not drawn, so that the ones made in the first
+        // person are not played at once when the camera moves out
+        OFScript::FalloutScripts* shotScripts = OFBase::Environment::get().getFalloutScripts();
+        const unsigned shots = shotScripts->playerShots();
+        const bool shotMade = shots != mPlayerShotsSeen;
+        mPlayerShotsSeen = shots;
         if (mPlayerBody == nullptr)
         {
             if (!visible)
@@ -1063,6 +1069,12 @@ namespace OFRender
             mPlayerBody->die();
         // The games do not lie the player down to sleep: the screen fades and the hours pass
         mPlayerBody->setPose(scripts->isPlayerSleeping() ? 0 : scripts->furnitureKindOf(player));
+        // The weapon the player holds is in its hand when it is out, and a shot plays the attack of its type
+        const bool drawn = scripts->isPlayerWeaponDrawn() && !dead;
+        const OFScript::FalloutScripts::HeldWeapon held = scripts->heldWeapon(player);
+        mPlayerBody->setWeapon(drawn, held.mWeapon, held.mModel, held.mAnimationType);
+        if (shotMade && drawn)
+            mPlayerBody->attack();
     }
 
     void RenderingManager::updatePlayerPtr(const OFWorld::Ptr& ptr)

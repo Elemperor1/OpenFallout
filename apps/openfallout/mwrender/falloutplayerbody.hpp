@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 #include <osg/ref_ptr>
@@ -74,6 +75,13 @@ namespace OFRender
         /// Whether the body has fallen
         bool isDown() const;
 
+        /// The weapon in the hands, said every frame: with `drawn` the weapon `weapon` (a form id; its model and the
+        /// animation type of its record, -1 for bare hands) is out in the hand and held ready, as it is for the
+        /// characters of the world; without it the hands are empty and down. Only a change does anything.
+        void setWeapon(bool drawn, std::uint32_t weapon, const std::string& model, int animationType);
+        /// One shot or blow with it
+        void attack();
+
         /// Takes the body out of the scene
         void clear();
 
@@ -89,6 +97,9 @@ namespace OFRender
         std::uint64_t mRevision = 0;
         bool mVisible = false;
         int mPose = 0;
+        /// What the hands hold: whether it is out, and which weapon (the key of the change)
+        bool mDrawn = false;
+        std::uint32_t mWeapon = 0;
     };
 }
 

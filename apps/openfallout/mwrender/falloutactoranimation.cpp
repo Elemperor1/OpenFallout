@@ -248,7 +248,12 @@ namespace OFRender
     void FalloutActorAnimation::die(bool fallen)
     {
         if (mFall != nullptr || mObjectRoot == nullptr || mObjectRoot->getNumParents() == 0)
+        {
+            if (mFall == nullptr)
+                Log(Debug::Info) << mPtr.getCellRef().getRefId() << " cannot fall: "
+                                 << (mObjectRoot == nullptr ? "its body is not made" : "its body is in no scene");
             return;
+        }
         // What it did stops where it is
         if (mAdvanceCallback != nullptr)
         {

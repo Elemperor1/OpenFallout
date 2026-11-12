@@ -3010,6 +3010,8 @@ namespace OFScript
             mActors.removeItem(attacker, stats.mAmmo, stats.mAmmoUse);
         }
         result.mFired = true;
+        if (attacker == mPlayer)
+            ++mPlayerShots;
         {
             const std::lock_guard lock(mFireMutex);
             mFireCooldowns[attacker] = static_cast<float>(stats.mInterval);
@@ -3221,7 +3223,14 @@ namespace OFScript
         if (target.isEmpty() || !target.isInCell() || !target.getRefData().isEnabled() || mActors.isDead(targetId)
             || mCombat.unconscious(targetId) || mObjectState.ghost(targetId))
         {
-            // Nobody goes for a target that is gone
+            // Nobody goes for a target that is gone (round 14A: a fight started from a script was over half a second
+            // later, and nothing said why)
+            Log(Debug::Info) << FalloutScript::hex(self) << " ends its fight: its target " << FalloutScript::hex(targetId)
+                             << (target.isEmpty() ? " is not found" : (!target.isInCell() ? " is in no cell" : ""))
+                             << (!target.isEmpty() && !target.getRefData().isEnabled() ? " is disabled" : "")
+                             << (mActors.isDead(targetId) ? " is dead" : "")
+                             << (mCombat.unconscious(targetId) ? " is unconscious" : "")
+                             << (mObjectState.ghost(targetId) ? " is a ghost" : "");
             mCombat.stop(self);
             return stance;
         }

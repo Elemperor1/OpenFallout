@@ -488,7 +488,12 @@ namespace OFMechanics
         /// The body of an actor that died falls, and what walks is no longer stopped by it
         void fall(Frame& frame, FalloutActors::Mind& mind)
         {
-            if (auto* animation = dynamic_cast<OFRender::FalloutActorAnimation*>(frame.mWorld.getAnimation(mind.mPtr)))
+            auto* animation = dynamic_cast<OFRender::FalloutActorAnimation*>(frame.mWorld.getAnimation(mind.mPtr));
+            // (round 14A: the bodies of two characters that were shot dead stood upright with their weapons out)
+            Log(Debug::Info) << mind.mPtr.getCellRef().getRefId() << " dies: "
+                             << (animation != nullptr ? "its body falls" : "it has no body of Fallout to fall")
+                             << (mind.mSeenAlive ? "" : ", at once (it was dead when it came into view)");
+            if (animation != nullptr)
                 animation->die(!mind.mSeenAlive);
             frame.mWorld.setObjectCollision(mind.mPtr, false);
         }
@@ -1720,6 +1725,8 @@ namespace OFMechanics
             if (!sharesSpace(mind.mPtr, stance.mTarget))
             {
                 // The target is somewhere it can not go to
+                Log(Debug::Info) << mind.mPtr.getCellRef().getRefId()
+                                 << " ends its fight: its target is in another space";
                 scripts.endFight(mind.mPtr);
                 over();
                 return false;
@@ -1792,6 +1799,9 @@ namespace OFMechanics
                     if (stance.mFlee)
                     {
                         // It is far enough away: the fight is over for it
+                        Log(Debug::Info) << mind.mPtr.getCellRef().getRefId()
+                                         << " ends its fight: it lost its nerve and is far enough away ("
+                                         << static_cast<int>(away) << " units)";
                         scripts.endFight(mind.mPtr);
                         over();
                         return false;
