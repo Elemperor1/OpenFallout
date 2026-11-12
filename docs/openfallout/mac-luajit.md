@@ -57,7 +57,7 @@ overlay port) until LuaJIT carries the fix. Then check that the published librar
 and delete `CI/macos/build_luajit_hrt.sh` and its call.
 
 A release also needs a Developer ID identity (`OPENFALLOUT_CODESIGN_IDENTITY`): with it, every bundled library carries
-the team's ID and library validation stays on.
+the team's ID and library validation stays on. CI imports it from secrets and notarizes the image: see [mac-release.md](mac-release.md).
 
 ## Evidence
 

@@ -46,6 +46,9 @@ jobs:
     - name: Test macOS bundle selection
       run: python3 -m unittest discover -s CI -p test_mac_bundles.py -v
 
+    - name: Test macOS release signing (stand-in tools)
+      run: python3 -m unittest discover -s CI -p test_release_signing.py -v
+
     - name: Test the apt mirror fallback of the Harness build
       run: python3 -m unittest discover -s CI -p test_apt_mirrors.py -v
 
@@ -319,6 +322,13 @@ jobs:
     with:
       image: ${{ matrix.args.image }}
       runner: ${{ matrix.args.runner }}
+    secrets:
+      MACOS_DEVELOPER_ID_P12_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 }}
+      MACOS_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_P12_PASSWORD }}
+      MACOS_TEAM_ID: ${{ secrets.MACOS_TEAM_ID }}
+      MACOS_NOTARY_API_KEY: ${{ secrets.MACOS_NOTARY_API_KEY }}
+      MACOS_NOTARY_API_KEY_ID: ${{ secrets.MACOS_NOTARY_API_KEY_ID }}
+      MACOS_NOTARY_API_ISSUER_ID: ${{ secrets.MACOS_NOTARY_API_ISSUER_ID }}
 
   Windows:
     needs: Changes

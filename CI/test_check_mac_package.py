@@ -350,6 +350,14 @@ class SmokeRunTests(unittest.TestCase):
                       "@executable_path/../Frameworks/libopenal.1.25.0.dylib", output)
         self.assertIn("have different Team IDs", output)
 
+    def test_engine_crash_signal_is_quoted(self):
+        crash = ("\n\n*** Fatal Error ***\nInvalid address alignment (signal 10)\nAddress: 0x900000a00\n\n"
+                 "Generating /tmp/openfallout-crash.log and killing process 1, please wait...\n")
+        status, output, _ = self.smoke(JIT_ON + STARTED, stderr=crash)
+        self.assertEqual(status, 1, output)
+        self.assertIn("the engine's standard error says: *** Fatal Error *** Invalid address alignment (signal 10)",
+                      output)
+
     def test_missing_jit_line_fails(self):
         status, output, _ = self.smoke(STARTED + QUIT)
         self.assertEqual(status, 1, output)
@@ -362,6 +370,178 @@ class SmokeRunTests(unittest.TestCase):
         status, output, _ = self.smoke(NO_GL, "--smoke", "run")
         self.assertEqual(status, 1, output)
         self.assertIn("FAIL smoke", output)
+
+
+# ------------------------------------------------------------------------------------------------------- release mode
+
+TEAM = "EXAMPLE123"
+DEVELOPER_ID = f"Developer ID Application: Example Studio ({TEAM})"
+FAKE_MACHO = bytes.fromhex("cffaedfe") + bytes(28)
+
+
+class FakeTools:
+    """Answers the codesign, spctl and stapler calls of the check as a notarized, stapled Developer ID package would;
+    a test changes `signers` (path suffix -> signature details) or `fails` to make one item or tool misbehave."""
+
+    def __init__(self):
+        self.calls = []
+        self.overrides = {}     # path suffix -> dict of details to change for that item
+        self.fails = {}         # (tool, verb) -> (exit status, stderr)
+        self.entitlements = {}  # path suffix -> entitlements dict
+
+    def details(self, path):
+        info = {"authority": DEVELOPER_ID, "team": TEAM, "flags": "0x10000(runtime)", "timestamp": True}
+        for suffix, change in self.overrides.items():
+            if path.endswith(suffix):
+                info.update(change)
+        lines = [f"Executable={path}", "Identifier=org.openfallout.item", f"CodeDirectory v=20500 size=1 flags={info['flags']} hashes=1"]
+        if info["authority"] == "adhoc":
+            lines += ["Signature=adhoc", "TeamIdentifier=not set"]
+        else:
+            lines += [f"Authority={info['authority']}", "Authority=Developer ID Certification Authority",
+                      "Authority=Apple Root CA"]
+            lines += ["Timestamp=12 Nov 2026 at 10:00:00"] if info["timestamp"] else ["Signed Time=12 Nov 2026 at 10:00:00"]
+            lines += [f"TeamIdentifier={info['team']}"]
+        return "\n".join(lines) + "\n"
+
+    def __call__(self, command, **kwargs):
+        command = [str(part) for part in command]
+        self.calls.append(command)
+        tool = command[0] if command[0] != "xcrun" else command[1]
+        verb = command[2] if command[0] == "xcrun" else (command[1] if len(command) > 1 else "")
+        out, err, status = "", "", 0
+        if (tool, verb) in self.fails:
+            status, err = self.fails[(tool, verb)]
+        elif tool == "codesign" and "--entitlements" in command:
+            granted = next((value for suffix, value in self.entitlements.items() if command[-1].endswith(suffix)), {})
+            out = plistlib.dumps(granted).decode() if granted else ""
+        elif tool == "codesign" and "--display" in command:
+            err = self.details(command[-1])
+        elif tool == "spctl":
+            err = f"{command[-1]}: accepted\nsource=Notarized Developer ID\norigin={DEVELOPER_ID}\n"
+        elif tool == "stapler":
+            out = f"Processing: {command[-1]}\nThe validate action worked!\n"
+        elif tool == "sw_vers":
+            out = {"-productVersion": "26.1\n", "-buildVersion": "25B78\n"}[command[1]]
+        elif tool == "sysctl":
+            out = "Apple M2 (Virtual)\n"
+        return subprocess.CompletedProcess(command, status, out, err)
+
+
+def fake_package(root):
+    app = root / "OpenFallout.app"
+    for item in ("Contents/MacOS/openfallout", "Contents/MacOS/openfallout-launcher",
+                 "Contents/Frameworks/libopenal.1.25.0.dylib",
+                 "Contents/Helpers/OpenFallout Engine.app/Contents/MacOS/OpenFallout Engine"):
+        (app / item).parent.mkdir(parents=True, exist_ok=True)
+        (app / item).write_bytes(FAKE_MACHO)
+    write_plist(app, CFBundleExecutable="openfallout-launcher", **GAME_KEYS)
+    write_plist(app / "Contents/Helpers/OpenFallout Engine.app", CFBundleExecutable="OpenFallout Engine", **GAME_KEYS)
+    return app
+
+
+class ReleaseModeTests(unittest.TestCase):
+    """Release mode against a stand-in tree and stand-in tools: runs on any machine."""
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="release check ")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.tools = FakeTools()
+        patcher = unittest.mock.patch.object(check_mac_package, "run", self.tools)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.app = fake_package(self.root)
+
+    def check(self, *args, package=None):
+        return run_check(package or self.app, "--mode", "release", "--smoke", "skip", *args)
+
+    def test_notarized_developer_id_package_passes_signatures_and_gatekeeper(self):
+        status, output = self.check("--team-id", TEAM)
+        self.assertIn(f"PASS signatures: 4 Mach-O files and 1 nested bundles verified, Developer ID of team {TEAM}, "
+                      "hardened runtime, secure timestamp, no get-task-allow", output)
+        self.assertIn("PASS gatekeeper", output)
+        assessed = [call for call in self.tools.calls if call[0] == "spctl"]
+        self.assertEqual(assessed, [["spctl", "--assess", "--type", "execute", "-vv", str(self.app)]])
+        stapled = [call for call in self.tools.calls if call[:3] == ["xcrun", "stapler", "validate"]]
+        self.assertEqual(stapled, [["xcrun", "stapler", "validate", str(self.app)]])
+
+    def test_ad_hoc_item_fails_release_mode_and_is_named(self):
+        self.tools.overrides["libopenal.1.25.0.dylib"] = {"authority": "adhoc"}
+        status, output = self.check()
+        self.assertEqual(status, 1, output)
+        self.assertIn("FAIL signatures", output)
+        self.assertIn("Contents/Frameworks/libopenal.1.25.0.dylib: ad hoc signature, not Developer ID", output)
+
+    def test_item_of_another_team_fails(self):
+        self.tools.overrides["openfallout-launcher"] = {"team": "OTHERTEAM1",
+                                                        "authority": "Developer ID Application: Other (OTHERTEAM1)"}
+        status, output = self.check()
+        self.assertEqual(status, 1, output)
+        self.assertIn(f"Contents/MacOS/openfallout-launcher: Team ID OTHERTEAM1, not {TEAM}", output)
+
+    def test_team_id_option_must_match_the_app(self):
+        status, output = self.check("--team-id", "WRONGTEAM1")
+        self.assertEqual(status, 1, output)
+        self.assertIn(f"OpenFallout.app: Team ID {TEAM}, not WRONGTEAM1", output)
+
+    def test_missing_hardened_runtime_timestamp_or_debug_entitlement_fail(self):
+        self.tools.overrides["MacOS/openfallout"] = {"flags": "0x0(none)"}
+        self.tools.overrides["OpenFallout Engine.app"] = {"timestamp": False}
+        self.tools.entitlements["MacOS/openfallout-launcher"] = {"com.apple.security.get-task-allow": True}
+        status, output = self.check()
+        self.assertEqual(status, 1, output)
+        self.assertIn("Contents/MacOS/openfallout: no hardened runtime", output)
+        self.assertIn("Contents/Helpers/OpenFallout Engine.app: no secure timestamp", output)
+        self.assertIn("Contents/MacOS/openfallout-launcher: carries get-task-allow", output)
+
+    def test_gatekeeper_rejection_or_missing_ticket_fails(self):
+        self.tools.fails[("spctl", "--assess")] = (3, f"{self.app}: rejected\nsource=Unnotarized Developer ID\n")
+        self.tools.fails[("stapler", "validate")] = (65, f"{self.app} does not have a ticket stapled to it.\n")
+        status, output = self.check()
+        self.assertEqual(status, 1, output)
+        self.assertIn("FAIL gatekeeper", output)
+        self.assertIn("rejected", output)
+        self.assertIn("does not have a ticket stapled to it", output)
+
+    def test_disk_image_is_assessed_as_a_download_and_its_ticket_validated(self):
+        volume = self.root / "volume"
+        volume.mkdir()
+        shutil.move(str(self.app), volume / "OpenFallout.app")
+        os.symlink("/Applications", volume / "Applications")
+        dmg = self.root / "OpenFallout-1.0-macOS-arm64.dmg"
+        dmg.write_bytes(b"image")
+
+        @contextlib.contextmanager
+        def mounted(path):
+            yield volume
+
+        with unittest.mock.patch.object(check_mac_package, "mounted", mounted):
+            status, output = self.check(package=dmg)
+        self.assertIn("PASS gatekeeper", output)
+        self.assertIn(["spctl", "--assess", "--type", "open", "--context", "context:primary-signature", "-vv", str(dmg)],
+                      self.tools.calls)
+        self.assertIn(["xcrun", "stapler", "validate", str(dmg)], self.tools.calls)
+        self.assertIn(["xcrun", "stapler", "validate", str(volume / "OpenFallout.app")], self.tools.calls)
+
+    def test_notes_record_the_macos_version_and_chip_the_package_was_checked_on(self):
+        notes = self.root / "notes.md"
+        notes.write_text("earlier line\n")
+        status, output = self.check("--notes", notes)
+        self.assertEqual(notes.read_text().splitlines()[0], "earlier line")
+        line = notes.read_text().splitlines()[1]
+        self.assertIn("OpenFallout.app", line)
+        self.assertIn("macOS 26.1 (25B78)", line)
+        self.assertIn("Apple M2 (Virtual)", line)
+        self.assertIn("release mode", line)
+        self.assertIn("FAIL", line)  # the stand-in has no real libraries, so later steps fail; the line says so
+        self.assertIn("smoke SKIP", line)
+
+    def test_local_mode_skips_gatekeeper(self):
+        self.tools.overrides[""] = {"authority": "adhoc"}
+        status, output = run_check(self.app, "--mode", "local", "--smoke", "skip")
+        self.assertIn("SKIP gatekeeper: local mode", output)
+        self.assertNotIn("spctl", [call[0] for call in self.tools.calls])
 
 
 if __name__ == "__main__":

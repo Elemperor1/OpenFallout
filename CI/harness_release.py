@@ -134,6 +134,11 @@ def verify_assets(release):
     for arch in ("arm64", "x86_64"):
         if not any(name.endswith(".dmg") and arch in name for name in assets):
             raise ReleaseError(f"Release is missing its macOS {arch} disk image")
+    # Each disk image carries the line CI/check_mac_package.py --notes wrote: the macOS version and chip it was checked on.
+    lines = (release.get("body") or "").splitlines()
+    for name in (name for name in assets if name.endswith(".dmg")):
+        if not any(line.startswith(f"- {name}:") and " on macOS " in line for line in lines):
+            raise ReleaseError(f"Release notes lack the macOS version and chip that {name} was tested on")
 
 
 def find_release(api, tag):

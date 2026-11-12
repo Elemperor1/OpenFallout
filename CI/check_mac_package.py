@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
 """Check a packaged OpenFallout for macOS the way a player would get it: a disk image or an app bundle.
 
-    CI/check_mac_package.py PATH [--mode local] [--smoke run|auto|skip] [--expect-jit on|off|any] [--work DIR]
+    CI/check_mac_package.py PATH [--mode local|release] [--team-id ID] [--smoke run|auto|skip]
+                            [--expect-jit on|off|any] [--work DIR] [--notes FILE]
 
 PATH is OpenFallout-*.dmg or OpenFallout.app. The steps run in this order and each prints PASS, FAIL or SKIP:
 
   dmg          the disk image holds an Applications link and OpenFallout.app, and besides them only OpenFallout-CS.app and
                the README, CHANGELOG, LICENSE and AUTHORS files
   layout       the app holds its launcher, the engine and the nested Contents/Helpers/OpenFallout Engine.app
-  signatures   every Mach-O file and every nested bundle has a valid signature, and so has the app as a whole
+  signatures   every Mach-O file and every nested bundle has a valid signature, and so has the app as a whole; in
+               release mode each of them (and the app) is also signed by a Developer ID Application identity of one
+               team (--team-id, else the app's), with the hardened runtime and a secure timestamp, and none carries
+               get-task-allow
+  gatekeeper   release mode only: `spctl --assess --type open --context context:primary-signature` accepts the disk
+               image, `spctl --assess --type execute` accepts the app, and `stapler validate` finds a ticket on both
   info.plist   the app and its engine app declare Game Mode, the role-playing-games category and high resolution, and
                neither carries the Carbon key
   openal       the engine links the OpenAL Soft that is in the bundle, not the system's OpenAL framework
@@ -26,8 +32,10 @@ PATH is OpenFallout-*.dmg or OpenFallout.app. The steps run in this order and ea
                when the log shows the cell loaded, a Lua script ran, the LuaJIT compiler state that the engine logs is
                the expected one and the engine quit peacefully. The compiler state seen is always printed.
 
-Local mode accepts an ad hoc signature and has no Gatekeeper steps; release mode (a Developer ID signature, Gatekeeper
-assessment and a stapled ticket) arrives with notarization. `--smoke auto` runs the smoke step but reports it as
+Local mode accepts an ad hoc signature and skips the gatekeeper step; release mode requires the Developer ID signature,
+Gatekeeper's acceptance and the stapled tickets (CI runs it on the notarized build, CI/macos/release_signing.py).
+`--notes FILE` appends one release-notes line: the package, the result, the mode, the smoke result and the macOS version
+and chip of the machine that ran the check. `--smoke auto` runs the smoke step but reports it as
 skipped when the machine gives the engine no OpenGL context (a hosted CI runner may have none); run it with
 `--smoke run` on a Mac with a display before a release is tagged.
 
@@ -35,7 +43,9 @@ The exit status is 0 when no step failed.
 """
 import argparse
 import contextlib
+import os
 from pathlib import Path
+import platform
 import plistlib
 import re
 import subprocess
@@ -145,7 +155,7 @@ def signature_kind(path):
     return authority.group(1) if authority else "unknown"
 
 
-def check_signatures(app, mode):
+def check_signatures(app, mode, team_id=None):
     problems = []
     machos = [path for path in app.rglob("*") if is_macho(path)]
     for item in machos + nested_bundles(app):
@@ -161,9 +171,67 @@ def check_signatures(app, mode):
     if problems:
         raise StepFailed("not validly signed: " + "; ".join(problems))
     kind = signature_kind(app)
+    counted = f"{len(machos)} Mach-O files and {len(nested_bundles(app))} nested bundles verified"
     if mode == "local":
-        return f"{len(machos)} Mach-O files and {len(nested_bundles(app))} nested bundles verified, app signature: {kind}"
-    raise StepFailed(f"mode {mode} is not supported")
+        return f"{counted}, app signature: {kind}"
+    team = check_release_signatures(app, machos, team_id)
+    return f"{counted}, Developer ID of team {team}, hardened runtime, secure timestamp, no get-task-allow"
+
+
+def check_release_signatures(app, machos, team_id):
+    """Every Mach-O file, nested bundle and the app: a Developer ID Application signature of one team (team_id when
+    given, else the app's), the hardened runtime, a secure timestamp and no get-task-allow. Returns the team."""
+    expected = team_id or signing_details(app)[1]
+    problems = []
+    for item in machos + nested_bundles(app) + [app]:
+        name = relative(item, app)
+        details = run(["codesign", "--display", "--verbose=2", item]).stderr
+        if "Signature=adhoc" in details:
+            problems.append(f"{name}: ad hoc signature, not Developer ID")
+            continue
+        authority = re.search(r"^Authority=(.*)$", details, re.MULTILINE)
+        if not authority or not authority.group(1).startswith("Developer ID Application:"):
+            problems.append(f"{name}: signed by {authority.group(1) if authority else 'no authority'}, not Developer ID")
+            continue
+        hardened, team = signing_details(item)
+        if team != expected:
+            problems.append(f"{name}: Team ID {team}, not {expected}")
+        if not hardened:
+            problems.append(f"{name}: no hardened runtime")
+        if not re.search(r"^Timestamp=", details, re.MULTILINE):
+            problems.append(f"{name}: no secure timestamp")
+        if entitlements(item).get("com.apple.security.get-task-allow") is True:
+            problems.append(f"{name}: carries get-task-allow (the debugging entitlement)")
+    if problems:
+        raise StepFailed("not a release signature: " + "; ".join(problems))
+    return expected
+
+
+# ---------------------------------------------------------------------------------------------------------- gatekeeper
+
+def check_gatekeeper(app, dmg):
+    """What Gatekeeper decides for a downloaded copy: the disk image is assessed as a download (its own signature), the
+    app as a program to run; both must carry a stapled notarization ticket, so that they open offline."""
+    problems, accepted = [], []
+    assessments = [(app, ["--type", "execute"])]
+    if dmg:
+        assessments.insert(0, (dmg, ["--type", "open", "--context", "context:primary-signature"]))
+    for item, kind in assessments:
+        result = run(["spctl", "--assess", *kind, "-vv", item])
+        text = (result.stderr + result.stdout).strip()
+        source = re.search(r"^source=(.*)$", text, re.MULTILINE)
+        if result.returncode != 0:
+            problems.append(f"Gatekeeper rejects {item.name}: {' '.join(text.splitlines()[:2])}")
+        else:
+            accepted.append(f"{item.name} accepted ({source.group(1) if source else 'no source given'})")
+    for item in ([dmg] if dmg else []) + [app]:
+        result = run(["xcrun", "stapler", "validate", item])
+        if result.returncode != 0:
+            text = (result.stderr + result.stdout).strip().splitlines()
+            problems.append(f"no valid stapled ticket on {item.name}: {text[-1] if text else 'stapler failed'}")
+    if problems:
+        raise StepFailed("; ".join(problems))
+    return ", ".join(accepted) + "; tickets stapled"
 
 
 # ------------------------------------------------------------------------------------------------- library-validation
@@ -434,7 +502,9 @@ def check_smoke(app, options):
     if no_gl and options.smoke == "auto":
         raise SmokeSkipped(f"this machine gave the engine no OpenGL context; {CI_HINT}")
     stderr = (work / "stderr.log").read_text(encoding="utf-8", errors="replace") if (work / "stderr.log").exists() else ""
-    loader = [line.strip() for line in stderr.splitlines() if line.startswith("dyld") or "Reason:" in line]
+    # the loader's refusal (dyld, Reason:) and the engine's crash handler (*** Fatal Error ***, <what> (signal N))
+    loader = [line.strip() for line in stderr.splitlines()
+              if line.startswith("dyld") or "Reason:" in line or "Fatal Error" in line or re.search(r"\(signal \d+\)", line)]
     if loader:
         problems.append("the engine's standard error says: " + " ".join(loader[:2]))
     if helper_error and problems:
@@ -459,21 +529,34 @@ def report_smoke(app, options):
 
 # -------------------------------------------------------------------------------------------------------------- main
 
+RESULTS = {}  # step name -> PASS, FAIL or SKIP, for the notes line
+
+
 def report(name, step, *args):
     try:
         detail = step(*args)
     except StepFailed as error:
-        print(f"FAIL {name}: {error}")
+        fail(name, str(error))
         return False
+    RESULTS[name] = "PASS"
     print(f"PASS {name}" + (f": {detail}" if detail else ""))
     return True
 
 
-def check_app(app, options, dmg_ok=True):
+def fail(name, why):
+    RESULTS[name] = "FAIL"
+    print(f"FAIL {name}: {why}")
+
+
+def check_app(app, options, dmg_ok=True, dmg=None):
     results = [dmg_ok]
     layout_ok = report("layout", check_app_layout, app)
     results.append(layout_ok)
-    results.append(report("signatures", check_signatures, app, options.mode))
+    results.append(report("signatures", check_signatures, app, options.mode, options.team_id))
+    if options.mode == "release":
+        results.append(report("gatekeeper", check_gatekeeper, app, dmg))
+    else:
+        results.append(skip("gatekeeper", "local mode"))
     results.append(report("info.plist", check_info_plists, app))
     results.append(report("openal", check_openal, app))
     loadable = report("library-validation", check_library_validation, app)
@@ -484,38 +567,63 @@ def check_app(app, options, dmg_ok=True):
         results.append(skip("smoke", "--smoke skip"))
     elif not layout_ok:
         results.append(False)
-        print("FAIL smoke: not started, the layout step failed")
+        fail("smoke", "not started, the layout step failed")
     elif not loadable:
         results.append(False)
-        print("FAIL smoke: not started, the engine could not load its libraries (see library-validation)")
+        fail("smoke", "not started, the engine could not load its libraries (see library-validation)")
     elif not jit_ok:
         results.append(False)
-        print("FAIL smoke: not started, see the luajit step")
+        fail("smoke", "not started, see the luajit step")
     else:
         results.append(report_smoke(app, options))
     return all(results)
 
 
 def skip(name, why):
+    RESULTS[name] = "SKIP"
     print(f"SKIP {name}: {why}")
     return True
+
+
+def tested_on():
+    """'macOS <version> (<build>), <chip>, <architecture>' of this machine."""
+    version = run(["sw_vers", "-productVersion"]).stdout.strip() or "?"
+    build = run(["sw_vers", "-buildVersion"]).stdout.strip() or "?"
+    chip = run(["sysctl", "-n", "machdep.cpu.brand_string"]).stdout.strip() or "unknown chip"
+    return f"macOS {version} ({build}), {chip}, {platform.machine()}"
+
+
+def write_notes(path, package, mode, ok):
+    """Appends the release-notes line for this package: what was checked, with what result, on which Mac."""
+    line = (f"- {package.name}: packaged-app check {'PASS' if ok else 'FAIL'} ({mode} mode; smoke "
+            f"{RESULTS.get('smoke', 'not run')}) on {tested_on()}")
+    with path.open("a", encoding="utf-8") as file:
+        file.write(line + "\n")
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[1].strip(),
                                      epilog="See the top of this file for the steps.")
     parser.add_argument("package", type=Path, help="OpenFallout-*.dmg or OpenFallout.app")
-    parser.add_argument("--mode", choices=["local"], default="local",
-                        help="local: ad hoc signatures are accepted and Gatekeeper is not asked (release mode comes "
-                             "with notarization)")
+    parser.add_argument("--mode", choices=["local", "release"], default="local",
+                        help="local: ad hoc signatures are accepted and Gatekeeper is not asked; release: a Developer "
+                             "ID signature (hardened runtime, secure timestamp, one team) on every binary, Gatekeeper "
+                             "acceptance and a stapled ticket are required")
+    parser.add_argument("--team-id", default=os.environ.get("OPENFALLOUT_CODESIGN_TEAM_ID") or None,
+                        help="release mode: the Team ID every signature must carry (default: "
+                             "$OPENFALLOUT_CODESIGN_TEAM_ID, else the app's own)")
     parser.add_argument("--smoke", choices=["run", "auto", "skip"], default="run",
                         help="run: start the game and fail if it does not start; auto: as run, but skipped when "
                              "there is no OpenGL context; skip: do not start it")
     parser.add_argument("--expect-jit", choices=["on", "off", "any"], default="on",
                         help="the LuaJIT compiler state the smoke run must see (default: on, hot code compiled)")
     parser.add_argument("--seconds", type=float, default=120, help="how long the smoke run may take")
+    parser.add_argument("--notes", type=Path,
+                        help="append a release-notes line to this file: the package, the result, and the macOS "
+                             "version and chip it was checked on")
     parser.add_argument("--work", type=Path, help="folder for the smoke run's files (kept); default: a temporary one")
     options = parser.parse_args(argv)
+    RESULTS.clear()
 
     package = options.package.absolute()
     if not package.exists():
@@ -525,13 +633,15 @@ def main(argv=None):
         try:
             with mounted(package) as volume:
                 dmg_ok = report("dmg", check_dmg_layout, volume)
-                ok = check_app(volume / "OpenFallout.app", options, dmg_ok)
+                ok = check_app(volume / "OpenFallout.app", options, dmg_ok, package)
         except StepFailed as error:
-            print(f"FAIL dmg: {error}")
-            return 1
+            fail("dmg", str(error))
+            ok = False
     else:
         ok = check_app(package, options)
     print("package check: " + ("PASS" if ok else "FAIL"))
+    if options.notes:
+        write_notes(options.notes, package, options.mode, ok)
     return 0 if ok else 1
 
 

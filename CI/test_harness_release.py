@@ -11,6 +11,10 @@ TAG = "openfallout-0.1.0-test"
 RUN = {"id": 42, "head_branch": "master", "head_sha": SHA, "run_number": 1, "event": "push",
        "status": "completed", "conclusion": "success", "html_url": "https://example.invalid/run"}
 RELEASE = {"id": 7, "tag_name": TAG, "draft": True, "prerelease": True,
+           "body": "- OpenFallout-arm64.dmg: packaged-app check PASS (release mode; smoke SKIP) on macOS 26.1 (25B78), "
+                   "Apple M2 (Virtual), arm64\n"
+                   "- OpenFallout-x86_64.dmg: packaged-app check PASS (local mode; smoke SKIP) on macOS 26.1 (25B78), "
+                   "Intel(R) Core(TM) i7-8700B CPU @ 3.20GHz, x86_64\n",
            "html_url": "https://example.invalid/release", "assets": [
                {"name": name, "size": 12, "state": "uploaded"} for name in (
                    "OpenFallout.exe", "OpenFallout-arm64.dmg", "OpenFallout-x86_64.dmg")]}
@@ -120,6 +124,15 @@ class ReleaseTests(unittest.TestCase):
         release = copy.deepcopy(RELEASE)
         release["assets"][1]["name"] = "OpenFallout-unknown.dmg"
         with self.assertRaises(ReleaseError):
+            verify_assets(release)
+
+    def test_disk_image_without_its_tested_on_line_blocks_publish(self):
+        release = copy.deepcopy(RELEASE)
+        release["body"] = release["body"].splitlines()[0]
+        with self.assertRaisesRegex(ReleaseError, "macOS version and chip that OpenFallout-x86_64.dmg"):
+            verify_assets(release)
+        release["body"] = None
+        with self.assertRaisesRegex(ReleaseError, "OpenFallout-arm64.dmg"):
             verify_assets(release)
 
     def test_failed_packaging_blocks_publishing(self):
