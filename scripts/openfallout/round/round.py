@@ -268,7 +268,7 @@ def collect_shots(userdata, shots_dir, names, width=1280):
         if index >= len(files):
             written.append((number, name, None))
             continue
-        safe = re.sub(r"[^A-Za-z0-9_.-]+", "-", name) or "shot"
+        safe = safe_name(name) or "shot"
         written.append((number, name, convert_picture(files[index], shots_dir / f"{number:02d}-{safe}.jpg", width)))
     return written, max(0, len(files) - len(names))
 
@@ -681,8 +681,14 @@ def headless_policy(text):
     return f"{match.group(1)} {match.group(2)}" if match else None
 
 
+def safe_name(text):
+    """A name for a folder or a file: what is not a letter, a digit or `_.-` becomes `-`, and a plus sign becomes `plus` first, so that
+    two variants named `yaw+90` and `yaw-90` do not share a folder (round 14F: the first was never run)."""
+    return re.sub(r"[^A-Za-z0-9_.-]+", "-", str(text).replace("+", "plus"))
+
+
 def run_variant(profile, config, variant, out_dir, save, priority="low", guard=None, system=None):
-    name = re.sub(r"[^A-Za-z0-9_.-]+", "-", variant.get("name", "run"))
+    name = safe_name(variant.get("name", "run"))
     run_dir = out_dir / name
     prepare_run(profile, config, variant, run_dir, save)
     command = engine_command(profile, config, run_dir, save)

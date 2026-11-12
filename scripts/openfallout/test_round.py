@@ -61,6 +61,17 @@ class Settings(unittest.TestCase):
         self.assertEqual(base, {"A": {"k": "1"}})
 
 
+class SafeName(unittest.TestCase):
+    def test_a_plus_and_a_minus_do_not_give_the_same_name(self):
+        self.assertEqual(round_runner.safe_name("yaw+90"), "yawplus90")
+        self.assertEqual(round_runner.safe_name("yaw-90"), "yaw-90")
+        self.assertNotEqual(round_runner.safe_name("pitch+90"), round_runner.safe_name("pitch-90"))
+
+    def test_other_characters_become_a_dash(self):
+        self.assertEqual(round_runner.safe_name("a b/c"), "a-b-c")
+        self.assertEqual(round_runner.safe_name("C1_fight.3"), "C1_fight.3")
+
+
 class Log(unittest.TestCase):
     TEXT = "\n".join([
         "[10:00:00.100 I] Starting",
