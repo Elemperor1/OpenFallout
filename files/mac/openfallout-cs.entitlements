@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+    Entitlements for OpenFallout-CS.app (the editor), applied with the hardened runtime when the package is signed
+    with a Developer ID identity. The editor runs no Lua, so it needs none of the game's JIT entitlements.
+    Never add com.apple.security.get-task-allow here: it must not be present in a release.
+-->
+<plist version="1.0">
+<dict/>
+</plist>
