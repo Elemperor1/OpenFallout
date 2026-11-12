@@ -483,6 +483,12 @@ namespace MyGUIPlatform
         mUpdate = false;
     }
 
+    void RenderManager::setScalingFactor(float scalingFactor)
+    {
+        if (scalingFactor != 0.f)
+            mInvScalingFactor = 1.f / scalingFactor;
+    }
+
     void RenderManager::setViewSize(int width, int height)
     {
         if (width < 1)

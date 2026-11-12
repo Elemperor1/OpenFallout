@@ -587,6 +587,7 @@ namespace OFGui
 
         std::unique_ptr<SDLUtil::VideoWrapper> mVideoWrapper;
 
+        /// Interface units to drawable pixels: the user's interface scale times the display's pixels per point
         float mScalingFactor;
 
         struct ScheduledMessageBox
@@ -652,6 +653,8 @@ namespace OFGui
         void inventoryUpdated(const OFWorld::Ptr& ptr) const override;
 
         Files::ConfigurationManager& mCfgMgr;
+
+        SDL_Window* mSdlWindow;
     };
 }
 

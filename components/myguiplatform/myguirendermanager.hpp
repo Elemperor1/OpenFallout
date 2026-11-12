@@ -121,6 +121,9 @@ namespace MyGUIPlatform
 
         void setViewSize(int width, int height) override;
 
+        /// Interface units to drawable pixels; takes effect at the next setViewSize
+        void setScalingFactor(float scalingFactor);
+
         void registerShader(const std::string& shaderName, const std::string& vertexProgramFile,
             const std::string& fragmentProgramFile) override;
 

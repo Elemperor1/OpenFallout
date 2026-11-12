@@ -21,6 +21,7 @@
 #include <components/vfs/manager.hpp>
 #include <components/vfs/registerarchives.hpp>
 
+#include <components/sdlutil/desktopconventions.hpp>
 #include <components/sdlutil/imagetosurface.hpp>
 #include <components/sdlutil/sdlgraphicswindow.hpp>
 
@@ -396,6 +397,7 @@ OF::Engine::Engine(Files::ConfigurationManager& configurationManager)
 {
     SDL_SetHint(SDL_HINT_MAC_OPENGL_ASYNC_DISPATCH, "1");
     SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0"); // We use only gamepads
+    SDLUtil::applyDesktopHints();
 
     Uint32 flags
         = SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE | SDL_INIT_GAMECONTROLLER | SDL_INIT_JOYSTICK | SDL_INIT_SENSOR;
@@ -537,10 +539,8 @@ void OF::Engine::createWindow()
         flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN;
         Log(Debug::Info) << "Headless: the window is created hidden and stays so, " << width << "x" << height;
     }
-    else if (windowMode == Settings::WindowMode::Fullscreen)
-        flags |= SDL_WINDOW_FULLSCREEN;
-    else if (windowMode == Settings::WindowMode::WindowedFullscreen)
-        flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+    else
+        flags |= SDLUtil::fullScreenFlag(windowMode, SDLUtil::followsMacDesktopConventions());
 
     // Allows for Windows snapping features to properly work in borderless window
     SDL_SetHint("SDL_BORDERLESS_WINDOWED_STYLE", "1");

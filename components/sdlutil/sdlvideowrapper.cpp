@@ -1,6 +1,7 @@
 #include "sdlvideowrapper.hpp"
 
 #include <components/debug/debuglog.hpp>
+#include <components/sdlutil/desktopconventions.hpp>
 #include <components/sdlutil/sdlgraphicswindow.hpp>
 #include <components/settings/settings.hpp>
 
@@ -90,20 +91,23 @@ namespace SDLUtil
         SDL_GetWindowSize(mWindow, &w, &h);
         int dw, dh;
         SDL_GL_GetDrawableSize(mWindow, &dw, &dh);
+        // The resolution setting is in pixels, SDL's window sizes are in points
+        const float scaleX = pixelsPerPoint(w, dw);
+        const float scaleY = pixelsPerPoint(h, dh);
 
-        if (windowMode == Settings::WindowMode::Fullscreen || windowMode == Settings::WindowMode::WindowedFullscreen)
+        const Uint32 fullScreen = fullScreenFlag(windowMode, followsMacDesktopConventions());
+        if (fullScreen != 0)
         {
             SDL_DisplayMode mode;
             SDL_GetWindowDisplayMode(mWindow, &mode);
-            mode.w = width / (dw / w);
-            mode.h = height / (dh / h);
+            mode.w = pixelsToPoints(width, scaleX);
+            mode.h = pixelsToPoints(height, scaleY);
             SDL_SetWindowDisplayMode(mWindow, &mode);
-            SDL_SetWindowFullscreen(mWindow,
-                windowMode == Settings::WindowMode::Fullscreen ? SDL_WINDOW_FULLSCREEN : SDL_WINDOW_FULLSCREEN_DESKTOP);
+            SDL_SetWindowFullscreen(mWindow, fullScreen);
         }
         else
         {
-            SDL_SetWindowSize(mWindow, width / (dw / w), height / (dh / h));
+            SDL_SetWindowSize(mWindow, pixelsToPoints(width, scaleX), pixelsToPoints(height, scaleY));
             SDL_SetWindowBordered(mWindow, windowBorder ? SDL_TRUE : SDL_FALSE);
 
             centerWindow();
