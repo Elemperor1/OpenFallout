@@ -4427,8 +4427,10 @@ namespace OFScript
 
     void FalloutScripts::dropWorldRadioSongs()
     {
-        OFBase::SoundManager* sound
-            = OFBase::Environment::exists() ? OFBase::Environment::get().getSoundManager() : nullptr;
+        // (an if, not a conditional expression: the pointer of the environment cannot be made from a null pointer)
+        OFBase::SoundManager* sound = nullptr;
+        if (OFBase::Environment::exists())
+            sound = OFBase::Environment::get().getSoundManager();
         for (Saying& saying : mSayings)
         {
             if (saying.mNext >= saying.mLines.size())
