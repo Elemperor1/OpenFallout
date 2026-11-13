@@ -87,18 +87,28 @@ return { limit = 600, delay = 4, run = function(r)
     phase('L crippled legs')
     -- both of g1's legs are crippled by blows at them (limb types 7 to 9 are the left leg, 10 to 12 the right one)
     -- the blows are those of the player's own weapon (one cripples a leg, two do not kill a character of 45 health unless they are critical)
+    -- (each leg is struck until the blow says it is crippled, at most six times: a round that did not cripple both legs must
+    -- not compare the speeds, so it fails)
     local function cripple(target, label)
-        local crippled = {}
         for _, limb in ipairs({ 7, 10 }) do
-            local ok, result = pcall(r.core.combat.strike, r.form(player), r.form(target), '', limb)
-            local dead = false
-            do
-                local okd, d = pcall(r.core.combat.isDead, r.form(target))
-                dead = okd and d
+            local crippled = false
+            for blow = 1, 6 do
+                local ok, result = pcall(r.core.combat.strike, r.form(player), r.form(target), '', limb)
+                local dead = false
+                do
+                    local okd, d = pcall(r.core.combat.isDead, r.form(target))
+                    dead = okd and d
+                end
+                crippled = ok and result ~= nil and result.crippled == true
+                r.log(string.format('L %s limb %d blow %d: %s crippled=%s dead=%s', label, limb, blow,
+                    ok and 'struck' or ('error ' .. tostring(result)), tostring(crippled), tostring(dead)))
+                if dead then error('L ' .. label .. ' died of the blows at its legs: the comparison needs it alive') end
+                if crippled then break end
+                r.wait(0.2)
             end
-            r.log(string.format('L %s limb %d: %s crippled=%s dead=%s', label, limb, ok and 'struck' or ('error ' .. tostring(result)),
-                tostring(ok and result and result.crippled), tostring(dead)))
-            if dead then error('L ' .. label .. ' died of the blows at its legs: the comparison needs it alive') end
+            if not crippled then
+                error('L ' .. label .. ' limb ' .. limb .. ' was not crippled by six blows: the comparison needs two crippled legs')
+            end
         end
     end
     -- g1 is put back in line with g2, 35 m from the player, both at peace; the crippling blows throw g1 about, so it is put again after
@@ -147,7 +157,9 @@ return { limit = 600, delay = 4, run = function(r)
         r.log('F blow: ' .. (ok and ('hit=' .. tostring(hit and hit.hit)) or ('error ' .. tostring(hit))))
         r.wait(0.15)
         local p = target.position
-        r.putAt(target, { pos = { p.x, p.y, p.z + up }, yaw = math.pi, label = label .. ' ' .. up .. ' units up while it is thrown' })
+        -- (not taken to the ground: it has to be in the air)
+        r.putAt(target, { pos = { p.x, p.y, p.z + up }, yaw = math.pi, onGround = false,
+            label = label .. ' ' .. up .. ' units up while it is thrown' })
         for i = 1, 8 do
             r.wait(0.5)
             r.log(string.format('F %s %.1f s later at height %.0f (the ground is at %.0f)', label, i * 0.5, height(target), ground))

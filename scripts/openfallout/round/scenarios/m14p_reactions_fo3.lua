@@ -72,6 +72,7 @@ return { limit = 700, delay = 4, run = function(r)
     -- a character that dies of them fails the round (the comparison needs it alive)
     local function cripple(target, label)
         for _, limb in ipairs({ 7, 10 }) do
+            local legCrippled = false
             for blow = 1, 10 do
                 local ok, result = pcall(r.core.combat.strike, r.form(player), r.form(target), PISTOL, limb)
                 local okd, dead = pcall(r.core.combat.isDead, r.form(target))
@@ -80,8 +81,15 @@ return { limit = 700, delay = 4, run = function(r)
                 r.log(string.format('L %s limb %d blow %d: %s crippled=%s dead=%s', label, limb, blow,
                     ok and 'struck' or ('error ' .. tostring(result)), tostring(crippled), tostring(dead)))
                 if dead then error('L ' .. label .. ' died of the blows at its legs: the comparison needs it alive') end
-                if crippled then break end
+                if crippled then
+                    legCrippled = true
+                    break
+                end
                 r.wait(0.2)
+            end
+            -- (a round that did not cripple both legs must not compare the speeds, so it fails)
+            if not legCrippled then
+                error('L ' .. label .. ' limb ' .. limb .. ' was not crippled by ten blows: the comparison needs two crippled legs')
             end
         end
     end
@@ -125,7 +133,9 @@ return { limit = 700, delay = 4, run = function(r)
         r.log('F blow: ' .. (ok and ('hit=' .. tostring(hit and hit.hit)) or ('error ' .. tostring(hit))))
         r.wait(0.15)
         local p = target.position
-        r.putAt(target, { pos = { p.x, p.y, p.z + up }, yaw = math.pi, label = label .. ' ' .. up .. ' units up while it is thrown' })
+        -- (not taken to the ground: it has to be in the air)
+        r.putAt(target, { pos = { p.x, p.y, p.z + up }, yaw = math.pi, onGround = false,
+            label = label .. ' ' .. up .. ' units up while it is thrown' })
         for i = 1, 8 do
             r.wait(0.5)
             r.log(string.format('F %s %.1f s later at height %.0f (it stood at %.0f)', label, i * 0.5, height(target), stands))

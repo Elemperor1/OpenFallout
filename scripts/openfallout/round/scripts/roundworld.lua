@@ -293,7 +293,7 @@ function r.putAt(object, o)
         local p = player()
         local cell = world.getExteriorCell(math.floor(o.pos[1] / 4096), math.floor(o.pos[2] / 4096), p.cell)
         object:teleport(cell, util.vector3(o.pos[1], o.pos[2], o.pos[3] or p.position.z),
-            { rotation = util.transform.rotateZ(o.yaw or 0), onGround = true })
+            { rotation = util.transform.rotateZ(o.yaw or 0), onGround = o.onGround ~= false })
     end)
     return outcome('putAt', ok, err, tostring(o.label or '-'), string.format('pos=%.0f,%.0f', o.pos[1], o.pos[2]))
 end

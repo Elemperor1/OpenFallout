@@ -666,6 +666,11 @@ namespace
             "meshes/characters/_male/swimmtleft.kf");
         EXPECT_EQ(chooseFalloutAction(mFolder, "", false, Action::Swim, FalloutDirection::Backward, false, false, false, files),
             "meshes/characters/_male/swimmtforward.kf");
+        // a character with only the plain forward file swims backward running by it too (no fast file of any way)
+        const std::vector<std::string> onlyForward = { "meshes/characters/_male/swimmtforward.kf" };
+        EXPECT_EQ(
+            chooseFalloutAction(mFolder, "", false, Action::Swim, FalloutDirection::Backward, false, true, false, onlyForward),
+            "meshes/characters/_male/swimmtforward.kf");
     }
 
     TEST_F(OpenFalloutRenderChooseFalloutMove, sneakIdleIsThatOfTheWeaponOrTheHandsFree)

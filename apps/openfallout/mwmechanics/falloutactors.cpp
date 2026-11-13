@@ -740,10 +740,21 @@ namespace OFMechanics
         const auto found = mMinds.find(ptr.mRef);
         Mind& mind = found == mMinds.end() ? makeMind(ptr) : *found->second;
         mind.mThrown = true;
-        mind.mKnock = velocity;
-        mind.mKnock.z() = 0.f;
-        mind.mKnockTotal = seconds;
-        mind.mKnockLeft = seconds;
+        osg::Vec3f push = velocity;
+        push.z() = 0.f;
+        if (mind.mAirborne)
+        {
+            // Already in the air, where it goes by what it had: the blow adds to that (a throw's force is spent over its time,
+            // and the share of it that is the average speed is what the body takes on)
+            mind.mDrift += push * 0.5f;
+            mind.mKnockLeft = 0.f;
+        }
+        else
+        {
+            mind.mKnock = push;
+            mind.mKnockTotal = seconds;
+            mind.mKnockLeft = seconds;
+        }
         stopWalking(mind);
         Log(Debug::Info) << ptr.getCellRef().getRefId() << " is thrown back by a blow: " << static_cast<int>(velocity.length())
                          << " units a second for " << seconds << " s";
@@ -2192,13 +2203,24 @@ namespace OFMechanics
                     mind.mFell = true;
                     fall(frame, mind);
                 }
+                // A blow that killed it threw it back, or it died in the air: the body goes on to where the throw takes it
+                // and falls to the ground (a body that is dead takes no damage from the fall)
+                if (mind.mThrown)
+                    thrown(frame, mind, duration);
                 continue;
             }
             mind.mSeenAlive = true;
 
             // A blow threw it back, or it is falling: it does nothing else until it stands
-            if (mind.mThrown && thrown(frame, mind, duration))
-                continue;
+            if (mind.mThrown)
+            {
+                if (thrown(frame, mind, duration))
+                    continue;
+                // It died of the fall that ended it: the next frame lets its body fall, and nothing of the fight or the
+                // packages is done for a corpse
+                if (frame.mScripts != nullptr && frame.mScripts->isDead(mind.mPtr))
+                    continue;
+            }
 
             if (facesSpeaker(frame, mind, speaker, duration))
                 continue;

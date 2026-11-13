@@ -362,7 +362,12 @@ namespace OFRender
             if (file.empty() && run)
                 file = findMoveFile(folder, "swimmt" + way, female, files);
             if (file.empty() && direction != FalloutDirection::Forward)
+            {
                 file = findMoveFile(folder, "swimmt" + std::string(run ? "fast" : "") + "forward", female, files);
+                // (a character that has no fast file for a way has none for forward either: the pace of the walk)
+                if (file.empty() && run)
+                    file = findMoveFile(folder, "swimmtforward", female, files);
+            }
             return file;
         }
         const std::string name = action == FalloutAction::JumpLoop ? "jumploop" : "jumpland";

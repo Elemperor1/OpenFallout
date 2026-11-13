@@ -475,12 +475,7 @@ namespace OFRender
                                  << (mObjectRoot == nullptr ? "its body is not made" : "its body is in no scene");
             return;
         }
-        // What it did stops where it is
-        if (mAdvanceCallback != nullptr)
-        {
-            mInsert->removeUpdateCallback(mAdvanceCallback);
-            mAdvanceCallback = nullptr;
-        }
+        // What it did stops where it is (advance() goes on only for the effects on the body, which run out)
         // ... and is over: the groups it was playing (a walk, an attack, the reel of the blow that killed it) are taken out
         // of the list of what it plays, which would show a dead body that goes on with its attack (the pose stays: nothing
         // is updating the bones any more)
@@ -506,6 +501,12 @@ namespace OFRender
 
     void FalloutActorAnimation::advance(float duration)
     {
+        // A dead body does nothing more: only the impact or the flash that was on it when it fell runs out
+        if (mFall != nullptr)
+        {
+            updateEffects(duration);
+            return;
+        }
         updateGait(duration);
         runAnimation(duration);
         watchPose(duration);
