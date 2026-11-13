@@ -72,6 +72,24 @@ namespace OFInput
             EXPECT_TRUE(sReports.empty());
         }
 
+        TEST_F(OFInputSdlTriggerDeviceTest, aClearThatFailsAfterAResistanceIsReportedAndCanBeSentAgain)
+        {
+            SdlTriggerDevice device(somePad, true, false, &fakeSendEffect);
+            device.setResistance(Trigger::Right, pistol);
+            sAnswers = { -1 };
+            EXPECT_FALSE(device.clear(Trigger::Right));
+            EXPECT_TRUE(device.clear(Trigger::Right));
+            ASSERT_EQ(sReports.size(), 3u);
+            EXPECT_EQ(sReports.back(), report(std::nullopt));
+        }
+
+        TEST_F(OFInputSdlTriggerDeviceTest, aClearThatFailsOnAPadThatNeverResistedLeavesNothingToTakeBack)
+        {
+            SdlTriggerDevice device(somePad, true, false, &fakeSendEffect);
+            sAnswers = { -1 };
+            EXPECT_TRUE(device.clear(Trigger::Right));
+        }
+
         /// Records the calls; refuses resistance after the first one when asked to
         struct FakeDevice final : TriggerDevice
         {
@@ -79,6 +97,7 @@ namespace OFInput
             bool mRefuseResistance = false;
             int mSets = 0;
             int mClears = 0;
+            int mFailingClears = 0;
 
             bool supported() const override { return mSupported; }
             void setResistance(Trigger, const Resistance&) override
@@ -87,7 +106,14 @@ namespace OFInput
                 if (mRefuseResistance)
                     mSupported = false;
             }
-            void clear(Trigger) override { ++mClears; }
+            bool clear(Trigger) override
+            {
+                ++mClears;
+                if (mFailingClears == 0)
+                    return true;
+                --mFailingClears;
+                return false;
+            }
             bool pulseSupported() const override { return false; }
             void pulse(Trigger, const TriggerFeel::Pulse&) override {}
         };
@@ -111,6 +137,21 @@ namespace OFInput
             EXPECT_EQ(device.mClears, 1);
             driveTriggers(planner, device, inPlay(), pistol);
             EXPECT_EQ(device.mClears, 1);
+        }
+
+        TEST(OFInputTriggerDriveTest, aClearThatFailedIsSentAgainOnTheNextUpdateUntilItSucceeds)
+        {
+            TriggerFeel::Planner planner;
+            FakeDevice device;
+            driveTriggers(planner, device, inPlay(), pistol);
+            Situation holstered;
+            device.mFailingClears = 2;
+            driveTriggers(planner, device, holstered, pistol);
+            driveTriggers(planner, device, holstered, pistol);
+            driveTriggers(planner, device, holstered, pistol);
+            EXPECT_EQ(device.mClears, 3);
+            driveTriggers(planner, device, holstered, pistol);
+            EXPECT_EQ(device.mClears, 3);
         }
 
         TEST(OFInputTriggerDriveTest, aPadWithoutResistanceIsNeverToldToResist)

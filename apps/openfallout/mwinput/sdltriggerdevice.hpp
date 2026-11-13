@@ -19,7 +19,8 @@ namespace OFInput
         /// can resist no more, and is nothing on a pad that never could.
         virtual bool supported() const = 0;
         virtual void setResistance(TriggerFeel::Trigger trigger, const TriggerFeel::Resistance& resistance) = 0;
-        virtual void clear(TriggerFeel::Trigger trigger) = 0;
+        /// False when the pad may still hold a resistance it was given (the clear did not reach it): ask again
+        virtual bool clear(TriggerFeel::Trigger trigger) = 0;
 
         /// Whether the triggers have motors of their own (the impulse triggers of an Xbox One or Series pad)
         virtual bool pulseSupported() const = 0;
@@ -42,23 +43,25 @@ namespace OFInput
 
         bool supported() const override { return mResistancePad && !mRefused; }
         void setResistance(TriggerFeel::Trigger trigger, const TriggerFeel::Resistance& resistance) override;
-        void clear(TriggerFeel::Trigger trigger) override;
+        bool clear(TriggerFeel::Trigger trigger) override;
 
         bool pulseSupported() const override { return mPulseSupported; }
         void pulse(TriggerFeel::Trigger trigger, const TriggerFeel::Pulse& pulse) override;
 
     private:
-        void send(TriggerFeel::Trigger trigger, const std::optional<TriggerFeel::Resistance>& resistance);
+        bool send(TriggerFeel::Trigger trigger, const std::optional<TriggerFeel::Resistance>& resistance);
 
         SDL_GameController* mController;
         bool mResistancePad; // a DualSense: the only pad that is ever sent the effect report
         bool mRefused = false; // it refused a report: no resistance from now on, only clears
+        bool mResisting = false; // it took a resistance and no clear has reached it since
         bool mPulseSupported;
         SendEffect mSendEffect;
     };
 
     /// Tells the trigger what the planner says for the situation. A pad that can not resist (or refused it) is only
-    /// ever cleared, so a resistance it was given before it refused is taken back.
+    /// ever cleared, so a resistance it was given before it refused is taken back. A clear that did not reach a pad
+    /// that resists is told again on the next call.
     void driveTriggers(TriggerFeel::Planner& planner, TriggerDevice& device, const TriggerFeel::Situation& situation,
         const std::optional<TriggerFeel::Resistance>& resistance);
 }

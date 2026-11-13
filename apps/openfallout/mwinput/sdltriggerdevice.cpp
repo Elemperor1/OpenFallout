@@ -30,29 +30,32 @@ namespace OFInput
     {
     }
 
-    void SdlTriggerDevice::send(TriggerFeel::Trigger trigger, const std::optional<TriggerFeel::Resistance>& resistance)
+    bool SdlTriggerDevice::send(TriggerFeel::Trigger trigger, const std::optional<TriggerFeel::Resistance>& resistance)
     {
         if (!mResistancePad)
-            return;
+            return false;
         const auto report = TriggerFeel::dualSenseEffect(trigger, resistance);
         if (mSendEffect(mController, report.data(), static_cast<int>(report.size())) == 0)
-            return;
+            return true;
         // A pad that refuses it once is given no resistance again (the game plays on without the effect), but is
         // still cleared, as it may keep the resistance it had
         if (!mRefused)
             Log(Debug::Warning) << "Pad triggers: the resistance is not available (" << SDL_GetError() << ")";
         mRefused = true;
+        return false;
     }
 
     void SdlTriggerDevice::setResistance(TriggerFeel::Trigger trigger, const TriggerFeel::Resistance& resistance)
     {
-        if (!mRefused)
-            send(trigger, resistance);
+        if (!mRefused && send(trigger, resistance))
+            mResisting = true;
     }
 
-    void SdlTriggerDevice::clear(TriggerFeel::Trigger trigger)
+    bool SdlTriggerDevice::clear(TriggerFeel::Trigger trigger)
     {
-        send(trigger, std::nullopt);
+        if (send(trigger, std::nullopt))
+            mResisting = false;
+        return !mResisting;
     }
 
     void driveTriggers(TriggerFeel::Planner& planner, TriggerDevice& device, const TriggerFeel::Situation& situation,
@@ -65,7 +68,9 @@ namespace OFInput
                 device.setResistance(TriggerFeel::Trigger::Right, command.mResistance);
                 break;
             case TriggerFeel::Command::Kind::Clear:
-                device.clear(TriggerFeel::Trigger::Right);
+                // The planner takes the trigger for clear from here on; a clear that did not arrive is planned again
+                if (!device.clear(TriggerFeel::Trigger::Right))
+                    planner.forget();
                 break;
             case TriggerFeel::Command::Kind::None:
                 break;
