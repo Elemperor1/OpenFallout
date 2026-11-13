@@ -29,7 +29,9 @@ stays green. A run on a tag or the default branch that has only some of the secr
 6. **Release notes**: the check appends one line per disk image to the draft release (`--notes`): the result, the mode,
    the smoke result and the macOS version and chip it ran on, e.g. `- OpenFallout-0.52.0-macOS-arm64.dmg: packaged-app
    check PASS (release mode; smoke SKIP) on macOS 26.1 (25B78), Apple M2 (Virtual), arm64`. `CI/harness_release.py`
-   refuses to publish a release whose disk images lack that line. When the smoke step was skipped on the runner (no
+   refuses to publish a release whose disk images lack that line, and refuses one whose Apple Silicon image has no
+   `packaged-app check PASS (release mode; ...)` line or no `... PASS (...; smoke PASS)` line: the game must have
+   started from that image on a Mac with a GPU (both may be the same line). When the smoke step was skipped on the runner (no
    OpenGL context, or only Apple's software renderer: the hosted arm64 runner has no GPU, and on 12 November 2026 the
    engine ended there with a bus error about 9.5 s after the cell started, while a package built from the same code on a
    Mac with a GPU passed; the cause on the runner is not known), run `CI/check_mac_package.py <dmg> --mode release --smoke run --notes notes.md` on a Mac with a
@@ -78,6 +80,12 @@ To check the credentials locally before the first tag: `xcrun notarytool history
 `--team-id <id>` (or `OPENFALLOUT_CODESIGN_TEAM_ID`) pins the team; without it, the app's own Team ID is the one every
 file must carry. See [playing.md](playing.md) for the steps of the check and [mac-luajit.md](mac-luajit.md) for the
 JIT entitlement.
+
+## Homebrew cask: not part of this work
+
+A Homebrew cask (spec #166, stories 17 and 32) is deferred. It waits for the first notarized tagged release, because a
+cask must point at a published, notarized disk image and its checksum, and it will live in a tap that the project owns
+(not in Homebrew's main cask repository). Nothing in this repository builds or updates a cask yet.
 
 ## Not verified
 

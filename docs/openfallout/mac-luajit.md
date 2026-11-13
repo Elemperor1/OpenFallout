@@ -136,6 +136,15 @@ The same package with the dependency set's own LuaJIT and the same entitlements 
 says `FAIL luajit: ... is a default build (mprotect, no LUAJIT_ENABLE_OSX_HRT); under the hardened runtime without
 allow-unsigned-executable-memory the engine is killed at its first compiled trace (Code Signature Invalid)`.
 
+### The engine's compiler line
+
+The engine runs its hot-loop probe and logs `LuaJIT compiler: on|off (<flags>); hot loop: <n> compiled trace(s), <m>
+aborted` once per run only when the environment has `OPENFALLOUT_LUAJIT_PROBE=1`. The smoke step of
+`CI/check_mac_package.py` passes it through `scripts/openfallout/mac_launch.py --env`; to see the line in a normal run,
+start the engine with that variable set. Without it the engine does no probe and logs nothing about the compiler, on
+every platform. The local check above also says in its `library-validation` line that library validation is off;
+release mode (`--mode release`) fails a package whose binaries carry `disable-library-validation`.
+
 ### Testing a hardened package locally
 
 Without a certificate: build the package with `OPENFALLOUT_CODESIGN_IDENTITY=-` and `OPENFALLOUT_CODESIGN_LOCAL_TEST=1`.

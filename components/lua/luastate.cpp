@@ -4,9 +4,11 @@
 #include <luajit.h>
 #endif // NO_LUAJIT
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <mutex>
+#include <string_view>
 
 #include <components/debug/debuglog.hpp>
 #include <components/files/conversion.hpp>
@@ -175,10 +177,15 @@ namespace LuaUtil
         return state;
     }
 
-    // Logs, once per process, whether LuaJIT's compiler is on and whether it really compiles: a hot loop is run with a
-    // trace listener attached. A signed macOS app whose entitlements forbid writable executable memory cannot place
-    // compiled code, so "on" alone does not prove it works; the packaged-app check (CI/check_mac_package.py) reads
-    // this line.
+    bool isLuaJitProbeRequested(const char* value)
+    {
+        return value != nullptr && std::string_view(value) == "1";
+    }
+
+    // With OPENFALLOUT_LUAJIT_PROBE=1, logs once per process whether LuaJIT's compiler is on and whether it really
+    // compiles: a hot loop is run with a trace listener attached. A signed macOS app whose entitlements forbid writable
+    // executable memory cannot place compiled code, so "on" alone does not prove it works; the packaged-app check
+    // (CI/check_mac_package.py) sets the variable and reads this line. Without it nothing is run or logged.
     static void reportJitStateOnce(sol::state_view& sol)
     {
 #ifdef NO_LUAJIT
@@ -186,6 +193,8 @@ namespace LuaUtil
 #else
         static std::once_flag once;
         std::call_once(once, [&] {
+            if (!isLuaJitProbeRequested(std::getenv("OPENFALLOUT_LUAJIT_PROBE")))
+                return;
             sol::protected_function_result result = sol.safe_script(R"(
                 local status = { jit.status() }
                 local traces, aborts, firstAbort = 0, 0, nil
