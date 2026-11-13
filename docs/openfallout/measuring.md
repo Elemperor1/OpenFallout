@@ -58,13 +58,16 @@ come from the round profile (`~/.config/openfallout-rounds.json`, see `scripts/o
 
 `compare BEFORE AFTER` takes two result folders (all `result.json` under each) or files and prints a Markdown table of the
 medians per scene and metric with the change in percent. A change smaller than the spread between repeats of one side
-is noise: look at the repeats of each side before believing a few percent. A run that was stopped, crashed or did not finish
-the probe is left out of the medians, and both `run` and `compare` name each run they left out.
+is noise: look at the repeats of each side before believing a few percent. A run that was stopped, crashed, did not finish
+the probe or lacks the `stand` or `turn` phase is left out of every median, and both `run` and `compare` name each run
+they left out.
 
 ## Instruments captures with `xctrace`
 
 `run ... --capture KIND` attaches `xcrun xctrace record` to the engine when the `stand` phase begins and records the 70 s
-of `stand` and `turn` into `<run>/<KIND>.trace`:
+of `stand` and `turn` into `<run>/<KIND>.trace`. `result.json` names the trace only when `xctrace` exited with status 0;
+otherwise its `capture` is null, `capture_error` says why and names `<run>/xctrace.log`, and the run prints the same.
+Ctrl-C or an error during a run still stops the engine, the capture and the heartbeat. The kinds:
 
 | `--capture` | template | what it shows |
 |---|---|---|

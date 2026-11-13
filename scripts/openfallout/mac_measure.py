@@ -140,14 +140,21 @@ def _value(result, path):
     return result
 
 
+MEASURED_PHASES = ("stand", "turn")  # the probe phases every counted run must have
+
+
 def _failure(result):
-    """Why a run's numbers do not count, or None: only a run whose probe finished and whose engine quit cleanly does."""
+    """Why a run's numbers do not count, or None: only a run whose probe finished with both measured phases and whose
+    engine quit cleanly does."""
     if result.get("stopped"):
         return f"stopped ({result['stopped']})"
     if result.get("exit_status") != 0:
         return f"exit status {result.get('exit_status')}"
     if not result.get("done"):
         return "the probe did not finish"
+    for phase in MEASURED_PHASES:
+        if not (result.get("phases") or {}).get(phase):
+            return f"no {phase} phase"
     return None
 
 
@@ -238,10 +245,36 @@ def sample_footprint(pid):
     return read_footprint(text_of(["footprint", "--noCategories", "-p", str(pid)]) or "")
 
 
+def stop_process_group(process):
+    """SIGTERM to the engine's session, SIGKILL after 20 s; the engine is reaped either way."""
+    import signal
+
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+        process.wait(timeout=20)
+    except ProcessLookupError:
+        process.wait()
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait()
+
+
+def capture_outcome(kind, capture, run_dir):
+    """(the trace's file name, None) when xctrace recorded it (exit status 0), else (None, why, naming xctrace.log)."""
+    if capture is None:
+        return None, None
+    if capture.returncode == 0:
+        return f"{kind}.trace", None
+    why = "did not finish" if capture.returncode is None else f"exited with status {capture.returncode}"
+    return None, f"xctrace {why}; see {run_dir / 'xctrace.log'}"
+
+
 def run_once(args, scene_name, run_dir, data):
     """One engine start on one scene; writes and gives result.json."""
     import pty
-    import signal
     sys.path.insert(0, str(HERE / "round"))
     import roundguard
 
@@ -258,51 +291,68 @@ def run_once(args, scene_name, run_dir, data):
     before = machine()
     system = roundguard.default_system(platform.system() == "Darwin")
     heartbeat = roundguard.Heartbeat(system.ping, system.window_server_pid) if system.heartbeat else None
-    if heartbeat is not None:
-        heartbeat.start()
+    log_path = run_dir / "config" / "openfallout.log"
+    process, capture, capture_log, samples, stopped = None, None, None, {}, None
     # the engine shows a dialog instead of logging a fatal error when stdin is not a terminal
     master, slave = pty.openpty()
     started = time.monotonic()
-    process = subprocess.Popen(command, stdin=slave, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env,
-                               cwd=run_dir, start_new_session=True)
-    os.close(slave)
-    log_path = run_dir / "config" / "openfallout.log"
-    capture, samples, stopped = None, {}, None
-    seen = ""
-    while process.poll() is None:
-        time.sleep(0.5)
-        try:
-            seen = log_path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            seen = ""
-        if "PERF\tstart\tstand" in seen and "stand_start" not in samples:
-            samples["stand_start"] = sample_footprint(process.pid)
-            if args.capture:
-                capture = subprocess.Popen(xctrace_command(args.capture, process.pid, run_dir / f"{args.capture}.trace",
-                                                           MEASURED_SECONDS),
-                                           stdout=open(run_dir / "xctrace.log", "w"), stderr=subprocess.STDOUT)
-        if "PERF\tphase\tstand" in seen and "stand_end" not in samples:
-            samples["stand_end"] = sample_footprint(process.pid)
-        if "PERF\tphase\tturn" in seen and "turn_end" not in samples:
-            samples["turn_end"] = sample_footprint(process.pid)
-        problem = heartbeat.problem() if heartbeat is not None else None
-        if problem or time.monotonic() - started > args.limit:
-            stopped = problem or f"time limit {args.limit} s"
-            os.killpg(process.pid, signal.SIGTERM)
+    # Whatever ends the watch (the engine quitting, Ctrl-C, an error while sampling or starting the capture), the
+    # engine is stopped and reaped, and the heartbeat, the capture and the pty are let go: the engine runs in a session
+    # of its own and would not see the terminal's interrupt.
+    try:
+        if heartbeat is not None:
+            heartbeat.start()
+        process = subprocess.Popen(command, stdin=slave, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env,
+                                   cwd=run_dir, start_new_session=True)
+        os.close(slave)
+        slave = None
+        while process.poll() is None:
+            time.sleep(0.5)
             try:
-                process.wait(timeout=20)
+                seen = log_path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                seen = ""
+            if "PERF\tstart\tstand" in seen and "stand_start" not in samples:
+                samples["stand_start"] = sample_footprint(process.pid)
+                if args.capture:
+                    capture_log = open(run_dir / "xctrace.log", "w")
+                    capture = subprocess.Popen(xctrace_command(args.capture, process.pid,
+                                                               run_dir / f"{args.capture}.trace", MEASURED_SECONDS),
+                                               stdout=capture_log, stderr=subprocess.STDOUT)
+            if "PERF\tphase\tstand" in seen and "stand_end" not in samples:
+                samples["stand_end"] = sample_footprint(process.pid)
+            if "PERF\tphase\tturn" in seen and "turn_end" not in samples:
+                samples["turn_end"] = sample_footprint(process.pid)
+            problem = heartbeat.problem() if heartbeat is not None else None
+            if problem or time.monotonic() - started > args.limit:
+                stopped = problem or f"time limit {args.limit} s"
+                stop_process_group(process)
+                break
+        if capture is not None:
+            try:
+                capture.wait(timeout=120)
             except subprocess.TimeoutExpired:
-                os.killpg(process.pid, signal.SIGKILL)
-                process.wait()
-            break
-    os.close(master)
-    if heartbeat is not None:
-        heartbeat.stop()
-    if capture is not None:
-        try:
-            capture.wait(timeout=120)
-        except subprocess.TimeoutExpired:
+                pass
+    finally:
+        if process is not None and process.poll() is None:
+            stop_process_group(process)
+        if capture is not None and capture.poll() is None:
             capture.terminate()
+            try:
+                capture.wait(timeout=20)
+            except subprocess.TimeoutExpired:
+                capture.kill()
+                capture.wait()
+        if capture_log is not None:
+            capture_log.close()
+        for fd in (master, slave):
+            if fd is not None:
+                os.close(fd)
+        if heartbeat is not None:
+            heartbeat.stop()
+    trace, capture_error = capture_outcome(args.capture, capture, run_dir)
+    if capture_error:
+        print(f"{scene_name}: no trace recorded: {capture_error}", file=sys.stderr)
     try:
         seen = log_path.read_text(encoding="utf-8", errors="replace")
     except OSError:
@@ -314,7 +364,7 @@ def run_once(args, scene_name, run_dir, data):
         "exit_status": process.returncode, "stopped": stopped, "wall_s": round(time.monotonic() - started, 1),
         "memory": {"footprint_mib": (samples.get("stand_end") or {}).get("footprint_mib"),
                    "peak_mib": max((s["peak_mib"] for s in valid), default=None), "samples": samples},
-        "capture": f"{args.capture}.trace" if capture is not None else None,
+        "capture": trace, "capture_error": capture_error,
         "machine_before": before, "machine_after": machine(),
         "when": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
     })
