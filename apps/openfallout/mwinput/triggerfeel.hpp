@@ -69,6 +69,7 @@ namespace OFInput::TriggerFeel
     struct Situation
     {
         bool mEnabled = true; // the setting for trigger effects
+        bool mControllerEnabled = true; // the setting for the pad itself (enable controller)
         bool mFocused = true; // the game window has the keyboard focus
         bool mMenu = false; // a menu or another screen is open
         bool mWeaponDrawn = false; // the player's weapon is out of its holster

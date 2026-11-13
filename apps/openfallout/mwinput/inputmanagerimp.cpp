@@ -134,6 +134,8 @@ namespace OFInput
         OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager();
         TriggerFeel::Situation situation;
         situation.mEnabled = Settings::input().mGamepadTriggerEffects;
+        // A pad that is off for the game still gets the situation, so that a resistance it was given is cleared
+        situation.mControllerEnabled = Settings::input().mEnableController;
         situation.mFocused = mInputWrapper->windowHasFocus();
         // A loading screen or a film (no controls), a window of the engine, a screen of the game, or no game running
         situation.mMenu = disableControls || mTriggerPlayer.mMenuOpen || (windows != nullptr && windows->isGuiMode())

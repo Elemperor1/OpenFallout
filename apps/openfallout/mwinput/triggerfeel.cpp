@@ -88,7 +88,8 @@ namespace OFInput::TriggerFeel
 
     bool Planner::pulseAllowed(const Situation& situation)
     {
-        return situation.mEnabled && situation.mFocused && !situation.mMenu && situation.mWeaponDrawn;
+        return situation.mEnabled && situation.mControllerEnabled && situation.mFocused && !situation.mMenu
+            && situation.mWeaponDrawn;
     }
 
     void Planner::forget()

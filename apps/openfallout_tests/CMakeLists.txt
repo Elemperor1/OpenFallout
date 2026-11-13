@@ -28,6 +28,7 @@ file(GLOB UNITTEST_SRC_FILES
 
     mwinput/testcontrollerdefaults.cpp
     mwinput/testtriggerfeel.cpp
+    mwinput/testtriggerdevice.cpp
 
     mwlua/testobjectcache.cpp
 

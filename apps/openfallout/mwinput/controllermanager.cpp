@@ -101,8 +101,9 @@ namespace OFInput
 
     ControllerManager::~ControllerManager()
     {
-        // A DualSense keeps a resistance it was given: the game does not leave it behind
-        if (mTriggerDevice != nullptr && mTriggerDevice->supported())
+        // A DualSense keeps a resistance it was given: the game does not leave it behind, even on a pad that refused a
+        // later report (a pad that never could resist takes the clear as nothing)
+        if (mTriggerDevice != nullptr)
             mTriggerDevice->clear(TriggerFeel::Trigger::Right);
     }
 
@@ -645,20 +646,8 @@ namespace OFInput
         mTriggerSituation = situation;
         mTriggerFeel = weapon ? TriggerFeel::forWeapon(*weapon) : TriggerFeel::Feel{};
         TriggerDevice* device = triggerDevice();
-        if (device == nullptr || !device->supported())
-            return;
-        const TriggerFeel::Command command = mTriggerPlanner.update(situation, mTriggerFeel.mResistance);
-        switch (command.mKind)
-        {
-            case TriggerFeel::Command::Kind::Set:
-                device->setResistance(TriggerFeel::Trigger::Right, command.mResistance);
-                break;
-            case TriggerFeel::Command::Kind::Clear:
-                device->clear(TriggerFeel::Trigger::Right);
-                break;
-            case TriggerFeel::Command::Kind::None:
-                break;
-        }
+        if (device != nullptr)
+            driveTriggers(mTriggerPlanner, *device, situation, mTriggerFeel.mResistance);
     }
 
     void ControllerManager::weaponFired()

@@ -15,7 +15,8 @@ namespace OFInput
     public:
         virtual ~TriggerDevice() = default;
 
-        /// Whether the triggers can resist (a DualSense that takes the effect report)
+        /// Whether the triggers can resist (a DualSense that takes the effect report). Clear still goes to a pad that
+        /// can resist no more, and is nothing on a pad that never could.
         virtual bool supported() const = 0;
         virtual void setResistance(TriggerFeel::Trigger trigger, const TriggerFeel::Resistance& resistance) = 0;
         virtual void clear(TriggerFeel::Trigger trigger) = 0;
@@ -27,14 +28,19 @@ namespace OFInput
 
     /// The triggers through SDL, which stays the controller layer: the effect report of SDL's DualSense driver
     /// (SDL_GameControllerSendEffect) for the resistance, SDL_GameControllerRumbleTriggers for the buzz. A pad that
-    /// refuses the effect report (another pad, a DualSense that SDL can not reach in full over Bluetooth) is taken as
-    /// unsupported from then on.
+    /// refuses the effect report (another pad, a DualSense that SDL can not reach in full over Bluetooth) is not given
+    /// a resistance again, but is still cleared: a refusal may leave the resistance it had before on the trigger.
     class SdlTriggerDevice final : public TriggerDevice
     {
     public:
-        explicit SdlTriggerDevice(SDL_GameController* controller);
+        /// SDL_GameControllerSendEffect, or a stand-in for it
+        using SendEffect = int (*)(SDL_GameController* controller, const void* data, int size);
 
-        bool supported() const override { return mSupported; }
+        explicit SdlTriggerDevice(SDL_GameController* controller);
+        /// A pad whose kind is already known (resistance: a DualSense; pulse: trigger motors)
+        SdlTriggerDevice(SDL_GameController* controller, bool resistance, bool pulse, SendEffect sendEffect);
+
+        bool supported() const override { return mResistancePad && !mRefused; }
         void setResistance(TriggerFeel::Trigger trigger, const TriggerFeel::Resistance& resistance) override;
         void clear(TriggerFeel::Trigger trigger) override;
 
@@ -45,9 +51,16 @@ namespace OFInput
         void send(TriggerFeel::Trigger trigger, const std::optional<TriggerFeel::Resistance>& resistance);
 
         SDL_GameController* mController;
-        bool mSupported;
+        bool mResistancePad; // a DualSense: the only pad that is ever sent the effect report
+        bool mRefused = false; // it refused a report: no resistance from now on, only clears
         bool mPulseSupported;
+        SendEffect mSendEffect;
     };
+
+    /// Tells the trigger what the planner says for the situation. A pad that can not resist (or refused it) is only
+    /// ever cleared, so a resistance it was given before it refused is taken back.
+    void driveTriggers(TriggerFeel::Planner& planner, TriggerDevice& device, const TriggerFeel::Situation& situation,
+        const std::optional<TriggerFeel::Resistance>& resistance);
 }
 
 #endif

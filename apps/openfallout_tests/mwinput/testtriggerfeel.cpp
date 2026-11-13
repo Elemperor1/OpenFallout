@@ -132,7 +132,9 @@ namespace OFInput::TriggerFeel
             unfocused.mFocused = false;
             Situation disabled = inPlay();
             disabled.mEnabled = false;
-            for (const Situation& situation : { menu, holstered, unfocused, disabled })
+            Situation padOff = inPlay();
+            padOff.mControllerEnabled = false;
+            for (const Situation& situation : { menu, holstered, unfocused, disabled, padOff })
             {
                 Planner planner;
                 planner.update(inPlay(), pistol);
@@ -179,7 +181,9 @@ namespace OFInput::TriggerFeel
             unfocused.mFocused = false;
             Situation disabled = inPlay();
             disabled.mEnabled = false;
-            for (const Situation& situation : { menu, holstered, unfocused, disabled })
+            Situation padOff = inPlay();
+            padOff.mControllerEnabled = false;
+            for (const Situation& situation : { menu, holstered, unfocused, disabled, padOff })
                 EXPECT_FALSE(Planner::pulseAllowed(situation));
         }
 
