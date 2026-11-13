@@ -4394,6 +4394,21 @@ namespace OFScript
         mSayings.push_back(std::move(saying));
     }
 
+    void FalloutScripts::cutOffSaying(FalloutScript::FormId reference)
+    {
+        const auto saying = std::find_if(
+            mSayings.begin(), mSayings.end(), [reference](const Saying& other) { return other.mReference == reference; });
+        if (saying == mSayings.end())
+            return;
+        mSayings.erase(saying);
+        if (!OFBase::Environment::exists())
+            return;
+        OFBase::SoundManager* sound = OFBase::Environment::get().getSoundManager();
+        const OFWorld::Ptr ptr = findReference(reference);
+        if (sound != nullptr && !ptr.isEmpty())
+            sound->stopSay(ptr);
+    }
+
     void FalloutScripts::raiseNothingSaid()
     {
         std::vector<std::pair<FalloutScript::FormId, FalloutScript::FormId>> told;

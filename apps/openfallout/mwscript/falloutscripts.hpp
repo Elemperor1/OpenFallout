@@ -2034,6 +2034,8 @@ namespace OFScript
         bool isSoundPlaying(FalloutScript::FormId sound, FalloutScript::FormId reference) override;
         bool isMusicPlaying() override;
         bool playMusic(FalloutScript::FormId track) override;
+        /// `once`: the track plays once, whatever the loop flag of its record says (the stingers)
+        bool playMusicRecord(FalloutScript::FormId track, bool once);
         void forceWeather(FalloutScript::FormId weather, bool hold) override;
         void releaseWeather() override;
         double imageSpaceDuration(FalloutScript::FormId modifier) override;
@@ -2181,6 +2183,9 @@ namespace OFScript
             bool mStarted = false;
         };
         void startSaying(FalloutScript::FormId reference, std::vector<SaidLine> lines);
+        /// What a character is saying stops, with what it had left to say (a radio that is turned off, a conversation that
+        /// is asked for)
+        void cutOffSaying(FalloutScript::FormId reference);
         void updateVoices(float frametime);
         /// Tells the scripts of the characters that were told to say what nobody could say that they are done
         void raiseNothingSaid();

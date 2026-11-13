@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <set>
 #include <string>
 #include <string_view>
@@ -225,6 +226,11 @@ namespace
         EXPECT_FALSE(isStairs(settings, 1.f, 100.f, 103.f, 97.f));
         // a ramp has a tilted normal even where it changes as much as a step
         EXPECT_FALSE(isStairs(settings, 0.8f, 100.f, 114.f, 86.f));
+        // a ramp that rises 7 units over the reach (a tilt that passes as flat) rises as much as a step but evenly: it is
+        // not a stair, as ground with a normal of 0.9606 rises 7 units in 24
+        EXPECT_FALSE(isStairs(settings, 24.f / std::sqrt(24.f * 24.f + 7.f * 7.f), 100.f, 107.f, 93.f));
+        // while a flat that the ground goes up 14 units from is
+        EXPECT_TRUE(isStairs(settings, 24.f / std::sqrt(24.f * 24.f + 7.f * 7.f), 100.f, 114.f, 86.f));
         // a ledge higher than a step is a wall, not a stair
         EXPECT_FALSE(isStairs(settings, 1.f, 100.f, 160.f, std::nullopt));
         // nothing found around: not stairs

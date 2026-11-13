@@ -326,6 +326,9 @@ namespace OFScript
         if (actor == 0)
             return;
         RadioPlayback& radio = mRadioPlayback;
+        // What the character was saying of the station stops when the radio goes off or to another station
+        if (const auto old = radio.mNpc.find(actor); old != radio.mNpc.end() && (!on || old->second.mStation != station))
+            cutOffSaying(actor);
         if (!on)
         {
             radio.mNpc.erase(actor);
@@ -560,6 +563,7 @@ namespace OFScript
             // A conversation that was asked for starts at once (what it says is cut off)
             if (const auto pending = radio.mPending.find(station.mReference); pending != radio.mPending.end())
             {
+                cutOffSaying(station.mReference);
                 radio.mRoomTopic[station.mReference] = pending->second;
                 rest = 0.f;
                 radio.mPending.erase(pending);
@@ -585,6 +589,9 @@ namespace OFScript
                 std::vector<SaidLine> lines;
                 for (const RadioPlayback::Line& step : steps)
                 {
+                    // (the songs are left out when the radio is set to dialogue only)
+                    if (radio.mDialogueOnly && step.mSong)
+                        continue;
                     SaidLine& line = lines.emplace_back();
                     line.mVoice = step.mVoice;
                     line.mText = step.mText;
@@ -592,8 +599,11 @@ namespace OFScript
                     line.mTopic = step.mTopic;
                     line.mSpeakerBase = step.mSpeakerBase;
                 }
-                lines.back().mEnd = true;
-                startSaying(station.mReference, std::move(lines));
+                if (!lines.empty())
+                {
+                    lines.back().mEnd = true;
+                    startSaying(station.mReference, std::move(lines));
+                }
             }
             logRadio(station.mName + " in the room says " + (said ? "a chain" : "nothing"));
         }
@@ -616,16 +626,18 @@ namespace OFScript
                 if ((npc.getRefData().getPosition().asVec3() - player.getRefData().getPosition().asVec3()).length() > reach)
                     continue;
             }
-            const bool saying = std::any_of(
-                mSayings.begin(), mSayings.end(), [&](const Saying& other) { return other.mReference == actor; });
-            if (saying)
-                continue;
+            // A conversation that was asked for starts at once (what is said is cut off)
             if (const auto pending = radio.mPending.find(entry.mStation); pending != radio.mPending.end())
             {
+                cutOffSaying(actor);
                 entry.mTopic = pending->second;
                 entry.mRest = 0.f;
                 dispatched.push_back(pending->first);
             }
+            const bool saying = std::any_of(
+                mSayings.begin(), mSayings.end(), [&](const Saying& other) { return other.mReference == actor; });
+            if (saying)
+                continue;
             entry.mRest -= frametime;
             if (entry.mRest > 0.f)
                 continue;

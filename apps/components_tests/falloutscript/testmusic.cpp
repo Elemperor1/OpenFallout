@@ -425,9 +425,17 @@ namespace
         EXPECT_FLOAT_EQ(incidental.wait(), 6.f);
         incidental.reset();
         EXPECT_FLOAT_EQ(incidental.wait(), 0.f);
-        // times of zero leave no wait at all
-        incidental.update(0.f, true, IncidentalTimes(), [] { return 0.5; });
-        EXPECT_FLOAT_EQ(incidental.wait(), 0.f);
+    }
+
+    TEST(FalloutScriptMusicTest, times_of_zero_leave_the_shortest_wait_the_port_keeps_not_one_stinger_per_frame)
+    {
+        Incidental incidental;
+        EXPECT_EQ(incidental.update(0.f, true, IncidentalTimes(), [] { return 0.5; }), Incidental::Sound::Open);
+        EXPECT_FLOAT_EQ(incidental.wait(), Incidental::minimumWait);
+        // the next frames play nothing until that time has gone
+        EXPECT_EQ(incidental.update(0.016f, true, IncidentalTimes(), [] { return 0.5; }), Incidental::Sound::None);
+        EXPECT_EQ(incidental.update(0.5f, true, IncidentalTimes(), [] { return 0.5; }), Incidental::Sound::None);
+        EXPECT_EQ(incidental.update(0.5f, true, IncidentalTimes(), [] { return 0.5; }), Incidental::Sound::Open);
     }
 
     TEST(FalloutScriptMusicTest, a_controller_picks_the_first_set_when_no_other_takes_over)

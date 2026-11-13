@@ -252,7 +252,7 @@ namespace FalloutScript::Music
         float longest = day ? times.mDayLongest : times.mNightLongest;
         if (shortest > longest)
             std::swap(shortest, longest);
-        mWait = std::max(0.f, shortest + static_cast<float>(unit()) * (longest - shortest));
+        mWait = std::max(minimumWait, shortest + static_cast<float>(unit()) * (longest - shortest));
         return day ? Sound::Open : Sound::Close;
     }
 }

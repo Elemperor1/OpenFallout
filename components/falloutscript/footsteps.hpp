@@ -134,7 +134,8 @@ namespace FalloutScript::Footsteps
         float mReach = 24.f;
         float mMinStep = 5.f;
         float mMaxStep = 30.f;
-        /// How flat the ground has to be: the z of its normal
+        /// How flat the ground has to be: the z of its normal. What a slope of that tilt rises over `mReach` does not count
+        /// as a step, so a ramp is not taken for stairs.
         float mFlatNormal = 0.95f;
     };
     bool isStairs(const StairSettings& settings, float normalZ, float height, std::optional<float> aheadHeight,

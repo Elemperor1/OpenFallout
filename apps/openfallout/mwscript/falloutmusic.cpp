@@ -123,6 +123,7 @@ namespace OFScript
             runOnMainThread([this, kind] { playStinger(kind); });
             return;
         }
+        // (they play once, whatever the loop flag of the record says: they are stingers over the music of the place)
         // The default music records of the game (DOBJ). The executable's callers of these were not found: the death of the
         // player, the completing of a quest and a level gained are what their names in the editor say ("Death Music",
         // "Success Music", "Level Up Music").
@@ -136,7 +137,7 @@ namespace OFScript
         }
         if (music.isZeroOrUnset())
             return;
-        if (playMusic(music.toUint32()))
+        if (playMusicRecord(music.toUint32(), true))
             logMusic(std::string("the music of ")
                 + (kind == Stinger::Death         ? "a death"
                         : kind == Stinger::Success ? "a quest completed"
@@ -643,7 +644,8 @@ namespace OFScript
                 active = battleSet->mId;
             else if (locationSet != nullptr && locations && locationSet->mSetType == 2)
                 active = locationSet->mId;
-            if (active != music.mIntroSet)
+            // (while the track of a script has the music the sounds of the sets wait, and are heard when it is over)
+            if (!scriptMusic && active != music.mIntroSet)
             {
                 const auto play = [&](ESM::FormId id, const char* what, const ESM4::MediaSet& set) {
                     if (id.isZeroOrUnset())
@@ -667,8 +669,9 @@ namespace OFScript
         const ESM4::MediaSet* incidental = soundRegion == nullptr || soundRegion->mIncidentalSet.isZeroOrUnset()
             ? nullptr
             : mStore.get<ESM4::MediaSet>().search(soundRegion->mIncidentalSet);
+        // (the layers of a set that is left fade out first: the mixer still plays them while the wanted list is empty)
         const bool quiet = music.mStems.empty() && !scriptMusic && !combat
-            && (music.mTrack == 0 || !sound->isMusicTrackPlaying(music.mTrack));
+            && (music.mTrack == 0 || !sound->isMusicTrackPlaying(music.mTrack)) && !music.mMixer.playing(*sound);
         if (incidental != nullptr && incidental->mSetType == 3 && quiet)
         {
             FalloutScript::Music::IncidentalTimes times;

@@ -15,6 +15,7 @@
 #include "../mwbase/environment.hpp"
 #include "../mwbase/inputmanager.hpp"
 #include "../mwbase/soundmanager.hpp"
+#include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
 #include "../mwworld/esmstore.hpp"
 
@@ -127,6 +128,11 @@ namespace OFScript
 
     bool FalloutScripts::playMusic(FalloutScript::FormId track)
     {
+        return playMusicRecord(track, false);
+    }
+
+    bool FalloutScripts::playMusicRecord(FalloutScript::FormId track, bool once)
+    {
         const ESM::FormId id = ESM::FormId::fromUint32(track);
         const Resource::ResourceSystem* resources = OFBase::Environment::get().getResourceSystem();
         if (id.isZeroOrUnset() || resources == nullptr)
@@ -147,7 +153,7 @@ namespace OFScript
         }
         // The track replaces what plays, with a fade, as loud as the record says (ANAM), looping when it says so. The
         // music of the place comes back after it.
-        runOnMainThread([this, id] {
+        runOnMainThread([this, id, once] {
             OFBase::SoundManager* sound = OFBase::Environment::get().getSoundManager();
             OFSound::FalloutMusic* music = mMusicPlayback.mRecords ? mMusicPlayback.mRecords->find(id) : nullptr;
             if (sound == nullptr || music == nullptr || music->mFiles.empty())
@@ -179,9 +185,9 @@ namespace OFScript
             mMusicPlayback.mStemKey.clear();
             mMusicPlayback.mStems.clear();
             mMusicPlayback.mScriptTrack = sound->startMusicTrack(
-                file, FalloutScript::Music::gainOfDb(music->mDb), 1.f, music->mLoop);
+                file, FalloutScript::Music::gainOfDb(music->mDb), 1.f, music->mLoop && !once);
             logMusic("a script plays " + music->mEditorId + ": " + std::string(file.value())
-                + (music->mLoop ? ", loops" : ""));
+                + (music->mLoop && !once ? ", loops" : ""));
         });
         return true;
     }
@@ -222,6 +228,10 @@ namespace OFScript
 
     void FalloutScripts::rumble(double left, double right, double seconds)
     {
+        // Nothing shakes while a menu is open, whoever asks
+        if (OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager();
+            windows != nullptr && windows->isGuiMode())
+            return;
         if (OFBase::InputManager* input = OFBase::Environment::get().getInputManager())
             input->rumble(static_cast<float>(left), static_cast<float>(right), static_cast<float>(seconds));
     }

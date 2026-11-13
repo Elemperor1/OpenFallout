@@ -160,6 +160,9 @@ namespace FalloutScript::Music
         Sound update(float seconds, bool day, const IncidentalTimes& times, const std::function<double()>& unit);
         void reset() { mWait = 0.f; }
         float wait() const { return mWait; }
+        /// The shortest wait the port keeps between two stingers, in seconds: a set whose times are zero would play its
+        /// sound again in every frame (the sound is cut off by itself), so it plays the stinger once and then rests
+        static constexpr float minimumWait = 1.f;
 
     private:
         float mWait = 0.f;
