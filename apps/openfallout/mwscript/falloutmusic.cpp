@@ -445,14 +445,23 @@ namespace OFScript
         const bool wantBattle = combat && battleList != nullptr;
         if (!wantBattle)
             music.mBattleSet = ESM::FormId();
-        else if (music.mBattleSet.isZeroOrUnset())
+        else
         {
-            std::vector<ESM::FormId> sets;
-            for (const ESM::FormId id : *battleList)
-                if (mStore.get<ESM4::MediaSet>().search(id) != nullptr)
-                    sets.push_back(id);
-            if (!sets.empty())
-                music.mBattleSet = sets[std::uniform_int_distribution<std::size_t>(0, sets.size() - 1)(music.mRandom)];
+            // A set that was picked for another place (the player crossed into a sound region whose fights have other
+            // sets, in the middle of a fight) is not kept
+            if (!music.mBattleSet.isZeroOrUnset()
+                && std::find(battleList->begin(), battleList->end(), music.mBattleSet) == battleList->end())
+                music.mBattleSet = ESM::FormId();
+            if (music.mBattleSet.isZeroOrUnset())
+            {
+                std::vector<ESM::FormId> sets;
+                for (const ESM::FormId id : *battleList)
+                    if (mStore.get<ESM4::MediaSet>().search(id) != nullptr)
+                        sets.push_back(id);
+                if (!sets.empty())
+                    music.mBattleSet
+                        = sets[std::uniform_int_distribution<std::size_t>(0, sets.size() - 1)(music.mRandom)];
+            }
         }
 
         const ESM4::MediaSet* locationSet = music.mSet.isZeroOrUnset() ? nullptr : mStore.get<ESM4::MediaSet>().search(music.mSet);

@@ -599,6 +599,9 @@ namespace OFScript
         }
 
         // ---- The characters that have a station on (SetNPCRadio) say what it says, where they are ----
+        // (a conversation that was asked for starts once for every character that plays the station, and is dropped after
+        // them: left in the list it would start again each time one of them has finished)
+        std::vector<decltype(radio.mPending)::key_type> dispatched;
         for (auto& [actor, entry] : radio.mNpc)
         {
             // A character that is not in a loaded cell is not heard
@@ -621,6 +624,7 @@ namespace OFScript
             {
                 entry.mTopic = pending->second;
                 entry.mRest = 0.f;
+                dispatched.push_back(pending->first);
             }
             entry.mRest -= frametime;
             if (entry.mRest > 0.f)
@@ -648,6 +652,8 @@ namespace OFScript
                 startSaying(actor, std::move(lines));
             }
         }
+        for (const auto station : dispatched)
+            radio.mPending.erase(station);
         // (a conversation that was asked of a station that nobody plays any more is dropped)
         if (radio.mPending.size() > 64)
             radio.mPending.clear();
