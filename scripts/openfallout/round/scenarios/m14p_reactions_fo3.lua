@@ -162,14 +162,19 @@ return { limit = 700, delay = 4, run = function(r)
     phase('D killing blow')
     -- b is struck with the pistol's form until it is dead; the place it was at when the killing blow was made is kept, and the
     -- body has to have gone from it by the throw (the blow of the kill is made inside the call: the throw is of the frames after)
+    -- (b has to be alive here: it fell 626 units in phase F, which hurts for 5 points; a corpse would make the check mean nothing)
+    do
+        local okd, dead = pcall(r.core.combat.isDead, r.form(g2))
+        if okd and dead then error('D b was already dead before the killing blow (it died of the fall of phase F)') end
+    end
     r.peace(g2)
     r.teleport{ pos = { g2.position.x, g2.position.y - 5 * M, g2.position.z + 200 }, yaw = 0, onGround = true, label = 'five metres from b' }
     r.wait(1.5)
     local killedAt
     for blow = 1, 40 do
         local ok, hit = pcall(r.core.combat.strike, r.form(player), r.form(g2), PISTOL, -1)
-        local okd, dead = pcall(r.core.combat.isDead, r.form(g2))
-        if okd and dead then
+        -- (the blow itself says that it killed: a character that was dead before it is not taken for a kill)
+        if ok and hit and hit.killed then
             killedAt = { x = g2.position.x, y = g2.position.y, z = g2.position.z }
             r.log(string.format('D b was killed by blow %d at (%.0f, %.0f, %.0f)', blow, killedAt.x, killedAt.y, killedAt.z))
             break
