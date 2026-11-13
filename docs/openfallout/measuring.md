@@ -90,11 +90,13 @@ with the whole command line of a run. `<run>` is the folder of a run that `mac_m
 
 ```
 xcrun xctrace record --template Allocations --output alloc.trace --env SDL_MAC_BACKGROUND_APP=1 --launch -- \
-    <engine> --resources <resources> --config <run>/config --replace config --user-data <run>/userdata \
-    --data-local <run>/userdata/data --data <the game's Data folder> --data scripts/openfallout/perfprobe \
-    --data <run>/data --content FalloutNV.esm --content perfprobe.omwscripts --skip-menu --no-grab \
-    --start GSDocMitchellHouse
+    "<engine>" --resources "<resources>" --config "<run>/config" --replace config \
+    --user-data "<run>/userdata" --data-local "<run>/userdata/data" --data "<the game's Data folder>" \
+    --data scripts/openfallout/perfprobe --data "<run>/data" --content FalloutNV.esm \
+    --content perfprobe.omwscripts --skip-menu --no-grab --start GSDocMitchellHouse
 ```
+
+The quotes matter: the folder of a game often has spaces in its name.
 
 Leave none of it out: without `--config <run>/config --replace config` and `--user-data` the engine reads and writes
 the settings and saves of whoever uses the Mac, and without the probe (`perfprobe.omwscripts` and its two `--data`
