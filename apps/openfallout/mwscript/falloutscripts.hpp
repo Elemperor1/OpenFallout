@@ -3056,6 +3056,10 @@ namespace OFScript
             FalloutScript::FormId mLastTuned = 0;
             /// The topic that StartRadioConversation asked a station to say, by station, until the station says it
             std::map<FalloutScript::FormId, FalloutScript::FormId> mPending;
+            /// The same request for the characters that play the station (the tuned radio and a thing in a room take
+            /// `mPending`; the characters have a request of their own, so that a station that the player has tuned still
+            /// starts the conversation for them)
+            std::map<FalloutScript::FormId, FalloutScript::FormId> mPendingNpc;
             /// SetNPCRadio: a character that has a station on, by the character: what it says goes on from where the
             /// character is
             struct NpcRadio

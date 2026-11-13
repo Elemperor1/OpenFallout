@@ -74,6 +74,7 @@ namespace OFScript
         radio.mDialogueOnly = false;
         radio.mLastTuned = 0;
         radio.mPending.clear();
+        radio.mPendingNpc.clear();
         radio.mNpc.clear();
         radio.mGroupCell = ESM::RefId();
         radio.mGroup = {};
@@ -318,6 +319,13 @@ namespace OFScript
         }
         else
             radio.mPending[station] = topic;
+        // (the characters that play the station start it as well, tuned or not)
+        for (const auto& [actor, entry] : radio.mNpc)
+            if (entry.mStation == station)
+            {
+                radio.mPendingNpc[station] = topic;
+                break;
+            }
         logRadio("the station " + std::to_string(station) + " is asked to start a conversation");
     }
 
@@ -627,7 +635,7 @@ namespace OFScript
                     continue;
             }
             // A conversation that was asked for starts at once (what is said is cut off)
-            if (const auto pending = radio.mPending.find(entry.mStation); pending != radio.mPending.end())
+            if (const auto pending = radio.mPendingNpc.find(entry.mStation); pending != radio.mPendingNpc.end())
             {
                 cutOffSaying(actor);
                 entry.mTopic = pending->second;
@@ -665,9 +673,15 @@ namespace OFScript
             }
         }
         for (const auto station : dispatched)
+        {
+            radio.mPendingNpc.erase(station);
+            // (a request for a station that characters play is theirs: the tuned radio and a thing in a room had it first)
             radio.mPending.erase(station);
+        }
         // (a conversation that was asked of a station that nobody plays any more is dropped)
         if (radio.mPending.size() > 64)
             radio.mPending.clear();
+        if (radio.mPendingNpc.size() > 64)
+            radio.mPendingNpc.clear();
     }
 }
