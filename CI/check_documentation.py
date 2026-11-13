@@ -17,7 +17,8 @@ RST_ENTRYPOINTS = (
 )
 REPO_BLOB_PREFIX = "https://github.com/OpenBethesda/OpenFallout/blob/master/"
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
-REPO_BLOB_LINK = re.compile(r"<((?:https://github\.com/OpenBethesda/OpenFallout/blob/)[^>]+)>_?")
+# Any owner: a link to the repository under its former owner or to a fork is reported as non-canonical
+REPO_BLOB_LINK = re.compile(r"<((?:https://github\.com/[^/>\s]+/OpenFallout/blob/)[^>]+)>_?")
 DOC_ROLE = re.compile(r":doc:`(?:[^`<>]*<)?([^`<>]+)>?`")
 TOCTREE = re.compile(r"^(?P<indent>\s*)\.\. toctree::\s*$")
 
