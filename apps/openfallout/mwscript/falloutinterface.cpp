@@ -164,11 +164,11 @@ namespace OFScript
         OFBase::InputManager* input = OFBase::Environment::get().getInputManager();
         if (input == nullptr)
             return;
-        std::optional<OFInput::TriggerFeel::Weapon> weapon;
-        bool drawn = false;
+        OFInput::TriggerFeel::PlayerState player;
+        std::optional<OFInput::TriggerFeel::Weapon>& weapon = player.mWeapon;
         if (mPlayer != 0 && !mActors.isDead(mPlayer))
         {
-            drawn = mEquipment.weaponDrawn(mPlayer);
+            player.mWeaponDrawn = mEquipment.weaponDrawn(mPlayer);
             const FalloutScript::FormId held = mEquipment.weapon(mPlayer);
             const ESM4::Weapon* record = held != 0
                 ? mStore.get<ESM4::Weapon>().search(ESM::RefId::formIdRefId(ESM::FormId::fromUint32(held)))
@@ -185,7 +185,8 @@ namespace OFScript
             else
                 weapon.emplace(); // the hands
         }
-        input->setTriggerState(weapon, drawn, menuOpen(0));
+        player.mMenuOpen = menuOpen(0);
+        input->setTriggerState(player);
     }
 
     void FalloutScripts::jumped(const OFWorld::Ptr& ptr)

@@ -26,6 +26,7 @@
 
 #include "actions.hpp"
 #include "bindingsmanager.hpp"
+#include "controllerdefaults.hpp"
 #include "inputlog.hpp"
 #include "mousemanager.hpp"
 #include "sdltriggerdevice.hpp"
@@ -180,6 +181,9 @@ namespace OFInput
 
     void ControllerManager::buttonPressed(int deviceID, const SDL_ControllerButtonEvent& arg)
     {
+        // macOS: the Home button opens the system's game overlay; the game neither acts on it nor binds it
+        if (!isGameControllerButton(arg.button, SDLUtil::thisDesktopPlatform()))
+            return;
         if (!Settings::input().mEnableController || mBindingsManager->isDetectingBindingState())
             return;
 
@@ -245,6 +249,8 @@ namespace OFInput
 
     void ControllerManager::buttonReleased(int deviceID, const SDL_ControllerButtonEvent& arg)
     {
+        if (!isGameControllerButton(arg.button, SDLUtil::thisDesktopPlatform()))
+            return;
         if (mBindingsManager->isDetectingBindingState())
         {
             mBindingsManager->controllerButtonReleased(deviceID, arg);

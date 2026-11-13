@@ -53,7 +53,7 @@ namespace OFInput
         // Enable all controls
         mControlSwitch->clear();
         // The player of the game that is left has no weapon until the next one says so
-        setTriggerState(std::nullopt, false, false);
+        setTriggerState({});
     }
 
     InputManager::~InputManager() {}
@@ -119,11 +119,9 @@ namespace OFInput
         mControllerManager->rumble(strength, seconds);
     }
 
-    void InputManager::setTriggerState(const std::optional<TriggerFeel::Weapon>& weapon, bool drawn, bool menu)
+    void InputManager::setTriggerState(const TriggerFeel::PlayerState& player)
     {
-        mTriggerWeapon = weapon;
-        mTriggerDrawn = drawn;
-        mTriggerMenu = menu;
+        mTriggerPlayer = player;
     }
 
     void InputManager::weaponFired()
@@ -138,10 +136,10 @@ namespace OFInput
         situation.mEnabled = Settings::input().mGamepadTriggerEffects;
         situation.mFocused = mInputWrapper->windowHasFocus();
         // A loading screen or a film (no controls), a window of the engine, a screen of the game, or no game running
-        situation.mMenu = disableControls || mTriggerMenu || (windows != nullptr && windows->isGuiMode())
+        situation.mMenu = disableControls || mTriggerPlayer.mMenuOpen || (windows != nullptr && windows->isGuiMode())
             || OFBase::Environment::get().getStateManager()->getState() != OFBase::StateManager::State_Running;
-        situation.mWeaponDrawn = mTriggerDrawn;
-        mControllerManager->updateTriggers(situation, mTriggerWeapon);
+        situation.mWeaponDrawn = mTriggerPlayer.mWeaponDrawn;
+        mControllerManager->updateTriggers(situation, mTriggerPlayer.mWeapon);
         if (mTriggerShotPending.exchange(false))
             mControllerManager->weaponFired();
     }

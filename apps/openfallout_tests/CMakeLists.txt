@@ -26,6 +26,7 @@ file(GLOB UNITTEST_SRC_FILES
     mwgui/tooltips.cpp
     mwgui/weightedsearch.cpp
 
+    mwinput/testcontrollerdefaults.cpp
     mwinput/testtriggerfeel.cpp
 
     mwlua/testobjectcache.cpp

@@ -77,7 +77,7 @@ namespace OFInput
         void setPadPick(bool pick) override;
         bool padPick() const override;
         void rumble(float strength, float seconds) override;
-        void setTriggerState(const std::optional<TriggerFeel::Weapon>& weapon, bool drawn, bool menu) override;
+        void setTriggerState(const TriggerFeel::PlayerState& player) override;
         void weaponFired() override;
 
         void toggleControlSwitch(std::string_view sw, bool value) override;
@@ -122,9 +122,7 @@ namespace OFInput
         bool mControlsDisabled;
 
         // What the game said last about the player, for the triggers
-        std::optional<TriggerFeel::Weapon> mTriggerWeapon;
-        bool mTriggerDrawn = false;
-        bool mTriggerMenu = false;
+        TriggerFeel::PlayerState mTriggerPlayer;
         // A shot of the player waits for the next frame: the attack may run off the main thread, and the pad is told
         // on it
         std::atomic<bool> mTriggerShotPending{ false };

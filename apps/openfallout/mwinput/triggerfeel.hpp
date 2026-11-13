@@ -57,6 +57,14 @@ namespace OFInput::TriggerFeel
 
     Feel forWeapon(const Weapon& weapon);
 
+    /// What the game says about the player, once a frame
+    struct PlayerState
+    {
+        std::optional<Weapon> mWeapon; // the weapon in the hands; none: no weapon
+        bool mWeaponDrawn = false; // out of the holster
+        bool mMenuOpen = false; // a menu or another screen of the game is open
+    };
+
     /// What the game is doing, as far as the triggers care
     struct Situation
     {
