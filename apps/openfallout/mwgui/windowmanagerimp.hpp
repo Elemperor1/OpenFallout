@@ -303,6 +303,7 @@ namespace OFGui
         void windowVisibilityChange(bool visible) override;
         void windowResized(int x, int y) override;
         void windowClosed() override;
+        void windowModeRequested(Settings::WindowMode mode) override;
         bool isWindowVisible() const override;
 
         void watchActor(const OFWorld::Ptr& ptr) override;

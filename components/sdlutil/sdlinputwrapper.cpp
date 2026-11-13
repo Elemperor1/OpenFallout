@@ -124,7 +124,17 @@ namespace SDLUtil
                     break;
                 case SDL_KEYDOWN:
                     if (mDesktopShortcuts.swallowKeyDown(evt.key.keysym.sym, evt.key.keysym.mod, evt.key.repeat != 0))
+                    {
+                        if (evt.key.repeat == 0 && mWindowListener != nullptr
+                            && desktopShortcut(evt.key.keysym.sym, evt.key.keysym.mod)
+                                == DesktopShortcut::ToggleFullScreen)
+                        {
+                            if (const std::optional<Settings::WindowMode> mode = windowModeForToggleFullScreen(
+                                    SDL_GetWindowFlags(mSDLWindow), thisDesktopPlatform()))
+                                mWindowListener->windowModeRequested(*mode);
+                        }
                         break;
+                    }
                     mKeyboardListener->keyPressed(evt.key);
 
                     if (!isModifierHeld(KMOD_ALT) && evt.key.keysym.sym >= SDLK_F1 && evt.key.keysym.sym <= SDLK_F12)

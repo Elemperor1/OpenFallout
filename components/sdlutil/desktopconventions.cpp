@@ -67,6 +67,14 @@ namespace SDLUtil
         if (mPlatform == DesktopPlatform::Mac && ((units > 0 && mPending < 0) || (units < 0 && mPending > 0)))
             mPending = 0.0;
         mPending += units;
+        if (mPlatform == DesktopPlatform::Mac)
+        {
+            // Deltas such as 0.7f are a little under their decimal value: a sum that is a hair short of a whole step
+            // counts as the whole step, so ten deltas of 0.7 are seven steps and not six
+            const double nearest = std::round(mPending);
+            if (std::abs(mPending - nearest) < 1e-4)
+                mPending = nearest;
+        }
         const int whole = static_cast<int>(mPending);
         mPending -= whole;
         return whole;
@@ -202,6 +210,18 @@ namespace SDLUtil
                 break;
         }
         return 0;
+    }
+
+    std::optional<Settings::WindowMode> windowModeForToggleFullScreen(Uint32 windowFlags, DesktopPlatform platform)
+    {
+        if (platform != DesktopPlatform::Mac)
+            return std::nullopt;
+        // SDL_cocoawindow.m validateMenuItem: the item is greyed out in these two cases, so the key would do nothing
+        if (windowFlags & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP))
+            return Settings::WindowMode::Windowed;
+        if ((windowFlags & SDL_WINDOW_RESIZABLE) == 0)
+            return Settings::WindowMode::WindowedFullscreen;
+        return std::nullopt;
     }
 
     DesktopPlatform thisDesktopPlatform()

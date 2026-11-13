@@ -1421,6 +1421,17 @@ namespace OFGui
         OFBase::Environment::get().getStateManager()->requestQuit();
     }
 
+    void WindowManager::windowModeRequested(Settings::WindowMode mode)
+    {
+        // Control-Command-F out of (or into) a full-screen mode of the game: the setting changes as from the options
+        Log(Debug::Info) << "Window mode " << static_cast<int>(Settings::video().mWindowMode.get()) << " -> "
+                         << static_cast<int>(mode) << " (Control-Command-F)";
+        Settings::video().mWindowMode.set(mode);
+        mVideoWrapper->setVideoMode(Settings::video().mResolutionX, Settings::video().mResolutionY,
+            Settings::video().mWindowMode, Settings::video().mWindowBorder);
+        Settings::Manager::resetPendingChanges({ { "Video", "window mode" } });
+    }
+
     void WindowManager::onCursorChange(std::string_view name)
     {
         mMyGuiCursor = name;

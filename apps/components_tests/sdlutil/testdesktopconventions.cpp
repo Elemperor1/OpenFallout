@@ -50,6 +50,33 @@ namespace
     // The units MyGUI counts the wheel in: 120 to a notch of a mouse wheel
     constexpr double myGuiUnitsPerNotch = 120.0;
 
+    TEST(SDLUtilToggleFullScreenTest, theGameLeavesItsOwnFullScreenModesToAWindow)
+    {
+        // SDL greys out its menu item Toggle Full Screen while the window is in an SDL full-screen mode
+        const Uint32 resizable = SDL_WINDOW_RESIZABLE;
+        EXPECT_EQ(windowModeForToggleFullScreen(resizable | SDL_WINDOW_FULLSCREEN_DESKTOP, mac),
+            Settings::WindowMode::Windowed);
+        EXPECT_EQ(
+            windowModeForToggleFullScreen(resizable | SDL_WINDOW_FULLSCREEN, mac), Settings::WindowMode::Windowed);
+    }
+
+    TEST(SDLUtilToggleFullScreenTest, aResizableWindowIsLeftToTheMenuBar)
+    {
+        // the menu item takes it to a full-screen Space of its own and back
+        EXPECT_EQ(windowModeForToggleFullScreen(SDL_WINDOW_RESIZABLE, mac), std::nullopt);
+    }
+
+    TEST(SDLUtilToggleFullScreenTest, aWindowTheMenuBarCanNotTakeGoesFullScreen)
+    {
+        EXPECT_EQ(windowModeForToggleFullScreen(0, mac), Settings::WindowMode::WindowedFullscreen);
+    }
+
+    TEST(SDLUtilToggleFullScreenTest, nothingChangesElsewhere)
+    {
+        EXPECT_EQ(windowModeForToggleFullScreen(SDL_WINDOW_FULLSCREEN_DESKTOP, other), std::nullopt);
+        EXPECT_EQ(windowModeForToggleFullScreen(0, other), std::nullopt);
+    }
+
     TEST(SDLUtilWheelAccumulatorTest, aMouseWheelNotchIsOneWholeStep)
     {
         WheelAccumulator wheel(myGuiUnitsPerNotch, mac);
@@ -87,6 +114,23 @@ namespace
         EXPECT_EQ(notches.add(0.3f, SDL_MOUSEWHEEL_NORMAL), 0);
         EXPECT_EQ(notches.add(0.3f, SDL_MOUSEWHEEL_NORMAL), 1);
         EXPECT_EQ(notches.add(2.5f, SDL_MOUSEWHEEL_NORMAL), 2);
+    }
+
+    TEST(SDLUtilWheelAccumulatorTest, tenDeltasOfSevenTenthsAreSevenNotches)
+    {
+        // 0.7f is a little under 0.7: the sum must not fall a notch short by rounding
+        WheelNotches notches(mac);
+        int total = 0;
+        for (int i = 0; i < 10; ++i)
+            total += notches.add(0.7f, SDL_MOUSEWHEEL_NORMAL);
+        EXPECT_EQ(total, 7);
+        for (int i = 0; i < 10; ++i)
+            total += notches.add(0.7f, SDL_MOUSEWHEEL_NORMAL);
+        EXPECT_EQ(total, 14);
+        int back = 0;
+        for (int i = 0; i < 10; ++i)
+            back += notches.add(-0.7f, SDL_MOUSEWHEEL_NORMAL);
+        EXPECT_EQ(back, -7);
     }
 
     TEST(SDLUtilWheelAccumulatorTest, reversingDropsTheUnfinishedPartOfTheOtherWay)

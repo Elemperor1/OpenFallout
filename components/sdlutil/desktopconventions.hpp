@@ -71,6 +71,11 @@ namespace SDLUtil
     std::optional<float> interfaceScaleAfterResize(
         float userScale, int windowPoints, int drawablePixels, float current, DesktopPlatform platform);
 
+    /// The window mode the game itself goes to on Control-Command-F, for the SDL flags of the window; nullopt when
+    /// SDL's menu bar item Toggle Full Screen does it (a resizable window outside SDL's full-screen modes) and on other
+    /// systems. SDL greys that item out while the window is in one of its full-screen modes, or is not resizable.
+    std::optional<Settings::WindowMode> windowModeForToggleFullScreen(Uint32 windowFlags, DesktopPlatform platform);
+
     /// The SDL window flag for a window mode. With the system's full-screen Spaces (macOS), both full-screen modes go
     /// to a Space of their own: exclusive full screen would change the display mode and keep the window out of Mission
     /// Control, the green button and Control-Command-F.
