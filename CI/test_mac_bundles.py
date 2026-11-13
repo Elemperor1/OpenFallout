@@ -265,6 +265,17 @@ endif()
                 self.assertNotIn("--entitlements", call)
         self.assertIn("LOCAL TEST", self.output)
 
+    def test_local_test_overlay_also_merges_into_the_editors_empty_entitlements(self):
+        temporary = tempfile.TemporaryDirectory(prefix="mac signing ")
+        self.addCleanup(temporary.cleanup)
+        calls = self.sign(Path(temporary.name), ["OpenFallout.app", "OpenFallout-CS.app"],
+                          OPENFALLOUT_CODESIGN_IDENTITY="-", OPENFALLOUT_CODESIGN_LOCAL_TEST="1")
+        editor = str(self.app_root / "OpenFallout-CS.app")
+        used = [call[call.index("--entitlements") + 1] for call in calls if "--sign" in call and call[-1] == editor]
+        self.assertEqual(len(used), 1, self.output)
+        with open(used[0], "rb") as entitlements:
+            self.assertEqual(plistlib.load(entitlements), {"com.apple.security.cs.disable-library-validation": True})
+
     def test_local_test_is_refused_with_a_real_identity(self):
         temporary = tempfile.TemporaryDirectory(prefix="mac signing ")
         self.addCleanup(temporary.cleanup)

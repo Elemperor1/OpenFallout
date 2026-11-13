@@ -90,6 +90,8 @@ if (APPLE)
     # The app's entitlements plus the local-test overlay, written next to the staged apps (never into the source tree).
     function(openfallout_local_test_entitlements app_name release_file result_var)
         file(READ "${release_file}" release)
+        # an app without entitlements has an empty dictionary (<dict/>): open it so the overlay has a place to go
+        string(REPLACE "<dict/>" "<dict>\n</dict>" release "${release}")
         file(READ "${CMAKE_CURRENT_LIST_DIR}/../files/mac/local-hardened-test.entitlements" overlay)
         string(REGEX MATCH "<dict>(.*)</dict>" overlay_dict "${overlay}")
         string(FIND "${release}" "</dict>" dict_end REVERSE)

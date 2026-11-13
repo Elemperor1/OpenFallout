@@ -140,14 +140,31 @@ def _value(result, path):
     return result
 
 
+def _failure(result):
+    """Why a run's numbers do not count, or None: only a run whose probe finished and whose engine quit cleanly does."""
+    if result.get("stopped"):
+        return f"stopped ({result['stopped']})"
+    if result.get("exit_status") != 0:
+        return f"exit status {result.get('exit_status')}"
+    if not result.get("done"):
+        return "the probe did not finish"
+    return None
+
+
+def left_out(results):
+    """One line for each run that `compare` leaves out of the medians."""
+    return [f"{r.get('run') or r.get('scene')}: {_failure(r)}" for r in results if _failure(r)]
+
+
 def _median(results, scene, path):
-    values = [_value(r, path) for r in results if r.get("scene") == scene]
+    values = [_value(r, path) for r in results if r.get("scene") == scene and not _failure(r)]
     values = [v for v in values if v is not None]
     return round(statistics.median(values), 3) if values else None
 
 
 def compare(before, after):
-    """Rows (scene, metric, median before, median after, change in %) of two lists of results."""
+    """Rows (scene, metric, median before, median after, change in %) of two lists of results. Runs that were stopped,
+    crashed or did not finish the probe are left out (see left_out)."""
     scenes = sorted({r["scene"] for r in before + after}, key=lambda s: (list(SCENES) + [s]).index(s))
     rows = []
     for scene in scenes:
@@ -293,7 +310,7 @@ def run_once(args, scene_name, run_dir, data):
     result = read_log(seen)
     valid = [s for s in samples.values() if s]
     result.update({
-        "scene": scene_name, "start": scene["start"], "label": args.label, "commit": args.commit,
+        "scene": scene_name, "run": run_dir.name, "start": scene["start"], "label": args.label, "commit": args.commit,
         "exit_status": process.returncode, "stopped": stopped, "wall_s": round(time.monotonic() - started, 1),
         "memory": {"footprint_mib": (samples.get("stand_end") or {}).get("footprint_mib"),
                    "peak_mib": max((s["peak_mib"] for s in valid), default=None), "samples": samples},
@@ -315,6 +332,11 @@ def load_results(paths):
         files = [path] if path.is_file() else sorted(path.rglob("result.json"))
         results += [json.loads(f.read_text(encoding="utf-8")) for f in files]
     return results
+
+
+def print_left_out(results, side=""):
+    for line in left_out(results):
+        print(f"left out of the medians{side}: {line}")
 
 
 def print_rows(rows, before="before", after="after"):
@@ -356,8 +378,10 @@ def main(argv=None):
             print(f"{name:13} --content {scene['master']:14} --start {scene['start']}")
         return 0
     if args.command == "compare":
-        print_rows(compare(load_results([args.before]), load_results([args.after])),
-                   Path(args.before).name, Path(args.after).name)
+        before, after = load_results([args.before]), load_results([args.after])
+        print_left_out(before, f" ({Path(args.before).name})")
+        print_left_out(after, f" ({Path(args.after).name})")
+        print_rows(compare(before, after), Path(args.before).name, Path(args.after).name)
         return 0
 
     names = list(SCENES) if args.scenes == ["all"] else args.scenes
@@ -383,6 +407,7 @@ def main(argv=None):
                   + (f", stopped: {result['stopped']}" if result["stopped"] else ""), flush=True)
             results.append(result)
     print(f"results in {out}")
+    print_left_out(results)
     print_rows(compare(results, []), "median", "-")
     return 0
 

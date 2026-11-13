@@ -58,7 +58,8 @@ come from the round profile (`~/.config/openfallout-rounds.json`, see `scripts/o
 
 `compare BEFORE AFTER` takes two result folders (all `result.json` under each) or files and prints a Markdown table of the
 medians per scene and metric with the change in percent. A change smaller than the spread between repeats of one side
-is noise: look at the repeats of each side before believing a few percent.
+is noise: look at the repeats of each side before believing a few percent. A run that was stopped, crashed or did not finish
+the probe is left out of the medians, and both `run` and `compare` name each run they left out.
 
 ## Instruments captures with `xctrace`
 

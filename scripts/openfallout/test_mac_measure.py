@@ -86,8 +86,9 @@ class FootprintTests(unittest.TestCase):
         self.assertIsNone(mac_measure.read_footprint("footprint: no process matching 4242\n"))
 
 
-def result(scene, stand_p50, cell_load, peak):
+def result(scene, stand_p50, cell_load, peak, **outcome):
     return {"scene": scene, "cell_load_s": cell_load, "memory": {"peak_mib": peak},
+            "done": True, "stopped": None, "exit_status": 0, **outcome,
             "phases": {"stand": {"p50": stand_p50, "p95": stand_p50 * 2}, "turn": {"p50": 10.0, "p95": 20.0}}}
 
 
@@ -101,6 +102,23 @@ class CompareTests(unittest.TestCase):
         self.assertEqual(rows[("nv-busy", "stand p95 ms")], (24.0, 18.0, -25.0))
         self.assertEqual(rows[("nv-busy", "cell load s")], (2.5, 2.5, 0.0))
         self.assertEqual(rows[("nv-busy", "peak footprint MiB")], (2050.0, 2050.0, 0.0))
+
+    def test_runs_that_did_not_finish_cleanly_are_left_out_of_the_medians(self):
+        good = result("nv-busy", 10.0, 2.0, 2000.0)
+        failed = [result("nv-busy", 90.0, 9.0, 9000.0, stopped="time limit 300 s"),
+                  result("nv-busy", 90.0, 9.0, 9000.0, exit_status=-10),
+                  result("nv-busy", 90.0, 9.0, 9000.0, done=False)]
+        rows = {(row[0], row[1]): row[2:] for row in mac_measure.compare([good] + failed, failed)}
+        self.assertEqual(rows[("nv-busy", "stand p50 ms")], (10.0, None, None))
+        self.assertEqual(rows[("nv-busy", "cell load s")], (2.0, None, None))
+
+    def test_names_the_runs_it_left_out_and_why(self):
+        failed = [result("nv-busy", 90.0, 9.0, 9000.0, stopped="time limit 300 s", run="nv-busy-2"),
+                  result("fo3-busy", 90.0, 9.0, 9000.0, exit_status=-10),
+                  result("fo3-interior", 90.0, 9.0, 9000.0, done=False)]
+        self.assertEqual(mac_measure.left_out([result("nv-busy", 10.0, 2.0, 2000.0)] + failed),
+                         ["nv-busy-2: stopped (time limit 300 s)", "fo3-busy: exit status -10",
+                          "fo3-interior: the probe did not finish"])
 
     def test_a_scene_measured_on_one_side_only_shows_a_gap(self):
         rows = mac_measure.compare([result("fo3-busy", 10.0, 2.0, 2000.0)], [])
