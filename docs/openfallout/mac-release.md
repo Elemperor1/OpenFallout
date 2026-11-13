@@ -109,11 +109,28 @@ A Homebrew cask (spec #166, stories 17 and 32) is deferred. It waits for the fir
 cask must point at a published, notarized disk image and its checksum, and it will live in a tap that the project owns
 (not in Homebrew's main cask repository). Nothing in this repository builds or updates a cask yet.
 
-## Not verified
+## What has run for real, and what has not
 
-The project has no Developer ID certificate or notary key yet, so the release path has not run against Apple's
-services: it is covered by unit tests with stand-in `security`, `xcrun`, `codesign`, `hdiutil` and `ditto`
-(`CI/test_release_signing.py`) and stand-in `codesign`, `spctl` and `stapler` answers (`CI/test_check_mac_package.py`,
-`ReleaseModeTests`). The first tag with the secrets is the first real run. Two macOS jobs append their notes lines to
-the same draft release; if they finish at the same moment, one line can be lost, and `harness_release.py` then refuses
-to publish until it is added by hand.
+On 13 November 2026 the release path ran once on a Mac with a GPU (Apple M3 Pro, macOS 27.2.1), with a real Developer
+ID Application certificate and a real App Store Connect team key, on the apps of the Apple Silicon disk image that CI
+built for 67089ed566:
+
+- `release_signing.py setup` imported the certificate into a temporary keychain and found the identity of the team;
+  `cleanup` removed the keychain and left the keychain search list as it was.
+- `cmake/SignMacApplications.cmake` signed both apps with that identity (run as a script on the apps copied out of the
+  image, not from inside CPack) and its own verification passed.
+- `release_signing.py notarize` had both submissions accepted by Apple, stapled the two apps and the image, and
+  `stapler validate` passed for all three.
+- `CI/check_mac_package.py --mode release --smoke run` passed every step: Developer ID of the one team, hardened
+  runtime and secure timestamp on 76 Mach-O files and 6 nested bundles, Gatekeeper's `Notarized Developer ID` for the
+  image and the app, stapled tickets, and the game started from the image with the LuaJIT compiler on.
+- `CI/harness_release.py` accepted the line that check wrote for the image's SHA-256. Earlier the same day it was run
+  against a real draft release with the ad hoc images: GitHub reports a `sha256:` digest for the assets of a draft,
+  equal to the local hash, and the gate refused that release for lacking a release-mode line.
+
+Not run yet: the workflows themselves with the secrets (the `macos-release` environment, CPack calling the signing
+script in the job, the notes line appended to the draft release, publishing through the gate). The first tag or push
+to the default branch with the secrets is the first run of those. The unit tests with stand-in tools stay
+(`CI/test_release_signing.py`, `CI/test_check_mac_package.py`). Two macOS jobs append their notes lines to the same
+draft release; if they finish at the same moment, one line can be lost, and `harness_release.py` then refuses to publish
+until it is added by hand.
