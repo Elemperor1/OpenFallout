@@ -207,3 +207,22 @@ quieter comparison. The tail (turn p99) was lower "after" in 4 of 6 scenes. Thes
 with nothing else competing for the performance cores for long; whether the change helps a frontmost full-screen game
 while the system is busy (what it is for) is not measured by this method. Physics was not raised (no gain measured to justify
 it). Results: `scratch-macfirst/measure-186/r{1,2}-{before,after}` on the development Mac.
+
+Round 3, `fo3-interior` alone (2026-11-12, to settle the one thing to watch): two engines built from the same commit
+(1ce59f453a) that differ only in the two priority calls, three passes of before then after, three starts each (9 runs a
+side), median (min-max):
+
+| metric | before | after | change |
+| --- | ---: | ---: | ---: |
+| stand p50 ms | 4.5 (4.1-4.6) | 4.5 (4.4-7.9) | 0 % |
+| stand p95 ms | 8.1 (7.2-8.4) | 7.7 (6.9-8.6) | -5 % |
+| turn p50 ms | 12.7 (12.0-13.2) | 12.9 (12.5-16.4) | +2 % |
+| turn p95 ms | 17.2 (16.6-18.1) | 17.0 (16.8-17.4) | -1 % |
+| turn p99 ms | 19.7 (18.1-20.6) | 17.6 (17.5-18.5) | -11 % |
+| cell load s | 1.06 (0.95-1.22) | 1.09 (0.98-1.23) | +3 % |
+
+The slowdown of rounds 1 and 2 is not there: the medians are equal within the spread (0 and +0.2 ms). The tail is
+lower with the change: turn p99 was lower "after" in every pass (by 1.5, 1.5 and 2.2 ms), and the two ranges barely
+overlap. One "after" pass (the second) had all three starts at 16.4 ms turn p50 with p95 and p99 close to those of the other
+passes, which reads as that pass being paced at the display's 60 Hz and not as slower frames; it is in the numbers
+above. Results: `scratch-macfirst/measure-186/r3-{before,after}-p{1,2,3}`.
