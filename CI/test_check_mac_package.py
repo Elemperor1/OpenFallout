@@ -81,8 +81,11 @@ class StandIn:
         write_plist(nested, CFBundleExecutable="OpenFallout Engine",
                     CFBundleIdentifier="org.openfallout.openfallout.engine", CFBundlePackageType="APPL",
                     **(GAME_KEYS if engine_keys is None else engine_keys))
-        # inside out, as SignMacApplications does
-        for item in (openal, lua, contents / "MacOS/openfallout-launcher"):
+        # inside out, as SignMacApplications does. The launcher is the bundle's own program: the bundle's signature
+        # seals it, after everything in the bundle is signed. Signing it on its own before that signs the bundle, which
+        # codesign refuses while code inside is unsigned (on Apple Silicon the linker has signed every program already,
+        # on an Intel Mac nothing is signed until here)
+        for item in (openal, lua):
             sign(item)
         if hardened is None:
             sign(engine)
