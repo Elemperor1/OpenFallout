@@ -8,9 +8,18 @@ namespace MyGUI
 
 namespace LuaUi
 {
-    /// `x`, `y`: the precise wheel delta; `notchesX`, `notchesY`: the whole notches it makes up, counted from the
-    /// precise deltas (a trackpad sends many small ones)
-    void dispatchMouseWheel(MyGUI::Widget* widget, float left, float top, float x, float y, int notchesX, int notchesY);
+    /// A turn of the wheel over the interface, as a Lua `MouseWheelEvent` gets it
+    struct MouseWheel
+    {
+        float mLeft = 0.f; // where the cursor is
+        float mTop = 0.f;
+        float mDeltaX = 0.f; // the precise wheel delta
+        float mDeltaY = 0.f;
+        int mNotchesX = 0; // the whole notches it makes up (SDLUtil::WheelNotches)
+        int mNotchesY = 0;
+    };
+
+    void dispatchMouseWheel(MyGUI::Widget* widget, const MouseWheel& wheel);
 }
 
 #endif

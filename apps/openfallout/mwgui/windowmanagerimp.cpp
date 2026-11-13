@@ -217,7 +217,7 @@ namespace OFGui
         int dw, dh;
         SDL_GL_GetDrawableSize(window, &dw, &dh);
 
-        mScalingFactor = SDLUtil::interfaceScale(Settings::gui().mScalingFactor, w, dw);
+        mScalingFactor = SDLUtil::interfaceScale(Settings::gui().mScalingFactor, w, dw, SDLUtil::thisDesktopPlatform());
         constexpr VFS::Path::NormalizedView resourcePath("mygui");
         mGuiPlatform = std::make_unique<MyGUIPlatform::Platform>(viewer, guiRoot, resourceSystem->getImageManager(),
             resourceSystem->getVFS(), mScalingFactor, resourcePath, logpath / "MyGUI.log");
@@ -1359,15 +1359,16 @@ namespace OFGui
 
         Settings::Manager::resetPendingChanges(filter);
 
-        // The interface is sized in points: on a display of another scaling (the window moved) it keeps its size
+        // On the Mac the interface is sized in points: on a display of another scaling (the window moved) it keeps its
+        // size. Elsewhere it keeps the scale it started with.
         int pointsW, pointsH;
         SDL_GetWindowSize(mSdlWindow, &pointsW, &pointsH);
-        const float scalingFactor = SDLUtil::interfaceScale(Settings::gui().mScalingFactor, pointsW, x);
-        if (scalingFactor != mScalingFactor)
+        if (const std::optional<float> scalingFactor = SDLUtil::interfaceScaleAfterResize(
+                Settings::gui().mScalingFactor, pointsW, x, mScalingFactor, SDLUtil::thisDesktopPlatform()))
         {
-            Log(Debug::Info) << "Interface scale " << mScalingFactor << " -> " << scalingFactor << " (" << x
+            Log(Debug::Info) << "Interface scale " << mScalingFactor << " -> " << *scalingFactor << " (" << x
                              << " pixels across " << pointsW << " points)";
-            mScalingFactor = scalingFactor;
+            mScalingFactor = *scalingFactor;
             mGuiPlatform->getRenderManagerPtr()->setScalingFactor(mScalingFactor);
         }
 

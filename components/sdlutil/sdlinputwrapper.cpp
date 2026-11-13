@@ -28,7 +28,7 @@ namespace SDLUtil
         , mMouseRelative(false)
         , mFirstMouseMove(true)
         , mMouseZ(0)
-        , mWheelY(120.0) // MyGUI's units: 120 to a notch
+        , mWheelY(120.0, thisDesktopPlatform()) // MyGUI's units: 120 to a notch
         , mWindowHasFocus(true)
         , mMouseInWindow(true)
         , mHeadless(false)
@@ -53,8 +53,8 @@ namespace SDLUtil
         SDL_GetWindowSize(mSDLWindow, &w, &h);
         int dw, dh;
         SDL_GL_GetDrawableSize(mSDLWindow, &dw, &dh);
-        mScaleX = pixelsPerPoint(w, dw);
-        mScaleY = pixelsPerPoint(h, dh);
+        mScaleX = pixelsPerPoint(w, dw, thisDesktopPlatform());
+        mScaleY = pixelsPerPoint(h, dh, thisDesktopPlatform());
     }
 
     void InputWrapper::capture(bool windowEventsOnly)
@@ -268,15 +268,17 @@ namespace SDLUtil
                 // so we ignore window moved events (improves window movement performance)
                 break;
             case SDL_WINDOWEVENT_SIZE_CHANGED:
-                handleDrawableResize();
-                // Entering or leaving full screen changes the size; the capture depends on full screen
-                updateMouseSettings();
-                break;
-
             case SDL_WINDOWEVENT_DISPLAY_CHANGED:
-                // Moved to another display, which may have another scaling: the drawable has another size in pixels
-                handleDrawableResize();
+            {
+                // On the Mac a display change (another display, maybe another scaling) resizes the drawable too, and
+                // entering or leaving full screen changes the size while the capture depends on full screen
+                const WindowEventResponse response = respondToWindowEvent(evt.window.event, thisDesktopPlatform());
+                if (response.resizeDrawable)
+                    handleDrawableResize(response.scaleBeforeListener);
+                if (response.updateMouseCapture)
+                    updateMouseSettings();
                 break;
+            }
 
             case SDL_WINDOWEVENT_RESIZED:
                 // This should also fire SIZE_CHANGED, so no need to handle
@@ -305,7 +307,7 @@ namespace SDLUtil
         }
     }
 
-    void InputWrapper::handleDrawableResize()
+    void InputWrapper::handleDrawableResize(bool scaleBeforeListener)
     {
         int w, h;
         SDL_GL_GetDrawableSize(mSDLWindow, &w, &h);
@@ -320,10 +322,14 @@ namespace SDLUtil
 
         mViewer->getEventQueue()->windowResize(x, y, w, h);
 
-        _setWindowScale();
+        if (scaleBeforeListener)
+            _setWindowScale();
 
         if (mWindowListener)
             mWindowListener->windowResized(w, h);
+
+        if (!scaleBeforeListener)
+            _setWindowScale();
     }
 
     bool InputWrapper::isModifierHeld(int mod)
@@ -376,7 +382,7 @@ namespace SDLUtil
         request.hasFocus = mWindowHasFocus;
         request.mouseInWindow = mMouseInWindow;
         request.fullScreen = (SDL_GetWindowFlags(mSDLWindow) & SDL_WINDOW_FULLSCREEN) != 0;
-        const MouseCapture capture = decideMouseCapture(request);
+        const MouseCapture capture = decideMouseCapture(request, thisDesktopPlatform());
 
         mGrabPointer = capture.grab;
         SDL_SetWindowGrab(mSDLWindow, capture.windowGrab ? SDL_TRUE : SDL_FALSE);

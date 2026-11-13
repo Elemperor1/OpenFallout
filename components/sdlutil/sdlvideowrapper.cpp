@@ -92,22 +92,24 @@ namespace SDLUtil
         int dw, dh;
         SDL_GL_GetDrawableSize(mWindow, &dw, &dh);
         // The resolution setting is in pixels, SDL's window sizes are in points
-        const float scaleX = pixelsPerPoint(w, dw);
-        const float scaleY = pixelsPerPoint(h, dh);
+        const DesktopPlatform platform = thisDesktopPlatform();
+        const float scaleX = pixelsPerPoint(w, dw, platform);
+        const float scaleY = pixelsPerPoint(h, dh, platform);
 
         const Uint32 fullScreen = fullScreenFlag(windowMode, followsMacDesktopConventions());
         if (fullScreen != 0)
         {
             SDL_DisplayMode mode;
             SDL_GetWindowDisplayMode(mWindow, &mode);
-            mode.w = pixelsToPoints(width, scaleX);
-            mode.h = pixelsToPoints(height, scaleY);
+            mode.w = pixelsToPoints(width, scaleX, platform);
+            mode.h = pixelsToPoints(height, scaleY, platform);
             SDL_SetWindowDisplayMode(mWindow, &mode);
             SDL_SetWindowFullscreen(mWindow, fullScreen);
         }
         else
         {
-            SDL_SetWindowSize(mWindow, pixelsToPoints(width, scaleX), pixelsToPoints(height, scaleY));
+            SDL_SetWindowSize(
+                mWindow, pixelsToPoints(width, scaleX, platform), pixelsToPoints(height, scaleY, platform));
             SDL_SetWindowBordered(mWindow, windowBorder ? SDL_TRUE : SDL_FALSE);
 
             centerWindow();

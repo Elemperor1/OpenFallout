@@ -57,8 +57,8 @@ namespace OFInput
         float mGuiCursorY;
         int mMouseWheel;
         // Whole notches of the wheel for the interface, from the precise deltas (a trackpad sends many small ones)
-        SDLUtil::WheelAccumulator mGuiWheelNotchesX{ 1.0 };
-        SDLUtil::WheelAccumulator mGuiWheelNotchesY{ 1.0 };
+        SDLUtil::WheelNotches mGuiWheelNotchesX{ SDLUtil::thisDesktopPlatform() };
+        SDLUtil::WheelNotches mGuiWheelNotchesY{ SDLUtil::thisDesktopPlatform() };
         bool mMouseLookEnabled;
         bool mGuiCursorEnabled;
         OFBase::CursorMode mCursorMode;

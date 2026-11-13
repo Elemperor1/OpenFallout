@@ -55,20 +55,38 @@ namespace SDLUtil
         return DesktopShortcut::None;
     }
 
-    WheelAccumulator::WheelAccumulator(double unitsPerNotch)
+    WheelAccumulator::WheelAccumulator(double unitsPerNotch, DesktopPlatform platform)
         : mUnitsPerNotch(unitsPerNotch)
+        , mPlatform(platform)
     {
     }
 
     int WheelAccumulator::add(float precise, Uint32 /*direction*/)
     {
         const double units = static_cast<double>(precise) * mUnitsPerNotch;
-        if ((units > 0 && mPending < 0) || (units < 0 && mPending > 0))
+        if (mPlatform == DesktopPlatform::Mac && ((units > 0 && mPending < 0) || (units < 0 && mPending > 0)))
             mPending = 0.0;
         mPending += units;
         const int whole = static_cast<int>(mPending);
         mPending -= whole;
         return whole;
+    }
+
+    WheelNotches::WheelNotches(DesktopPlatform platform)
+        : mPlatform(platform)
+        , mAccumulator(1.0, platform)
+    {
+    }
+
+    int WheelNotches::add(float precise, Uint32 direction)
+    {
+        if (mPlatform == DesktopPlatform::Mac)
+            return mAccumulator.add(precise, direction);
+        if (precise > 0.f)
+            return static_cast<int>(std::ceil(precise));
+        if (precise < 0.f)
+            return static_cast<int>(std::floor(precise));
+        return 0;
     }
 
     DesktopShortcutFilter::DesktopShortcutFilter(bool enabled)
@@ -92,8 +110,15 @@ namespace SDLUtil
         return mSwallowed.erase(key) > 0;
     }
 
-    float pixelsPerPoint(int windowPoints, int drawablePixels)
+    float pixelsPerPoint(int windowPoints, int drawablePixels, DesktopPlatform platform)
     {
+        if (platform == DesktopPlatform::Other)
+        {
+            // the integer division of before; only the division by zero of a window with no size is left out
+            if (windowPoints <= 0)
+                return 1.f;
+            return static_cast<float>(drawablePixels / windowPoints);
+        }
         if (windowPoints <= 0 || drawablePixels <= 0)
             return 1.f;
         return static_cast<float>(drawablePixels) / static_cast<float>(windowPoints);
@@ -104,21 +129,59 @@ namespace SDLUtil
         return static_cast<int>(std::lround(points * pixelsPerPoint));
     }
 
-    int pixelsToPoints(int pixels, float pixelsPerPoint)
+    int pixelsToPoints(int pixels, float pixelsPerPoint, DesktopPlatform platform)
     {
+        if (platform == DesktopPlatform::Other)
+        {
+            const int whole = static_cast<int>(pixelsPerPoint);
+            return whole > 0 ? pixels / whole : pixels;
+        }
         if (pixelsPerPoint <= 0.f)
             return pixels;
         return static_cast<int>(std::lround(pixels / pixelsPerPoint));
     }
 
-    float interfaceScale(float userScale, int windowPoints, int drawablePixels)
+    float interfaceScale(float userScale, int windowPoints, int drawablePixels, DesktopPlatform platform)
     {
-        return userScale * pixelsPerPoint(windowPoints, drawablePixels);
+        return userScale * pixelsPerPoint(windowPoints, drawablePixels, platform);
     }
 
-    MouseCapture decideMouseCapture(const MouseCaptureRequest& request)
+    std::optional<float> interfaceScaleAfterResize(
+        float userScale, int windowPoints, int drawablePixels, float current, DesktopPlatform platform)
     {
-        const bool pointerHere = request.hasFocus && (request.mouseInWindow || request.fullScreen);
+        if (platform != DesktopPlatform::Mac)
+            return std::nullopt;
+        const float scale = interfaceScale(userScale, windowPoints, drawablePixels, platform);
+        if (scale == current)
+            return std::nullopt;
+        return scale;
+    }
+
+    WindowEventResponse respondToWindowEvent(Uint8 windowEvent, DesktopPlatform platform)
+    {
+        const bool mac = platform == DesktopPlatform::Mac;
+        WindowEventResponse response;
+        switch (windowEvent)
+        {
+            case SDL_WINDOWEVENT_SIZE_CHANGED:
+                response.resizeDrawable = true;
+                response.scaleBeforeListener = mac;
+                response.updateMouseCapture = mac;
+                break;
+            case SDL_WINDOWEVENT_DISPLAY_CHANGED:
+                response.resizeDrawable = mac;
+                response.scaleBeforeListener = mac;
+                break;
+            default:
+                break;
+        }
+        return response;
+    }
+
+    MouseCapture decideMouseCapture(const MouseCaptureRequest& request, DesktopPlatform platform)
+    {
+        const bool fullScreenHasThePointer = platform == DesktopPlatform::Mac && request.fullScreen;
+        const bool pointerHere = request.hasFocus && (request.mouseInWindow || fullScreenHasThePointer);
         MouseCapture capture;
         capture.grab = request.wantGrab && pointerHere;
         capture.windowGrab = capture.grab && request.allowGrab;
@@ -141,13 +204,18 @@ namespace SDLUtil
         return 0;
     }
 
-    bool followsMacDesktopConventions()
+    DesktopPlatform thisDesktopPlatform()
     {
 #ifdef __APPLE__
-        return true;
+        return DesktopPlatform::Mac;
 #else
-        return false;
+        return DesktopPlatform::Other;
 #endif
+    }
+
+    bool followsMacDesktopConventions()
+    {
+        return thisDesktopPlatform() == DesktopPlatform::Mac;
     }
 
     void applyDesktopHints()

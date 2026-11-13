@@ -46,7 +46,7 @@ namespace SDLUtil
 
     private:
         void handleWindowEvent(const SDL_Event& evt);
-        void handleDrawableResize();
+        void handleDrawableResize(bool scaleBeforeListener);
 
         bool _handleWarpMotion(const SDL_MouseMotionEvent& evt);
         void _wrapMousePointer(const SDL_MouseMotionEvent& evt);

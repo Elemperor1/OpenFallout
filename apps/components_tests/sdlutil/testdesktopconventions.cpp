@@ -6,6 +6,9 @@ namespace
 {
     using namespace SDLUtil;
 
+    constexpr DesktopPlatform mac = DesktopPlatform::Mac;
+    constexpr DesktopPlatform other = DesktopPlatform::Other;
+
     TEST(SDLUtilDesktopShortcutTest, commandQIsQuit)
     {
         EXPECT_EQ(desktopShortcut(SDLK_q, KMOD_LGUI), DesktopShortcut::Quit);
@@ -49,14 +52,14 @@ namespace
 
     TEST(SDLUtilWheelAccumulatorTest, aMouseWheelNotchIsOneWholeStep)
     {
-        WheelAccumulator wheel(myGuiUnitsPerNotch);
+        WheelAccumulator wheel(myGuiUnitsPerNotch, mac);
         EXPECT_EQ(wheel.add(1.f, SDL_MOUSEWHEEL_NORMAL), 120);
         EXPECT_EQ(wheel.add(-1.f, SDL_MOUSEWHEEL_NORMAL), -120);
     }
 
     TEST(SDLUtilWheelAccumulatorTest, trackpadFractionsMoveOnEveryEventAndAddUpToANotch)
     {
-        WheelAccumulator wheel(myGuiUnitsPerNotch);
+        WheelAccumulator wheel(myGuiUnitsPerNotch, mac);
         int total = 0;
         for (int i = 0; i < 4; ++i)
         {
@@ -71,14 +74,14 @@ namespace
     {
         // With natural scrolling on, SDL marks the event flipped but its values already go the way the system setting
         // says; inverting them again would undo the setting
-        WheelAccumulator wheel(myGuiUnitsPerNotch);
+        WheelAccumulator wheel(myGuiUnitsPerNotch, mac);
         EXPECT_EQ(wheel.add(-1.f, SDL_MOUSEWHEEL_FLIPPED), -120);
         EXPECT_EQ(wheel.add(1.f, SDL_MOUSEWHEEL_FLIPPED), 120);
     }
 
     TEST(SDLUtilWheelAccumulatorTest, wholeNotchesFromSmallTrackpadDeltas)
     {
-        WheelAccumulator notches(1.0);
+        WheelAccumulator notches(1.0, mac);
         EXPECT_EQ(notches.add(0.3f, SDL_MOUSEWHEEL_NORMAL), 0);
         EXPECT_EQ(notches.add(0.3f, SDL_MOUSEWHEEL_NORMAL), 0);
         EXPECT_EQ(notches.add(0.3f, SDL_MOUSEWHEEL_NORMAL), 0);
@@ -88,7 +91,7 @@ namespace
 
     TEST(SDLUtilWheelAccumulatorTest, reversingDropsTheUnfinishedPartOfTheOtherWay)
     {
-        WheelAccumulator notches(1.0);
+        WheelAccumulator notches(1.0, mac);
         EXPECT_EQ(notches.add(0.9f, SDL_MOUSEWHEEL_NORMAL), 0);
         EXPECT_EQ(notches.add(-0.5f, SDL_MOUSEWHEEL_NORMAL), 0);
         EXPECT_EQ(notches.add(-0.5f, SDL_MOUSEWHEEL_NORMAL), -1);
@@ -96,37 +99,37 @@ namespace
 
     TEST(SDLUtilPixelsPerPointTest, retinaWindowHasTwoPixelsToAPoint)
     {
-        EXPECT_FLOAT_EQ(pixelsPerPoint(1440, 2880), 2.f);
-        EXPECT_FLOAT_EQ(pixelsPerPoint(1440, 1440), 1.f);
+        EXPECT_FLOAT_EQ(pixelsPerPoint(1440, 2880, mac), 2.f);
+        EXPECT_FLOAT_EQ(pixelsPerPoint(1440, 1440, mac), 1.f);
     }
 
     TEST(SDLUtilPixelsPerPointTest, fractionalScalingIsKept)
     {
-        EXPECT_FLOAT_EQ(pixelsPerPoint(1000, 1500), 1.5f);
+        EXPECT_FLOAT_EQ(pixelsPerPoint(1000, 1500, mac), 1.5f);
     }
 
     TEST(SDLUtilPixelsPerPointTest, aWindowWithNoSizeCountsAsOne)
     {
         // a minimised or hidden window can report 0 x 0
-        EXPECT_FLOAT_EQ(pixelsPerPoint(0, 0), 1.f);
-        EXPECT_FLOAT_EQ(pixelsPerPoint(0, 2880), 1.f);
-        EXPECT_FLOAT_EQ(pixelsPerPoint(1440, 0), 1.f);
+        EXPECT_FLOAT_EQ(pixelsPerPoint(0, 0, mac), 1.f);
+        EXPECT_FLOAT_EQ(pixelsPerPoint(0, 2880, mac), 1.f);
+        EXPECT_FLOAT_EQ(pixelsPerPoint(1440, 0, mac), 1.f);
     }
 
     TEST(SDLUtilPixelsPerPointTest, pointsAndPixelsConvertBothWays)
     {
         EXPECT_EQ(pointsToPixels(100, 2.f), 200);
         EXPECT_EQ(pointsToPixels(101, 1.5f), 152);
-        EXPECT_EQ(pixelsToPoints(2880, 2.f), 1440);
-        EXPECT_EQ(pixelsToPoints(1920, 1.5f), 1280);
+        EXPECT_EQ(pixelsToPoints(2880, 2.f, mac), 1440);
+        EXPECT_EQ(pixelsToPoints(1920, 1.5f, mac), 1280);
     }
 
     TEST(SDLUtilInterfaceScaleTest, interfaceIsSizedInPointsTimesTheUserScale)
     {
         // The same window in points gives the same interface in points on a 1x and on a 2x display
-        EXPECT_FLOAT_EQ(interfaceScale(1.f, 1440, 2880), 2.f);
-        EXPECT_FLOAT_EQ(interfaceScale(1.f, 1440, 1440), 1.f);
-        EXPECT_FLOAT_EQ(interfaceScale(1.25f, 1440, 2880), 2.5f);
+        EXPECT_FLOAT_EQ(interfaceScale(1.f, 1440, 2880, mac), 2.f);
+        EXPECT_FLOAT_EQ(interfaceScale(1.f, 1440, 1440, mac), 1.f);
+        EXPECT_FLOAT_EQ(interfaceScale(1.25f, 1440, 2880, mac), 2.5f);
     }
 
     MouseCaptureRequest playing()
@@ -144,7 +147,7 @@ namespace
 
     TEST(SDLUtilMouseCaptureTest, playingWithFocusCapturesTheMouse)
     {
-        const MouseCapture capture = decideMouseCapture(playing());
+        const MouseCapture capture = decideMouseCapture(playing(), mac);
         EXPECT_TRUE(capture.grab);
         EXPECT_TRUE(capture.windowGrab);
         EXPECT_TRUE(capture.relative);
@@ -155,7 +158,7 @@ namespace
     {
         MouseCaptureRequest request = playing();
         request.hasFocus = false;
-        const MouseCapture capture = decideMouseCapture(request);
+        const MouseCapture capture = decideMouseCapture(request, mac);
         EXPECT_FALSE(capture.grab);
         EXPECT_FALSE(capture.windowGrab);
         EXPECT_FALSE(capture.relative);
@@ -166,7 +169,7 @@ namespace
     {
         MouseCaptureRequest request = playing();
         request.mouseInWindow = false;
-        const MouseCapture capture = decideMouseCapture(request);
+        const MouseCapture capture = decideMouseCapture(request, mac);
         EXPECT_FALSE(capture.grab);
         EXPECT_FALSE(capture.relative);
     }
@@ -177,7 +180,7 @@ namespace
         MouseCaptureRequest request = playing();
         request.fullScreen = true;
         request.mouseInWindow = false;
-        const MouseCapture capture = decideMouseCapture(request);
+        const MouseCapture capture = decideMouseCapture(request, mac);
         EXPECT_TRUE(capture.grab);
         EXPECT_TRUE(capture.relative);
     }
@@ -186,7 +189,7 @@ namespace
     {
         MouseCaptureRequest request = playing();
         request.allowGrab = false;
-        const MouseCapture capture = decideMouseCapture(request);
+        const MouseCapture capture = decideMouseCapture(request, mac);
         EXPECT_TRUE(capture.grab);
         EXPECT_FALSE(capture.windowGrab);
         EXPECT_TRUE(capture.relative);
@@ -197,7 +200,7 @@ namespace
         MouseCaptureRequest request = playing();
         request.wantRelative = false;
         request.wantCursorVisible = true;
-        const MouseCapture capture = decideMouseCapture(request);
+        const MouseCapture capture = decideMouseCapture(request, mac);
         EXPECT_FALSE(capture.relative);
         EXPECT_TRUE(capture.cursorVisible);
     }
@@ -256,5 +259,144 @@ namespace
         DesktopShortcutFilter filter(false);
         EXPECT_FALSE(filter.swallowKeyDown(SDLK_q, KMOD_LGUI, false));
         EXPECT_FALSE(filter.swallowKeyUp(SDLK_q));
+    }
+
+    // Off macOS (Windows, Linux) every rule below is what the engine did before the desktop conventions
+
+    TEST(SDLUtilOtherDesktopTest, wheelLeftoverIsKeptWhenTurningTheOtherWay)
+    {
+        // 1/64 of a notch is 1.875 units: 1 now, 0.875 left over
+        WheelAccumulator wheel(myGuiUnitsPerNotch, other);
+        EXPECT_EQ(wheel.add(0.015625f, SDL_MOUSEWHEEL_NORMAL), 1);
+        EXPECT_EQ(wheel.add(-0.5f, SDL_MOUSEWHEEL_NORMAL), -59);
+        EXPECT_EQ(wheel.add(0.25f, SDL_MOUSEWHEEL_NORMAL), 29);
+
+        WheelAccumulator macWheel(myGuiUnitsPerNotch, mac);
+        EXPECT_EQ(macWheel.add(0.015625f, SDL_MOUSEWHEEL_NORMAL), 1);
+        EXPECT_EQ(macWheel.add(-0.5f, SDL_MOUSEWHEEL_NORMAL), -60);
+        EXPECT_EQ(macWheel.add(0.25f, SDL_MOUSEWHEEL_NORMAL), 30);
+    }
+
+    TEST(SDLUtilOtherDesktopTest, wheelFractionsStillAddUp)
+    {
+        WheelAccumulator wheel(myGuiUnitsPerNotch, other);
+        EXPECT_EQ(wheel.add(0.004f, SDL_MOUSEWHEEL_NORMAL), 0);
+        EXPECT_EQ(wheel.add(0.005f, SDL_MOUSEWHEEL_NORMAL), 1);
+        // 0.08 of a unit is left over and kept
+        EXPECT_EQ(wheel.add(-1.f, SDL_MOUSEWHEEL_FLIPPED), -119);
+    }
+
+    TEST(SDLUtilWheelNotchesTest, onTheMacSmallDeltasAddUpToWholeNotches)
+    {
+        WheelNotches notches(mac);
+        EXPECT_EQ(notches.add(0.3f, SDL_MOUSEWHEEL_NORMAL), 0);
+        EXPECT_EQ(notches.add(0.3f, SDL_MOUSEWHEEL_NORMAL), 0);
+        EXPECT_EQ(notches.add(0.5f, SDL_MOUSEWHEEL_NORMAL), 1);
+        EXPECT_EQ(notches.add(-0.6f, SDL_MOUSEWHEEL_NORMAL), 0);
+        EXPECT_EQ(notches.add(-0.6f, SDL_MOUSEWHEEL_NORMAL), -1);
+    }
+
+    TEST(SDLUtilWheelNotchesTest, elsewhereEveryEventIsANotchInItsDirection)
+    {
+        // as before: each wheel event moved a Fallout menu by one row, whatever its size
+        WheelNotches notches(other);
+        EXPECT_EQ(notches.add(0.3f, SDL_MOUSEWHEEL_NORMAL), 1);
+        EXPECT_EQ(notches.add(0.3f, SDL_MOUSEWHEEL_NORMAL), 1);
+        EXPECT_EQ(notches.add(-0.1f, SDL_MOUSEWHEEL_NORMAL), -1);
+        EXPECT_EQ(notches.add(1.f, SDL_MOUSEWHEEL_NORMAL), 1);
+        EXPECT_EQ(notches.add(-2.f, SDL_MOUSEWHEEL_NORMAL), -2);
+        EXPECT_EQ(notches.add(0.f, SDL_MOUSEWHEEL_NORMAL), 0);
+    }
+
+    TEST(SDLUtilOtherDesktopTest, pixelsPerPointIsAWholeNumber)
+    {
+        EXPECT_FLOAT_EQ(pixelsPerPoint(1440, 2880, other), 2.f);
+        EXPECT_FLOAT_EQ(pixelsPerPoint(1000, 1500, other), 1.f);
+        EXPECT_FLOAT_EQ(pixelsPerPoint(1920, 1920, other), 1.f);
+    }
+
+    TEST(SDLUtilOtherDesktopTest, pixelsToPointsDividesByTheWholeNumber)
+    {
+        EXPECT_EQ(pixelsToPoints(2880, 2.f, other), 1440);
+        EXPECT_EQ(pixelsToPoints(1921, 2.f, other), 960);
+        EXPECT_EQ(pixelsToPoints(1921, 1.f, other), 1921);
+    }
+
+    TEST(SDLUtilOtherDesktopTest, interfaceScaleUsesTheWholeNumber)
+    {
+        EXPECT_FLOAT_EQ(interfaceScale(1.25f, 1440, 2880, other), 2.5f);
+        EXPECT_FLOAT_EQ(interfaceScale(1.25f, 1000, 1500, other), 1.25f);
+    }
+
+    TEST(SDLUtilInterfaceRescaleTest, onTheMacAResizeToAnotherScalingRescales)
+    {
+        EXPECT_EQ(interfaceScaleAfterResize(1.f, 1440, 1440, 2.f, mac), std::optional<float>(1.f));
+        EXPECT_EQ(interfaceScaleAfterResize(1.f, 1440, 2880, 2.f, mac), std::nullopt);
+    }
+
+    TEST(SDLUtilInterfaceRescaleTest, elsewhereTheInterfaceKeepsItsStartScale)
+    {
+        EXPECT_EQ(interfaceScaleAfterResize(1.f, 1440, 1440, 2.f, other), std::nullopt);
+    }
+
+    TEST(SDLUtilOtherDesktopTest, fullScreenDoesNotCaptureAPointerOutsideTheWindow)
+    {
+        MouseCaptureRequest request = playing();
+        request.fullScreen = true;
+        request.mouseInWindow = false;
+        const MouseCapture capture = decideMouseCapture(request, other);
+        EXPECT_FALSE(capture.grab);
+        EXPECT_FALSE(capture.windowGrab);
+        EXPECT_FALSE(capture.relative);
+        EXPECT_FALSE(capture.cursorVisible);
+    }
+
+    TEST(SDLUtilOtherDesktopTest, captureIsOtherwiseTheSame)
+    {
+        EXPECT_TRUE(decideMouseCapture(playing(), other).grab);
+        EXPECT_TRUE(decideMouseCapture(playing(), other).relative);
+        MouseCaptureRequest request = playing();
+        request.hasFocus = false;
+        EXPECT_TRUE(decideMouseCapture(request, other).cursorVisible);
+        request = playing();
+        request.allowGrab = false;
+        EXPECT_FALSE(decideMouseCapture(request, other).windowGrab);
+    }
+
+    TEST(SDLUtilWindowEventTest, onTheMacASizeChangeRescalesFirstAndUpdatesTheCapture)
+    {
+        const WindowEventResponse response = respondToWindowEvent(SDL_WINDOWEVENT_SIZE_CHANGED, mac);
+        EXPECT_TRUE(response.resizeDrawable);
+        EXPECT_TRUE(response.scaleBeforeListener);
+        EXPECT_TRUE(response.updateMouseCapture);
+    }
+
+    TEST(SDLUtilWindowEventTest, onTheMacADisplayChangeResizesTheDrawable)
+    {
+        const WindowEventResponse response = respondToWindowEvent(SDL_WINDOWEVENT_DISPLAY_CHANGED, mac);
+        EXPECT_TRUE(response.resizeDrawable);
+        EXPECT_TRUE(response.scaleBeforeListener);
+        EXPECT_FALSE(response.updateMouseCapture);
+    }
+
+    TEST(SDLUtilWindowEventTest, elsewhereASizeChangeOnlyResizesAndADisplayChangeDoesNothing)
+    {
+        const WindowEventResponse sizeChanged = respondToWindowEvent(SDL_WINDOWEVENT_SIZE_CHANGED, other);
+        EXPECT_TRUE(sizeChanged.resizeDrawable);
+        EXPECT_FALSE(sizeChanged.scaleBeforeListener);
+        EXPECT_FALSE(sizeChanged.updateMouseCapture);
+        const WindowEventResponse displayChanged = respondToWindowEvent(SDL_WINDOWEVENT_DISPLAY_CHANGED, other);
+        EXPECT_FALSE(displayChanged.resizeDrawable);
+        EXPECT_FALSE(displayChanged.updateMouseCapture);
+    }
+
+    TEST(SDLUtilDesktopPlatformTest, theBridgeNamesThisPlatform)
+    {
+#ifdef __APPLE__
+        EXPECT_EQ(thisDesktopPlatform(), mac);
+#else
+        EXPECT_EQ(thisDesktopPlatform(), other);
+#endif
+        EXPECT_EQ(followsMacDesktopConventions(), thisDesktopPlatform() == mac);
     }
 }
