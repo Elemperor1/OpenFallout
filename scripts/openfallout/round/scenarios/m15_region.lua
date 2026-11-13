@@ -1,14 +1,15 @@
 -- M15 round 15E: the music of a region of New Vegas where no audio marker has any. Nobody can hear a hidden round: what is checked
 -- is what the engine logs ("Music: ..."), with the master volume at 0. The player stands on open ground that no marker reaches (the
 -- sound region of its acoustic space has an incidental media set whose stingers are heard while nothing else plays), and then two
--- Powder Gangers fight the player there (the battle sets of the region play, not the default battle music).
+-- Powder Gangers fight the player there (the battle sets of the region play, not the default battle music); last the player goes to
+-- the marker of a controller whose looping option is "random", whose tracks are started without looping.
 local M = 70
 local NV = 'FalloutNV.esm'
 local PLACE = { x = -44000, y = 4000, z = 6000 }   -- no audio marker near (8500 units to the nearest edge); dropped to the ground
 local SITE_X = { x = -21860, y = -38900, z = 8100, gun1 = 0x1629a4, gun2 = 0x1629a3 }
 local MOJAVE_CELLS = { 0x0daeb9, 0x0daeb8, 0x0daebb }
 
-return { limit = 400, delay = 4, run = function(r)
+return { limit = 480, delay = 4, run = function(r)
     local player = r.player()
     local function phase(name) r.log('PHASE ' .. name) end
     local function lookup(id)
@@ -54,5 +55,11 @@ return { limit = 400, delay = 4, run = function(r)
     r.drawn(false)
     r.teleport{ pos = { SITE_X.x, SITE_X.y, SITE_X.z }, yaw = 0, onGround = true, label = 'away from the fight' }
     r.wait(40)
+    phase('D a controller that plays its set once (the crashed B-29: five location sets, the looping option "random")')
+    r.teleport{ pos = { 75775, 59369, 1685 }, worldspace = mojave, yaw = 0, onGround = true, label = 'crashed B-29' }
+    r.wait(10)
+    r.settle(3, 30)
+    r.eye('crashed B-29')
+    r.wait(30)
     r.eye('end')
 end }
