@@ -35,8 +35,9 @@ PATH is OpenFallout-*.dmg or OpenFallout.app. The steps run in this order and ea
 
 Local mode accepts an ad hoc signature and skips the gatekeeper step; release mode requires the Developer ID signature,
 Gatekeeper's acceptance and the stapled tickets (CI runs it on the notarized build, CI/macos/release_signing.py).
-`--notes FILE` appends one release-notes line: the package, the result, the mode, the smoke result and the macOS version
-and chip of the machine that ran the check, then which Macs the package is for (chip from the file name, notarized in
+`--notes FILE` appends one release-notes line: the package, the result, the mode, the smoke result, the OpenGL renderer
+the smoke run reported, the disk image's SHA-256, and the macOS version and chip of the machine that ran the check,
+then which Macs the package is for (chip from the file name, notarized in
 release mode, the engine's minimum macOS). `--smoke auto` runs the smoke step but reports it as
 skipped when the machine gives the engine no OpenGL context, or only Apple's software renderer and the run does not
 finish there (a hosted CI runner has no GPU); run it with
@@ -46,6 +47,7 @@ The exit status is 0 when no step failed.
 """
 import argparse
 import contextlib
+import hashlib
 import os
 from pathlib import Path
 import platform
@@ -441,6 +443,7 @@ JIT_LINE = re.compile(r"LuaJIT compiler: (on|off) \(([^)]*)\); hot loop: (\w+) c
 QUIT = "Quitting peacefully."
 NO_GL = re.compile(r"Failed to create SDL window|Failed to create GraphicsContext|GL context|OpenGL context", re.IGNORECASE)
 SOFTWARE_GL = "OpenGL Renderer: Apple Software Renderer"
+RENDERER = re.compile(r"OpenGL Renderer: (.*)$", re.MULTILINE)
 CI_HINT = ("run `CI/check_mac_package.py <package> --smoke run` on a Mac with a display before the release is tagged")
 
 
@@ -510,6 +513,10 @@ def check_smoke(app, options):
         if launched.returncode != 0:
             helper_error = f"the launch helper (open) failed: {launched.stderr.strip()}"
     text = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+    renderer = RENDERER.search(text)
+    if renderer:
+        # for the notes line, whose fields the renderer's name must not break
+        RENDERER_SEEN.append(" ".join(re.sub(r"[;()]", " ", renderer.group(1)).split()) or "not reported")
     compiler, problems, state, no_gl = smoke_verdict(text, options.expect_jit)
     print(f"smoke: LuaJIT compiler: {state or 'not reported'} (log: {log})")
     if no_gl and options.smoke == "auto":
@@ -549,6 +556,7 @@ def report_smoke(app, options):
 # -------------------------------------------------------------------------------------------------------------- main
 
 RESULTS = {}  # step name -> PASS, FAIL or SKIP, for the notes line
+RENDERER_SEEN = []  # the OpenGL renderer the smoke run's engine reported, for the notes line
 
 
 def report(name, step, *args):
@@ -636,11 +644,25 @@ def supported_macs(package, mode, minimum):
     return f"For {kind}, {signed}{needs} (Game Mode: macOS 26 or later)."
 
 
+def sha256_of(package):
+    """The SHA-256 of a disk image (what GitHub reports as the release asset's digest), or 'none' for an app."""
+    if not package.is_file():
+        return "none"
+    digest = hashlib.sha256()
+    with package.open("rb") as file:
+        for chunk in iter(lambda: file.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def write_notes(path, package, mode, ok, minimum=None):
-    """Appends the release-notes line for this package: what was checked, with what result, on which Mac, and which
-    Macs the package is for."""
+    """Appends the release-notes line for this package: what was checked, with what result, the renderer the smoke
+    run reported and the image's SHA-256 (CI/harness_release.py binds the passes to the uploaded image and to a GPU),
+    on which Mac, and which Macs the package is for."""
+    renderer = RENDERER_SEEN[-1] if RENDERER_SEEN else "not reported"
     line = (f"- {package.name}: packaged-app check {'PASS' if ok else 'FAIL'} ({mode} mode; smoke "
-            f"{RESULTS.get('smoke', 'not run')}) on {tested_on()}. {supported_macs(package, mode, minimum)}")
+            f"{RESULTS.get('smoke', 'not run')}; renderer {renderer}; sha256 {sha256_of(package)}) on {tested_on()}. "
+            f"{supported_macs(package, mode, minimum)}")
     with path.open("a", encoding="utf-8") as file:
         file.write(line + "\n")
 
@@ -663,11 +685,12 @@ def main(argv=None):
                         help="the LuaJIT compiler state the smoke run must see (default: on, hot code compiled)")
     parser.add_argument("--seconds", type=float, default=120, help="how long the smoke run may take")
     parser.add_argument("--notes", type=Path,
-                        help="append a release-notes line to this file: the package, the result, and the macOS "
-                             "version and chip it was checked on")
+                        help="append a release-notes line to this file: the package, the result, the smoke run's "
+                             "renderer, the image's SHA-256, and the macOS version and chip it was checked on")
     parser.add_argument("--work", type=Path, help="folder for the smoke run's files (kept); default: a temporary one")
     options = parser.parse_args(argv)
     RESULTS.clear()
+    RENDERER_SEEN.clear()
 
     package = options.package.absolute()
     minimum = None

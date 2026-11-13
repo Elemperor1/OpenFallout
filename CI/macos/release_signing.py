@@ -165,7 +165,8 @@ def setup():
         search = [line.strip().strip('"') for line in listed.splitlines() if line.strip()]
         run(["security", "list-keychains", "-d", "user", "-s", keychain, *search])
         identity = find_identity(keychain, os.environ["MACOS_TEAM_ID"])
-    except Failed:
+    except BaseException:
+        # whatever stopped it (a certificate that is not base64, an interrupt): no keychain is left behind
         cleanup()
         raise
     append_to_github_file("GITHUB_ENV", "OPENFALLOUT_CODESIGN_IDENTITY", identity)

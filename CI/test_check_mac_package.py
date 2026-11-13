@@ -389,6 +389,18 @@ class SmokeRunTests(unittest.TestCase):
         self.assertEqual(status, 1, output)
         self.assertIn("the LuaJIT compiler should be on", output)
 
+    def test_notes_record_the_renderer_the_smoke_run_reported(self):
+        notes = self.root / "notes.md"
+        gpu = "[12:00:00.300 I] OpenGL Renderer: Apple M4 (Metal; tile)\n"
+        self.smoke(gpu + STARTED + JIT_ON + QUIT, "--notes", notes)
+        self.smoke(SOFTWARE_GL + STARTED + JIT_ON + QUIT, "--notes", notes)
+        self.smoke(STARTED + JIT_ON + QUIT, "--notes", notes)
+        first, second, third = notes.read_text().splitlines()
+        # what would break the line's fields is left out of the name
+        self.assertIn("; renderer Apple M4 Metal tile; sha256 none)", first)
+        self.assertIn("; renderer Apple Software Renderer; sha256 none)", second)
+        self.assertIn("; renderer not reported; sha256 none)", third)
+
     def test_software_renderer_run_that_finishes_passes(self):
         status, output, _ = self.smoke(SOFTWARE_GL + JIT_ON + STARTED + QUIT, "--smoke", "auto")
         self.assertEqual(status, 0, output)
@@ -562,6 +574,21 @@ class ReleaseModeTests(unittest.TestCase):
                       "(Game Mode: macOS 26 or later).", line)
         self.assertIn(["vtool", "-show-build", str(self.root / "volume/OpenFallout.app/Contents/MacOS/openfallout")],
                       self.tools.calls)
+
+    def test_notes_record_the_sha256_of_the_image_in_the_form_the_release_harness_reads(self):
+        import hashlib
+        import harness_release
+
+        notes = self.root / "notes.md"
+        dmg = self.disk_image()
+        self.check("--notes", notes, package=dmg)
+        line = notes.read_text().strip()
+        found = harness_release.NOTE_LINE.match(line)
+        self.assertIsNotNone(found, line)
+        self.assertEqual(found["sha256"], hashlib.sha256(b"image").hexdigest())
+        self.assertEqual(found["macos"], "26.1")
+        self.assertEqual(found["chip"], "Apple M2 (Virtual)")
+        self.assertEqual((found["mode"], found["smoke"], found["renderer"]), ("release", "SKIP", "not reported"))
 
     def test_notes_of_the_intel_image_say_it_is_not_notarized(self):
         notes = self.root / "notes.md"

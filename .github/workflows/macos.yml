@@ -183,8 +183,9 @@ jobs:
         set -- build/OpenFallout-*.dmg
         python3 CI/macos/release_signing.py notarize "$1"
 
+    # Always: setup can fail before it sets its output; cleanup does nothing when this job made no keychain
     - name: Remove the signing keychain
-      if: ${{ always() && steps.signing.outputs.mode == 'release' }}
+      if: ${{ always() }}
       run: python3 CI/macos/release_signing.py cleanup
 
     - name: Test the packaged-app check
@@ -193,7 +194,8 @@ jobs:
     # Release mode on the notarized build (Developer ID on every binary, Gatekeeper, stapled tickets); local mode on the
     # ad hoc one (Gatekeeper is not asked). The smoke step starts the game from the disk image with a hidden window; a
     # runner that gives it no OpenGL context reports it as skipped, and then the smoke step is run on the development
-    # Mac before a tag is pushed (`--smoke run`). The check appends the release-notes line (macOS version and chip).
+    # Mac on the draft release's image (`--smoke run`). The check appends the release-notes line (renderer, SHA-256,
+    # macOS version and chip).
     - name: Check the packaged app
       env:
         CHECK_MODE: ${{ steps.signing.outputs.mode == 'release' && 'release' || 'local' }}
@@ -225,7 +227,7 @@ jobs:
       uses: softprops/action-gh-release@v3
       with:
         files: ${{ github.workspace }}/build/OpenFallout-*.dmg
-        # one line per disk image: the macOS version and chip it was checked on (CI/check_mac_package.py --notes)
+        # one line per disk image: its SHA-256 and the macOS version and chip it was checked on (check_mac_package.py --notes)
         body_path: ${{ runner.temp }}/release-notes.md
         append_body: true
         prerelease: true

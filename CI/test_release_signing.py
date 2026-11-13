@@ -204,6 +204,22 @@ class ReleaseSigningTests(unittest.TestCase):
         self.assertEqual(self.calls()[-1][:2], ["security", "delete-keychain"])
         self.assert_no_secrets(output)
 
+    def test_any_error_in_setup_removes_the_keychain(self):
+        # a certificate that is not base64 fails in Python (binascii.Error), after the keychain was created
+        status, output = self.run_script("setup", MACOS_DEVELOPER_ID_P12_BASE64="abc")
+        self.assertNotEqual(status, 0, output)
+        self.assertEqual(self.calls()[0][:2], ["security", "create-keychain"])
+        self.assertEqual(self.calls()[-1][:2], ["security", "delete-keychain"])
+        self.assertEqual(list(self.runner_temp.iterdir()), [])
+        self.assertNotIn("mode=release", self.github_output.read_text() if self.github_output.exists() else "")
+
+    def test_the_workflow_removes_the_keychain_whatever_the_signing_step_did(self):
+        # setup() may fail before it sets its output; cleanup() does nothing without a keychain of this run
+        workflow = (SCRIPT.parents[2] / ".github/workflows/macos.yml").read_text()
+        step = workflow.split("- name: Remove the signing keychain", 1)[1].split("- name:", 1)[0]
+        self.assertIn("if: ${{ always() }}", step)
+        self.assertIn("release_signing.py cleanup", step)
+
     def test_cleanup_deletes_the_keychain(self):
         self.run_script("setup")
         keychain = self.calls()[0][-1]

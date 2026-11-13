@@ -27,15 +27,21 @@ stays green. A run on a tag or the default branch that has only some of the secr
    the image, `spctl --assess --type execute` for the app) and a stapled ticket on both. Ad hoc builds are checked in
    local mode.
 6. **Release notes**: the check appends one line per disk image to the draft release (`--notes`): the result, the mode,
-   the smoke result and the macOS version and chip it ran on, e.g. `- OpenFallout-0.52.0-macOS-arm64.dmg: packaged-app
-   check PASS (release mode; smoke SKIP) on macOS 26.1 (25B78), Apple M2 (Virtual), arm64`. `CI/harness_release.py`
-   refuses to publish a release whose disk images lack that line, and refuses one whose Apple Silicon image has no
-   `packaged-app check PASS (release mode; ...)` line or no `... PASS (...; smoke PASS)` line: the game must have
-   started from that image on a Mac with a GPU (both may be the same line). When the smoke step was skipped on the runner (no
-   OpenGL context, or only Apple's software renderer: the hosted arm64 runner has no GPU, and on 12 November 2026 the
-   engine ended there with a bus error about 9.5 s after the cell started, while a package built from the same code on a
-   Mac with a GPU passed; the cause on the runner is not known), run `CI/check_mac_package.py <dmg> --mode release --smoke run --notes notes.md` on a Mac with a
-   display and add its line to the release notes before publishing.
+   the smoke result, the OpenGL renderer the smoke run reported, the image's SHA-256 and the macOS version and chip it
+   ran on, e.g. `- OpenFallout-0.52.0-macOS-arm64.dmg: packaged-app check PASS (release mode; smoke SKIP; renderer not
+   reported; sha256 3f2a...) on macOS 26.1 (25B78), Apple M2 (Virtual), arm64. For ...`. `CI/harness_release.py`
+   refuses to publish a release whose disk images lack such a line with both a macOS version and a chip. For the Apple
+   Silicon image it counts only lines whose `sha256` equals the digest GitHub reports for the uploaded asset (the
+   `digest` field of the release asset, `sha256:<hex>`; a release asset without one blocks publishing), and among those
+   it needs a `packaged-app check PASS (release mode; ...)` line and a `PASS` line with `smoke PASS` and a GPU renderer
+   (not `Apple Software Renderer`, not `not reported`): the game must have started from that very image on a Mac with a
+   GPU (both may be the same line). A smoke run of a locally built package does not count, even with the same file
+   name. When the smoke step was skipped on the runner (no OpenGL context, or only Apple's software renderer: the hosted
+   arm64 runner has no GPU, and on 12 November 2026 the engine ended there with a bus error about 9.5 s after the cell
+   started, while a package built from the same code on a Mac with a GPU passed; the cause on the runner is not known),
+   download the Apple Silicon disk image from the draft release, run
+   `CI/check_mac_package.py <dmg> --mode release --smoke run --notes notes.md` on a Mac with a display, and add its line
+   to the release notes before publishing.
 
 Secret values never reach the log: the scripts echo every command with them replaced by `***` (GitHub masks them as
 well), the certificate and API key exist as files only while a command reads them, and nothing under the runner's

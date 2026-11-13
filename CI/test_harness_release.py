@@ -10,16 +10,27 @@ SHA = "a" * 40
 TAG = "openfallout-0.1.0-test"
 RUN = {"id": 42, "head_branch": "master", "head_sha": SHA, "run_number": 1, "event": "push",
        "status": "completed", "conclusion": "success", "html_url": "https://example.invalid/run"}
+ARM = "1" * 64  # the sha256 of the Apple Silicon image GitHub reports
+INTEL = "2" * 64
+OTHER = "3" * 64  # an image of the same name built elsewhere (an ad hoc local package)
+
+
+def note(name, result, mode, smoke, renderer, digest, chip):
+    """A line as CI/check_mac_package.py --notes writes it."""
+    arch = "x86_64" if "x86_64" in name else "arm64"
+    return (f"- {name}: packaged-app check {result} ({mode} mode; smoke {smoke}; renderer {renderer}; sha256 {digest}) "
+            f"on macOS 26.1 (25B78), {chip}, {arch}. For Macs.")
+
+
 RELEASE = {"id": 7, "tag_name": TAG, "draft": True, "prerelease": True,
-           "body": "- OpenFallout-arm64.dmg: packaged-app check PASS (release mode; smoke SKIP) on macOS 26.1 (25B78), "
-                   "Apple M2 (Virtual), arm64\n"
-                   "- OpenFallout-arm64.dmg: packaged-app check PASS (local mode; smoke PASS) on macOS 26.1 (25B78), "
-                   "Apple M4, arm64\n"
-                   "- OpenFallout-x86_64.dmg: packaged-app check PASS (local mode; smoke SKIP) on macOS 26.1 (25B78), "
-                   "Intel(R) Core(TM) i7-8700B CPU @ 3.20GHz, x86_64\n",
+           "body": note("OpenFallout-arm64.dmg", "PASS", "release", "SKIP", "not reported", ARM, "Apple M2 (Virtual)")
+                   + "\n" + note("OpenFallout-arm64.dmg", "PASS", "release", "PASS", "Apple M4", ARM, "Apple M4")
+                   + "\n" + note("OpenFallout-x86_64.dmg", "PASS", "local", "SKIP", "not reported", INTEL,
+                                  "Intel(R) Core(TM) i7-8700B CPU @ 3.20GHz") + "\n",
            "html_url": "https://example.invalid/release", "assets": [
-               {"name": name, "size": 12, "state": "uploaded"} for name in (
-                   "OpenFallout.exe", "OpenFallout-arm64.dmg", "OpenFallout-x86_64.dmg")]}
+               {"name": "OpenFallout.exe", "size": 12, "state": "uploaded", "digest": "sha256:" + "4" * 64},
+               {"name": "OpenFallout-arm64.dmg", "size": 12, "state": "uploaded", "digest": "sha256:" + ARM},
+               {"name": "OpenFallout-x86_64.dmg", "size": 12, "state": "uploaded", "digest": "sha256:" + INTEL}]}
 
 
 class FakeGitHub:
@@ -137,27 +148,64 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaisesRegex(ReleaseError, "OpenFallout-arm64.dmg"):
             verify_assets(release)
 
+    def test_a_tested_on_line_needs_both_the_macos_version_and_the_chip(self):
+        lines = RELEASE["body"].splitlines()
+        intel = lines[2]
+        for broken in (intel.replace(", Intel(R) Core(TM) i7-8700B CPU @ 3.20GHz, x86_64.", "."),
+                       intel.replace("Intel(R) Core(TM) i7-8700B CPU @ 3.20GHz", "unknown chip"),
+                       intel.replace("on macOS 26.1 (25B78)", "on macOS ? (?)"),
+                       "- OpenFallout-x86_64.dmg: checked on macOS 26.1"):
+            release = copy.deepcopy(RELEASE)
+            release["body"] = "\n".join(lines[:2] + [broken])
+            with self.subTest(line=broken), self.assertRaisesRegex(ReleaseError, "OpenFallout-x86_64.dmg"):
+                verify_assets(release)
+
     def test_arm64_image_needs_a_release_mode_pass_and_a_smoke_pass(self):
         release = copy.deepcopy(RELEASE)
         verify_assets(release)
         lines = release["body"].splitlines()
+        runner, gpu, intel = lines
         # only the runner's line: the game was never started on a Mac with a GPU
-        release["body"] = "\n".join(line for line in lines if "smoke PASS" not in line)
+        release["body"] = "\n".join([runner, intel])
         with self.assertRaisesRegex(ReleaseError, "smoke PASS.*OpenFallout-arm64.dmg"):
             verify_assets(release)
-        # only the smoke run: the notarized image was never checked in release mode
-        release["body"] = "\n".join(line for line in lines if "release mode" not in line)
+        # only a smoke run in local mode: the notarized image was never checked in release mode
+        release["body"] = "\n".join([gpu.replace("release mode", "local mode"), intel])
         with self.assertRaisesRegex(ReleaseError, "release mode.*OpenFallout-arm64.dmg"):
             verify_assets(release)
         # a failed check does not count, whatever its smoke result
-        release["body"] = release["body"].replace("check PASS (local mode; smoke PASS)", "check FAIL (local mode; smoke PASS)")
-        release["body"] += "\n- OpenFallout-arm64.dmg: packaged-app check FAIL (release mode; smoke PASS) on macOS 26.1"
+        release["body"] = "\n".join([runner, gpu.replace("check PASS", "check FAIL"), intel])
         with self.assertRaises(ReleaseError):
             verify_assets(release)
         # one line with both is enough
-        release["body"] = ("- OpenFallout-arm64.dmg: packaged-app check PASS (release mode; smoke PASS) on macOS 26.1 (25B78), "
-                           "Apple M4, arm64\n" + lines[-1])
+        release["body"] = "\n".join([gpu, intel])
         verify_assets(release)
+
+    def test_passes_count_only_for_the_image_that_was_uploaded(self):
+        lines = RELEASE["body"].splitlines()
+        runner, gpu, intel = lines
+        release = copy.deepcopy(RELEASE)
+        # the smoke run was of another image with the same name (an ad hoc local package)
+        release["body"] = "\n".join([runner, gpu.replace(ARM, OTHER), intel])
+        with self.assertRaisesRegex(ReleaseError, "smoke PASS.*OpenFallout-arm64.dmg"):
+            verify_assets(release)
+        # the release-mode check was of another image
+        release["body"] = "\n".join([runner.replace(ARM, OTHER), gpu.replace("release mode", "local mode"), intel])
+        with self.assertRaisesRegex(ReleaseError, "release mode.*OpenFallout-arm64.dmg"):
+            verify_assets(release)
+        # GitHub gave no digest for the image: nothing can be bound to it
+        release = copy.deepcopy(RELEASE)
+        del release["assets"][1]["digest"]
+        with self.assertRaisesRegex(ReleaseError, "digest.*OpenFallout-arm64.dmg"):
+            verify_assets(release)
+
+    def test_a_smoke_pass_on_the_software_renderer_does_not_count(self):
+        runner, gpu, intel = RELEASE["body"].splitlines()
+        release = copy.deepcopy(RELEASE)
+        for renderer in ("Apple Software Renderer", "not reported"):
+            release["body"] = "\n".join([runner, gpu.replace("renderer Apple M4", f"renderer {renderer}"), intel])
+            with self.subTest(renderer=renderer), self.assertRaisesRegex(ReleaseError, "GPU.*OpenFallout-arm64.dmg"):
+                verify_assets(release)
 
     def test_failed_packaging_blocks_publishing(self):
         api = FakeGitHub()
