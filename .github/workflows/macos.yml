@@ -14,6 +14,13 @@ on:
         description: Runner label, when it differs from the image name
         default: ""
         type: string
+      signing-environment:
+        description: >-
+          GitHub environment that holds the release signing secrets (docs/openfallout/mac-release.md). Callers name it
+          only for the arm64 build of a tag or the default branch; empty means the job has no environment and can only
+          make the ad hoc build.
+        default: ""
+        type: string
     # Release signing (CI/macos/release_signing.py, docs/openfallout/mac-release.md). All optional: without them, and
     # on pull requests, the package is the ad hoc build and notarization is skipped.
     secrets:
@@ -34,6 +41,9 @@ jobs:
   MacOS:
     name: ${{ inputs.image }}
     runs-on: ${{ inputs.runner || inputs.image }}
+    # The environment's own rules (which branches and tags may use it, who must approve) decide whether this job gets
+    # the signing secrets; a tag or branch outside those rules cannot read them whatever its copy of the scripts says.
+    environment: ${{ inputs.signing-environment }}
     steps:
     - uses: actions/checkout@v7
     - run: echo "CMAKE_BUILD_TYPE=${{ inputs.build-type }}" >> "$GITHUB_ENV"

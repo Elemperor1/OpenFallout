@@ -44,7 +44,23 @@ temporary folder is uploaded. The secrets are passed only to the two steps that 
 
 ## The secrets the owner adds
 
-Repository settings, Secrets and variables, Actions, New repository secret:
+Keep them in a GitHub **environment**, not as repository secrets. A repository secret is handed to any workflow run
+that someone with push access can start, including a tag on a commit nobody reviewed, and that run executes its own
+copy of the signing scripts. An environment's rules are applied by GitHub before the job starts and cannot be changed
+from the pushed commit.
+
+1. Repository settings, Environments, New environment, name `macos-release` (the name the workflows use for the arm64
+   build of a tag or of the default branch; every other macOS job has no environment).
+2. Deployment branches and tags: Selected branches and tags; add the default branch and the tag pattern
+   `openfallout-*`.
+3. Optional, and the strongest guard: Required reviewers. Each signing job then waits for an approval, also on every
+   push to the default branch.
+4. Add the six secrets below as **environment secrets** of `macos-release`.
+5. Repository settings, Rules, Rulesets: a tag ruleset for `openfallout-*` that restricts who may create, update and
+   delete those tags.
+
+The workflows still read repository secrets of the same names when the environment has none, so that works too, without
+the protection above.
 
 | Secret | What it holds |
 | --- | --- |
