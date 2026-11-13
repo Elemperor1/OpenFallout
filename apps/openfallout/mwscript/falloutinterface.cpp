@@ -15,6 +15,7 @@
 #include <components/falloutscript/actorvalues.hpp>
 #include <components/falloutscript/derivedstats.hpp>
 #include <components/falloutscript/falldamage.hpp>
+#include <components/falloutscript/hitreactions.hpp>
 #include <components/falloutscript/hud.hpp>
 #include <components/falloutscript/messagetext.hpp>
 
@@ -183,6 +184,75 @@ namespace OFScript
     {
         if (mPlayer != 0 && !ptr.isEmpty() && scriptReferenceOf(ptr) == mPlayer)
             playGroundStep(ptr, FalloutScript::Footsteps::Slot::Jump);
+    }
+
+    int FalloutScripts::crippledLegs(const OFWorld::Ptr& ptr)
+    {
+        if (ptr.isEmpty())
+            return 0;
+        const FalloutScript::FormId reference = scriptReferenceOf(ptr);
+        if (reference == 0)
+            return 0;
+        constexpr int leftLegCondition = 29;
+        constexpr int rightLegCondition = 30;
+        return FalloutScript::HitReactions::crippledLegs(
+            mActorValues.current(reference, leftLegCondition), mActorValues.current(reference, rightLegCondition));
+    }
+
+    double FalloutScripts::moveSpeedMultiplier(const OFWorld::Ptr& ptr)
+    {
+        const int crippled = crippledLegs(ptr);
+        if (crippled == 0)
+            return 1.0;
+        const FalloutScript::HitReactions::Settings settings = FalloutScript::HitReactions::Settings::fromGameSettings(
+            [this](std::string_view name) -> std::optional<double> { return gameSetting(name); });
+        return FalloutScript::HitReactions::legSpeedMultiplier(settings, crippled);
+    }
+
+    void FalloutScripts::fell(const OFWorld::Ptr& ptr, float heightLost)
+    {
+        namespace AV = FalloutScript::ActorValue;
+        namespace Fall = FalloutScript::FallDamage;
+        if (ptr.isEmpty())
+            return;
+        const FalloutScript::FormId actor = scriptReferenceOf(ptr);
+        if (actor == 0 || actor == mPlayer || mActors.isDead(actor))
+            return;
+        playGroundStep(ptr, FalloutScript::Footsteps::Slot::Land);
+        const Fall::Settings settings = Fall::Settings::fromGameSettings(
+            [this](std::string_view name) -> std::optional<double> { return gameSetting(name); });
+        const double damage = Fall::damage(settings, heightLost);
+        log("Fall of " + referenceName(ptr) + ": " + std::to_string(static_cast<int>(heightLost)) + " units, damage "
+            + std::to_string(static_cast<int>(damage)));
+        // A character that nothing hurts has no damage to take
+        if (damage <= 0 || mObjectState.ghost(actor))
+            return;
+        int leftRoll = 0;
+        int rightRoll = 0;
+        {
+            const std::lock_guard lock(mCombatRandomMutex);
+            std::uniform_int_distribution<int> percent(0, 99);
+            leftRoll = percent(mCombatRandom);
+            rightRoll = percent(mCombatRandom);
+        }
+        const std::lock_guard strikeLock(mStrikeMutex);
+        const auto transitions = mActors.holdTransitions();
+        if (mActors.isDead(actor))
+            return;
+        // The damage of a fall has no attacker, so the difficulty has no say (only the player's falls are scaled) and
+        // no armor stops it
+        mActorValues.damage(actor, AV::health, damage);
+        constexpr int leftLegCondition = 29;
+        constexpr int rightLegCondition = 30;
+        if (Fall::legHurt(settings, leftRoll))
+            mActorValues.damage(actor, leftLegCondition, damage * settings.mLegMultiplier);
+        if (Fall::legHurt(settings, rightRoll))
+            mActorValues.damage(actor, rightLegCondition, damage * settings.mLegMultiplier);
+        if (mActorValues.current(actor, AV::health) > 0 || fallsInsteadOfDying(actor))
+            return;
+        // It dies of the fall (no killer: the world did it)
+        if (mActors.setDead(actor, true, 0, -1))
+            evaluatePackage(actor);
     }
 
     bool FalloutScripts::landed(const OFWorld::Ptr& ptr, float heightLost)

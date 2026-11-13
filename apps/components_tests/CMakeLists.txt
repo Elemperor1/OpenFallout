@@ -219,6 +219,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testradio.cpp
     falloutscript/testmusic.cpp
     falloutscript/testhardcore.cpp
+    falloutscript/testhitreactions.cpp
     falloutscript/testequipment.cpp
     falloutscript/testfightai.cpp
     falloutscript/testformlists.cpp

@@ -1,0 +1,10 @@
+{
+  "name": "m14p-reactions",
+  "game": "nv",
+  "save": "latest",
+  "scenario": "../scenarios/m14p_reactions.lua",
+  "resolution": [1280, 720],
+  "framerate": 30,
+  "limit": 600,
+  "variants": [ { "name": "plain" } ]
+}

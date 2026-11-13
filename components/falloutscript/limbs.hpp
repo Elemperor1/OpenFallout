@@ -31,6 +31,8 @@ namespace FalloutScript
         int mToHit = 0;
         /// The share in percent of the health of the character that the part stands for
         int mHealthPercent = 100;
+        /// The node of the skeleton that the part is (what a blow at the part lands on), empty when the record names none
+        std::string mNode;
     };
 
     class LimbRecords

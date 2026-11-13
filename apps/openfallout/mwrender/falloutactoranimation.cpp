@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include <iomanip>
 #include <map>
 #include <memory>
@@ -15,17 +17,23 @@
 
 #include <osg/ComputeBoundsVisitor>
 #include <osg/Matrix>
+#include <osg/Quat>
 #include <osg/MatrixTransform>
 #include <osg/Transform>
 
 #include <components/debug/debuglog.hpp>
 #include <components/esm4/loadarmo.hpp>
 #include <components/esm4/loadcrea.hpp>
+#include <components/esm4/loadipct.hpp>
+#include <components/esm4/loadipds.hpp>
 #include <components/esm4/loadnpc.hpp>
+#include <components/esm4/loadproj.hpp>
+#include <components/esm4/loadweap.hpp>
 #include <components/falloutscript/footsteps.hpp>
 #include <components/misc/resourcehelpers.hpp>
 #include <components/resource/resourcesystem.hpp>
 #include <components/resource/scenemanager.hpp>
+#include <components/sceneutil/controller.hpp>
 #include <components/sceneutil/nodecallback.hpp>
 #include <components/sceneutil/riggeometry.hpp>
 #include <components/sceneutil/riggeometryosgaextension.hpp>
@@ -467,12 +475,16 @@ namespace OFRender
                                  << (mObjectRoot == nullptr ? "its body is not made" : "its body is in no scene");
             return;
         }
-        // What it did stops where it is
-        if (mAdvanceCallback != nullptr)
-        {
-            mInsert->removeUpdateCallback(mAdvanceCallback);
-            mAdvanceCallback = nullptr;
-        }
+        // What it did stops where it is (advance() goes on only for the effects on the body, which run out)
+        // ... and is over: the groups it was playing (a walk, an attack, the reel of the blow that killed it) are taken out
+        // of the list of what it plays, which would show a dead body that goes on with its attack (the pose stays: nothing
+        // is updating the bones any more)
+        std::vector<std::string> playing;
+        for (const auto& state : mStates)
+            playing.push_back(state.first);
+        for (const std::string& group : playing)
+            disable(group);
+        mMoveGroup.clear();
 
         // A person falls on its back, and a creature (a four-legged one, a robot) on its side. The body is as thick
         // as a fifth of its size across, which keeps it out of the ground.
@@ -489,11 +501,18 @@ namespace OFRender
 
     void FalloutActorAnimation::advance(float duration)
     {
+        // A dead body does nothing more: only the impact or the flash that was on it when it fell runs out
+        if (mFall != nullptr)
+        {
+            updateEffects(duration);
+            return;
+        }
         updateGait(duration);
         runAnimation(duration);
         watchPose(duration);
         logPose(duration);
         logWeapon(duration);
+        updateEffects(duration);
     }
 
     void FalloutActorAnimation::logWeapon(float duration)
@@ -754,6 +773,7 @@ namespace OFRender
         // place to another is a teleport and not a movement.
         constexpr float teleportSpeed = 3000.f;
         constexpr float smoothingTime = 0.2f;
+        mFrameTime = duration;
         const OFWorld::Ptr& source = mMotionSource.isEmpty() ? mPtr : mMotionSource;
         const ESM::Position& placed = source.getRefData().getPosition();
         const osg::Vec3f position = placed.asVec3();
@@ -782,6 +802,30 @@ namespace OFRender
         }
         mLastPosition = position;
         mHasLastPosition = true;
+
+        // How fast it turns where it stands: the change of its yaw from one frame to the next (a jump of the yaw, a
+        // teleport or a script that faces it, is not a turn that is walked)
+        {
+            constexpr float turnSmoothing = 0.1f;
+            constexpr float instantTurnRate = 12.f;
+            const float yaw = placed.rot[2];
+            if (mHasLastYaw && duration > 0.f)
+            {
+                float change = yaw - mLastYaw;
+                const float pi = static_cast<float>(osg::PI);
+                while (change > pi)
+                    change -= 2.f * pi;
+                while (change < -pi)
+                    change += 2.f * pi;
+                const float rate = change / duration;
+                if (std::abs(rate) > instantTurnRate)
+                    mTurnRate = 0.f;
+                else
+                    mTurnRate += (rate - mTurnRate) * std::min(1.f, duration / turnSmoothing);
+            }
+            mLastYaw = yaw;
+            mHasLastYaw = true;
+        }
 
         // A character in a piece of furniture does not walk: its place changes by a few units when it is put on its
         // seat, which would play the walk over the pose of its seat
@@ -827,29 +871,114 @@ namespace OFRender
         }
         const std::string_view prefix = mDrawn ? falloutWeaponPrefix(mWeaponType) : std::string_view();
 
+        // In the air, touching the ground again, and swimming: the characters of the world are told whether they are in
+        // the air; the body of the player asks the world, and is in the air when it has been off the ground for a
+        // moment (a step down a stair is not a jump)
+        constexpr float airborneAfter = 0.15f;
+        constexpr float landingTime = 0.4f;
+        bool airborne = mAirborneTold;
+        bool swimming = false;
+        if (mPoseKind == 0 && !mFirstPerson && !isDown() && !mMotionSource.isEmpty()
+            && mMotionSource == OFMechanics::getPlayer())
+        {
+            OFBase::World* world = OFBase::Environment::get().getWorld();
+            swimming = world->isSwimming(source);
+            mAirTime = world->isOnGround(source) || swimming ? 0.f : mAirTime + mFrameTime;
+            airborne = mAirTime > airborneAfter;
+        }
+        if (mPoseKind != 0 || mFirstPerson || isDown())
+        {
+            airborne = false;
+            mWasAirborne = false;
+            mLandLeft = 0.f;
+        }
+        else if (airborne)
+        {
+            mWasAirborne = true;
+            mLandLeft = 0.f;
+        }
+        else if (mWasAirborne)
+        {
+            mWasAirborne = false;
+            mLandLeft = landingTime;
+        }
+        else if (mLandLeft > 0.f)
+            mLandLeft -= mFrameTime;
+        int special = 0;
+        if (airborne)
+            special = 1;
+        else if (mLandLeft > 0.f)
+            special = 2;
+        // Standing and turning where it stands (in the water too): the turn animation plays for as long as it turns,
+        // and a moment more, so that a short turn is not a flicker
+        constexpr float turnFrom = 0.5f;
+        constexpr float turnHold = 0.35f;
+        if (special == 0 && mPoseKind == 0 && mGait == FalloutGait::Idle && !isDown() && !mFirstPerson)
+        {
+            if (std::abs(mTurnRate) > turnFrom)
+            {
+                mTurning = mTurnRate > 0.f ? 5 : 4;
+                mTurnLeft = turnHold;
+            }
+            else if (mTurnLeft > 0.f)
+                mTurnLeft -= mFrameTime;
+            else
+                mTurning = 0;
+        }
+        else
+        {
+            mTurning = 0;
+            mTurnLeft = 0.f;
+        }
+        if (special == 0)
+        {
+            if (mTurning != 0)
+                special = mTurning;
+            else if (swimming)
+                special = 3;
+        }
+
         // The file is chosen again only when what it is chosen for changes: the files of the folder are looked through
-        const MoveKey key{ mGait, mGait == FalloutGait::Idle ? FalloutDirection::Forward : mDirection, sneak,
+        MoveKey key{ mGait, mGait == FalloutGait::Idle ? FalloutDirection::Forward : mDirection, sneak,
             std::string(prefix), true };
+        key.mSpecial = special;
+        // A character with a crippled leg limps when it moves
+        if (mGait != FalloutGait::Idle && mPoseKind == 0 && OFBase::Environment::get().hasFalloutScripts())
+            key.mHurt = OFBase::Environment::get().getFalloutScripts()->crippledLegs(source) > 0;
         std::string wanted = mMoveFile;
         if (!(key == mMoveKey))
         {
             mMoveKey = key;
             wanted.clear();
             const std::vector<std::string>& files = animationFilesOf(*mResourceSystem->getVFS(), mMoveFolder);
-            if (mGait == FalloutGait::Idle)
+            if (special != 0)
             {
-                if (sneak)
-                    wanted = chooseFalloutSneakIdle(mMoveFolder, prefix, mFemale, files);
+                // (a skeleton that has none of the files goes on with its gaits)
+                const FalloutAction action = special == 5 ? FalloutAction::TurnRight
+                    : special == 4                       ? FalloutAction::TurnLeft
+                    : special == 3                       ? FalloutAction::Swim
+                    : special == 1                       ? FalloutAction::JumpLoop
+                                                         : FalloutAction::JumpLand;
+                wanted = chooseFalloutAction(mMoveFolder, prefix, sneak, action, mDirection, mGait == FalloutGait::Idle,
+                    mGait == FalloutGait::Run, mFemale, files, swimming);
             }
-            else
+            if (wanted.empty())
             {
-                wanted = chooseFalloutMove(
-                    mMoveFolder, prefix, sneak, mDirection, mGait == FalloutGait::Run, mFemale, files);
-                // A creature has the forward ones only, found by other names
-                if (wanted.empty())
-                    wanted = mGait == FalloutGait::Run && mGaits.mHasRun ? mRunFile : mWalkFile;
-                if (wanted.empty())
-                    wanted = mGait == FalloutGait::Run ? mWalkFile : mRunFile;
+                if (mGait == FalloutGait::Idle)
+                {
+                    if (sneak)
+                        wanted = chooseFalloutSneakIdle(mMoveFolder, prefix, mFemale, files);
+                }
+                else
+                {
+                    wanted = chooseFalloutMove(
+                        mMoveFolder, prefix, sneak, mDirection, mGait == FalloutGait::Run, mFemale, files, key.mHurt);
+                    // A creature has the forward ones only, found by other names
+                    if (wanted.empty())
+                        wanted = mGait == FalloutGait::Run && mGaits.mHasRun ? mRunFile : mWalkFile;
+                    if (wanted.empty())
+                        wanted = mGait == FalloutGait::Run ? mWalkFile : mRunFile;
+                }
             }
         }
         if (sneak != mSneaking)
@@ -883,19 +1012,24 @@ namespace OFRender
                         1.f, "start", "stop", 0.f, ~0u, false);
                     mMoveGroup = group;
                 }
-                if (mMovesSaid < 12)
+                // (the jumps, landings, swims and turns are said apart from the gaits, whose changes use the first twelve up)
+                if (mMovesSaid < 12 || (special != 0 && mSpecialsSaid < 12))
                 {
-                    ++mMovesSaid;
+                    if (mMovesSaid < 12)
+                        ++mMovesSaid;
+                    else
+                        ++mSpecialsSaid;
                     Log(Debug::Info) << "Movement of " << mPtr.getCellRef().getRefId() << ": " << wanted << " (gait "
                                      << static_cast<int>(mGait) << ", direction " << static_cast<int>(mDirection)
-                                     << ", sneaks " << sneak << ", weapon prefix \"" << prefix << "\", "
+                                     << ", sneaks " << sneak << ", limps " << key.mHurt << ", special " << special
+                                     << ", weapon prefix \"" << prefix << "\", "
                                      << (group.empty() ? "no group" : "playing") << ")";
                 }
             }
         }
 
         // The feet keep up with the ground: the animation plays as much faster or slower as the actor is
-        if (!mMoveGroup.empty() && mGait != FalloutGait::Idle)
+        if (!mMoveGroup.empty() && mGait != FalloutGait::Idle && special == 0)
             adjustSpeedMult(mMoveGroup, falloutAnimationSpeed(mSpeed, getVelocity(mMoveGroup)));
     }
 
@@ -1106,6 +1240,7 @@ namespace OFRender
             disable(mAimGroup);
             mAimGroup.clear();
         }
+        removeEffects(true);
         if (mWeaponNode != nullptr && mWeaponParent != nullptr)
             mWeaponParent->removeChild(mWeaponNode);
         mWeaponNode = nullptr;
@@ -1118,6 +1253,231 @@ namespace OFRender
             return;
         playWeaponMove(FalloutWeaponMove::Attack, OFMechanics::Priority_Weapon, false);
         ++mAttacks;
+        flashMuzzle();
+    }
+
+    namespace
+    {
+        /// How much slower the effects play and how much longer they last, for a check (the environment variable
+        /// OPENFALLOUT_EFFECT_HOLD); 1 for the game
+        float effectHold()
+        {
+            static const float hold = [] {
+                const char* text = std::getenv("OPENFALLOUT_EFFECT_HOLD");
+                const float value = text != nullptr ? static_cast<float>(std::atof(text)) : 1.f;
+                return value > 1.f ? value : 1.f;
+            }();
+            return hold;
+        }
+    }
+
+    void FalloutActorAnimation::addEffect(const std::string& model, osg::Group* parent, float seconds, bool flash,
+        const osg::Vec3f* facing, float lift)
+    {
+        if (parent == nullptr || model.empty() || mResourceSystem == nullptr)
+            return;
+        // A model that is turned hangs from a mount of its own, which is what is taken off the node when it is over
+        osg::ref_ptr<osg::Group> mount;
+        if (facing != nullptr)
+        {
+            osg::Vec3f local = *facing;
+            const osg::NodePathList paths = parent->getParentalNodePaths();
+            if (!paths.empty())
+                local = osg::computeLocalToWorld(paths.front()).getRotate().inverse() * local;
+            if (local.length2() < 1e-6f)
+                local = osg::Vec3f(0.f, 0.f, 1.f);
+            local.normalize();
+            osg::Quat turn;
+            turn.makeRotate(osg::Vec3f(0.f, 0.f, 1.f), local);
+            osg::ref_ptr<osg::MatrixTransform> placed = new osg::MatrixTransform;
+            placed->setMatrix(osg::Matrix::rotate(turn) * osg::Matrix::translate(local * lift));
+            mount = placed;
+        }
+        osg::ref_ptr<osg::Node> node;
+        try
+        {
+            node = mResourceSystem->getSceneManager()->getInstance(
+                Misc::ResourceHelpers::correctMeshPath(VFS::Path::Normalized(model)),
+                mount != nullptr ? mount.get() : parent);
+        }
+        catch (const std::exception& e)
+        {
+            static std::atomic<int> sFailed{ 0 };
+            if (sFailed.fetch_add(1) < 4)
+                Log(Debug::Warning) << "The effect " << model << " could not be loaded: " << e.what();
+            return;
+        }
+        if (node == nullptr)
+            return;
+        if (mount != nullptr)
+        {
+            parent->addChild(mount);
+            // (what is taken away when the effect ends is the mount)
+        }
+        // The controllers of the model run from the moment it is shown, by a time of its own
+        auto time = std::make_shared<EffectAnimationTime>();
+        const std::shared_ptr<SceneUtil::ControllerSource> source = time;
+        SceneUtil::AssignControllerSourcesVisitor assign(source);
+        node->accept(assign);
+        // A check can make the effects play slower and last longer so that a picture catches them (by the number in the
+        // environment variable OPENFALLOUT_EFFECT_HOLD; the games' own last a fraction of a second)
+        seconds *= effectHold();
+        // At most a handful are alive at once: a weapon that fires faster than its effects fade drops the oldest
+        constexpr std::size_t most = 12;
+        if (mEffects.size() >= most)
+            removeEffects(false);
+        mEffects.push_back({ mount != nullptr ? osg::ref_ptr<osg::Node>(mount) : node, parent, seconds, flash, std::move(time) });
+    }
+
+    void FalloutActorAnimation::updateEffects(float duration)
+    {
+        for (auto it = mEffects.begin(); it != mEffects.end();)
+        {
+            it->mLeft -= duration;
+            if (it->mLeft > 0.f)
+            {
+                if (it->mTime != nullptr)
+                    it->mTime->addTime(duration / effectHold());
+                ++it;
+                continue;
+            }
+            if (it->mParent != nullptr && it->mNode != nullptr)
+                it->mParent->removeChild(it->mNode);
+            it = mEffects.erase(it);
+        }
+    }
+
+    void FalloutActorAnimation::removeEffects(bool flashesOnly)
+    {
+        for (auto it = mEffects.begin(); it != mEffects.end();)
+        {
+            if (flashesOnly && !it->mFlash)
+            {
+                ++it;
+                continue;
+            }
+            if (it->mParent != nullptr && it->mNode != nullptr)
+                it->mParent->removeChild(it->mNode);
+            it = mEffects.erase(it);
+            // (without the flag the oldest one goes, which is enough to make room)
+            if (!flashesOnly)
+                break;
+        }
+    }
+
+    void FalloutActorAnimation::flashMuzzle()
+    {
+        if (mWeaponNode == nullptr || mWeaponForm == 0)
+            return;
+        const OFWorld::ESMStore* store = OFBase::Environment::get().getESMStore();
+        if (store == nullptr)
+            return;
+        const ESM4::Weapon* weapon
+            = store->get<ESM4::Weapon>().search(ESM::RefId::formIdRefId(ESM::FormId::fromUint32(mWeaponForm)));
+        if (weapon == nullptr || !weapon->mHasGameData || weapon->mGame.mProjectile.isZeroOrUnset())
+            return;
+        const ESM4::Projectile* projectile
+            = store->get<ESM4::Projectile>().search(ESM::RefId::formIdRefId(weapon->mGame.mProjectile));
+        // A projectile that says no seconds for its flash has none (the silenced guns' say 0)
+        if (projectile == nullptr || projectile->mMuzzleFlashModel.empty())
+            return;
+        const float seconds = projectile->gameData().mMuzzleFlashDuration;
+        if (seconds <= 0.f)
+            return;
+        // The weapon's model names the muzzle (the node `ProjectileNode`); one that does not has the flash on the weapon
+        SceneUtil::FindByNameVisitor find("ProjectileNode");
+        mWeaponNode->accept(find);
+        osg::Group* muzzle = find.mFoundNode != nullptr ? find.mFoundNode : mWeaponNode->asGroup();
+        if (muzzle == nullptr)
+            return;
+        // A flash that is still on is the one of the shot before: the new shot starts it again
+        removeEffects(true);
+        addEffect(projectile->mMuzzleFlashModel, muzzle, seconds, true);
+        static std::atomic<int> sSaid{ 0 };
+        if (sSaid.fetch_add(1) < 6)
+            Log(Debug::Info) << "Muzzle flash of " << mPtr.getCellRef().getRefId() << ": "
+                             << projectile->mMuzzleFlashModel << " on " << muzzle->getName() << " for " << seconds
+                             << " s" << (find.mFoundNode == nullptr ? " (the weapon has no ProjectileNode)" : "");
+    }
+
+    std::size_t FalloutActorAnimation::impactMaterial() const
+    {
+        // The materials of an impact data set, in the order of its list: stone, dirt, grass, glass, metal, wood, organic
+        // (flesh), cloth, water, hollow metal, organic bug, organic glow
+        constexpr std::size_t metal = 4;
+        constexpr std::size_t flesh = 6;
+        constexpr std::size_t bug = 10;
+        // (the type is asked first: get<> throws for a character)
+        if (mPtr.getType() == ESM4::Creature::sRecordId)
+        {
+            // The creature types: 2 is a mutated insect, 6 a robot
+            if (const OFWorld::LiveCellRef<ESM4::Creature>* ref = mPtr.get<ESM4::Creature>(); ref->mBase != nullptr)
+            {
+                if (ref->mBase->mCreatureType == 2)
+                    return bug;
+                if (ref->mBase->mCreatureType == 6)
+                    return metal;
+            }
+        }
+        return flesh;
+    }
+
+    void FalloutActorAnimation::showImpact(std::uint32_t weapon, const std::string& node, const osg::Vec3f& toward)
+    {
+        if (mObjectRoot == nullptr || weapon == 0)
+            return;
+        const OFWorld::ESMStore* store = OFBase::Environment::get().getESMStore();
+        if (store == nullptr)
+            return;
+        // Why a blow shows nothing is said for the first few (a weapon with no impact data set, a set that has no entry for
+        // the body's material, an entry with no model)
+        static std::atomic<int> sSkipped{ 0 };
+        const auto nothing = [&](const char* why) {
+            if (sSkipped.fetch_add(1) < 6)
+                Log(Debug::Info) << "No impact on " << mPtr.getCellRef().getRefId() << " for the weapon 0x" << std::hex
+                                 << weapon << std::dec << ": " << why;
+        };
+        const ESM4::Weapon* record
+            = store->get<ESM4::Weapon>().search(ESM::RefId::formIdRefId(ESM::FormId::fromUint32(weapon)));
+        if (record == nullptr)
+            return nothing("the weapon has no record");
+        if (record->mImpactDataSet.isZeroOrUnset())
+            return nothing("the weapon names no impact data set");
+        const ESM4::ImpactDataSet* set
+            = store->get<ESM4::ImpactDataSet>().search(ESM::RefId::formIdRefId(record->mImpactDataSet));
+        if (set == nullptr)
+            return nothing("the impact data set is not in the store");
+        const std::size_t material = impactMaterial();
+        if (material >= set->mImpacts.size() || set->mImpacts[material].isZeroOrUnset())
+            return nothing("the set has no impact for the material of the body");
+        const ESM4::ImpactData* impact
+            = store->get<ESM4::ImpactData>().search(ESM::RefId::formIdRefId(set->mImpacts[material]));
+        if (impact == nullptr)
+            return nothing("the impact is not in the store");
+        if (impact->mModel.empty())
+            return nothing("the impact has no model");
+        // The first float of the impact's data is the seconds it lasts
+        float seconds = 0.f;
+        std::memcpy(&seconds, impact->mData.data(), sizeof(seconds));
+        if (!(seconds > 0.f))
+            seconds = 0.1f;
+        osg::Group* parent = nullptr;
+        if (!node.empty())
+        {
+            SceneUtil::FindByNameVisitor find(node);
+            mObjectRoot->accept(find);
+            parent = find.mFoundNode;
+        }
+        if (parent == nullptr)
+            parent = mObjectRoot.get();
+        // The splat lies on the body facing the one that struck, a hand's breadth out from the node
+        constexpr float lift = 8.f;
+        addEffect(impact->mModel.getOriginal(), parent, seconds, false, &toward, lift);
+        static std::atomic<int> sSaid{ 0 };
+        if (sSaid.fetch_add(1) < 8)
+            Log(Debug::Info) << "Impact on " << mPtr.getCellRef().getRefId() << ": " << impact->mEditorId << " ("
+                             << impact->mModel.getOriginal() << ") on " << parent->getName() << " for " << seconds
+                             << " s";
     }
 
     void FalloutActorAnimation::setPose(int entryKind)

@@ -1,0 +1,12 @@
+{
+  "name": "m14p-reactions-fo3",
+  "game": "fo3",
+  "start": "Wasteland:0,0",
+  "scenario": "../scenarios/m14p_reactions_fo3.lua",
+  "resolution": [1280, 720],
+  "framerate": 30,
+  "limit": 700,
+  "settings": { "Sound": { "master volume": "0" } },
+  "env": { "OPENFALLOUT_HEADLESS_SOUND": "1" },
+  "variants": [ { "name": "plain" } ]
+}

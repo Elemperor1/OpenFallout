@@ -84,7 +84,7 @@ as well.
 | `r.boxes(false)` | a message box that the game opens covers the picture and nobody clicks it in a round, so it is answered with its first button after a second (`ROUND box` lines name its number, form and buttons, never its text; a `shot` line says `box=<number>` when one is open as the picture is taken); `r.boxes(false)` leaves the boxes open, `r.boxes(true)` answers again |
 | `r.log(...)` | a note |
 | `r.world`, `r.core`, `r.util`, `r.player()`, `r.lookup(form)` | the Lua modules and helpers, for steps of your own |
-| `r.spawn{ record, bearing, dist, pos, yaw, count, label }`, `r.place(object, { dist, bearing, pos, yaw, label })`, `r.putAt(object, { pos, yaw, label })`, `r.give(record, count[, actor])` | M14: make an object of a record, put one at `dist` units from the player along `bearing` (radians, 0 north; it looks at the player unless `yaw`), or at a place of the player's worldspace, put items in an inventory |
+| `r.spawn{ record, bearing, dist, pos, yaw, count, label }`, `r.place(object, { dist, bearing, pos, yaw, label })`, `r.putAt(object, { pos, yaw, onGround, label })`, `r.give(record, count[, actor])` | M14: make an object of a record, put one at `dist` units from the player along `bearing` (radians, 0 north; it looks at the player unless `yaw`), or at a place of the player's worldspace (the height is taken to the ground there unless `onGround = false`), put items in an inventory |
 | `r.equip([record[, pick]])`, `r.drawn(on)`, `r.weapon(label)`, `r.inventory(label[, actor])`, `r.god(on)` | the weapon of the player: put one of the Pip-Boy's list in the hand (the first ranged one with rounds when no record is given), out or away, what the rules say of it, what an actor carries, god mode |
 | `r.fire(label[, target])`, `r.shoot{ shots, interval, target, shotName }`, `r.aimAt(object, label[, up])`, `r.use(on)` | the player shoots (at what the camera ray hits, or at `target`), turns the camera at an object |
 | `r.move{ forward, side, run, sneak, seconds }`, `r.crouch(on)`, `r.mode(label)`, `r.status(label)`, `r.hp()` | walk, run or sneak for some seconds, crouch, the stance and the sneak meter's word, the player's health |
@@ -94,6 +94,13 @@ as well.
 `scenarios/m14_fight.lua` (`rounds/m14-fight.json`) is the survey of moving and fighting in New Vegas (first and third person, a fight with two
 armed Powder Gangers, V.A.T.S., sneaking up on one), `scenarios/m14_arms.lua` (`rounds/m14-arms.json`, and `m14-arms-tune.json` with
 `OPENFALLOUT_FIRSTPERSON_ARMS` variants) the pictures of the player's arms in the first person.
+
+`scenarios/m14p_reactions.lua` (`rounds/m14p-reactions.json`; `m14p-effects.json` is the same with `OPENFALLOUT_EFFECT_HOLD=40`, which makes
+muzzle flashes and impacts play 40 times slower so that a picture catches them) is M14 part two on New Vegas: a blow throws a character back,
+two crippled legs slow it and make it limp, a character put up in the air falls and is hurt by the fall, the player's own body in the air and
+turning. `scenarios/m14p_reactions_fo3.lua` (`rounds/m14p-reactions-fo3.json`) does the same with two placed raiders of Fallout 3 (the blows
+are made with the form of a pistol, as the player's round has no way to give itself items), and `scenarios/m14p_swim.lua`
+(`rounds/m14p-swim.json`) lets the player's body fall into the lake of the east and swim.
 
 `scenarios/smoke.lua` is the smallest scenario; `scenarios/m13_mountains.lua` with `rounds/m13-mountains.json` is the check of the
 distant land of New Vegas in seven variants of `game lod debug`. Its places are in the Mojave and the save can be anywhere:
