@@ -88,6 +88,7 @@ namespace SDLUtil
 
         /// A desktop shortcut (macOS: Command-Q, -H, -M, -W, Control-Command-F) is the menu bar's, not the game's
         DesktopShortcutFilter mDesktopShortcuts;
+        Uint32 mWindowFlagsBeforeEvents = 0;
     };
 
 }

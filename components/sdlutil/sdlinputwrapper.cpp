@@ -61,6 +61,9 @@ namespace SDLUtil
     {
         mViewer->getEventQueue()->frame(0.f);
 
+        // Pumping runs the menu bar's key equivalents (macOS) before the same key press is read below: the window's
+        // state from before the pump tells whether Toggle Full Screen was the menu's to do
+        mWindowFlagsBeforeEvents = SDL_GetWindowFlags(mSDLWindow);
         SDL_PumpEvents();
 
         SDL_Event evt;
@@ -129,8 +132,8 @@ namespace SDLUtil
                             && desktopShortcut(evt.key.keysym.sym, evt.key.keysym.mod)
                                 == DesktopShortcut::ToggleFullScreen)
                         {
-                            if (const std::optional<Settings::WindowMode> mode = windowModeForToggleFullScreen(
-                                    SDL_GetWindowFlags(mSDLWindow), thisDesktopPlatform()))
+                            if (const std::optional<Settings::WindowMode> mode
+                                = windowModeForToggleFullScreen(mWindowFlagsBeforeEvents, thisDesktopPlatform()))
                                 mWindowListener->windowModeRequested(*mode);
                         }
                         break;
