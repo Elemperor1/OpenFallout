@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 
 namespace FalloutScript::Footsteps
 {
@@ -156,6 +157,23 @@ namespace FalloutScript::Footsteps
         if (exists(lastResort))
             return std::string(lastResort);
         return {};
+    }
+
+    bool isStairs(const StairSettings& settings, float normalZ, float height, std::optional<float> aheadHeight,
+        std::optional<float> behindHeight, float slopeAhead)
+    {
+        if (normalZ < settings.mFlatNormal)
+            return false;
+        // What the plane of the ground under the foot rises along the probe is not a step: a ramp goes up evenly (the
+        // ground ahead is higher by `slopeAhead`, and the ground behind lower by as much), a tread is a flat that the ground
+        // goes up from
+        const auto isStep = [&](std::optional<float> other, float plane) {
+            if (!other)
+                return false;
+            const float rise = std::abs(*other - height - plane);
+            return rise >= settings.mMinStep && rise <= settings.mMaxStep;
+        };
+        return isStep(aheadHeight, slopeAhead) || isStep(behindHeight, -slopeAhead);
     }
 
     std::string armorSoundName(bool powerArmor, Foot foot)

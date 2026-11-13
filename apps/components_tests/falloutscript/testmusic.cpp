@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <random>
 #include <vector>
 
 namespace
@@ -382,5 +383,128 @@ namespace
         }
         EXPECT_EQ(action.mKind, DirectorAction::Kind::Start);
         EXPECT_NEAR(seconds, 8, 1);
+    }
+
+    TEST(FalloutScriptMusicTest, an_incidental_set_plays_its_first_stinger_at_once_and_then_waits_between_its_times)
+    {
+        Incidental incidental;
+        IncidentalTimes times;
+        times.mDayShortest = 4.f;
+        times.mDayLongest = 16.f;
+        times.mNightShortest = 6.f;
+        times.mNightLongest = 12.f;
+        const auto zero = [] { return 0.0; };
+        const auto half = [] { return 0.5; };
+        // nothing was waited for yet: the open sound by day, and then the shortest time
+        EXPECT_EQ(incidental.update(0.1f, true, times, zero), Incidental::Sound::Open);
+        EXPECT_FLOAT_EQ(incidental.wait(), 4.f);
+        EXPECT_EQ(incidental.update(3.f, true, times, zero), Incidental::Sound::None);
+        EXPECT_EQ(incidental.update(1.f, true, times, half), Incidental::Sound::Open);
+        EXPECT_FLOAT_EQ(incidental.wait(), 10.f);
+    }
+
+    TEST(FalloutScriptMusicTest, an_incidental_set_plays_its_close_sound_by_night_with_the_times_of_the_night)
+    {
+        Incidental incidental;
+        IncidentalTimes times;
+        times.mDayShortest = 4.f;
+        times.mDayLongest = 16.f;
+        times.mNightShortest = 6.f;
+        times.mNightLongest = 12.f;
+        EXPECT_EQ(incidental.update(0.f, false, times, [] { return 1.0; }), Incidental::Sound::Close);
+        EXPECT_FLOAT_EQ(incidental.wait(), 12.f);
+    }
+
+    TEST(FalloutScriptMusicTest, incidental_times_given_the_wrong_way_round_are_taken_the_right_way_round)
+    {
+        Incidental incidental;
+        IncidentalTimes times;
+        times.mDayShortest = 9.f;
+        times.mDayLongest = 3.f;
+        incidental.update(0.f, true, times, [] { return 0.5; });
+        EXPECT_FLOAT_EQ(incidental.wait(), 6.f);
+        incidental.reset();
+        EXPECT_FLOAT_EQ(incidental.wait(), 0.f);
+    }
+
+    TEST(FalloutScriptMusicTest, times_of_zero_leave_the_shortest_wait_the_port_keeps_not_one_stinger_per_frame)
+    {
+        Incidental incidental;
+        EXPECT_EQ(incidental.update(0.f, true, IncidentalTimes(), [] { return 0.5; }), Incidental::Sound::Open);
+        EXPECT_FLOAT_EQ(incidental.wait(), Incidental::minimumWait);
+        // the next frames play nothing until that time has gone
+        EXPECT_EQ(incidental.update(0.016f, true, IncidentalTimes(), [] { return 0.5; }), Incidental::Sound::None);
+        EXPECT_EQ(incidental.update(0.5f, true, IncidentalTimes(), [] { return 0.5; }), Incidental::Sound::None);
+        EXPECT_EQ(incidental.update(0.5f, true, IncidentalTimes(), [] { return 0.5; }), Incidental::Sound::Open);
+    }
+
+    TEST(FalloutScriptMusicTest, a_controller_picks_the_first_set_when_no_other_takes_over)
+    {
+        std::vector<std::uint32_t> list{ 10, 20, 30 };
+        // a roll of 3 never takes over: the first is picked, and goes to the end
+        EXPECT_EQ(pickSet(list, [](int, int) { return 3; }), 10u);
+        EXPECT_EQ(list, (std::vector<std::uint32_t>{ 20, 30, 10 }));
+    }
+
+    TEST(FalloutScriptMusicTest, a_set_after_the_first_takes_over_with_a_roll_of_zero_and_the_last_roll_wins)
+    {
+        std::vector<std::uint32_t> list{ 10, 20, 30, 40 };
+        // the second and the fourth take over, the third does not
+        std::vector<int> rolls{ 0, 3, 0 };
+        std::size_t at = 0;
+        EXPECT_EQ(pickSet(list, [&](int low, int high) {
+            EXPECT_EQ(low, 0);
+            EXPECT_EQ(high, 3);
+            return rolls[at++];
+        }), 40u);
+        EXPECT_EQ(at, 3u);
+        EXPECT_EQ(list, (std::vector<std::uint32_t>{ 10, 20, 30, 40 }));
+        // and with only the second taking over
+        rolls = { 0, 3, 3 };
+        at = 0;
+        EXPECT_EQ(pickSet(list, [&](int, int) { return rolls[at++]; }), 20u);
+        EXPECT_EQ(list, (std::vector<std::uint32_t>{ 10, 30, 40, 20 }));
+    }
+
+    TEST(FalloutScriptMusicTest, the_set_that_played_last_is_picked_a_quarter_of_the_times)
+    {
+        // a list of two: the last takes over a quarter of the times, so the set that played last (at the end now) is the one
+        // picked a quarter of the times and the other three quarters
+        std::vector<std::uint32_t> list{ 1, 2 };
+        int repeats = 0;
+        std::uint32_t last = pickSet(list, [](int, int) { return 3; });
+        std::mt19937 engine(7);
+        const int rounds = 40000;
+        for (int i = 0; i < rounds; ++i)
+        {
+            const std::uint32_t next
+                = pickSet(list, [&engine](int low, int high) { return std::uniform_int_distribution<int>(low, high)(engine); });
+            if (next == last)
+                ++repeats;
+            last = next;
+        }
+        EXPECT_NEAR(static_cast<double>(repeats) / rounds, 0.25, 0.02);
+    }
+
+    TEST(FalloutScriptMusicTest, a_list_of_one_set_picks_it_again_and_an_empty_list_none)
+    {
+        std::vector<std::uint32_t> one{ 7 };
+        EXPECT_EQ(pickSet(one, [](int, int) { return 0; }), 7u);
+        EXPECT_EQ(pickSet(one, [](int, int) { return 0; }), 7u);
+        std::vector<std::uint32_t> none;
+        EXPECT_EQ(pickSet(none, [](int, int) { return 0; }), 0u);
+        EXPECT_TRUE(none.empty());
+    }
+
+    TEST(FalloutScriptMusicTest, only_the_looping_option_zero_loops_the_tracks_of_a_set)
+    {
+        // the looping options are the low two bits of the nibble (the bit above them says the defaults are used)
+        EXPECT_TRUE(loopsSets(0));
+        EXPECT_TRUE(loopsSets(4));
+        EXPECT_FALSE(loopsSets(1));
+        EXPECT_FALSE(loopsSets(5));
+        EXPECT_FALSE(loopsSets(2));
+        EXPECT_FALSE(loopsSets(3));
+        EXPECT_FALSE(loopsSets(7));
     }
 }

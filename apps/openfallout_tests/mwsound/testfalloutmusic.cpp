@@ -1,7 +1,10 @@
 #include "apps/openfallout/mwsound/falloutmusic.hpp"
 
 #include <algorithm>
+#include <set>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -127,6 +130,205 @@ namespace OFSound
                 (std::vector<std::string>{ "music/tenpenny/lobby.mp3" }));
             EXPECT_TRUE(falloutMusicFiles("special\\success.mp3", *vfs).empty());
             EXPECT_TRUE(falloutMusicFiles("", *vfs).empty());
+        }
+
+        /// What the mixer needs of the sound manager, with the tracks that are playing in a set
+        struct FakeSound
+        {
+            struct Started
+            {
+                std::string mFile;
+                float mGain;
+                float mFade;
+                bool mLoop;
+            };
+            std::vector<Started> mStarted;
+            std::set<OFBase::SoundManager::MusicTrackId> mPlaying;
+            std::vector<std::pair<OFBase::SoundManager::MusicTrackId, float>> mFaded;
+            bool mCannotStart = false;
+            /// A fade takes time: the faded tracks play until `finishFades`
+            bool mFadesTakeTime = false;
+            std::set<OFBase::SoundManager::MusicTrackId> mStopping;
+            void finishFades()
+            {
+                for (const auto id : mStopping)
+                    mPlaying.erase(id);
+                mStopping.clear();
+            }
+
+            OFBase::SoundManager::MusicTrackId startMusicTrack(VFS::Path::NormalizedView file, float gain, float fade, bool loop)
+            {
+                if (mCannotStart)
+                    return 0;
+                mStarted.push_back({ std::string(file.value()), gain, fade, loop });
+                const auto id = static_cast<OFBase::SoundManager::MusicTrackId>(mStarted.size());
+                mPlaying.insert(id);
+                return id;
+            }
+            bool isMusicTrackPlaying(OFBase::SoundManager::MusicTrackId id) const { return mPlaying.count(id) != 0; }
+            void fadeMusicTrack(OFBase::SoundManager::MusicTrackId id, float gain, float, bool stopAtEnd)
+            {
+                mFaded.emplace_back(id, gain);
+                if (stopAtEnd)
+                {
+                    if (mFadesTakeTime)
+                        mStopping.insert(id);
+                    else
+                        mPlaying.erase(id);
+                }
+            }
+        };
+
+        MusicMixer::Stem stemOf(const char* file, float gain, bool loop)
+        {
+            MusicMixer::Stem stem;
+            stem.mFile = VFS::Path::Normalized(file);
+            stem.mGain = gain;
+            stem.mLoop = loop;
+            return stem;
+        }
+
+        TEST(OFSoundFalloutMusicTest, theMixerStartsTheStemsThatAreWantedWithTheirLoopAndFade)
+        {
+            FakeSound sound;
+            MusicMixer mixer;
+            mixer.update(sound, { stemOf("music/a.mp3", 0.5f, true), stemOf("music/b.mp3", 0.f, false) }, 6.f);
+            ASSERT_EQ(sound.mStarted.size(), 2u);
+            EXPECT_EQ(sound.mStarted[0].mFile, "music/a.mp3");
+            EXPECT_TRUE(sound.mStarted[0].mLoop);
+            EXPECT_FALSE(sound.mStarted[1].mLoop);
+            EXPECT_FLOAT_EQ(sound.mStarted[0].mFade, 6.f);
+            EXPECT_EQ(mixer.size(), 2u);
+            EXPECT_TRUE(mixer.playing(sound));
+            // asked again, nothing starts twice
+            mixer.update(sound, { stemOf("music/a.mp3", 0.5f, true), stemOf("music/b.mp3", 0.f, false) }, 6.f);
+            EXPECT_EQ(sound.mStarted.size(), 2u);
+        }
+
+        TEST(OFSoundFalloutMusicTest, theMixerFadesAStemToANewGainAndOutWhenItIsNotWanted)
+        {
+            FakeSound sound;
+            MusicMixer mixer;
+            mixer.update(sound, { stemOf("music/a.mp3", 0.f, true), stemOf("music/b.mp3", 0.5f, true) }, 1.f);
+            mixer.update(sound, { stemOf("music/a.mp3", 0.7f, true) }, 1.f);
+            // b is faded out and stopped, a goes to its new gain
+            ASSERT_EQ(sound.mFaded.size(), 2u);
+            EXPECT_EQ(sound.mFaded[0].first, 1u);
+            EXPECT_FLOAT_EQ(sound.mFaded[0].second, 0.7f);
+            EXPECT_EQ(sound.mFaded[1].first, 2u);
+            EXPECT_FLOAT_EQ(sound.mFaded[1].second, 0.f);
+            EXPECT_EQ(mixer.size(), 1u);
+        }
+
+        TEST(OFSoundFalloutMusicTest, aStemThatIsWantedWithAnotherLoopPolicyIsFadedOutAndStartedAgain)
+        {
+            FakeSound sound;
+            sound.mFadesTakeTime = true;
+            MusicMixer mixer;
+            mixer.update(sound, { stemOf("music/a.mp3", 0.5f, true) }, 2.f);
+            ASSERT_EQ(sound.mStarted.size(), 1u);
+            // the same file from a controller whose tracks play once
+            mixer.update(sound, { stemOf("music/a.mp3", 0.5f, false) }, 2.f);
+            ASSERT_EQ(sound.mStarted.size(), 2u);
+            EXPECT_FALSE(sound.mStarted[1].mLoop);
+            ASSERT_FALSE(sound.mFaded.empty());
+            EXPECT_EQ(sound.mFaded.front().first, 1u);
+            EXPECT_EQ(mixer.size(), 1u);
+            // asked again with the same policy, nothing starts
+            mixer.update(sound, { stemOf("music/a.mp3", 0.5f, false) }, 2.f);
+            EXPECT_EQ(sound.mStarted.size(), 2u);
+        }
+
+        TEST(OFSoundFalloutMusicTest, theMixerIsAudibleWhileAStemFadesOutThoughItIsNotPlayingAStemAnyMore)
+        {
+            FakeSound sound;
+            sound.mFadesTakeTime = true;
+            MusicMixer mixer;
+            mixer.update(sound, { stemOf("music/a.mp3", 0.5f, true) }, 3.f);
+            EXPECT_TRUE(mixer.audible(sound));
+            // nothing is wanted now: the stem is the mixer's no more, but the fade is heard
+            mixer.update(sound, {}, 3.f);
+            EXPECT_EQ(mixer.size(), 0u);
+            EXPECT_TRUE(mixer.audible(sound));
+            sound.finishFades();
+            EXPECT_FALSE(mixer.audible(sound));
+        }
+
+        TEST(OFSoundFalloutMusicTest, stoppingTheMixerIsAudibleUntilTheFadeIsOver)
+        {
+            FakeSound sound;
+            sound.mFadesTakeTime = true;
+            MusicMixer mixer;
+            mixer.update(sound, { stemOf("music/a.mp3", 0.5f, true), stemOf("music/b.mp3", 0.5f, true) }, 1.f);
+            mixer.stopAll(sound, 2.f);
+            EXPECT_TRUE(mixer.audible(sound));
+            sound.finishFades();
+            EXPECT_FALSE(mixer.audible(sound));
+        }
+
+        TEST(OFSoundFalloutMusicTest, aStemThatPlayedToItsEndIsNotStartedAgainUntilTheMixerIsToldToRestart)
+        {
+            FakeSound sound;
+            MusicMixer mixer;
+            const std::vector<MusicMixer::Stem> wanted{ stemOf("music/a.mp3", 0.5f, false) };
+            mixer.update(sound, wanted, 1.f);
+            EXPECT_FALSE(mixer.finished());
+            sound.mPlaying.clear();
+            mixer.update(sound, wanted, 1.f);
+            EXPECT_TRUE(mixer.finished());
+            EXPECT_FALSE(mixer.playing(sound));
+            // it does not start by itself
+            mixer.update(sound, wanted, 1.f);
+            EXPECT_EQ(sound.mStarted.size(), 1u);
+            EXPECT_TRUE(mixer.finished());
+            // a set that is picked again is played again
+            mixer.restart();
+            EXPECT_FALSE(mixer.finished());
+            mixer.update(sound, wanted, 1.f);
+            EXPECT_EQ(sound.mStarted.size(), 2u);
+            EXPECT_FALSE(mixer.finished());
+        }
+
+        TEST(OFSoundFalloutMusicTest, aSetIsNotOverWhileAnyOfItsStemsPlaysOrWhenNoneCouldBeStarted)
+        {
+            FakeSound sound;
+            MusicMixer mixer;
+            const std::vector<MusicMixer::Stem> wanted{ stemOf("music/a.mp3", 0.5f, false), stemOf("music/b.mp3", 0.f, false) };
+            mixer.update(sound, wanted, 1.f);
+            // the stem that is heard ends while the other still plays
+            sound.mPlaying.erase(1);
+            mixer.update(sound, wanted, 1.f);
+            EXPECT_FALSE(mixer.finished());
+            sound.mPlaying.erase(2);
+            mixer.update(sound, wanted, 1.f);
+            EXPECT_TRUE(mixer.finished());
+            // files that cannot be started are not an end that was played
+            FakeSound broken;
+            broken.mCannotStart = true;
+            MusicMixer other;
+            other.update(broken, wanted, 1.f);
+            other.update(broken, wanted, 1.f);
+            EXPECT_FALSE(other.finished());
+        }
+
+        TEST(OFSoundFalloutMusicTest, stoppingAndForgettingTheMixerClearsWhatEnded)
+        {
+            FakeSound sound;
+            MusicMixer mixer;
+            const std::vector<MusicMixer::Stem> wanted{ stemOf("music/a.mp3", 0.5f, false) };
+            mixer.update(sound, wanted, 1.f);
+            sound.mPlaying.clear();
+            mixer.update(sound, wanted, 1.f);
+            ASSERT_TRUE(mixer.finished());
+            mixer.stopAll(sound, 1.f);
+            EXPECT_FALSE(mixer.finished());
+            mixer.update(sound, wanted, 1.f);
+            sound.mPlaying.clear();
+            mixer.update(sound, wanted, 1.f);
+            ASSERT_TRUE(mixer.finished());
+            mixer.forget();
+            EXPECT_FALSE(mixer.finished());
+            EXPECT_EQ(mixer.size(), 0u);
         }
     }
 }

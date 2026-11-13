@@ -206,6 +206,30 @@ void ESM4::Weapon::load(ESM4::Reader& reader)
                 else
                     reader.skipSubRecordData();
                 break;
+            case ESM::fourCC("NAM9"): // Fallout 3 and New Vegas: the sound of taking the weapon out
+                if (reader.isFalloutFile() && subHdr.dataSize == 4)
+                    reader.getFormId(mEquipSound);
+                else
+                    reader.skipSubRecordData();
+                break;
+            case ESM::fourCC("NAM8"): // Fallout 3 and New Vegas: the sound of putting the weapon away
+                if (reader.isFalloutFile() && subHdr.dataSize == 4)
+                    reader.getFormId(mUnequipSound);
+                else
+                    reader.skipSubRecordData();
+                break;
+            case ESM::fourCC("UNAM"): // Fallout 3 and New Vegas: the sound that goes on while the weapon is held out
+                if (reader.isFalloutFile() && subHdr.dataSize == 4)
+                    reader.getFormId(mIdleSound);
+                else
+                    reader.skipSubRecordData();
+                break;
+            case ESM::fourCC("NAM6"): // Fallout 3 and New Vegas: the sound of a blow that the weapon blocks
+                if (reader.isFalloutFile() && subHdr.dataSize == 4)
+                    reader.getFormId(mBlockSound);
+                else
+                    reader.skipSubRecordData();
+                break;
             case ESM::fourCC("DNAM"):
             {
                 // Fallout 3 and New Vegas: 136 bytes of the game data are the same in both. A few Fallout 3 records
@@ -312,16 +336,12 @@ void ESM4::Weapon::load(ESM4::Reader& reader)
             case ESM::fourCC("EITM"):
             case ESM::fourCC("KSIZ"):
             case ESM::fourCC("KWDA"):
-            case ESM::fourCC("NAM8"):
-            case ESM::fourCC("NAM9"):
             case ESM::fourCC("OBND"):
-            case ESM::fourCC("UNAM"):
             case ESM::fourCC("VMAD"):
             case ESM::fourCC("NNAM"):
             case ESM::fourCC("MOD2"): // FO3
             case ESM::fourCC("MO2T"): // FO3
             case ESM::fourCC("MO2S"): // FO3
-            case ESM::fourCC("NAM6"): // FO3
             case ESM::fourCC("MOD4"): // First person model data
             case ESM::fourCC("MO4T"):
             case ESM::fourCC("MO4S"):

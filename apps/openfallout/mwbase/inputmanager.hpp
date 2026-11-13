@@ -112,6 +112,8 @@ namespace OFBase
         /// The pad vibrates with the given strength (0 to 1) for the given seconds, when there is a pad and the setting for
         /// its vibration is on
         virtual void rumble(float strength, float seconds) = 0;
+        /// The same with a strength for each motor of the pad (the left one is the heavy one)
+        virtual void rumble(float left, float right, float seconds) = 0;
         virtual bool isIdle() const = 0;
 
         virtual void executeAction(int action) = 0;

@@ -239,6 +239,30 @@ namespace
         EXPECT_TRUE(skyrim.mLoopSound.isZeroOrUnset());
     }
 
+    TEST(ESM4CombatDataTest, readsTheEquipIdleAndBlockSoundsOfAWeaponOfFallout)
+    {
+        // NAM9 takes the weapon out and NAM8 puts it away, UNAM goes on while it is held out and NAM6 is a blow it blocks
+        const std::string sounds = zString("EDID", "Hum") + valueSubRecord<std::uint32_t>("NAM9", 0x00010011)
+            + valueSubRecord<std::uint32_t>("NAM8", 0x00010012) + valueSubRecord<std::uint32_t>("UNAM", 0x00010013)
+            + valueSubRecord<std::uint32_t>("NAM6", 0x00010014);
+        const ESM4::Weapon weapon = loadFromAPlugin<ESM4::Weapon>(1.34f, 15, "WEAP", sounds);
+        EXPECT_EQ(weapon.mEquipSound.toUint32(), 0x00010011u);
+        EXPECT_EQ(weapon.mUnequipSound.toUint32(), 0x00010012u);
+        EXPECT_EQ(weapon.mIdleSound.toUint32(), 0x00010013u);
+        EXPECT_EQ(weapon.mBlockSound.toUint32(), 0x00010014u);
+
+        const ESM4::Weapon without = loadFromAPlugin<ESM4::Weapon>(1.34f, 15, "WEAP", zString("EDID", "Quiet"));
+        EXPECT_TRUE(without.mEquipSound.isZeroOrUnset());
+        EXPECT_TRUE(without.mUnequipSound.isZeroOrUnset());
+        EXPECT_TRUE(without.mIdleSound.isZeroOrUnset());
+        EXPECT_TRUE(without.mBlockSound.isZeroOrUnset());
+
+        // The weapons of Skyrim use these subrecords for other things
+        const ESM4::Weapon skyrim = loadFromAPlugin<ESM4::Weapon>(0.94f, 43, "WEAP", sounds);
+        EXPECT_TRUE(skyrim.mEquipSound.isZeroOrUnset());
+        EXPECT_TRUE(skyrim.mIdleSound.isZeroOrUnset());
+    }
+
     TEST(ESM4CombatDataTest, readsALongerGameDataAndLeavesAShorterOne)
     {
         // New Vegas has more after the 136 bytes; the first of them are the same

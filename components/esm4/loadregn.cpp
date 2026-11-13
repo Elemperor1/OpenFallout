@@ -177,14 +177,28 @@ void ESM4::Region::load(ESM4::Reader& reader)
 
                 break;
             }
+            case ESM::fourCC("RDSB"): // FONV: a battle media set
+                if (mData.type != RDAT_Sound || subHdr.dataSize != sizeof(std::uint32_t))
+                {
+                    reader.skipSubRecordData();
+                    break;
+                }
+                reader.getFormId(mBattleSets.emplace_back());
+                break;
+            case ESM::fourCC("RDSI"): // FONV: the incidental media set
+                if (mData.type != RDAT_Sound || subHdr.dataSize != sizeof(std::uint32_t))
+                {
+                    reader.skipSubRecordData();
+                    break;
+                }
+                reader.getFormId(mIncidentalSet);
+                break;
             case ESM::fourCC("RDGS"): // Only in Oblivion? (ToddTestRegion1) // formId
             case ESM::fourCC("RDSA"):
             case ESM::fourCC("RDWT"): // formId
             case ESM::fourCC("RDOT"): // formId
             case ESM::fourCC("MICO"): // small icon, FO3 and FONV
             case ESM::fourCC("RDID"): // FONV
-            case ESM::fourCC("RDSB"): // FONV
-            case ESM::fourCC("RDSI"): // FONV
             case ESM::fourCC("NVMI"): // TES5
             case ESM::fourCC("ANAM"): // FO4
             case ESM::fourCC("RLDM"): // FO4

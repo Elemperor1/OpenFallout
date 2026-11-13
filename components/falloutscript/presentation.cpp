@@ -127,6 +127,11 @@ namespace FalloutScript
                 presentation.stopLooking(call.mReference);
             return 0.0;
         });
+        // The pad shakes by the strength of each motor for the seconds, as the executable's own rumble calls ask of it
+        interpreter.setHandler("SetRumble", [&world](CallContext& call) {
+            world.rumble(argument(call, 0), argument(call, 1), argument(call, 2));
+            return 0.0;
+        });
         interpreter.setHandler("AddAchievement", [&world](CallContext& call) {
             world.achievement(intArgument(call, 0));
             return 0.0;

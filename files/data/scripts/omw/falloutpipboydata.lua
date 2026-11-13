@@ -478,6 +478,65 @@ local function pollRadio()
     end
 end
 
+-- The waveform: the picture in the tile MM_Waveform while the radio is on (FalloutNV.exe 0x79C0C0 and 0x79C090, each frame
+-- the page is shown). One of three pictures of the games' `sRadioWaveformFileFormat` (Forward, Backward and Left, in
+-- Interface\Radio Wave) is on it, a new one picked at random every 750 ms, and it moves along by a tenth of its width every
+-- 10 ms, going on from the other side when it has run past the whole. The port draws it as the strip of a compass: a window
+-- of its own width that moves over the picture (the games' own zoom of the tile, 175, was not read).
+local WAVEFORM = 'MM_Waveform'
+local WAVEFORM_FORMAT = 'Interface\\Radio Wave\\%s.dds'
+local WAVEFORM_NAMES = { 'Forward', 'Backward', 'Left' }
+local WAVEFORM_CHANGE = 0.75
+local WAVEFORM_STEP = 0.01
+local WAVEFORM_SIZE = 256
+local waveform = nil
+
+local function pollWaveform(radioOn)
+    if not shown or not shown:find(WAVEFORM) then return end
+    if not radioOn then
+        if waveform then
+            shown:set(WAVEFORM, 'visible', false)
+            waveform = nil
+        end
+        return
+    end
+    local now = core.getRealTime()
+    if not waveform then
+        waveform = { name = WAVEFORM_NAMES[1], changed = now, moved = now, phase = 0 }
+        shown:batch(function()
+            -- (centered in the rectangle of the file, 350 across)
+            shown:set(WAVEFORM, 'width', WAVEFORM_SIZE)
+            shown:set(WAVEFORM, 'height', WAVEFORM_SIZE)
+            shown:set(WAVEFORM, 'x', 47)
+            shown:set(WAVEFORM, 'y', 47)
+            shown:set(WAVEFORM, 'filename', string.format(WAVEFORM_FORMAT, waveform.name))
+            shown:set(WAVEFORM, '_sourcex', 0)
+            shown:set(WAVEFORM, 'visible', true)
+        end)
+        return
+    end
+    local changed = false
+    if now - waveform.moved >= WAVEFORM_STEP then
+        waveform.moved = now
+        waveform.phase = waveform.phase + 0.1
+        if waveform.phase > 1 then waveform.phase = waveform.phase - 1 end
+        changed = true
+    end
+    local name
+    if now - waveform.changed >= WAVEFORM_CHANGE then
+        waveform.changed = now
+        name = WAVEFORM_NAMES[math.random(#WAVEFORM_NAMES)]
+        waveform.name = name
+        changed = true
+    end
+    if changed then
+        shown:batch(function()
+            if name then shown:set(WAVEFORM, 'filename', string.format(WAVEFORM_FORMAT, name)) end
+            shown:set(WAVEFORM, '_sourcex', waveform.phase * WAVEFORM_SIZE)
+        end)
+    end
+end
+
 -- ---- The page ----
 
 local function fillHeadline()
@@ -612,6 +671,7 @@ function module.hide()
     end
     shown, lists, tabs = nil, nil, nil
     marked, named, objectivesFor, dragFrom = {}, nil, nil, nil
+    waveform = nil
 end
 
 -- Each frame the page is shown: the window size, and the objectives of the quest that is picked
@@ -622,6 +682,13 @@ function module.update()
     if TABS[tabIndex].key == 'radio' then
         local polled, problem = pcall(pollRadio)
         if not polled then print('data menu radio: ' .. tostring(problem)) end
+        -- The waveform is there while a station is tuned (the radio is on)
+        local on = false
+        for _, station in ipairs(stations or {}) do
+            if station.tuned then on = true end
+        end
+        local drawn, trouble = pcall(pollWaveform, on)
+        if not drawn then print('data menu waveform: ' .. tostring(trouble)) end
     end
 end
 

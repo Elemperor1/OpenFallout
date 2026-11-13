@@ -112,71 +112,12 @@ namespace OFSound
         return files;
     }
 
-    void MusicMixer::update(OFBase::SoundManager& sound, const std::vector<Stem>& wanted, float fadeSeconds)
-    {
-        const auto isWanted = [&wanted](const VFS::Path::Normalized& file) {
-            return std::find_if(wanted.begin(), wanted.end(), [&file](const Stem& stem) { return stem.mFile == file; });
-        };
-        // What was unwanted for a while may start again
-        mDone.erase(std::remove_if(mDone.begin(), mDone.end(), [&](const auto& file) { return isWanted(file) == wanted.end(); }),
-            mDone.end());
-        for (auto it = mPlaying.begin(); it != mPlaying.end();)
-        {
-            const auto stem = isWanted(it->mFile);
-            if (!sound.isMusicTrackPlaying(it->mId))
-            {
-                if (stem != wanted.end())
-                    mDone.push_back(it->mFile);
-                it = mPlaying.erase(it);
-                continue;
-            }
-            if (stem == wanted.end())
-            {
-                sound.fadeMusicTrack(it->mId, 0.f, fadeSeconds, true);
-                it = mPlaying.erase(it);
-                continue;
-            }
-            if (std::abs(stem->mGain - it->mGain) > 0.002f)
-            {
-                sound.fadeMusicTrack(it->mId, stem->mGain, fadeSeconds, false);
-                it->mGain = stem->mGain;
-            }
-            ++it;
-        }
-        for (const Stem& stem : wanted)
-        {
-            const auto same = [&stem](const auto& other) { return other.mFile == stem.mFile; };
-            if (std::any_of(mPlaying.begin(), mPlaying.end(), same)
-                || std::find(mDone.begin(), mDone.end(), stem.mFile) != mDone.end())
-                continue;
-            const OFBase::SoundManager::MusicTrackId id = sound.startMusicTrack(stem.mFile, stem.mGain, fadeSeconds, stem.mLoop);
-            if (id == 0)
-            {
-                mDone.push_back(stem.mFile);
-                continue;
-            }
-            mPlaying.push_back({ stem.mFile, id, stem.mGain });
-        }
-    }
-
-    void MusicMixer::stopAll(OFBase::SoundManager& sound, float fadeSeconds)
-    {
-        for (const Playing& playing : mPlaying)
-            sound.fadeMusicTrack(playing.mId, 0.f, fadeSeconds, true);
-        mPlaying.clear();
-        mDone.clear();
-    }
-
-    bool MusicMixer::playing(OFBase::SoundManager& sound)
-    {
-        return std::any_of(
-            mPlaying.begin(), mPlaying.end(), [&sound](const Playing& p) { return sound.isMusicTrackPlaying(p.mId); });
-    }
-
     void MusicMixer::forget()
     {
         mPlaying.clear();
+        mFading.clear();
         mDone.clear();
+        mEnded = false;
     }
 
     FalloutMusicRecords::FalloutMusicRecords(const VFS::Manager& vfs, const OFWorld::ESMStore& store)

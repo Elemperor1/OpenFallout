@@ -1,6 +1,7 @@
 #include "radio.hpp"
 
 #include <algorithm>
+#include <cctype>
 
 namespace FalloutScript::Radio
 {
@@ -37,6 +38,34 @@ namespace FalloutScript::Radio
         const float atOuter = staticPercent > 0.f ? std::min(staticPercent, 100.f) / 100.f : settings.mStaticAtOuterRadius;
         signal.mStatic = atOuter * far;
         return signal;
+    }
+
+    PipboyAction pipboyActionOf(std::string_view word)
+    {
+        const auto same = [word](std::string_view other) {
+            return word.size() == other.size()
+                && std::equal(word.begin(), word.end(), other.begin(),
+                    [](char a, char b) { return std::tolower(static_cast<unsigned char>(a)) == b; });
+        };
+        if (word == "1" || same("enable") || same("on"))
+            return PipboyAction::On;
+        if (word == "0" || same("disable") || same("off"))
+            return PipboyAction::Off;
+        if (same("tune"))
+            return PipboyAction::Tune;
+        return PipboyAction::None;
+    }
+
+    float creatureReach(float creatureRadioMax)
+    {
+        return std::max(creatureRadioMax, 0.f) * 1.1f;
+    }
+
+    Settings channelSettings(const Settings& settings)
+    {
+        Settings result = settings;
+        result.mVolume = 1.f;
+        return result;
     }
 
     float gainOf(const Signal& signal, bool dialogue, const Settings& settings)

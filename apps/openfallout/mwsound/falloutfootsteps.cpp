@@ -5,15 +5,33 @@
 #include <string_view>
 
 #include <components/debug/debuglog.hpp>
+#include <components/esm4/loadarmo.hpp>
+#include <components/esm4/loadnpc.hpp>
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/soundmanager.hpp"
 #include "../mwbase/world.hpp"
+#include "../mwclass/esm4npc.hpp"
 #include "../mwscript/falloutscripts.hpp"
 #include "../mwworld/refdata.hpp"
 
 namespace OFSound
 {
+    int armorSoundKind(const OFWorld::Ptr& actor)
+    {
+        if (actor.isEmpty() || actor.getType() != ESM4::Npc::sRecordId)
+            return 0;
+        int kind = 0;
+        for (const ESM4::Armor* armor : OFClass::ESM4Npc::getEquippedArmor(actor))
+        {
+            if ((armor->mGeneralFlags & ESM4::Armor::FO3_PowerArmor) != 0)
+                kind = 2;
+            else if ((armor->mGeneralFlags & ESM4::Armor::FO3_HeavyArmor) != 0 && kind == 0)
+                kind = 1;
+        }
+        return kind;
+    }
+
     void playFootstep(const FootstepRequest& request)
     {
         namespace Steps = FalloutScript::Footsteps;

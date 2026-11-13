@@ -27,6 +27,8 @@ namespace FalloutScript
         virtual void releaseWeather() = 0;
         /// How long an image space modifier lasts, in seconds; 0 when the files do not say
         virtual double imageSpaceDuration(FormId modifier) = 0;
+        /// The pad of the player shakes: a strength for each motor (0 to 1) for the seconds (SetRumble)
+        virtual void rumble(double left, double right, double seconds) = 0;
         /// An achievement of the game was earned (the number is the id the script names)
         virtual void achievement(int id) = 0;
     };

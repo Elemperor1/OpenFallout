@@ -1,6 +1,7 @@
 #include "soundmanagerimp.hpp"
 
 #include <algorithm>
+#include <cstdio>
 #include <map>
 #include <numeric>
 #include <set>
@@ -59,21 +60,6 @@ namespace OFSound
         // The maximum distance of a sound record of Fallout that has no distance: it is heard wherever the listener is
         constexpr float sNoDistanceLimit = 1.0e8f;
 
-        WaterSoundUpdaterSettings makeWaterSoundUpdaterSettings()
-        {
-            WaterSoundUpdaterSettings settings;
-
-            settings.mNearWaterRadius = Fallback::Map::getInt("Water_NearWaterRadius");
-            settings.mNearWaterPoints = Fallback::Map::getInt("Water_NearWaterPoints");
-            settings.mNearWaterIndoorTolerance = Fallback::Map::getFloat("Water_NearWaterIndoorTolerance");
-            settings.mNearWaterOutdoorTolerance = Fallback::Map::getFloat("Water_NearWaterOutdoorTolerance");
-            settings.mNearWaterIndoorID = ESM::RefId::stringRefId(Fallback::Map::getString("Water_NearWaterIndoorID"));
-            settings.mNearWaterOutdoorID
-                = ESM::RefId::stringRefId(Fallback::Map::getString("Water_NearWaterOutdoorID"));
-
-            return settings;
-        }
-
         float initialFadeVolume(float squaredDist, float minDist, float maxDist, Type type, PlayMode mode)
         {
             // If a sound is farther away than its maximum distance, start playing it with a zero fade volume.
@@ -114,6 +100,9 @@ namespace OFSound
                 case Type::Music:
                     volume *= Settings::sound().mMusicVolume;
                     break;
+                case Type::Radio:
+                    volume *= Settings::sound().mRadioVolume;
+                    break;
                 case Type::Movie:
                 case Type::Mask:
                     break;
@@ -148,7 +137,6 @@ namespace OFSound
         : mVFS(vfs)
         , mHeadCache(makeHeadCache(*vfs))
         , mOutput(std::make_unique<OpenALOutput>(*this))
-        , mWaterSoundUpdater(makeWaterSoundUpdaterSettings())
         , mSoundBuffers(*mOutput)
         , mMusicType(OFSound::MusicType::Normal)
         , mListenerUnderwater(false)
@@ -160,7 +148,6 @@ namespace OFSound
         , mNearWaterSound(nullptr)
         , mPlaybackPaused(false)
         , mTimePassed(0.f)
-        , mLastCell(nullptr)
         , mCurrentRegionSound(nullptr)
     {
         if (!useSound)
@@ -261,7 +248,7 @@ namespace OFSound
         return mStreams.get();
     }
 
-    StreamPtr SoundManager::playVoice(DecoderPtr decoder, const osg::Vec3f& pos, bool playlocal)
+    StreamPtr SoundManager::playVoice(DecoderPtr decoder, const osg::Vec3f& pos, bool playlocal, Type type)
     {
         OFBase::World* world = OFBase::Environment::get().getWorld();
         static const float fAudioMinDistanceMult
@@ -276,14 +263,14 @@ namespace OFSound
         static float maxDistance = std::max(fAudioVoiceDefaultMaxDistance * fAudioMaxDistanceMult, minDistance);
 
         bool played;
-        float basevol = volumeFromType(Type::Voice);
+        float basevol = volumeFromType(type);
         StreamPtr sound = getStreamRef();
         if (playlocal)
         {
             sound->init([&] {
                 SoundParams params;
                 params.mBaseVolume = basevol;
-                params.mFlags = PlayMode::NoEnv | Type::Voice | Play_2D;
+                params.mFlags = PlayMode::NoEnv | type | Play_2D;
                 return params;
             }());
             played = mOutput->streamSound(std::move(decoder), sound.get(), true);
@@ -296,7 +283,7 @@ namespace OFSound
                 params.mBaseVolume = basevol;
                 params.mMinDistance = minDistance;
                 params.mMaxDistance = maxDistance;
-                params.mFlags = PlayMode::Normal | Type::Voice | Play_3D;
+                params.mFlags = PlayMode::Normal | type | Play_3D;
                 return params;
             }());
             played = mOutput->streamSound3D(std::move(decoder), sound.get(), true);
@@ -351,6 +338,11 @@ namespace OFSound
         VFS::Path::NormalizedView filename, float gain, float fadeIn, bool loop)
     {
         return startTrack(filename, gain, fadeIn, loop, Type::Music);
+    }
+
+    SoundManager::MusicTrackId SoundManager::startRadioTrack(VFS::Path::NormalizedView filename, float gain)
+    {
+        return startTrack(filename, gain, 0.f, false, Type::Radio);
     }
 
     SoundManager::MusicTrackId SoundManager::startFalloutLoop(ESM::FormId sound, float fadeIn)
@@ -473,7 +465,7 @@ namespace OFSound
         advanceMusic(filename, fade);
     }
 
-    void SoundManager::say(const OFWorld::ConstPtr& ptr, VFS::Path::NormalizedView filename)
+    void SoundManager::say(const OFWorld::ConstPtr& ptr, VFS::Path::NormalizedView filename, Type type)
     {
         if (!mOutput->isInitialized())
             return;
@@ -486,7 +478,7 @@ namespace OFSound
         const osg::Vec3f pos = world->getActorHeadTransform(ptr).getTrans();
 
         stopSay(ptr);
-        StreamPtr sound = playVoice(std::move(decoder), pos, (ptr == OFMechanics::getPlayer()));
+        StreamPtr sound = playVoice(std::move(decoder), pos, (ptr == OFMechanics::getPlayer()), type);
         if (!sound)
             return;
 
@@ -933,6 +925,18 @@ namespace OFSound
                                  : nullptr;
     }
 
+    void SoundManager::stopFalloutSound(ESM::FormId sound, const OFWorld::ConstPtr& reference)
+    {
+        FalloutSounds* sounds = falloutSounds();
+        if (sounds == nullptr || !mOutput->isInitialized())
+            return;
+        const FalloutSound* record = sounds->find(sound);
+        if (record == nullptr)
+            return;
+        for (const VFS::Path::Normalized& file : record->mFiles)
+            stopSound3D(reference, file);
+    }
+
     std::optional<FalloutScript::SoundData> SoundManager::falloutSoundData(ESM::FormId sound)
     {
         FalloutSounds* sounds = falloutSounds();
@@ -1255,71 +1259,52 @@ namespace OFSound
     void SoundManager::updateWaterSound()
     {
         OFBase::World* world = OFBase::Environment::get().getWorld();
+        const OFWorld::ESMStore* store = OFBase::Environment::get().getESMStore();
+        if (world == nullptr || store == nullptr)
+            return;
         const OFWorld::ConstPtr player = world->getPlayerPtr();
+        if (player.isEmpty() || !player.isInCell())
+            return;
 
-        const OFWorld::Cell* curcell = player.getCell()->getCell();
-        const auto update = mWaterSoundUpdater.update(player, *world);
+        const auto update = mWaterSoundUpdater.update(player, *world, *store);
+        const auto note = [this](const std::string& text) {
+            if (mNearWaterLogged >= 30)
+                return;
+            ++mNearWaterLogged;
+            Log(Debug::Info) << "Water: " << text;
+        };
+        const auto formText = [](ESM::FormId id) {
+            char text[16];
+            std::snprintf(text, sizeof(text), "%08X", id.toUint32());
+            return std::string(text);
+        };
 
-        WaterSoundAction action;
-        SoundBuffer* sfx;
-        std::tie(action, sfx) = getWaterSoundAction(update, curcell);
-
-        switch (action)
+        // The sound plays while the water is near: it is the water's own record, from a place that moves with the player
+        // (nothing but the record's volume and curve make it louder or quieter)
+        const bool wanted = update.mStrength > 0.f && !update.mSound.isZeroOrUnset();
+        if (mNearWaterSound != nullptr && (!wanted || update.mSound != mNearWaterId))
         {
-            case WaterSoundAction::DoNothing:
-                break;
-            case WaterSoundAction::SetVolume:
-                mNearWaterSound->setVolume(update.mVolume * sfx->getVolume());
-                mNearWaterSound->setFade(sSfxFadeInDuration, 1.0f, Play_FadeExponential);
-                break;
-            case WaterSoundAction::FinishSound:
-                mNearWaterSound->setFade(sSfxFadeOutDuration, 0.0f, Play_FadeExponential | Play_StopAtFadeEnd);
-                break;
-            case WaterSoundAction::PlaySound:
-                if (mNearWaterSound)
-                    mOutput->finishSound(mNearWaterSound);
-                mNearWaterSound = playSound(update.mId, update.mVolume, 1.0f, Type::Sfx, PlayMode::Loop);
-                break;
+            mNearWaterSound->setFade(sSfxFadeOutDuration, 0.0f, Play_FadeExponential | Play_StopAtFadeEnd);
+            note("the sound " + formText(mNearWaterId) + " of the water fades out");
+            mNearWaterSound = nullptr;
         }
-
-        mLastCell = curcell;
-    }
-
-    std::pair<SoundManager::WaterSoundAction, SoundBuffer*> SoundManager::getWaterSoundAction(
-        const WaterSoundUpdate& update, const OFWorld::Cell* cell) const
-    {
-        if (mNearWaterSound)
+        if (!wanted)
+            return;
+        if (mNearWaterSound != nullptr)
         {
-            if (update.mVolume == 0.0f)
-                return { WaterSoundAction::FinishSound, nullptr };
-
-            bool soundIdChanged = false;
-
-            SoundBuffer* sfx = mSoundBuffers.lookup(update.mId);
-            if (mLastCell != cell)
-            {
-                const auto snditer = mActiveSounds.find(nullptr);
-                if (snditer != mActiveSounds.end())
-                {
-                    const auto pairiter = std::find_if(snditer->second.mList.begin(), snditer->second.mList.end(),
-                        [this](const SoundBufferRefPairList::value_type& item) -> bool {
-                            return mNearWaterSound == item.first.get();
-                        });
-                    if (pairiter != snditer->second.mList.end() && pairiter->second != sfx)
-                        soundIdChanged = true;
-                }
-            }
-
-            if (soundIdChanged)
-                return { WaterSoundAction::PlaySound, nullptr };
-
-            if (sfx)
-                return { WaterSoundAction::SetVolume, sfx };
+            mNearWaterSound->setLastPosition(mNearWaterSound->getPosition());
+            mNearWaterSound->setPosition(update.mPosition);
+            return;
         }
-        else if (update.mVolume > 0.0f)
-            return { WaterSoundAction::PlaySound, nullptr };
-
-        return { WaterSoundAction::DoNothing, nullptr };
+        mNearWaterSound = playFalloutSoundAt(update.mSound, update.mPosition, 1.f, Type::Sfx, PlayMode::Normal);
+        mNearWaterId = update.mSound;
+        if (mNearWaterSound != nullptr)
+        {
+            mNearWaterSound->setFade(sSfxFadeInDuration, 1.0f, Play_FadeExponential);
+            note("the sound " + formText(update.mSound) + " of the water starts, strength "
+                + std::to_string(update.mStrength) + " at " + std::to_string(update.mPosition.x()) + " "
+                + std::to_string(update.mPosition.y()) + " " + std::to_string(update.mPosition.z()));
+        }
     }
 
     void SoundManager::cull3DSound(SoundBase* sound)

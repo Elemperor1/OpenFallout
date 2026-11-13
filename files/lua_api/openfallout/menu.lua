@@ -126,7 +126,7 @@
 
 ---
 -- What a setting that the game's own settings screens write is now: a number, or a boolean for a switch. The names are:
--- `masterVolume`, `musicVolume`, `footstepsVolume`, `voiceVolume`, `effectsVolume` (0 to 1), `gamma` (the video's
+-- `masterVolume`, `musicVolume`, `radioVolume`, `footstepsVolume`, `voiceVolume`, `effectsVolume` (0 to 1), `gamma` (the video's
 -- gamma), `mouseSensitivity` (the camera's), `invertYAxis`, `crosshair` and `subtitles` (booleans). Any other name is an error.
 -- @function [parent=#menu] getOption
 -- @param #string name

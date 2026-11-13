@@ -306,7 +306,7 @@ namespace OFRender
         held.mDrawn = drawn;
         held.mWeapon = weapon;
         if (drawn)
-            animation.drawWeapon(model, animationType);
+            animation.drawWeapon(model, animationType, weapon);
         else
             animation.holsterWeapon();
     }
