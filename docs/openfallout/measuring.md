@@ -156,3 +156,50 @@ First baseline, 2026-11-12, taken when this page was written.
 
 The interiors draw in 3-4 ms when standing; `fo3-interior` costs about three times as much while
 turning as while standing (why was not looked into). The busy New Vegas exterior is the slowest scene standing (12 ms, about 80 frames a second).
+
+## Frame-critical thread priority (#186), before and after
+
+2026-11-12. The change marks the main thread and OSG's draw thread user-interactive (QoS) on macOS
+(`Misc::setCurrentThreadFrameCriticalPriority()`, called at the start of `Engine::go()` and from an initial draw callback
+on the main camera). The engine runs OSG's `DrawThreadPerContext` model on macOS: cull on the main thread, draw on one
+`osg::GraphicsThread`.
+
+What the change does to the threads, read from a running engine (`proc_pidinfo` thread info of `nv-exterior`, same
+scene, one run each): the draw thread's scheduler priority goes from 31 (default class) to 46; the main thread is 46
+in both builds (macOS already starts a process's main thread at user-interactive, so for the main thread the call only
+makes that explicit); every other thread keeps its priority (loading, physics and Lua workers at 31, the navmesh and
+sound workers that ask for background at 4). A thread started from a user-interactive thread gets the default class, not
+its creator's (checked with a test program and pinned by the unit test 
+`MiscThreadTest.threadsStartedFromAFrameCriticalThreadKeepTheDefaultQos`), so no worker is raised by accident and none needed pinning back.
+
+- Engines: "before" = Release build of `mac-first` at `4422e7ad24` (copied aside), "after" = the same tree with the change
+  (`bf3edde1a0`), same build options (Homebrew libraries, the local Apple-bundling switch), started directly (Game Mode
+  off), windowed in the background.
+- Machine: Apple M3 Pro, 18 GiB, macOS 27.2.1 (26B131).
+- Method: `mac_measure.py run all --repeat 3`, interleaved in two rounds: before, after, before, after (each pass about
+  32 min), 6 runs per scene and side in all.
+- Conditions, which make this a noisy comparison: round 1 "before" ran on battery (38 % to 23 %); the Mac was plugged in
+  during round 1 "after" and round 2 ran charging (69 % to 100 %). An unrelated build (`ninja`) in another folder started
+  at 18:08 during round 1 "after", and build processes were running at the start or end of 8 of the 18 round-1 "after"
+  runs and 4 of the 18 round-2 "before" runs. Load averages 3-12. Single runs on both sides had slow cell loads (before
+  `nv-exterior` 8.3 s once, after `nv-busy` 5.0 s and 7.8 s), which is why the table gives medians with the range.
+
+Medians of the 6 runs per side (min-max), frame times in ms, cell load in s:
+
+| scene | stand p50 before / after | turn p50 before / after | turn p99 before / after | cell load before / after |
+|---|---:|---:|---:|---:|
+| `nv-interior` | 3.7 (3.3-5.3) / 3.95 (3.2-4.5) | 2.8 (2.2-3.4) / 3.4 (2.0-4.2) | 7.55 (7.2-8.6) / 7.25 (7.1-9.0) | 0.71 (0.61-0.84) / 0.68 (0.62-0.76) |
+| `nv-exterior` | 8.6 (8.3-9.0) / 8.75 (8.5-11.2) | 11.0 (10.9-11.3) / 11.3 (10.7-12.8) | 19.8 (16-31.9) / 18.1 (16.8-21.8) | 2.73 (2.56-8.33) / 2.79 (2.61-3.05) |
+| `nv-busy` | 10.5 (10.3-11.0) / 10.9 (10.3-11.3) | 10.1 (9.9-10.8) / 10.4 (9.9-10.6) | 15.9 (13.2-22.5) / 16.6 (14.8-19.5) | 2.84 (2.47-3.14) / 2.86 (2.65-7.79) |
+| `fo3-interior` | 4.1 (3.3-8.0) / 4.45 (3.8-4.7) | 12.1 (11.2-15.1) / 13.0 (12.3-16.1) | 19.4 (15.8-24.8) / 18.1 (17.5-29.9) | 1.02 (0.95-1.06) / 1.03 (0.99-1.08) |
+| `fo3-exterior` | 8.3 (7.3-8.4) / 8.3 (7.9-8.5) | 8.0 (6.7-9.1) / 8.1 (6.4-8.4) | 11.9 (10.4-16.8) / 10.8 (9.7-14.4) | 2.34 (2.12-2.56) / 2.39 (1.98-2.59) |
+| `fo3-busy` | 8.3 (6.8-8.4) / 8.3 (7.9-8.3) | 4.2 (3.8-8.3) / 4.2 (3.7-4.3) | 8.8 (8.0-10.9) / 7.4 (6.8-8.6) | 3.09 (2.63-3.36) / 3.06 (2.63-3.46) |
+
+Result: no measurable difference. Cell-load medians moved by -3 % to +2 %, far inside the spread of either side. Median
+frame times moved by -16 % to +21 %, every change inside the range of the runs of one side; the largest (`nv-interior`
+turning, 2.8 to 3.4 ms) comes from round 2 alone (round 1: 3.1 to 2.9). `fo3-interior` was slower "after" in both
+rounds by 0.3-1 ms median (round 1 clearly, round 2 within the spread), which is the one thing to watch in a later,
+quieter comparison. The tail (turn p99) was lower "after" in 4 of 6 scenes. These runs are windowed in the background
+with nothing else competing for the performance cores for long; whether the change helps a frontmost full-screen game
+while the system is busy (what it is for) is not measured by this method. Physics was not raised (no gain measured to justify
+it). Results: `scratch-macfirst/measure-186/r{1,2}-{before,after}` on the development Mac.
