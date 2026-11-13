@@ -84,10 +84,23 @@ xcrun xctrace record --template 'Allocations'   --attach <pid> --time-limit 70s 
 xcrun xctrace record --template 'Game Performance' --attach <pid> --time-limit 70s --output game.trace --no-prompt
 ```
 
-To record allocations from the very start (the load included), launch the engine under `xctrace` instead of attaching:
-`xcrun xctrace record --template Allocations --output alloc.trace --env SDL_MAC_BACKGROUND_APP=1 --launch -- <engine>
-<the scene's arguments>`. `mac_measure.py` does not do that, because a launched engine gets no terminal and shows a
-dialog instead of a log line when it fails to start.
+To record allocations from the very start (the load included), launch the engine under `xctrace` instead of attaching,
+with the whole command line of a run. `<run>` is the folder of a run that `mac_measure.py run` made before: it holds the
+`config`, `userdata` and `data` folders the run was prepared with. For `nv-interior`:
+
+```
+xcrun xctrace record --template Allocations --output alloc.trace --env SDL_MAC_BACKGROUND_APP=1 --launch -- \
+    <engine> --resources <resources> --config <run>/config --replace config --user-data <run>/userdata \
+    --data-local <run>/userdata/data --data <the game's Data folder> --data scripts/openfallout/perfprobe \
+    --data <run>/data --content FalloutNV.esm --content perfprobe.omwscripts --skip-menu --no-grab \
+    --start GSDocMitchellHouse
+```
+
+Leave none of it out: without `--config <run>/config --replace config` and `--user-data` the engine reads and writes
+the settings and saves of whoever uses the Mac, and without the probe (`perfprobe.omwscripts` and its two `--data`
+folders) it does not go through the phases and does not quit by itself. The master file and `--start` of the other
+scenes are in the table above. `mac_measure.py` does not launch under `xctrace` itself, because a launched engine gets
+no terminal and shows a dialog instead of a log line when it fails to start.
 
 A trace adds its own cost: never compare the frame times of a run with a capture to those of a run without one.
 
