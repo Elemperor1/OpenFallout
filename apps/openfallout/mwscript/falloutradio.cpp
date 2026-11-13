@@ -567,6 +567,9 @@ namespace OFScript
             // A station that is not in a loaded cell is not a thing the player can hear
             if (findReference(station.mReference).isEmpty())
                 continue;
+            // (and one the player talks to says what the conversation says)
+            if (inConversationWith(station.mReference))
+                continue;
             float& rest = radio.mRoomRest[station.mReference];
             // A conversation that was asked for starts at once (what it says is cut off)
             if (const auto pending = radio.mPending.find(station.mReference); pending != radio.mPending.end())
@@ -606,6 +609,8 @@ namespace OFScript
                     line.mSeconds = step.mSeconds;
                     line.mTopic = step.mTopic;
                     line.mSpeakerBase = step.mSpeakerBase;
+                    line.mRadio = true;
+                    line.mSong = step.mSong;
                 }
                 if (!lines.empty())
                 {
@@ -634,6 +639,9 @@ namespace OFScript
                 if ((npc.getRefData().getPosition().asVec3() - player.getRefData().getPosition().asVec3()).length() > reach)
                     continue;
             }
+            // A character that the player talks to says what the conversation says, not what its radio does
+            if (inConversationWith(actor))
+                continue;
             // A conversation that was asked for starts at once (what is said is cut off)
             if (const auto pending = radio.mPendingNpc.find(entry.mStation); pending != radio.mPendingNpc.end())
             {
@@ -665,6 +673,8 @@ namespace OFScript
                 line.mSeconds = step.mSeconds;
                 line.mTopic = step.mTopic;
                 line.mSpeakerBase = step.mSpeakerBase;
+                line.mRadio = true;
+                line.mSong = step.mSong;
             }
             if (!lines.empty())
             {
@@ -673,11 +683,7 @@ namespace OFScript
             }
         }
         for (const auto station : dispatched)
-        {
             radio.mPendingNpc.erase(station);
-            // (a request for a station that characters play is theirs: the tuned radio and a thing in a room had it first)
-            radio.mPending.erase(station);
-        }
         // (a conversation that was asked of a station that nobody plays any more is dropped)
         if (radio.mPending.size() > 64)
             radio.mPending.clear();

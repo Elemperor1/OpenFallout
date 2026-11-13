@@ -2173,6 +2173,10 @@ namespace OFScript
             FalloutScript::FormId mSpeaker = 0;
             /// The script asked for the text to be shown even with subtitles off
             bool mForceSubtitles = false;
+            /// A line of a radio that is not the Pip-Boy's (a thing in a room, a character's): it follows the radio's
+            /// volume, and a song of it is left out when the radio is set to dialogue only
+            bool mRadio = false;
+            bool mSong = false;
         };
         struct Saying
         {
@@ -2186,6 +2190,11 @@ namespace OFScript
         /// What a character is saying stops, with what it had left to say (a radio that is turned off, a conversation that
         /// is asked for)
         void cutOffSaying(FalloutScript::FormId reference);
+        /// The songs that radios of the world (things in rooms, characters) are playing or have queued stop, when the radio
+        /// is set to dialogue only; what else they say goes on
+        void dropWorldRadioSongs();
+        /// Whether the character is the one the player talks to
+        bool inConversationWith(FalloutScript::FormId reference);
         void updateVoices(float frametime);
         /// Tells the scripts of the characters that were told to say what nobody could say that they are done
         void raiseNothingSaid();

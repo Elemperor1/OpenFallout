@@ -248,7 +248,7 @@ namespace OFSound
         return mStreams.get();
     }
 
-    StreamPtr SoundManager::playVoice(DecoderPtr decoder, const osg::Vec3f& pos, bool playlocal)
+    StreamPtr SoundManager::playVoice(DecoderPtr decoder, const osg::Vec3f& pos, bool playlocal, Type type)
     {
         OFBase::World* world = OFBase::Environment::get().getWorld();
         static const float fAudioMinDistanceMult
@@ -263,14 +263,14 @@ namespace OFSound
         static float maxDistance = std::max(fAudioVoiceDefaultMaxDistance * fAudioMaxDistanceMult, minDistance);
 
         bool played;
-        float basevol = volumeFromType(Type::Voice);
+        float basevol = volumeFromType(type);
         StreamPtr sound = getStreamRef();
         if (playlocal)
         {
             sound->init([&] {
                 SoundParams params;
                 params.mBaseVolume = basevol;
-                params.mFlags = PlayMode::NoEnv | Type::Voice | Play_2D;
+                params.mFlags = PlayMode::NoEnv | type | Play_2D;
                 return params;
             }());
             played = mOutput->streamSound(std::move(decoder), sound.get(), true);
@@ -283,7 +283,7 @@ namespace OFSound
                 params.mBaseVolume = basevol;
                 params.mMinDistance = minDistance;
                 params.mMaxDistance = maxDistance;
-                params.mFlags = PlayMode::Normal | Type::Voice | Play_3D;
+                params.mFlags = PlayMode::Normal | type | Play_3D;
                 return params;
             }());
             played = mOutput->streamSound3D(std::move(decoder), sound.get(), true);
@@ -465,7 +465,7 @@ namespace OFSound
         advanceMusic(filename, fade);
     }
 
-    void SoundManager::say(const OFWorld::ConstPtr& ptr, VFS::Path::NormalizedView filename)
+    void SoundManager::say(const OFWorld::ConstPtr& ptr, VFS::Path::NormalizedView filename, Type type)
     {
         if (!mOutput->isInitialized())
             return;
@@ -478,7 +478,7 @@ namespace OFSound
         const osg::Vec3f pos = world->getActorHeadTransform(ptr).getTrans();
 
         stopSay(ptr);
-        StreamPtr sound = playVoice(std::move(decoder), pos, (ptr == OFMechanics::getPlayer()));
+        StreamPtr sound = playVoice(std::move(decoder), pos, (ptr == OFMechanics::getPlayer()), type);
         if (!sound)
             return;
 

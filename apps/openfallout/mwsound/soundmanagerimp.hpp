@@ -148,7 +148,7 @@ namespace OFSound
         SoundPtr getSoundRef();
         StreamPtr getStreamRef();
 
-        StreamPtr playVoice(DecoderPtr decoder, const osg::Vec3f& pos, bool playlocal);
+        StreamPtr playVoice(DecoderPtr decoder, const osg::Vec3f& pos, bool playlocal, Type type = Type::Voice);
 
         void streamMusicFull(VFS::Path::NormalizedView filename);
         void advanceMusic(VFS::Path::NormalizedView filename, float fadeOut = 1.f);
@@ -212,7 +212,8 @@ namespace OFSound
         bool isMusicTrackPlaying(MusicTrackId track) const override;
         void stopMusicTrack(MusicTrackId track) override;
 
-        void say(const OFWorld::ConstPtr& reference, VFS::Path::NormalizedView filename) override;
+        void say(const OFWorld::ConstPtr& reference, VFS::Path::NormalizedView filename,
+            OFSound::Type type = OFSound::Type::Voice) override;
         ///< Make an actor say some text.
         /// \param filename name of a sound file in the VFS
 

@@ -2255,8 +2255,11 @@ namespace OFWorld
                     return std::nullopt;
                 return other.mHitPos.z();
             };
+            // (what the plane of the tread rises along the probe is not a step: a ramp goes up evenly)
+            const float slopeAhead = -(hit.mHitNormal.x() * forward.x() + hit.mHitNormal.y() * forward.y())
+                / std::max(hit.mHitNormal.z(), 1e-3f) * stairSettings.mReach;
             stairs = Steps::isStairs(stairSettings, hit.mHitNormal.z(), hit.mHitPos.z(),
-                heightAt(forward * stairSettings.mReach), heightAt(forward * -stairSettings.mReach));
+                heightAt(forward * stairSettings.mReach), heightAt(forward * -stairSettings.mReach), slopeAhead);
         }
 
         int material = -1;

@@ -115,6 +115,7 @@ namespace OFSound
     void MusicMixer::forget()
     {
         mPlaying.clear();
+        mFading.clear();
         mDone.clear();
         mEnded = false;
     }

@@ -160,21 +160,20 @@ namespace FalloutScript::Footsteps
     }
 
     bool isStairs(const StairSettings& settings, float normalZ, float height, std::optional<float> aheadHeight,
-        std::optional<float> behindHeight)
+        std::optional<float> behindHeight, float slopeAhead)
     {
         if (normalZ < settings.mFlatNormal)
             return false;
-        // What a slope of that tilt rises over the reach is not a step: a ramp is ground that goes up evenly, a tread is a
-        // flat that the ground goes up from
-        const float tilt = std::sqrt(std::max(0.f, 1.f - normalZ * normalZ)) / std::max(normalZ, 1e-3f);
-        const float slopeRise = settings.mReach * tilt;
-        const auto isStep = [&](std::optional<float> other) {
+        // What the plane of the ground under the foot rises along the probe is not a step: a ramp goes up evenly (the
+        // ground ahead is higher by `slopeAhead`, and the ground behind lower by as much), a tread is a flat that the ground
+        // goes up from
+        const auto isStep = [&](std::optional<float> other, float plane) {
             if (!other)
                 return false;
-            const float rise = std::abs(*other - height);
-            return rise - slopeRise >= settings.mMinStep && rise <= settings.mMaxStep;
+            const float rise = std::abs(*other - height - plane);
+            return rise >= settings.mMinStep && rise <= settings.mMaxStep;
         };
-        return isStep(aheadHeight) || isStep(behindHeight);
+        return isStep(aheadHeight, slopeAhead) || isStep(behindHeight, -slopeAhead);
     }
 
     std::string armorSoundName(bool powerArmor, Foot foot)

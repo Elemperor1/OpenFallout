@@ -134,12 +134,14 @@ namespace FalloutScript::Footsteps
         float mReach = 24.f;
         float mMinStep = 5.f;
         float mMaxStep = 30.f;
-        /// How flat the ground has to be: the z of its normal. What a slope of that tilt rises over `mReach` does not count
-        /// as a step, so a ramp is not taken for stairs.
+        /// How flat the ground has to be: the z of its normal
         float mFlatNormal = 0.95f;
     };
+    /// `slopeAhead` is how much higher the plane of the ground under the foot is at `mReach` ahead along the probe than
+    /// where the foot is (negative for a downhill, 0 for ground that is level along the probe, as a tread is); the ground
+    /// behind is taken at the opposite rise, and what the plane explains is not counted as a step.
     bool isStairs(const StairSettings& settings, float normalZ, float height, std::optional<float> aheadHeight,
-        std::optional<float> behindHeight);
+        std::optional<float> behindHeight, float slopeAhead = 0.f);
 
     /// The slot of the landing and of the jump
     constexpr Slot landSlot = Slot::Land;

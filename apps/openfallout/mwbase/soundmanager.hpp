@@ -150,9 +150,11 @@ namespace OFBase
         virtual bool isMusicTrackPlaying(MusicTrackId track) const = 0;
         virtual void stopMusicTrack(MusicTrackId track) = 0;
 
-        virtual void say(const OFWorld::ConstPtr& reference, VFS::Path::NormalizedView filename) = 0;
+        virtual void say(const OFWorld::ConstPtr& reference, VFS::Path::NormalizedView filename,
+            OFSound::Type type = OFSound::Type::Voice) = 0;
         ///< Make an actor say some text.
         /// \param filename name of a sound file in the VFS
+        /// \param type the volume channel it follows (a radio that a character plays follows the radio's)
 
         virtual void say(VFS::Path::NormalizedView filename) = 0;
         ///< Say some text, without an actor ref

@@ -146,6 +146,15 @@ namespace OFSound
             std::set<OFBase::SoundManager::MusicTrackId> mPlaying;
             std::vector<std::pair<OFBase::SoundManager::MusicTrackId, float>> mFaded;
             bool mCannotStart = false;
+            /// A fade takes time: the faded tracks play until `finishFades`
+            bool mFadesTakeTime = false;
+            std::set<OFBase::SoundManager::MusicTrackId> mStopping;
+            void finishFades()
+            {
+                for (const auto id : mStopping)
+                    mPlaying.erase(id);
+                mStopping.clear();
+            }
 
             OFBase::SoundManager::MusicTrackId startMusicTrack(VFS::Path::NormalizedView file, float gain, float fade, bool loop)
             {
@@ -161,7 +170,12 @@ namespace OFSound
             {
                 mFaded.emplace_back(id, gain);
                 if (stopAtEnd)
-                    mPlaying.erase(id);
+                {
+                    if (mFadesTakeTime)
+                        mStopping.insert(id);
+                    else
+                        mPlaying.erase(id);
+                }
             }
         };
 
@@ -204,6 +218,33 @@ namespace OFSound
             EXPECT_EQ(sound.mFaded[1].first, 2u);
             EXPECT_FLOAT_EQ(sound.mFaded[1].second, 0.f);
             EXPECT_EQ(mixer.size(), 1u);
+        }
+
+        TEST(OFSoundFalloutMusicTest, theMixerIsAudibleWhileAStemFadesOutThoughItIsNotPlayingAStemAnyMore)
+        {
+            FakeSound sound;
+            sound.mFadesTakeTime = true;
+            MusicMixer mixer;
+            mixer.update(sound, { stemOf("music/a.mp3", 0.5f, true) }, 3.f);
+            EXPECT_TRUE(mixer.audible(sound));
+            // nothing is wanted now: the stem is the mixer's no more, but the fade is heard
+            mixer.update(sound, {}, 3.f);
+            EXPECT_EQ(mixer.size(), 0u);
+            EXPECT_TRUE(mixer.audible(sound));
+            sound.finishFades();
+            EXPECT_FALSE(mixer.audible(sound));
+        }
+
+        TEST(OFSoundFalloutMusicTest, stoppingTheMixerIsAudibleUntilTheFadeIsOver)
+        {
+            FakeSound sound;
+            sound.mFadesTakeTime = true;
+            MusicMixer mixer;
+            mixer.update(sound, { stemOf("music/a.mp3", 0.5f, true), stemOf("music/b.mp3", 0.5f, true) }, 1.f);
+            mixer.stopAll(sound, 2.f);
+            EXPECT_TRUE(mixer.audible(sound));
+            sound.finishFades();
+            EXPECT_FALSE(mixer.audible(sound));
         }
 
         TEST(OFSoundFalloutMusicTest, aStemThatPlayedToItsEndIsNotStartedAgainUntilTheMixerIsToldToRestart)

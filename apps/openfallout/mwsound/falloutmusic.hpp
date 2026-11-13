@@ -115,6 +115,7 @@ namespace OFSound
                 if (stem == wanted.end())
                 {
                     sound.fadeMusicTrack(it->mId, 0.f, fadeSeconds, true);
+                    mFading.push_back(it->mId);
                     it = mPlaying.erase(it);
                     continue;
                 }
@@ -146,7 +147,10 @@ namespace OFSound
         void stopAll(Sound& sound, float fadeSeconds)
         {
             for (const Playing& playing : mPlaying)
+            {
                 sound.fadeMusicTrack(playing.mId, 0.f, fadeSeconds, true);
+                mFading.push_back(playing.mId);
+            }
             mPlaying.clear();
             mDone.clear();
             mEnded = false;
@@ -157,6 +161,15 @@ namespace OFSound
         {
             return std::any_of(mPlaying.begin(), mPlaying.end(),
                 [&sound](const Playing& p) { return sound.isMusicTrackPlaying(p.mId); });
+        }
+        /// Whether anything of the mixer is heard: a stem that plays, or one that was faded out and still fades
+        template <class Sound>
+        bool audible(Sound& sound)
+        {
+            mFading.erase(std::remove_if(mFading.begin(), mFading.end(),
+                              [&sound](OFBase::SoundManager::MusicTrackId id) { return !sound.isMusicTrackPlaying(id); }),
+                mFading.end());
+            return !mFading.empty() || playing(sound);
         }
         /// Whether the stems that were wanted have all played to their end and none plays now (a set that does not loop is
         /// over, and the controller picks one again)
@@ -179,6 +192,9 @@ namespace OFSound
             float mGain = 0.f;
         };
         std::vector<Playing> mPlaying;
+        /// The tracks that were faded out (and stop at the end of the fade): they are not the mixer's stems any more, but
+        /// they are heard until then
+        std::vector<OFBase::SoundManager::MusicTrackId> mFading;
         /// Files that ended or could not be started while they were wanted: they are not started again until they
         /// have been unwanted
         std::vector<VFS::Path::Normalized> mDone;

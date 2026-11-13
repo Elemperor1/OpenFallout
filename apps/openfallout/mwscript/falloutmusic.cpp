@@ -669,9 +669,9 @@ namespace OFScript
         const ESM4::MediaSet* incidental = soundRegion == nullptr || soundRegion->mIncidentalSet.isZeroOrUnset()
             ? nullptr
             : mStore.get<ESM4::MediaSet>().search(soundRegion->mIncidentalSet);
-        // (the layers of a set that is left fade out first: the mixer still plays them while the wanted list is empty)
+        // (the layers of a set that is left fade out first: the mixer still fades them while the wanted list is empty)
         const bool quiet = music.mStems.empty() && !scriptMusic && !combat
-            && (music.mTrack == 0 || !sound->isMusicTrackPlaying(music.mTrack)) && !music.mMixer.playing(*sound);
+            && (music.mTrack == 0 || !sound->isMusicTrackPlaying(music.mTrack)) && !music.mMixer.audible(*sound);
         if (incidental != nullptr && incidental->mSetType == 3 && quiet)
         {
             FalloutScript::Music::IncidentalTimes times;

@@ -423,7 +423,11 @@ namespace OFScript
         // SetRadioToDialogueOnlyMode: the radio says what is said and plays no songs (0x5E0020)
         mInterpreter.setHandler("SetRadioToDialogueOnlyMode", [this](FalloutScript::CallContext& call) {
             const bool on = FalloutScript::intArgument(call, 0) != 0;
-            runOnMainThread([this, on] { mRadioPlayback.mDialogueOnly = on; });
+            runOnMainThread([this, on] {
+                mRadioPlayback.mDialogueOnly = on;
+                if (on)
+                    dropWorldRadioSongs();
+            });
             return 0.0;
         });
         // The station that the command is called on says the topic next (0x5D82A0 calls 0x835BE0: the topic is given, or
@@ -4400,13 +4404,54 @@ namespace OFScript
             mSayings.begin(), mSayings.end(), [reference](const Saying& other) { return other.mReference == reference; });
         if (saying == mSayings.end())
             return;
+        // The line that is said now may be another character's (in an exchange they take turns)
+        FalloutScript::FormId speaker = reference;
+        if (saying->mNext < saying->mLines.size() && saying->mLines[saying->mNext].mSpeaker != 0)
+            speaker = saying->mLines[saying->mNext].mSpeaker;
         mSayings.erase(saying);
         if (!OFBase::Environment::exists())
             return;
         OFBase::SoundManager* sound = OFBase::Environment::get().getSoundManager();
-        const OFWorld::Ptr ptr = findReference(reference);
+        const OFWorld::Ptr ptr = findReference(speaker);
         if (sound != nullptr && !ptr.isEmpty())
             sound->stopSay(ptr);
+    }
+
+    void FalloutScripts::dropWorldRadioSongs()
+    {
+        OFBase::SoundManager* sound
+            = OFBase::Environment::exists() ? OFBase::Environment::get().getSoundManager() : nullptr;
+        for (Saying& saying : mSayings)
+        {
+            if (saying.mNext >= saying.mLines.size())
+                continue;
+            // The song that plays now stops
+            if (const SaidLine& line = saying.mLines[saying.mNext]; line.mRadio && line.mSong && saying.mStarted)
+            {
+                if (const OFWorld::Ptr speaker = findReference(line.mSpeaker != 0 ? line.mSpeaker : saying.mReference);
+                    sound != nullptr && !speaker.isEmpty())
+                    sound->stopSay(speaker);
+                saying.mStarted = false;
+            }
+            // and the songs that were queued are not said (the end of what was said is kept for the line that is left)
+            bool ended = false;
+            const auto from = saying.mLines.begin() + static_cast<std::ptrdiff_t>(saying.mNext);
+            const auto removed = std::remove_if(from, saying.mLines.end(), [&ended](const SaidLine& line) {
+                if (!line.mRadio || !line.mSong)
+                    return false;
+                ended = ended || line.mEnd;
+                return true;
+            });
+            saying.mLines.erase(removed, saying.mLines.end());
+            if (ended && saying.mNext < saying.mLines.size())
+                saying.mLines.back().mEnd = true;
+        }
+    }
+
+    bool FalloutScripts::inConversationWith(FalloutScript::FormId reference)
+    {
+        const std::lock_guard lock(mDialogueMutex);
+        return mDialogue.active() && mDialogue.speaker().mReference == reference;
     }
 
     void FalloutScripts::raiseNothingSaid()
@@ -4498,7 +4543,8 @@ namespace OFScript
                 bool voiced = false;
                 if (!line.mVoice.empty())
                 {
-                    sound->say(speaker, VFS::Path::Normalized(line.mVoice));
+                    sound->say(speaker, VFS::Path::Normalized(line.mVoice),
+                        line.mRadio ? OFSound::Type::Radio : OFSound::Type::Voice);
                     voiced = sound->sayActive(speaker);
                 }
                 saying->mWait = voiced ? 0.f : line.mSeconds;
