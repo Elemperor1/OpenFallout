@@ -228,6 +228,9 @@ namespace OFBase
         /// A character or creature of Fallout looks at its AI packages again, now and not at the next time it does:
         /// scripts changed the packages they gave it, or what the conditions of its packages depend on
         virtual void evaluateFalloutPackages(const OFWorld::Ptr& actor) = 0;
+        /// A blow throws a character or creature of Fallout back: it goes along the ground at `velocity` (units a
+        /// second), which falls to nothing over `seconds`, and falls when the ground ends under it
+        virtual void knockFallout(const OFWorld::Ptr& actor, const osg::Vec3f& velocity, float seconds) = 0;
         /// The AI package that a character or creature of Fallout follows now: the id of its record, unset for one
         /// that follows none
         virtual ESM::FormId falloutPackageOf(const OFWorld::Ptr& actor) const = 0;

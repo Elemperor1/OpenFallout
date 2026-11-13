@@ -1949,13 +1949,27 @@ namespace OFScript
         /// rule of Morrowind that the controller has is not used. False for a character that is not the player, whose
         /// falls the rule does not read yet.
         bool landed(const OFWorld::Ptr& ptr, float heightLost);
+        /// A character or creature of the world lands after a fall that lost that much height (main thread): the
+        /// ground's landing sound, and the damage that the executables' rule gives (the exponent of the height, and the
+        /// legs), which it dies of when nothing is left of its health. The player lands in `landed`.
+        void fell(const OFWorld::Ptr& ptr, float heightLost);
         /// The player jumps: the sound of the jump (New Vegas) from the ground it leaves
         void jumped(const OFWorld::Ptr& ptr);
+        /// How many legs of the character or creature are crippled (0 to 2): the conditions of its legs are the actor
+        /// values 0x1D and 0x1E and a leg is crippled when nothing is left of it. Any thread.
+        int crippledLegs(const OFWorld::Ptr& ptr);
+        /// What the crippled legs of the character leave of its speed (1 when none is: fMoveOneCrippledLegSpeedMult and
+        /// fMoveTwoCrippledLegsSpeedMult of the executables' speed rule, 0x647d10). Any thread.
+        double moveSpeedMultiplier(const OFWorld::Ptr& ptr);
         /// The pad shakes because the player was hurt, as the games' settings fRumblePainStrength and fRumblePainTime say
         /// The pad of the player shakes for something that happened to it (the INI's `fRumble<Kind>Strength` and
         /// `fRumble<Kind>Time`: Pain, Struck, Hit), unless a menu is open (the executable's own rule at 0x89CEBA)
         void rumbleFor(const char* strengthSetting, double strengthDefault, const char* timeSetting, double timeDefault);
         void painRumble();
+        /// A blow of the weapon hit the character or creature: the impact that the weapon's impact data set has for its
+        /// body is shown on the part that was hit (`limb`, the type of the part; -1 for the body, which is the torso).
+        /// Any thread; what is drawn is done on the main thread.
+        void showImpact(FalloutScript::FormId victim, FalloutScript::FormId attacker, FalloutScript::FormId weapon, int limb);
         void struckRumble();
         void hitRumble();
         /// The sound of the ground for a landing or a jump, from where the actor stands

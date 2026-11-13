@@ -63,6 +63,7 @@
 #include "../mwrender/renderinginterface.hpp"
 
 #include "../mwgui/tooltips.hpp"
+#include "../mwscript/falloutscripts.hpp"
 
 #include "nameorid.hpp"
 
@@ -900,6 +901,10 @@ namespace OFClass
 
         if (stats.isWerewolf() && running && stats.getDrawState() == OFMechanics::DrawState::Nothing)
             moveSpeed *= gmst.fWereWolfRunMult->mValue.getFloat();
+
+        // The player of Fallout moves slower on crippled legs (the executables' speed rule)
+        if (OFBase::Environment::get().hasFalloutScripts())
+            moveSpeed *= static_cast<float>(OFBase::Environment::get().getFalloutScripts()->moveSpeedMultiplier(ptr));
 
         return moveSpeed;
     }

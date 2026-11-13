@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include <osg/MatrixTransform>
 #include <osg/Vec3f>
@@ -57,8 +58,19 @@ namespace OFRender
         void holsterWeapon();
         bool isWeaponDrawn() const { return mDrawn; }
 
-        /// One attack with what it holds: a gun fires, a melee weapon or the hands swing in turn left and right
+        /// One attack with what it holds: a gun fires, a melee weapon or the hands swing in turn left and right. A gun
+        /// whose projectile has a muzzle flash (the record's flash model and the seconds it lasts) flashes at its muzzle.
         void attack();
+        /// Whether the actor is in the air (thrown off the ground by a blow, or falling): it plays the animation of a jump
+        /// while it is, and the landing when it is not. The characters of the world have no physics to ask, so what moves
+        /// them says; the body of the player asks the world.
+        void setAirborne(bool airborne) { mAirborneTold = airborne; }
+        /// A blow of the weapon (its form) hits the actor: the impact of the weapon's impact data set for the kind of
+        /// body the actor has (flesh, the blood of an insect, metal for a robot) is shown on the node of the part that
+        /// was hit (empty: on the body) for the seconds the impact lasts
+        /// `toward` is the way from the actor toward the one that struck, in the world: the impact model lies on the body
+        /// facing that way (the surface normal of the hit, which the games take from the ray)
+        void showImpact(std::uint32_t weapon, const std::string& node, const osg::Vec3f& toward);
         /// A blow hits the actor and it reels, when the files have the animation for it
         void flinch();
 
@@ -121,6 +133,29 @@ namespace OFRender
         int mArmorSounds = 0;
         /// The form of the weapon that is out, 0 for none
         std::uint32_t mWeaponForm = 0;
+
+        /// A model that is shown for a moment on a node (a muzzle flash, an impact) and the seconds it has left
+        struct Effect
+        {
+            osg::ref_ptr<osg::Node> mNode;
+            osg::ref_ptr<osg::Group> mParent;
+            float mLeft = 0.f;
+            bool mFlash = false;
+            /// The time that the model's controllers (its particles, its textures) run by: it starts at 0 when the effect
+            /// is made, as those of a spell's effect do
+            std::shared_ptr<EffectAnimationTime> mTime;
+        };
+        std::vector<Effect> mEffects;
+        /// Shows the model on the node for the seconds. With `facing` (a way in the world) the model is turned so that its
+        /// +Z (the normal of an impact's splat) points that way, and put `lift` units out along it.
+        void addEffect(const std::string& model, osg::Group* parent, float seconds, bool flash,
+            const osg::Vec3f* facing = nullptr, float lift = 0.f);
+        void updateEffects(float duration);
+        void removeEffects(bool flashesOnly);
+        /// The flash of the weapon's muzzle, when its projectile has one
+        void flashMuzzle();
+        /// Which of the impact data set's materials the actor's body is (0 stone ... 6 flesh, 10 insect, 4 metal)
+        std::size_t impactMaterial() const;
         /// The sound that the weapon makes as it is taken out (the key `Enum: Equip` of its animation)
         void playWeaponHandled(bool equip);
 
@@ -210,9 +245,29 @@ namespace OFRender
             bool mSneak = false;
             std::string mPrefix;
             bool mValid = false;
+            /// A leg of the character is crippled: it limps
+            bool mHurt = false;
+            /// 0 the gaits, 1 in the air, 2 landing, 3 swimming, 4 and 5 turning to the left and to the right where it
+            /// stands
+            int mSpecial = 0;
             bool operator==(const MoveKey&) const = default;
         };
         MoveKey mMoveKey;
+        /// What the mechanics told of the air (`setAirborne`), how long the player's body has been off the ground, whether
+        /// it was in the air the frame before, the seconds that its landing has left and the length of the last frame
+        bool mAirborneTold = false;
+        float mAirTime = 0.f;
+        bool mWasAirborne = false;
+        float mLandLeft = 0.f;
+        float mFrameTime = 0.f;
+        /// How fast the actor turns (radians a second, clockwise positive, smoothed), the way it was turning last and the
+        /// seconds that the turn has left to show (a short turn plays its animation a moment, not for a flicker), and
+        /// the yaw of the frame before
+        float mTurnRate = 0.f;
+        int mTurning = 0;
+        float mTurnLeft = 0.f;
+        float mLastYaw = 0.f;
+        bool mHasLastYaw = false;
         /// How fast the actor goes ahead of where it faces and to its right (units a second, smoothed), and the
         /// direction that makes
         float mForwardSpeed = 0.f;
@@ -221,6 +276,7 @@ namespace OFRender
         /// Whether the actor sneaked the last time it was asked, and how many movement files were said in the log
         bool mSneaking = false;
         int mMovesSaid = 0;
+        int mSpecialsSaid = 0;
         FalloutGaits mGaits;
         FalloutGait mGait = FalloutGait::Idle;
         /// The speed (units a second, across the ground) at which the actor is moved, smoothed over a few frames

@@ -864,6 +864,11 @@ namespace OFMechanics
         mFalloutActors.evaluate(actor);
     }
 
+    void MechanicsManager::knockFallout(const OFWorld::Ptr& actor, const osg::Vec3f& velocity, float seconds)
+    {
+        mFalloutActors.knock(actor, velocity, seconds);
+    }
+
     ESM::FormId MechanicsManager::falloutPackageOf(const OFWorld::Ptr& actor) const
     {
         return mFalloutActors.currentPackage(actor);

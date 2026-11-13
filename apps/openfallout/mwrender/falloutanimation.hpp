@@ -78,9 +78,36 @@ namespace OFRender
     /// next of: the sneaking one with the weapon's prefix, the sneaking one of `mt`, the one of the weapon, the one of
     /// `mt`; a direction none of those has is the forward one. A file of the folder for the sex of the character comes
     /// before one of the folder `locomotion` or the folder itself, then any other; those named for children and for
-    /// the hurt are left out. Empty when there is none (a creature, whose movements `chooseFalloutLocomotion` finds).
+    /// the hurt are left out, except when `hurt` asks for the limping files of a character with a crippled leg (the files
+    /// `<name>_hurt.kf` of the folder `hurt`: `mtforward_hurt.kf`, `1hpfastleft_hurt.kf`; the games have none for
+    /// sneaking), which come before the ordinary ones. Empty when there is none (a creature, whose movements
+    /// `chooseFalloutLocomotion` finds).
     std::string chooseFalloutMove(std::string_view folder, std::string_view prefix, bool sneak,
-        FalloutDirection direction, bool run, bool female, const std::vector<std::string>& files);
+        FalloutDirection direction, bool run, bool female, const std::vector<std::string>& files, bool hurt = false);
+
+    /// What a character does that is not walking: in the air (`JumpLoop`, a jump or a fall) or touching the ground again
+    /// (`JumpLand`), or swimming
+    enum class FalloutAction
+    {
+        JumpLoop,
+        JumpLand,
+        Swim,
+        /// Standing and turning to the left or to the right (`mtturnleft.kf`, `1hpturnright.kf`, `sneakmtturnleft.kf`,
+        /// `swimmtturnleft.kf`)
+        TurnLeft,
+        TurnRight,
+    };
+
+    /// The animation file for an action, among the files of the folder of the skeleton of a character (as
+    /// `chooseFalloutMove`): the games name them `mtjumploopforward.kf`, `1hpjumpland.kf`, `sneakmtjumploopleft.kf`,
+    /// `swimmtfastbackward.kf`, `swimmtidle.kf`. A jump or a landing with the character standing still (`still`) takes
+    /// the file with no direction in its name, one that goes takes the file of its direction, and each takes the other
+    /// when its own is not there; swimming takes `swimmt` with `fast` (when it runs, `run`) and the direction, and
+    /// `swimmtidle` when it is `still`. The weapon's prefix, else `mt` (and `sneakmt` for a sneaking character, for
+    /// the jumps and turns) come first; a turn in water takes the one of swimming (`swimming`). Empty when there is none.
+    std::string chooseFalloutAction(std::string_view folder, std::string_view prefix, bool sneak, FalloutAction action,
+        FalloutDirection direction, bool still, bool run, bool female, const std::vector<std::string>& files,
+        bool swimming = false);
 
     /// The animation of a character that stands sneaking: `sneak` and the prefix of the weapon it holds, else
     /// `sneakmtidle.kf` (its folder or `locomotion`). Empty when there is none.

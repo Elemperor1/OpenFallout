@@ -86,6 +86,7 @@ namespace OFScript
             found.mDamageMult = part.mData.damageMult;
             found.mToHit = part.mData.toHitChance;
             found.mHealthPercent = part.mData.healthPercent;
+            found.mNode = part.mNodeName;
             parts.push_back(std::move(found));
         }
         return true;

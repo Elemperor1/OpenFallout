@@ -1,0 +1,11 @@
+{
+  "name": "m14p-effects",
+  "game": "nv",
+  "save": "latest",
+  "scenario": "../scenarios/m14p_reactions.lua",
+  "resolution": [1280, 720],
+  "framerate": 30,
+  "limit": 600,
+  "env": { "OPENFALLOUT_EFFECT_HOLD": "40" },
+  "variants": [ { "name": "plain" } ]
+}

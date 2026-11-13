@@ -8,6 +8,8 @@
 #include <components/esm/formid.hpp>
 #include <components/esm3/refnum.hpp>
 
+#include <osg/Vec3f>
+
 namespace OFWorld
 {
     class CellStore;
@@ -56,6 +58,11 @@ namespace OFMechanics
         /// the usual distance). Whatever the packages say, until stopFollowing.
         void follow(const OFWorld::Ptr& ptr, const OFWorld::Ptr& target, float distance);
         void stopFollowing(const OFWorld::Ptr& ptr);
+
+        /// A blow throws the character back: it goes along the ground at `velocity` (units a second), which falls to
+        /// nothing over `seconds`, is stopped by what is in its way, and falls (and is hurt by the fall) when the ground
+        /// ends under it
+        void knock(const OFWorld::Ptr& ptr, const osg::Vec3f& velocity, float seconds);
 
         /// Looks at the packages again at the next update: the packages that scripts gave the actor are read anew, and
         /// so are the conditions of its own

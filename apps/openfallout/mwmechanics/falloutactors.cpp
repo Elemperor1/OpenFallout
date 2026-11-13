@@ -21,6 +21,7 @@
 #include <components/esm4/packageschedule.hpp>
 #include <components/falloutscript/aimemory.hpp>
 #include <components/falloutscript/fightai.hpp>
+#include <components/misc/constants.hpp>
 #include <components/settings/values.hpp>
 
 #include "../mwbase/environment.hpp"
@@ -115,6 +116,17 @@ namespace OFMechanics
         constexpr float idleReportMove = 30.f;
         /// How near to the place it was told to shoot from a character has to be to shoot
         constexpr float scriptedPlaceReach = 64.f;
+        // A character that a blow throws back is stopped by what it would run into within this distance of its middle,
+        // at knee height
+        constexpr float thrownBodyRadius = 24.f;
+        // ... steps up onto ground that is this much higher than it stands, and steps off ground that falls away by
+        // more than this (and falls)
+        constexpr float thrownStepUp = 36.f;
+        constexpr float thrownStepDown = 40.f;
+        // A fall looks for the floor this far below, and a character that has fallen further than this with none below
+        // it is left where it is
+        constexpr float fallProbeDown = 8000.f;
+        constexpr float fallGiveUp = 20000.f;
 
         enum class Walk
         {
@@ -221,6 +233,17 @@ namespace OFMechanics
         FalloutYield mYield; // how long it has waited for the player to move out of its way, and whether it goes on
         float mPathWaiting = 0.f; // how long the navigator has had no mesh to make a path on
         bool mPathWaitingReported = false;
+
+        // A blow threw it back: it goes along the ground by mKnock (units a second), which falls to nothing over
+        // mKnockTotal seconds, and falls when the ground ends
+        bool mThrown = false;
+        osg::Vec3f mKnock;
+        float mKnockLeft = 0.f;
+        float mKnockTotal = 0.f;
+        bool mAirborne = false;
+        float mFallSpeed = 0.f; // units a second, down is negative
+        float mFallFrom = 0.f; // the height where the fall began
+        osg::Vec3f mDrift; // how fast it goes along the ground while it is in the air
 
         Mind(const OFWorld::Ptr& ptr, std::vector<const ESM4::AIPackage*> packages, std::uint64_t seed)
             : mPtr(ptr)
@@ -512,6 +535,136 @@ namespace OFMechanics
         }
     }
 
+    namespace
+    {
+        /// The height of the floor under a place, looked for from `up` above it to `down` below it
+        std::optional<float> floorBelow(OFBase::World& world, const osg::Vec3f& place, float up, float down)
+        {
+            const osg::Vec3f from(place.x(), place.y(), place.z() + up);
+            const float distance = world.getDistToNearestRayHit(from, osg::Vec3f(0.f, 0.f, -1.f), up + down);
+            if (distance >= up + down)
+                return std::nullopt;
+            return from.z() - distance;
+        }
+
+        /// A character that a blow threw back moves on by the force of it, and one that comes to the end of the ground
+        /// falls and is hurt by the fall (the executables' rule for a fall, as the player's). True while it is thrown or
+        /// in the air: it does nothing else then.
+        bool thrownStep(const Frame& frame, FalloutActors::Mind& mind, float duration)
+        {
+            OFBase::World& world = frame.mWorld;
+            const osg::Vec3f position = mind.position();
+            osg::Vec3f push;
+            if (mind.mAirborne)
+                push = mind.mDrift * duration;
+            else if (mind.mKnockLeft > 0.f)
+            {
+                // The force goes down to nothing over its time
+                const float share = mind.mKnockTotal > 0.f ? mind.mKnockLeft / mind.mKnockTotal : 0.f;
+                push = mind.mKnock * (share * duration);
+                mind.mKnockLeft = std::max(0.f, mind.mKnockLeft - duration);
+            }
+            push.z() = 0.f;
+
+            // It is stopped by what is in its way
+            const float length = push.length();
+            if (length > 1e-3f)
+            {
+                const osg::Vec3f from(position.x(), position.y(), position.z() + straightKneeHeight);
+                const float reach = length + thrownBodyRadius;
+                if (world.getDistToNearestRayHit(from, push / length, reach) < reach)
+                {
+                    push = osg::Vec3f();
+                    mind.mKnockLeft = 0.f;
+                    mind.mDrift = osg::Vec3f();
+                }
+            }
+
+            osg::Vec3f place = position + push;
+            bool landed = false;
+            if (mind.mAirborne)
+            {
+                mind.mFallSpeed -= Constants::GravityConst * Constants::UnitsPerMeter * duration;
+                const float height = position.z() + mind.mFallSpeed * duration;
+                const std::optional<float> floor = floorBelow(world, osg::Vec3f(place.x(), place.y(), position.z()),
+                    groundProbeUp, fallProbeDown);
+                if (floor && height <= *floor)
+                {
+                    place.z() = *floor;
+                    landed = true;
+                }
+                else if (!floor && mind.mFallFrom - height > fallGiveUp)
+                {
+                    // No floor at all below it: it is left where it is
+                    mind.mAirborne = false;
+                    mind.mThrown = false;
+                    return false;
+                }
+                else
+                    place.z() = height;
+            }
+            else
+            {
+                std::optional<float> floor = floorBelow(world, place, groundProbeUp, groundProbeDown);
+                // None within the usual reach: the ground may end in a drop, which it looks for further down
+                if (!floor)
+                    floor = floorBelow(world, place, groundProbeUp, fallProbeDown);
+                if (!floor || *floor > position.z() + thrownStepUp)
+                {
+                    // Ground it cannot step onto, or none: the push is over
+                    place = position;
+                    mind.mKnockLeft = 0.f;
+                }
+                else if (position.z() - *floor > thrownStepDown)
+                {
+                    // The ground ends: it goes on in the air with the speed it had
+                    mind.mAirborne = true;
+                    mind.mFallSpeed = 0.f;
+                    mind.mFallFrom = position.z();
+                    mind.mDrift = length > 1e-3f && duration > 0.f ? push / duration : osg::Vec3f();
+                    place.z() = position.z();
+                    Log(Debug::Info) << mind.mPtr.getCellRef().getRefId() << " goes off the edge: the ground is "
+                                     << static_cast<int>(position.z() - *floor) << " units below";
+                }
+                else
+                    place.z() = *floor;
+            }
+
+            if ((place - position).length2() > 1e-6f && isLoaded(frame, mind.mPtr, place))
+                world.moveObject(mind.mPtr, place);
+
+            if (landed)
+            {
+                const float heightLost = mind.mFallFrom - place.z();
+                mind.mAirborne = false;
+                mind.mFallSpeed = 0.f;
+                mind.mDrift = osg::Vec3f();
+                mind.mKnockLeft = 0.f;
+                if (frame.mScripts != nullptr)
+                    frame.mScripts->fell(mind.mPtr, heightLost);
+            }
+            if (mind.mAirborne || mind.mKnockLeft > 0.f)
+                return true;
+
+            // It is on its feet again: the packages and the fight take it up from where it is
+            mind.mThrown = false;
+            stopWalking(mind);
+            mind.mAtGoal = false;
+            mind.mWait = 0.f;
+            mind.mReview = 0.f;
+            return false;
+        }
+
+        /// The same, and the body is told whether it is in the air (it plays the animation of a jump, and the landing)
+        bool thrown(const Frame& frame, FalloutActors::Mind& mind, float duration)
+        {
+            const bool result = thrownStep(frame, mind, duration);
+            if (auto* animation = dynamic_cast<OFRender::FalloutActorAnimation*>(frame.mWorld.getAnimation(mind.mPtr)))
+                animation->setAirborne(mind.mAirborne);
+            return result;
+        }
+    }
+
     FalloutActors::FalloutActors() = default;
     FalloutActors::~FalloutActors() = default;
 
@@ -578,6 +731,22 @@ namespace OFMechanics
         }
         found->second->mScripted = scriptPackagesOf(ptr);
         found->second->mReview = 0.f;
+    }
+
+    void FalloutActors::knock(const OFWorld::Ptr& ptr, const osg::Vec3f& velocity, float seconds)
+    {
+        if (!handles(ptr) || seconds <= 0.f || velocity.length2() < 1e-6f)
+            return;
+        const auto found = mMinds.find(ptr.mRef);
+        Mind& mind = found == mMinds.end() ? makeMind(ptr) : *found->second;
+        mind.mThrown = true;
+        mind.mKnock = velocity;
+        mind.mKnock.z() = 0.f;
+        mind.mKnockTotal = seconds;
+        mind.mKnockLeft = seconds;
+        stopWalking(mind);
+        Log(Debug::Info) << ptr.getCellRef().getRefId() << " is thrown back by a blow: " << static_cast<int>(velocity.length())
+                         << " units a second for " << seconds << " s";
     }
 
     ESM::FormId FalloutActors::currentPackage(const OFWorld::Ptr& ptr) const
@@ -1100,7 +1269,10 @@ namespace OFMechanics
             }
 
             const osg::Vec3f next = mind.mWaypoints.front();
-            const float speed = run && animation->canRun() ? runSpeed(*animation) : walkSpeed(*animation);
+            float speed = run && animation->canRun() ? runSpeed(*animation) : walkSpeed(*animation);
+            // A crippled leg slows the walk (fMoveOneCrippledLegSpeedMult, fMoveTwoCrippledLegsSpeedMult)
+            if (frame.mScripts != nullptr)
+                speed *= static_cast<float>(frame.mScripts->moveSpeedMultiplier(mind.mPtr));
             osg::Vec3f place = falloutStepToward(position, next, speed * duration);
             place.z() = groundHeight(frame.mWorld, place);
 
@@ -2023,6 +2195,10 @@ namespace OFMechanics
                 continue;
             }
             mind.mSeenAlive = true;
+
+            // A blow threw it back, or it is falling: it does nothing else until it stands
+            if (mind.mThrown && thrown(frame, mind, duration))
+                continue;
 
             if (facesSpeaker(frame, mind, speaker, duration))
                 continue;

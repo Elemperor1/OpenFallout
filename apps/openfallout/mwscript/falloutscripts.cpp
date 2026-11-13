@@ -56,6 +56,7 @@
 #include <components/falloutscript/extendercommands.hpp>
 #include <components/falloutscript/falldamage.hpp>
 #include <components/falloutscript/fightai.hpp>
+#include <components/falloutscript/hitreactions.hpp>
 #include <components/falloutscript/messagetext.hpp>
 #include <components/falloutscript/playercontrols.hpp>
 #include <components/misc/convert.hpp>
@@ -2844,6 +2845,8 @@ namespace OFScript
         mCombat.noteHit(victim, struck, tolerated);
 
         mActorValues.damage(victim, AV::health, dealt);
+        // The blow leaves its impact on the body (blood, or what the weapon's impact data set has for the body)
+        showImpact(victim, attacker, weapon, limb);
         // The armor that the player wears is worn out by what it stopped (the resistance by the share of the blow it took,
         // the threshold by what it took of the rest), by less in V.A.T.S. as the blow is
         if (victim == mPlayer)
@@ -2902,6 +2905,31 @@ namespace OFScript
                             OFBase::Environment::get().getWorld()->getAnimation(ptr)))
                         animation->flinch();
                 });
+            // The blow throws it back, by the force that the executables work out from the damage and the agility of the
+            // one that is hit (0x646580), along the line from the one that struck
+            if (dealt > 0 && victim != mPlayer && attacker != 0)
+            {
+                const FalloutScript::HitReactions::Settings reaction
+                    = FalloutScript::HitReactions::Settings::fromGameSettings(
+                        [this](std::string_view name) -> std::optional<double> { return gameSetting(name); });
+                const double force = FalloutScript::HitReactions::knockbackForce(
+                    reaction, dealt, mActorValues.current(victim, AV::agility));
+                if (force > 0)
+                    runOnMainThread([this, victim, attacker, force, seconds = reaction.mKnockbackTime] {
+                        OFBase::World* world = OFBase::Environment::get().getWorld();
+                        const OFWorld::Ptr target = findReference(victim);
+                        const OFWorld::Ptr striker = attacker == mPlayer ? world->getPlayerPtr() : findReference(attacker);
+                        if (target.isEmpty() || striker.isEmpty() || !target.isInCell())
+                            return;
+                        osg::Vec3f away = target.getRefData().getPosition().asVec3() - striker.getRefData().getPosition().asVec3();
+                        away.z() = 0.f;
+                        if (away.length2() < 1.f)
+                            return;
+                        away.normalize();
+                        OFBase::Environment::get().getMechanicsManager()->knockFallout(
+                            target, away * static_cast<float>(force), static_cast<float>(seconds));
+                    });
+            }
             // A character that is hit fights back, and the attacker is in the fight too
             if (attacker != 0 && !tolerated)
             {
@@ -2927,6 +2955,56 @@ namespace OFScript
                 evaluatePackage(victim);
         }
         return result;
+    }
+
+    void FalloutScripts::showImpact(
+        FalloutScript::FormId victim, FalloutScript::FormId attacker, FalloutScript::FormId weapon, int limb)
+    {
+        // (the body of the player is not a character of the world that has a skeleton to put the impact on)
+        if (victim == 0 || victim == mPlayer || weapon == 0)
+            return;
+        runOnMainThread([this, victim, attacker, weapon, limb] {
+            static std::atomic<int> sMissed{ 0 };
+            const OFWorld::Ptr ptr = findReference(victim);
+            auto* animation = ptr.isEmpty() ? nullptr
+                                            : dynamic_cast<OFRender::FalloutActorAnimation*>(
+                                                OFBase::Environment::get().getWorld()->getAnimation(ptr));
+            if (animation == nullptr)
+            {
+                if (sMissed.fetch_add(1) < 4)
+                    Log(Debug::Info) << "No impact on 0x" << std::hex << victim << std::dec << ": "
+                                     << (ptr.isEmpty() ? "the reference is not found" : "it has no body of the actors' kind");
+                return;
+            }
+            // The node of the part that was hit; a blow at the body (no part) lands on the torso
+            std::string node;
+            std::vector<FalloutScript::BodyPart> parts;
+            if (bodyParts(victim, parts))
+            {
+                const int wanted = limb >= 0 ? limb : 0;
+                for (const FalloutScript::BodyPart& part : parts)
+                    if (part.mType == wanted)
+                    {
+                        node = part.mNode;
+                        break;
+                    }
+            }
+            // The way to the one that struck (the surface of the body faces it); one that cannot be found is straight up
+            osg::Vec3f toward(0.f, 0.f, 1.f);
+            const OFWorld::Ptr striker = attacker == 0 ? OFWorld::Ptr()
+                : attacker == mPlayer                    ? OFBase::Environment::get().getWorld()->getPlayerPtr()
+                                                         : findReference(attacker);
+            if (!striker.isEmpty() && !ptr.isEmpty())
+            {
+                osg::Vec3f way = striker.getRefData().getPosition().asVec3() - ptr.getRefData().getPosition().asVec3();
+                if (way.length2() > 1.f)
+                {
+                    way.normalize();
+                    toward = way;
+                }
+            }
+            animation->showImpact(weapon, node, toward);
+        });
     }
 
     bool FalloutScripts::toleratesBlow(FalloutScript::FormId attacker, FalloutScript::FormId victim)

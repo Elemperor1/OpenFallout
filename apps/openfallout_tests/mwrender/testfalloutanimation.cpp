@@ -550,11 +550,122 @@ namespace
             "meshes/characters/_male/locomotion/male/mtforward.kf");
     }
 
+    TEST_F(OpenFalloutRenderChooseFalloutMove, aCharacterWithACrippledLegLimpsByTheFilesOfTheFolderOfTheHurt)
+    {
+        const std::vector<std::string> files = { "meshes/characters/_male/locomotion/mtforward.kf",
+            "meshes/characters/_male/locomotion/mtfastforward.kf", "meshes/characters/_male/locomotion/1hpforward.kf",
+            "meshes/characters/_male/locomotion/hurt/mtforward_hurt.kf",
+            "meshes/characters/_male/locomotion/hurt/mtfastforward_hurt.kf",
+            "meshes/characters/_male/locomotion/hurt/mtleft_hurt.kf",
+            "meshes/characters/_male/locomotion/hurt/1hpforward_hurt.kf",
+            "meshes/characters/_male/locomotion/child/mtforward_hurt.kf" };
+        // the limp of the hands free, and of the one-handed pistol before it
+        EXPECT_EQ(chooseFalloutMove(mFolder, "", false, FalloutDirection::Forward, false, false, files, true),
+            "meshes/characters/_male/locomotion/hurt/mtforward_hurt.kf");
+        EXPECT_EQ(chooseFalloutMove(mFolder, "", false, FalloutDirection::Forward, true, false, files, true),
+            "meshes/characters/_male/locomotion/hurt/mtfastforward_hurt.kf");
+        EXPECT_EQ(chooseFalloutMove(mFolder, "1hp", false, FalloutDirection::Forward, false, false, files, true),
+            "meshes/characters/_male/locomotion/hurt/1hpforward_hurt.kf");
+        EXPECT_EQ(chooseFalloutMove(mFolder, "", false, FalloutDirection::Left, false, false, files, true),
+            "meshes/characters/_male/locomotion/hurt/mtleft_hurt.kf");
+        // a weapon type with no limp of its own limps by the free hands
+        EXPECT_EQ(chooseFalloutMove(mFolder, "2ha", false, FalloutDirection::Forward, false, false, files, true),
+            "meshes/characters/_male/locomotion/hurt/mtforward_hurt.kf");
+        // a way the files have no limp for goes forward, limping
+        EXPECT_EQ(chooseFalloutMove(mFolder, "", false, FalloutDirection::Backward, false, false, files, true),
+            "meshes/characters/_male/locomotion/hurt/mtforward_hurt.kf");
+        // not limping: the ordinary files, as before
+        EXPECT_EQ(chooseFalloutMove(mFolder, "", false, FalloutDirection::Forward, false, false, files, false),
+            "meshes/characters/_male/locomotion/mtforward.kf");
+        // the games have no limp for sneaking: it sneaks as usual
+        const std::vector<std::string> sneaking = { "meshes/characters/_male/sneakmtforward.kf",
+            "meshes/characters/_male/locomotion/hurt/mtforward_hurt.kf" };
+        EXPECT_EQ(chooseFalloutMove(mFolder, "", true, FalloutDirection::Forward, false, false, sneaking, true),
+            "meshes/characters/_male/sneakmtforward.kf");
+        // no limp files at all: the ordinary movement
+        EXPECT_EQ(chooseFalloutMove(
+                      mFolder, "", false, FalloutDirection::Forward, false, false, { files[0], files[1] }, true),
+            "meshes/characters/_male/locomotion/mtforward.kf");
+    }
+
     TEST_F(OpenFalloutRenderChooseFalloutMove, doesNotTakeAFileThatOnlyEndsLikeTheName)
     {
         // "mtforward" is not the end of the name of "sneakmtforward"
         const std::vector<std::string> files = { "meshes/characters/_male/sneakmtforward.kf" };
         EXPECT_EQ(chooseFalloutMove(mFolder, "", false, FalloutDirection::Forward, false, false, files), "");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutMove, aJumpTakesTheFileOfItsDirectionAndOfTheWeapon)
+    {
+        const std::vector<std::string> files = { "meshes/characters/_male/mtjumploop.kf",
+            "meshes/characters/_male/mtjumploopforward.kf", "meshes/characters/_male/mtjumploopleft.kf",
+            "meshes/characters/_male/1hpjumploop.kf", "meshes/characters/_male/mtjumpland.kf",
+            "meshes/characters/_male/sneakmtjumploopforward.kf", "meshes/characters/_male/2hajumploopforward.kf" };
+        using Action = FalloutAction;
+        // standing still: the file with no direction in its name
+        EXPECT_EQ(chooseFalloutAction(mFolder, "", false, Action::JumpLoop, FalloutDirection::Forward, true, false, false, files),
+            "meshes/characters/_male/mtjumploop.kf");
+        // going: the file of the direction, and the forward one for a direction it has none for... which here is the bare one
+        EXPECT_EQ(chooseFalloutAction(mFolder, "", false, Action::JumpLoop, FalloutDirection::Left, false, false, false, files),
+            "meshes/characters/_male/mtjumploopleft.kf");
+        EXPECT_EQ(chooseFalloutAction(mFolder, "", false, Action::JumpLoop, FalloutDirection::Backward, false, false, false, files),
+            "meshes/characters/_male/mtjumploop.kf");
+        // the weapon's own file first, then the hands free
+        EXPECT_EQ(chooseFalloutAction(mFolder, "1hp", false, Action::JumpLoop, FalloutDirection::Forward, true, false, false, files),
+            "meshes/characters/_male/1hpjumploop.kf");
+        EXPECT_EQ(chooseFalloutAction(mFolder, "2ha", false, Action::JumpLoop, FalloutDirection::Forward, false, false, false, files),
+            "meshes/characters/_male/2hajumploopforward.kf");
+        // sneaking has its own
+        EXPECT_EQ(chooseFalloutAction(mFolder, "", true, Action::JumpLoop, FalloutDirection::Forward, false, false, false, files),
+            "meshes/characters/_male/sneakmtjumploopforward.kf");
+        // landing
+        EXPECT_EQ(chooseFalloutAction(mFolder, "", false, Action::JumpLand, FalloutDirection::Forward, false, false, false, files),
+            "meshes/characters/_male/mtjumpland.kf");
+        // nothing at all: empty, and the movement goes on with its gaits
+        EXPECT_EQ(chooseFalloutAction(mFolder, "", false, Action::JumpLoop, FalloutDirection::Forward, true, false, false, {}), "");
+        EXPECT_EQ(chooseFalloutAction("", "", false, Action::JumpLoop, FalloutDirection::Forward, true, false, false, files), "");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutMove, aTurnTakesTheFileOfTheWeaponTheSneakOrTheWaterAndFallsBackToTheHandsFree)
+    {
+        const std::vector<std::string> files = { "meshes/characters/_male/locomotion/mtturnleft.kf",
+            "meshes/characters/_male/locomotion/mtturnright.kf", "meshes/characters/_male/1hpturnleft.kf",
+            "meshes/characters/_male/sneakmtturnleft.kf", "meshes/characters/_male/swimmtturnleft.kf" };
+        using Action = FalloutAction;
+        const auto turn = [&](std::string_view prefix, bool sneak, Action action, bool swimming) {
+            return chooseFalloutAction(mFolder, prefix, sneak, action, FalloutDirection::Forward, true, false, false, files,
+                swimming);
+        };
+        EXPECT_EQ(turn("", false, Action::TurnLeft, false), "meshes/characters/_male/locomotion/mtturnleft.kf");
+        EXPECT_EQ(turn("", false, Action::TurnRight, false), "meshes/characters/_male/locomotion/mtturnright.kf");
+        // the weapon's own file first, and a weapon with none turns by the hands free
+        EXPECT_EQ(turn("1hp", false, Action::TurnLeft, false), "meshes/characters/_male/1hpturnleft.kf");
+        EXPECT_EQ(turn("2ha", false, Action::TurnLeft, false), "meshes/characters/_male/locomotion/mtturnleft.kf");
+        EXPECT_EQ(turn("1hp", false, Action::TurnRight, false), "meshes/characters/_male/locomotion/mtturnright.kf");
+        // sneaking has its own, and the water
+        EXPECT_EQ(turn("", true, Action::TurnLeft, false), "meshes/characters/_male/sneakmtturnleft.kf");
+        EXPECT_EQ(turn("", false, Action::TurnLeft, true), "meshes/characters/_male/swimmtturnleft.kf");
+        // there is no file for swimming to the right: the character does not turn there by another
+        EXPECT_EQ(turn("", false, Action::TurnRight, true), "");
+    }
+
+    TEST_F(OpenFalloutRenderChooseFalloutMove, swimmingTakesTheFilesOfSwimmingByTheGaitAndTheDirection)
+    {
+        const std::vector<std::string> files = { "meshes/characters/_male/swimmtidle.kf",
+            "meshes/characters/_male/swimmtforward.kf", "meshes/characters/_male/swimmtfastforward.kf",
+            "meshes/characters/_male/swimmtleft.kf" };
+        using Action = FalloutAction;
+        EXPECT_EQ(chooseFalloutAction(mFolder, "1hp", false, Action::Swim, FalloutDirection::Forward, true, false, false, files),
+            "meshes/characters/_male/swimmtidle.kf");
+        EXPECT_EQ(chooseFalloutAction(mFolder, "1hp", false, Action::Swim, FalloutDirection::Forward, false, false, false, files),
+            "meshes/characters/_male/swimmtforward.kf");
+        EXPECT_EQ(chooseFalloutAction(mFolder, "", false, Action::Swim, FalloutDirection::Forward, false, true, false, files),
+            "meshes/characters/_male/swimmtfastforward.kf");
+        // a way that has no fast file swims at the pace of the walk, and one that has no file at all swims forward
+        EXPECT_EQ(chooseFalloutAction(mFolder, "", false, Action::Swim, FalloutDirection::Left, false, true, false, files),
+            "meshes/characters/_male/swimmtleft.kf");
+        EXPECT_EQ(chooseFalloutAction(mFolder, "", false, Action::Swim, FalloutDirection::Backward, false, false, false, files),
+            "meshes/characters/_male/swimmtforward.kf");
     }
 
     TEST_F(OpenFalloutRenderChooseFalloutMove, sneakIdleIsThatOfTheWeaponOrTheHandsFree)

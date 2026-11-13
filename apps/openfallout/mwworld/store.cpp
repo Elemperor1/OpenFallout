@@ -13,6 +13,8 @@
 #include <components/esm4/loadaspc.hpp>
 #include <components/esm4/loaddehy.hpp>
 #include <components/esm4/loadhung.hpp>
+#include <components/esm4/loadipct.hpp>
+#include <components/esm4/loadipds.hpp>
 #include <components/esm4/loadmset.hpp>
 #include <components/esm4/loadslpd.hpp>
 
@@ -1198,6 +1200,8 @@ template class OFWorld::TypedDynamicStore<ESM4::DialogInfo>;
 template class OFWorld::TypedDynamicStore<ESM4::Dialogue>;
 template class OFWorld::TypedDynamicStore<ESM4::Door>;
 template class OFWorld::TypedDynamicStore<ESM4::Explosion>;
+template class OFWorld::TypedDynamicStore<ESM4::ImpactData>;
+template class OFWorld::TypedDynamicStore<ESM4::ImpactDataSet>;
 template class OFWorld::TypedDynamicStore<ESM4::Eyes>;
 template class OFWorld::TypedDynamicStore<ESM4::Faction>;
 template class OFWorld::TypedDynamicStore<ESM4::Flora>;

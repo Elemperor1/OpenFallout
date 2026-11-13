@@ -198,8 +198,8 @@ namespace OFRender
         /// The path of the file `stem`.kf for a character: the folder for its sex below `locomotion` first, then the
         /// folder of the skeleton and `locomotion` itself, then any other folder below, except those of children and of
         /// the hurt. Empty when there is none.
-        std::string findMoveFile(
-            std::string_view folder, std::string_view stem, bool female, const std::vector<std::string>& files)
+        std::string findMoveFile(std::string_view folder, std::string_view stem, bool female,
+            const std::vector<std::string>& files, bool hurt = false)
         {
             const std::string wanted = std::string(stem) + std::string(sExtension);
             const std::string* best = nullptr;
@@ -215,7 +215,17 @@ namespace OFRender
                     continue;
                 rest.remove_suffix(rest.empty() ? 0 : 1);
                 int rank = 2;
-                if (rest.empty() || rest == "locomotion")
+                if (hurt)
+                {
+                    // The limping movements of a character with a crippled leg are the files of the folder `hurt`
+                    if (rest == "locomotion/hurt")
+                        rank = 0;
+                    else if (rest.find("hurt") == std::string_view::npos || rest.find("child") != std::string_view::npos)
+                        continue;
+                    else
+                        rank = 1;
+                }
+                else if (rest.empty() || rest == "locomotion")
                     rank = 1;
                 else if (rest == (female ? "locomotion/female" : "locomotion/male"))
                     rank = 0;
@@ -248,12 +258,34 @@ namespace OFRender
     }
 
     std::string chooseFalloutMove(std::string_view folder, std::string_view prefix, bool sneak,
-        FalloutDirection direction, bool run, bool female, const std::vector<std::string>& files)
+        FalloutDirection direction, bool run, bool female, const std::vector<std::string>& files, bool hurt)
     {
         if (folder.empty())
             return {};
         const std::string fast = run ? "fast" : "";
         const bool weapon = !prefix.empty() && prefix != "mt";
+        // A character that limps on a crippled leg uses the files of the limp (the games have them for the movements
+        // standing up, with no weapon and with the one-handed ones, and none for sneaking); one that has no file for
+        // the way it goes limps the way it can before it walks as usual
+        if (hurt && !sneak)
+        {
+            for (const FalloutDirection tried : { direction, FalloutDirection::Forward })
+            {
+                const std::string way = fast + std::string(directionName(tried)) + "_hurt";
+                std::vector<std::string> stems;
+                if (weapon)
+                    stems.push_back(std::string(prefix) + way);
+                stems.push_back("mt" + way);
+                for (const std::string& stem : stems)
+                {
+                    std::string file = findMoveFile(folder, stem, female, files, true);
+                    if (!file.empty())
+                        return file;
+                }
+                if (tried == FalloutDirection::Forward)
+                    break;
+            }
+        }
         // A sneak that has no file for the way it goes sneaks the way it can before it stands up to walk: the sneaking
         // files of both ways first, then the walking ones
         for (const bool sneaking : { true, false })
@@ -284,6 +316,79 @@ namespace OFRender
                 }
                 if (tried == FalloutDirection::Forward)
                     break;
+            }
+        }
+        return {};
+    }
+
+    std::string chooseFalloutAction(std::string_view folder, std::string_view prefix, bool sneak, FalloutAction action,
+        FalloutDirection direction, bool still, bool run, bool female, const std::vector<std::string>& files,
+        bool swimming)
+    {
+        if (folder.empty())
+            return {};
+        const bool weapon = !prefix.empty() && prefix != "mt";
+        const std::string way = std::string(directionName(direction));
+        if (action == FalloutAction::TurnLeft || action == FalloutAction::TurnRight)
+        {
+            const std::string turn = action == FalloutAction::TurnLeft ? "turnleft" : "turnright";
+            // Swimming turns by its own file (no weapon); the others take the sneaking one, the weapon's, the hands free
+            if (swimming)
+                return findMoveFile(folder, "swimmt" + turn, female, files);
+            std::vector<std::string> stems;
+            if (sneak)
+            {
+                if (weapon)
+                    stems.push_back("sneak" + std::string(prefix) + turn);
+                stems.push_back("sneakmt" + turn);
+            }
+            if (weapon)
+                stems.push_back(std::string(prefix) + turn);
+            stems.push_back("mt" + turn);
+            for (const std::string& stem : stems)
+            {
+                std::string file = findMoveFile(folder, stem, female, files);
+                if (!file.empty())
+                    return file;
+            }
+            return {};
+        }
+        if (action == FalloutAction::Swim)
+        {
+            // The files of swimming are for no weapon: `swimmtforward`, `swimmtfastleft`, `swimmtidle`
+            if (still)
+                return findMoveFile(folder, "swimmtidle", female, files);
+            std::string file = findMoveFile(folder, "swimmt" + std::string(run ? "fast" : "") + way, female, files);
+            if (file.empty() && run)
+                file = findMoveFile(folder, "swimmt" + way, female, files);
+            if (file.empty() && direction != FalloutDirection::Forward)
+                file = findMoveFile(folder, "swimmt" + std::string(run ? "fast" : "") + "forward", female, files);
+            return file;
+        }
+        const std::string name = action == FalloutAction::JumpLoop ? "jumploop" : "jumpland";
+        // (the name of the way first when the character goes, the bare one when it stands still)
+        std::vector<std::string> ways;
+        if (still)
+            ways = { "", way };
+        else
+            ways = { way, "" };
+        for (const std::string& suffix : ways)
+        {
+            std::vector<std::string> stems;
+            if (sneak)
+            {
+                if (weapon)
+                    stems.push_back("sneak" + std::string(prefix) + name + suffix);
+                stems.push_back("sneakmt" + name + suffix);
+            }
+            if (weapon)
+                stems.push_back(std::string(prefix) + name + suffix);
+            stems.push_back("mt" + name + suffix);
+            for (const std::string& stem : stems)
+            {
+                std::string file = findMoveFile(folder, stem, female, files);
+                if (!file.empty())
+                    return file;
             }
         }
         return {};

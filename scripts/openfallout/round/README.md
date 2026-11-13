@@ -95,6 +95,13 @@ as well.
 armed Powder Gangers, V.A.T.S., sneaking up on one), `scenarios/m14_arms.lua` (`rounds/m14-arms.json`, and `m14-arms-tune.json` with
 `OPENFALLOUT_FIRSTPERSON_ARMS` variants) the pictures of the player's arms in the first person.
 
+`scenarios/m14p_reactions.lua` (`rounds/m14p-reactions.json`; `m14p-effects.json` is the same with `OPENFALLOUT_EFFECT_HOLD=40`, which makes
+muzzle flashes and impacts play 40 times slower so that a picture catches them) is M14 part two on New Vegas: a blow throws a character back,
+two crippled legs slow it and make it limp, a character put up in the air falls and is hurt by the fall, the player's own body in the air and
+turning. `scenarios/m14p_reactions_fo3.lua` (`rounds/m14p-reactions-fo3.json`) does the same with two placed raiders of Fallout 3 (the blows
+are made with the form of a pistol, as the player's round has no way to give itself items), and `scenarios/m14p_swim.lua`
+(`rounds/m14p-swim.json`) lets the player's body fall into the lake of the east and swim.
+
 `scenarios/smoke.lua` is the smallest scenario; `scenarios/m13_mountains.lua` with `rounds/m13-mountains.json` is the check of the
 distant land of New Vegas in seven variants of `game lod debug`. Its places are in the Mojave and the save can be anywhere:
 the scenario takes the worldspace from the cell of a reference that lives there (`anchor` lines say which one was found and which

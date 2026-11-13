@@ -105,6 +105,8 @@ namespace ESM4
     struct Dialogue;
     struct Door;
     struct Explosion;
+    struct ImpactData;
+    struct ImpactDataSet;
     struct Eyes;
     struct Faction;
     struct Flora;
@@ -200,7 +202,8 @@ namespace OFWorld
             Store<ESM4::DefaultObj>, Store<ESM4::DialogInfo>, Store<ESM4::Dialogue>, Store<ESM4::Door>,
             Store<ESM4::Explosion>, Store<ESM4::Eyes>, Store<ESM4::Faction>, Store<ESM4::Furniture>, Store<ESM4::Flora>,
             Store<ESM4::FormIdList>, Store<ESM4::GameSetting>, Store<ESM4::GlobalVariable>, Store<ESM4::Hair>,
-            Store<ESM4::HeadPart>, Store<ESM4::IdleAnimation>, Store<ESM4::ImageSpaceModifier>, Store<ESM4::Ingredient>,
+            Store<ESM4::HeadPart>, Store<ESM4::IdleAnimation>, Store<ESM4::ImageSpaceModifier>, Store<ESM4::ImpactData>, Store<ESM4::ImpactDataSet>,
+            Store<ESM4::Ingredient>,
             Store<ESM4::ItemMod>, Store<ESM4::Key>, Store<ESM4::Land>, Store<ESM4::LandTexture>,
             Store<ESM4::LevelledCreature>, Store<ESM4::LevelledItem>, Store<ESM4::LevelledNpc>, Store<ESM4::Light>,
             Store<ESM4::LightingTemplate>, Store<ESM4::LoadScreen>, Store<ESM4::LoadScreenType>,
