@@ -3749,7 +3749,9 @@ namespace OFScript
                 {
                     const OFWorld::Ptr actor
                         = it->first == mPlayer && world != nullptr ? world->getPlayerPtr() : findReference(it->first);
-                    if (!actor.isEmpty() && !mActors.isDead(it->first))
+                    // (a character of a cell that was unloaded is found by its form still, but its sounds were stopped with
+                    // the cell: the active cells say)
+                    if (!actor.isEmpty() && !mActors.isDead(it->first) && !leftLoadedCells(it->first))
                     {
                         ++it;
                         continue;
