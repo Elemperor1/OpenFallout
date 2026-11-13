@@ -564,8 +564,9 @@ namespace OFScript
         {
             if (!station.mNonProxy || radio.mRoomInReach.count(station.mReference) == 0)
                 continue;
-            // A station that is not in a loaded cell is not a thing the player can hear
-            if (findReference(station.mReference).isEmpty())
+            // A station that is not in a loaded cell is not a thing the player can hear (a reference of a cell that was
+            // unloaded can still be found by its form: the active cells say)
+            if (findReference(station.mReference).isEmpty() || leftLoadedCells(station.mReference))
                 continue;
             // (and one the player talks to says what the conversation says)
             if (inConversationWith(station.mReference))
@@ -627,9 +628,10 @@ namespace OFScript
         std::vector<decltype(radio.mPending)::key_type> dispatched;
         for (auto& [actor, entry] : radio.mNpc)
         {
-            // A character that is not in a loaded cell is not heard
+            // A character that is not in a loaded cell is not heard (a reference of a cell that was unloaded can still be
+            // found by its form: the active cells say)
             const OFWorld::Ptr npc = findReference(actor);
-            if (npc.isEmpty())
+            if (npc.isEmpty() || leftLoadedCells(actor))
                 continue;
             // A creature with a radio is heard within fCreatureRadioMax (times 1.1) of the player (FalloutNV.exe 0x835271);
             // beyond that it says nothing (what it would say is not kept: the station goes on without it)
