@@ -1154,8 +1154,7 @@ void OF::Engine::go()
     mLuaWorker->join();
 
     // Save user settings
-    mWindowManager->storeWindowSizeForNextStart();
-    Settings::Manager::saveUser(mCfgMgr.getUserConfigPath() / "settings.cfg");
+    mWindowManager->saveUserSettings();
     Settings::ShaderManager::get().save();
     mLuaManager->savePermanentStorage(mCfgMgr.getUserConfigPath());
 }

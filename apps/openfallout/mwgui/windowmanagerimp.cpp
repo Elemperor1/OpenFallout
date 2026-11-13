@@ -519,7 +519,7 @@ namespace OFGui
         mWindows.push_back(std::move(debugWindow));
         trackWindow(mDebugWindow, makeDebugWindowSettingValues());
 
-        auto postProcessorHud = std::make_unique<PostProcessorHud>(mCfgMgr);
+        auto postProcessorHud = std::make_unique<PostProcessorHud>();
         mPostProcessorHud = postProcessorHud.get();
         mWindows.push_back(std::move(postProcessorHud));
         trackWindow(mPostProcessorHud, makePostprocessorWindowSettingValues());
@@ -1360,13 +1360,29 @@ namespace OFGui
         mVideoWrapper->setVideoMode(size.width, size.height, mode, Settings::video().mWindowBorder);
     }
 
-    void WindowManager::storeWindowSizeForNextStart()
+    void WindowManager::saveUserSettings()
     {
+        const std::filesystem::path file = mCfgMgr.getUserConfigPath() / "settings.cfg";
         const SDLUtil::WindowSize setting{ Settings::video().mResolutionX, Settings::video().mResolutionY };
         const SDLUtil::WindowSize size = SDLUtil::resolutionToSave(
             setting, mWindowSize, SDL_GetWindowFlags(mSdlWindow), SDLUtil::thisDesktopPlatform());
+        if (size == setting)
+        {
+            Settings::Manager::saveUser(file);
+            return;
+        }
+
+        // The file gets the size of the window on the desktop; the setting goes on following the drawable. Setting
+        // it there and back is no change of the resolution for anyone to act on.
+        const Settings::CategorySettingVector resolution = { { "Video", "resolution x" }, { "Video", "resolution y" } };
+        const bool pending = !Settings::Manager::getPendingChanges(resolution).empty();
         Settings::video().mResolutionX.set(size.width);
         Settings::video().mResolutionY.set(size.height);
+        Settings::Manager::saveUser(file);
+        Settings::video().mResolutionX.set(setting.width);
+        Settings::video().mResolutionY.set(setting.height);
+        if (!pending)
+            Settings::Manager::resetPendingChanges(resolution);
     }
 
     void WindowManager::windowResized(int x, int y)
@@ -2582,7 +2598,7 @@ namespace OFGui
 
     void WindowManager::saveSettings()
     {
-        Settings::Manager::saveUser(mCfgMgr.getUserConfigPath() / "settings.cfg");
+        saveUserSettings();
         OFBase::Environment::get().getLuaManager()->savePermanentStorage(mCfgMgr.getUserConfigPath());
     }
 

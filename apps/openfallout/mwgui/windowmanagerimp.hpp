@@ -305,7 +305,7 @@ namespace OFGui
         void windowResized(int x, int y) override;
         void windowClosed() override;
         void windowModeRequested(Settings::WindowMode mode) override;
-        void storeWindowSizeForNextStart() override;
+        void saveUserSettings() override;
         bool isWindowVisible() const override;
 
         void watchActor(const OFWorld::Ptr& ptr) override;
