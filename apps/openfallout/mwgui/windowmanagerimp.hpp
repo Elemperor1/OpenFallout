@@ -19,6 +19,7 @@
 
 #include <components/misc/guarded.hpp>
 #include <components/myguiplatform/myguiplatform.hpp>
+#include <components/sdlutil/desktopconventions.hpp>
 #include <components/sdlutil/events.hpp>
 #include <components/sdlutil/sdlcursormanager.hpp>
 #include <components/sdlutil/sdlvideowrapper.hpp>
@@ -304,6 +305,7 @@ namespace OFGui
         void windowResized(int x, int y) override;
         void windowClosed() override;
         void windowModeRequested(Settings::WindowMode mode) override;
+        void storeWindowSizeForNextStart() override;
         bool isWindowVisible() const override;
 
         void watchActor(const OFWorld::Ptr& ptr) override;
@@ -656,6 +658,10 @@ namespace OFGui
         Files::ConfigurationManager& mCfgMgr;
 
         SDL_Window* mSdlWindow;
+        // The size of the window on the desktop; the resolution setting is the size of the Space while it fills one
+        SDLUtil::WindowSize mWindowSize;
+
+        void setVideoMode();
     };
 }
 

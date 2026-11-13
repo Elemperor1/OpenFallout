@@ -81,6 +81,31 @@ namespace SDLUtil
     /// Control, the green button and Control-Command-F.
     Uint32 fullScreenFlag(Settings::WindowMode mode, bool useSpaces);
 
+    /// A size in drawable pixels, as the resolution setting
+    struct WindowSize
+    {
+        int width = 0;
+        int height = 0;
+
+        friend bool operator==(const WindowSize&, const WindowSize&) = default;
+    };
+
+    /// The size of the game's window on the desktop after the drawable was resized, given the size it had and the SDL
+    /// flags of the window. The resolution setting follows the drawable (the picture is drawn at it), so on the Mac it
+    /// holds the size of the Space while the window fills one; the window keeps its own size through that, to go back
+    /// to. Elsewhere the size of the window is the resolution setting, as before.
+    WindowSize windowSizeAfterResize(
+        WindowSize window, WindowSize drawable, Uint32 windowFlags, DesktopPlatform platform);
+
+    /// The size to set a window mode with, from the resolution setting and the size of the window on the desktop: on
+    /// the Mac a window that leaves full screen comes back at its own size, not at the size of the Space.
+    WindowSize sizeForWindowMode(
+        WindowSize setting, WindowSize window, Settings::WindowMode mode, DesktopPlatform platform);
+
+    /// The resolution to save for the next start: on the Mac the size of the window on the desktop when the game is
+    /// quit in full screen, so that the window does not open as large as the screen the next time it is one.
+    WindowSize resolutionToSave(WindowSize setting, WindowSize window, Uint32 windowFlags, DesktopPlatform platform);
+
     /// What the game asks of the mouse, and the state of the window it is in
     struct MouseCaptureRequest
     {

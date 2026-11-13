@@ -224,6 +224,33 @@ namespace SDLUtil
         return std::nullopt;
     }
 
+    namespace
+    {
+        bool fillsASpace(Uint32 windowFlags, DesktopPlatform platform)
+        {
+            // SDL_WINDOW_FULLSCREEN is part of SDL_WINDOW_FULLSCREEN_DESKTOP; it is also set while the window is in a
+            // Space it entered through the green button or the menu bar
+            return platform == DesktopPlatform::Mac && (windowFlags & SDL_WINDOW_FULLSCREEN) != 0;
+        }
+    }
+
+    WindowSize windowSizeAfterResize(
+        WindowSize window, WindowSize drawable, Uint32 windowFlags, DesktopPlatform platform)
+    {
+        return fillsASpace(windowFlags, platform) ? window : drawable;
+    }
+
+    WindowSize sizeForWindowMode(
+        WindowSize setting, WindowSize window, Settings::WindowMode mode, DesktopPlatform platform)
+    {
+        return platform == DesktopPlatform::Mac && mode == Settings::WindowMode::Windowed ? window : setting;
+    }
+
+    WindowSize resolutionToSave(WindowSize setting, WindowSize window, Uint32 windowFlags, DesktopPlatform platform)
+    {
+        return fillsASpace(windowFlags, platform) ? window : setting;
+    }
+
     DesktopPlatform thisDesktopPlatform()
     {
 #ifdef __APPLE__

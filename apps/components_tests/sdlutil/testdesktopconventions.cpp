@@ -265,6 +265,47 @@ namespace
         EXPECT_EQ(fullScreenFlag(Settings::WindowMode::Windowed, false), 0u);
     }
 
+    TEST(SDLUtilWindowSizeTest, onTheMacTheWindowKeepsItsOwnSizeWhileItFillsASpace)
+    {
+        const WindowSize window{ 1600, 1000 };
+        const WindowSize space{ 3456, 2104 };
+        EXPECT_EQ(windowSizeAfterResize(window, space, SDL_WINDOW_FULLSCREEN_DESKTOP, mac), window);
+        EXPECT_EQ(windowSizeAfterResize(window, space, SDL_WINDOW_FULLSCREEN, mac), window);
+    }
+
+    TEST(SDLUtilWindowSizeTest, aResizeOnTheDesktopIsTheNewSizeOfTheWindow)
+    {
+        const WindowSize resized{ 1920, 1200 };
+        EXPECT_EQ(windowSizeAfterResize(WindowSize{ 1600, 1000 }, resized, SDL_WINDOW_RESIZABLE, mac), resized);
+    }
+
+    TEST(SDLUtilWindowSizeTest, onTheMacLeavingFullScreenGoesBackToTheSizeOfTheWindow)
+    {
+        const WindowSize window{ 1600, 1000 };
+        const WindowSize space{ 3456, 2104 }; // the resolution setting follows the drawable into the Space
+        EXPECT_EQ(sizeForWindowMode(space, window, Settings::WindowMode::Windowed, mac), window);
+        EXPECT_EQ(sizeForWindowMode(space, window, Settings::WindowMode::Fullscreen, mac), space);
+        EXPECT_EQ(sizeForWindowMode(space, window, Settings::WindowMode::WindowedFullscreen, mac), space);
+    }
+
+    TEST(SDLUtilWindowSizeTest, onTheMacQuittingInFullScreenSavesTheSizeOfTheWindow)
+    {
+        const WindowSize window{ 1600, 1000 };
+        const WindowSize space{ 3456, 2104 };
+        EXPECT_EQ(resolutionToSave(space, window, SDL_WINDOW_FULLSCREEN_DESKTOP, mac), window);
+        const WindowSize resized{ 1920, 1200 };
+        EXPECT_EQ(resolutionToSave(resized, window, SDL_WINDOW_RESIZABLE, mac), resized);
+    }
+
+    TEST(SDLUtilOtherDesktopTest, theResolutionSettingStaysTheSizeOfTheWindow)
+    {
+        const WindowSize window{ 1600, 1000 };
+        const WindowSize screen{ 2560, 1440 };
+        EXPECT_EQ(windowSizeAfterResize(window, screen, SDL_WINDOW_FULLSCREEN_DESKTOP, other), screen);
+        EXPECT_EQ(sizeForWindowMode(screen, window, Settings::WindowMode::Windowed, other), screen);
+        EXPECT_EQ(resolutionToSave(screen, window, SDL_WINDOW_FULLSCREEN_DESKTOP, other), screen);
+    }
+
     TEST(SDLUtilDesktopShortcutFilterTest, theGameSeesNeitherThePressNorTheReleaseOfAShortcut)
     {
         DesktopShortcutFilter filter(true);

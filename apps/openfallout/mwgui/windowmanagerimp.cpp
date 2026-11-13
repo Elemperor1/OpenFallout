@@ -211,6 +211,7 @@ namespace OFGui
         , mWindowVisible(true)
         , mCfgMgr(cfgMgr)
         , mSdlWindow(window)
+        , mWindowSize{ Settings::video().mResolutionX, Settings::video().mResolutionY }
     {
         int w, h;
         SDL_GetWindowSize(window, &w, &h);
@@ -1321,6 +1322,7 @@ namespace OFGui
     void WindowManager::processChangedSettings(const Settings::CategorySettingVector& changed)
     {
         bool changeRes = false;
+        bool resolutionChosen = false;
         for (const auto& setting : changed)
         {
             if (setting.first == "GUI" && setting.second == "menu transparency")
@@ -1328,7 +1330,11 @@ namespace OFGui
             else if (setting.first == "Video"
                 && (setting.second == "resolution x" || setting.second == "resolution y"
                     || setting.second == "window mode" || setting.second == "window border"))
+            {
                 changeRes = true;
+                if (setting.second == "resolution x" || setting.second == "resolution y")
+                    resolutionChosen = true;
+            }
 
             else if (setting.first == "Video" && setting.second == "vsync mode")
                 mVideoWrapper->setSyncToVBlank(Settings::video().mVsyncMode);
@@ -1338,13 +1344,37 @@ namespace OFGui
 
         if (changeRes)
         {
-            mVideoWrapper->setVideoMode(Settings::video().mResolutionX, Settings::video().mResolutionY,
-                Settings::video().mWindowMode, Settings::video().mWindowBorder);
+            // A resolution picked in the options is the size the window is to have
+            if (resolutionChosen)
+                mWindowSize = { Settings::video().mResolutionX, Settings::video().mResolutionY };
+            setVideoMode();
         }
+    }
+
+    void WindowManager::setVideoMode()
+    {
+        const Settings::WindowMode mode = Settings::video().mWindowMode;
+        const SDLUtil::WindowSize setting{ Settings::video().mResolutionX, Settings::video().mResolutionY };
+        const SDLUtil::WindowSize size
+            = SDLUtil::sizeForWindowMode(setting, mWindowSize, mode, SDLUtil::thisDesktopPlatform());
+        mVideoWrapper->setVideoMode(size.width, size.height, mode, Settings::video().mWindowBorder);
+    }
+
+    void WindowManager::storeWindowSizeForNextStart()
+    {
+        const SDLUtil::WindowSize setting{ Settings::video().mResolutionX, Settings::video().mResolutionY };
+        const SDLUtil::WindowSize size = SDLUtil::resolutionToSave(
+            setting, mWindowSize, SDL_GetWindowFlags(mSdlWindow), SDLUtil::thisDesktopPlatform());
+        Settings::video().mResolutionX.set(size.width);
+        Settings::video().mResolutionY.set(size.height);
     }
 
     void WindowManager::windowResized(int x, int y)
     {
+        // The flags are those of the window now, at or after the resize this event is about: the size of a Space the
+        // window has entered is never taken for its own
+        mWindowSize = SDLUtil::windowSizeAfterResize(
+            mWindowSize, { x, y }, SDL_GetWindowFlags(mSdlWindow), SDLUtil::thisDesktopPlatform());
         Settings::video().mResolutionX.set(x);
         Settings::video().mResolutionY.set(y);
 
@@ -1425,10 +1455,10 @@ namespace OFGui
     {
         // Control-Command-F out of (or into) a full-screen mode of the game: the setting changes as from the options
         Log(Debug::Info) << "Window mode " << static_cast<int>(Settings::video().mWindowMode.get()) << " -> "
-                         << static_cast<int>(mode) << " (Control-Command-F)";
+                         << static_cast<int>(mode) << " (Control-Command-F), window size " << mWindowSize.width << "x"
+                         << mWindowSize.height;
         Settings::video().mWindowMode.set(mode);
-        mVideoWrapper->setVideoMode(Settings::video().mResolutionX, Settings::video().mResolutionY,
-            Settings::video().mWindowMode, Settings::video().mWindowBorder);
+        setVideoMode();
         Settings::Manager::resetPendingChanges({ { "Video", "window mode" } });
     }
 
