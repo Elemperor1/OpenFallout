@@ -33,11 +33,11 @@ class DocumentationLinkTest(unittest.TestCase):
 
     def test_repository_rst_links_require_canonical_existing_target(self):
         text = (
-            "`topic <https://github.com/Elemperor1/OpenFallout/blob/master/"
+            "`topic <https://github.com/OpenBethesda/OpenFallout/blob/master/"
             "docs/guide/topic.md>`_\n"
-            "`missing <https://github.com/Elemperor1/OpenFallout/blob/master/"
+            "`missing <https://github.com/OpenBethesda/OpenFallout/blob/master/"
             "docs/guide/missing.md>`_\n"
-            "`wrong branch <https://github.com/Elemperor1/OpenFallout/blob/main/"
+            "`wrong branch <https://github.com/OpenBethesda/OpenFallout/blob/main/"
             "docs/guide/topic.md>`_"
         )
         errors = check_documentation.check_repo_blob_links(

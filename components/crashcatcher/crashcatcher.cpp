@@ -433,7 +433,7 @@ static void crash_catcher(int signum, siginfo_t* siginfo, void* /*context*/)
     usleep(100000);
 
     const std::string message = "OpenFallout has encountered a fatal error.\nCrash log saved to '"
-        + std::string(logfile) + "'.\n Please report this to https://github.com/Elemperor1/OpenFallout/issues !";
+        + std::string(logfile) + "'.\n Please report this to https://github.com/OpenBethesda/OpenFallout/issues !";
     SDL_ShowSimpleMessageBox(0, "Fatal Error", message.c_str(), nullptr);
 
     exit(0);

@@ -101,4 +101,4 @@ Trees are drawn as crossed cards with the leaf image of their record, because th
 
 ## When something goes wrong
 
-Look at `openfallout.log` in the configuration folder first: it lists the data directories, the plugins and the archives it found, in the order they were used (`Archive order`, `Load order`), and every file it could not read. A bug report with that file attached is the most useful one: <https://github.com/Elemperor1/OpenFallout/issues>. Do not attach game files.
+Look at `openfallout.log` in the configuration folder first: it lists the data directories, the plugins and the archives it found, in the order they were used (`Archive order`, `Load order`), and every file it could not read. A bug report with that file attached is the most useful one: <https://github.com/OpenBethesda/OpenFallout/issues>. Do not attach game files.

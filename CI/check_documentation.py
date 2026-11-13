@@ -15,9 +15,9 @@ RST_ENTRYPOINTS = (
     Path("docs/source/openfallout.rst"),
     Path("docs/source/index.rst"),
 )
-REPO_BLOB_PREFIX = "https://github.com/Elemperor1/OpenFallout/blob/master/"
+REPO_BLOB_PREFIX = "https://github.com/OpenBethesda/OpenFallout/blob/master/"
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
-REPO_BLOB_LINK = re.compile(r"<((?:https://github\.com/Elemperor1/OpenFallout/blob/)[^>]+)>_?")
+REPO_BLOB_LINK = re.compile(r"<((?:https://github\.com/OpenBethesda/OpenFallout/blob/)[^>]+)>_?")
 DOC_ROLE = re.compile(r":doc:`(?:[^`<>]*<)?([^`<>]+)>?`")
 TOCTREE = re.compile(r"^(?P<indent>\s*)\.\. toctree::\s*$")
 

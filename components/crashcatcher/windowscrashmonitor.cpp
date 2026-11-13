@@ -220,7 +220,7 @@ namespace Crash
                 TerminateProcess(mAppProcessHandle, 0xDEAD);
                 std::string message = "OpenFallout has frozen.\nCrash dump saved to '"
                     + Misc::StringUtils::u8StringToString(getFreezeDumpPath(*mShm).u8string())
-                    + "'.\nPlease report this to https://github.com/Elemperor1/OpenFallout/issues !";
+                    + "'.\nPlease report this to https://github.com/OpenBethesda/OpenFallout/issues !";
                 SDL_ShowSimpleMessageBox(0, "Fatal Error", message.c_str(), nullptr);
             }
         }

@@ -12,7 +12,7 @@ from urllib.error import HTTPError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
-REPOSITORY = "Elemperor1/OpenFallout"
+REPOSITORY = "OpenBethesda/OpenFallout"
 MARKER = ".harness/openfallout-release.yaml"
 PLATFORM_JOBS = {
     "Ubuntu",

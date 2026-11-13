@@ -9,7 +9,7 @@ pipeline:
     ci:
       codebase:
         connectorRef: account.connector_Github_7cd1
-        repoName: Elemperor1/OpenFallout
+        repoName: OpenBethesda/OpenFallout
         persistCredentials: false
         build: <+input>
   variables:
@@ -69,7 +69,7 @@ pipeline:
                     harness_ci_driver="$(mktemp)"
                     trap 'rm -f "$harness_ci_driver"' EXIT
                     curl --fail --location --retry 3 \
-                      https://raw.githubusercontent.com/Elemperor1/OpenFallout/916dea949777988bd6ee4dcb65b076011c2d857d/CI/harness_ci.sh \
+                      https://raw.githubusercontent.com/OpenBethesda/OpenFallout/916dea949777988bd6ee4dcb65b076011c2d857d/CI/harness_ci.sh \
                       --output "$harness_ci_driver"
                   fi
                   docker run --rm -i \
