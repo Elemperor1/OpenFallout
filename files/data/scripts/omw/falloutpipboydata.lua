@@ -100,6 +100,8 @@ local info, markers = nil, {}
 local marked = {}
 local named = nil
 local quests = {}
+local stations = {}
+local stationsKey = nil
 -- The place and the size of the picture of the world: the units of the file (the picture may be moved and zoomed)
 local zoom, moveX, moveY = MAP.startZoom, 0, 0
 local objectivesFor = nil
@@ -426,6 +428,115 @@ local function fillQuests()
     fillObjectives()
 end
 
+-- ---- Radio ----
+
+-- The stations in reach, after a first row that turns the radio off. Picking a row tunes the station (the executables'
+-- radio tab does not have this first row's words in anything that was read: the page names it itself)
+local RADIO_OFF = 'Radio Off'
+
+local function radioKey(list)
+    local parts = {}
+    for _, station in ipairs(list) do
+        parts[#parts + 1] = station.id .. (station.tuned and '*' or '')
+    end
+    return table.concat(parts, ',')
+end
+
+local function fillRadio()
+    stations = pipboy.radio()
+    stationsKey = radioKey(stations)
+    local picked = 1
+    for index, station in ipairs(stations) do
+        if station.tuned then picked = index + 1 end
+    end
+    -- The square of the row that is tuned is filled
+    local rows = { { string = RADIO_OFF, _ShowEmptyMarker = true, _selected = picked == 1 } }
+    for index, station in ipairs(stations) do
+        rows[index + 1] = { string = station.name, _ShowEmptyMarker = true, _selected = station.tuned and true or false }
+    end
+    lists.radio.rows(rows)
+    lists.radio.select(picked, true)
+end
+
+-- Each frame the radio tab is shown: the list follows the stations that are in reach, and the row that is picked is tuned
+local function pollRadio()
+    local current = pipboy.radio()
+    if radioKey(current) ~= stationsKey then
+        fillRadio()
+        return
+    end
+    local row = lists.radio.selected()
+    if row <= 0 then return end
+    local station = row > 1 and stations[row - 1] or nil
+    local tunedNow
+    for _, entry in ipairs(current) do
+        if entry.tuned then tunedNow = entry.id end
+    end
+    if (station and station.id or nil) ~= tunedNow then
+        pipboy.tuneRadio(station and station.id or nil)
+        stationsKey = nil
+    end
+end
+
+-- The waveform: the picture in the tile MM_Waveform while the radio is on (FalloutNV.exe 0x79C0C0 and 0x79C090, each frame
+-- the page is shown). One of three pictures of the games' `sRadioWaveformFileFormat` (Forward, Backward and Left, in
+-- Interface\Radio Wave) is on it, a new one picked at random every 750 ms, and it moves along by a tenth of its width every
+-- 10 ms, going on from the other side when it has run past the whole. The port draws it as the strip of a compass: a window
+-- of its own width that moves over the picture (the games' own zoom of the tile, 175, was not read).
+local WAVEFORM = 'MM_Waveform'
+local WAVEFORM_FORMAT = 'Interface\\Radio Wave\\%s.dds'
+local WAVEFORM_NAMES = { 'Forward', 'Backward', 'Left' }
+local WAVEFORM_CHANGE = 0.75
+local WAVEFORM_STEP = 0.01
+local WAVEFORM_SIZE = 256
+local waveform = nil
+
+local function pollWaveform(radioOn)
+    if not shown or not shown:find(WAVEFORM) then return end
+    if not radioOn then
+        if waveform then
+            shown:set(WAVEFORM, 'visible', false)
+            waveform = nil
+        end
+        return
+    end
+    local now = core.getRealTime()
+    if not waveform then
+        waveform = { name = WAVEFORM_NAMES[1], changed = now, moved = now, phase = 0 }
+        shown:batch(function()
+            -- (centered in the rectangle of the file, 350 across)
+            shown:set(WAVEFORM, 'width', WAVEFORM_SIZE)
+            shown:set(WAVEFORM, 'height', WAVEFORM_SIZE)
+            shown:set(WAVEFORM, 'x', 47)
+            shown:set(WAVEFORM, 'y', 47)
+            shown:set(WAVEFORM, 'filename', string.format(WAVEFORM_FORMAT, waveform.name))
+            shown:set(WAVEFORM, '_sourcex', 0)
+            shown:set(WAVEFORM, 'visible', true)
+        end)
+        return
+    end
+    local changed = false
+    if now - waveform.moved >= WAVEFORM_STEP then
+        waveform.moved = now
+        waveform.phase = waveform.phase + 0.1
+        if waveform.phase > 1 then waveform.phase = waveform.phase - 1 end
+        changed = true
+    end
+    local name
+    if now - waveform.changed >= WAVEFORM_CHANGE then
+        waveform.changed = now
+        name = WAVEFORM_NAMES[math.random(#WAVEFORM_NAMES)]
+        waveform.name = name
+        changed = true
+    end
+    if changed then
+        shown:batch(function()
+            if name then shown:set(WAVEFORM, 'filename', string.format(WAVEFORM_FORMAT, name)) end
+            shown:set(WAVEFORM, '_sourcex', waveform.phase * WAVEFORM_SIZE)
+        end)
+    end
+end
+
 -- ---- The page ----
 
 local function fillHeadline()
@@ -442,7 +553,9 @@ local function fill()
     fillWorld()
     fillQuests()
     lists.notes.rows({})
-    lists.radio.rows({})
+    -- A radio tab that cannot be filled does not take the other tabs with it
+    local filled, problem = pcall(fillRadio)
+    if not filled then print('data menu radio: ' .. tostring(problem)) end
     shown:batch(function()
         shown:set('MM_DataRect', 'visible', TABS[tabIndex].key == 'quests' and #quests > 0)
     end)
@@ -489,7 +602,7 @@ local function open()
     zoom = MAP.startZoom
     opened:batch(function()
         -- The lists that can be picked from take the pointer (the objectives are only read)
-        for _, name in ipairs({ 'MM_QuestsList', 'MM_NotesList' }) do
+        for _, name in ipairs({ 'MM_QuestsList', 'MM_NotesList', 'MM_RadioStationList' }) do
             opened:set(name, '_enabled', true)
         end
         -- The picture of the world takes the pointer (the file leaves out `target`, which a hot rectangle has by default
@@ -558,6 +671,7 @@ function module.hide()
     end
     shown, lists, tabs = nil, nil, nil
     marked, named, objectivesFor, dragFrom = {}, nil, nil, nil
+    waveform = nil
 end
 
 -- Each frame the page is shown: the window size, and the objectives of the quest that is picked
@@ -565,6 +679,17 @@ function module.update()
     if not shown then return end
     shown:checkSize()
     if TABS[tabIndex].key == 'quests' then fillObjectives() end
+    if TABS[tabIndex].key == 'radio' then
+        local polled, problem = pcall(pollRadio)
+        if not polled then print('data menu radio: ' .. tostring(problem)) end
+        -- The waveform is there while a station is tuned (the radio is on)
+        local on = false
+        for _, station in ipairs(stations or {}) do
+            if station.tuned then on = true end
+        end
+        local drawn, trouble = pcall(pollWaveform, on)
+        if not drawn then print('data menu waveform: ' .. tostring(trouble)) end
+    end
 end
 
 -- What a key does while the page is there: [ and ] go to the tab before and after, the arrows and pages pick a quest,

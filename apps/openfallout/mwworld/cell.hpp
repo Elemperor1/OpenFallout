@@ -96,6 +96,14 @@ namespace OFWorld
         const MoodData& getMood() const { return mMood; }
         float getWaterHeight() const { return mWaterHeight; }
         ESM::FormId getWaterType() const { return mWaterType; }
+        /// The music of a Fallout cell: its own (XCMO), or the one of its worldspace (ZNAM) when it names none. Zero when
+        /// there is none.
+        ESM::FormId getMusic() const { return mMusic; }
+        /// The kind of music a cell of Fallout 3 asks for when it names no music (XCMT: 1 public, 2 dungeon), 0 none
+        std::uint8_t getMusicType() const { return mMusicType; }
+        /// The acoustic space of a Fallout cell (XCAS, an ASPC record): the loops of its ambience and the region whose sounds
+        /// play in it. Zero when it names none.
+        ESM::FormId getAcousticSpace() const { return mAcousticSpace; }
         const ESM::RefId& getId() const { return mId; }
         ESM::RefId getWorldSpace() const { return mIsExterior ? mParent : mId; }
 
@@ -118,6 +126,9 @@ namespace OFWorld
         ESM::RefId mParent;
         float mWaterHeight;
         ESM::FormId mWaterType;
+        ESM::FormId mMusic;
+        std::uint8_t mMusicType = 0;
+        ESM::FormId mAcousticSpace;
         std::string mDescription;
         MoodData mMood;
     };

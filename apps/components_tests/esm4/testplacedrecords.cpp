@@ -218,6 +218,7 @@ namespace
         const ESM4::Reference reference
             = load<ESM4::Reference>("REFR", subRecord("XRDO", radio) + valueSubRecord<std::uint32_t>("SCRO", 0x871));
 
+        EXPECT_TRUE(reference.mRadio.present);
         EXPECT_EQ(reference.mRadio.rangeRadius, 4500.f);
         EXPECT_EQ(reference.mRadio.broadcastRange, 2u);
         EXPECT_EQ(reference.mRadio.staticPercentage, 0.25f);

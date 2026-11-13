@@ -79,6 +79,19 @@ namespace
         EXPECT_THAT(state.attackersOf(ghoul), IsEmpty());
     }
 
+    TEST(FalloutScriptCombatStateTest, every_fight_is_told_with_who_fights_whom)
+    {
+        CombatState state;
+        EXPECT_THAT(state.fights(), IsEmpty());
+        state.start(ghoul, guard);
+        state.start(raider, guard);
+        state.start(guard, raider);
+        EXPECT_THAT(state.fights(), ElementsAre(std::make_pair(guard, raider), std::make_pair(raider, guard),
+                                        std::make_pair(ghoul, guard)));
+        state.stop(raider);
+        EXPECT_THAT(state.fights(), ElementsAre(std::make_pair(guard, raider), std::make_pair(ghoul, guard)));
+    }
+
     TEST(FalloutScriptCombatStateTest, the_beginning_and_the_end_of_a_fight_are_told_once)
     {
         CombatState state;

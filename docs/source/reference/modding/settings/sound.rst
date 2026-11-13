@@ -42,6 +42,16 @@ Sound Settings
    This setting controls the volume for music tracks.
 
 .. omw-setting::
+   :title: radio volume
+   :type: float32
+   :range: 0.0 (silent) to 1.0 (maximum volume)
+   :default: 0.5
+   :location: :bdg-info:`In Game > Options > Audio`
+
+   This setting controls the volume of the radio: the songs and the spoken lines of the stations that the Pip-Boy is tuned to
+   (fDefaultRadioVolume of the games).
+
+.. omw-setting::
    :title: sfx volume
    :type: float32
    :range: 0.0 (silent) to 1.0 (maximum volume)

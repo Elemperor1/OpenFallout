@@ -10,7 +10,8 @@ namespace OFSound
         Foot = 1 << 7, /* Footstep sound */
         Music = 1 << 8, /* Music track */
         Movie = 1 << 9, /* Movie audio track */
-        Mask = Sfx | Voice | Foot | Music | Movie
+        Radio = 1 << 11, /* What a radio station plays or says (its own volume, fDefaultRadioVolume of the games) */
+        Mask = Sfx | Voice | Foot | Music | Movie | Radio
     };
 }
 

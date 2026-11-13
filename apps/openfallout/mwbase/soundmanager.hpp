@@ -1,12 +1,15 @@
 #ifndef GAME_MWBASE_SOUNDMANAGER_H
 #define GAME_MWBASE_SOUNDMANAGER_H
 
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
 
 #include <components/esm/formid.hpp>
+#include <components/falloutscript/sounddata.hpp>
 #include <components/vfs/pathutil.hpp>
 
 #include "../mwsound/type.hpp"
@@ -130,9 +133,28 @@ namespace OFBase
         virtual bool isMusicPlaying() = 0;
         ///< Returns true if music is playing
 
-        virtual void say(const OFWorld::ConstPtr& reference, VFS::Path::NormalizedView filename) = 0;
+        /// A track of the music of a place of Fallout: played next to the music of the playlist and of scripts, with a
+        /// fade of its own, as loud as the music volume says times its gain, and looping when it is told to. The
+        /// layers of a New Vegas media set are several of them at once. 0 is no track.
+        using MusicTrackId = std::uint32_t;
+        virtual MusicTrackId startMusicTrack(VFS::Path::NormalizedView filename, float gain, float fadeIn, bool loop)
+            = 0;
+        /// Fades the track to the gain in the seconds; with `stopAtEnd` it stops when it has faded
+        /// The loop of a sound record of Fallout (an ambient sound), as a track that the calls below follow (it is as loud as
+        /// the sound effects, not the music). 0 when there is no such record, it has no file, or there is no sound.
+        virtual MusicTrackId startFalloutLoop(ESM::FormId sound, float fadeIn) = 0;
+        /// A track of a radio station (a song or a spoken line): the same calls follow it, and it is as loud as the radio
+        /// volume says times its gain, not the music volume
+        virtual MusicTrackId startRadioTrack(VFS::Path::NormalizedView filename, float gain) = 0;
+        virtual void fadeMusicTrack(MusicTrackId track, float gain, float seconds, bool stopAtEnd) = 0;
+        virtual bool isMusicTrackPlaying(MusicTrackId track) const = 0;
+        virtual void stopMusicTrack(MusicTrackId track) = 0;
+
+        virtual void say(const OFWorld::ConstPtr& reference, VFS::Path::NormalizedView filename,
+            OFSound::Type type = OFSound::Type::Voice) = 0;
         ///< Make an actor say some text.
         /// \param filename name of a sound file in the VFS
+        /// \param type the volume channel it follows (a radio that a character plays follows the radio's)
 
         virtual void say(VFS::Path::NormalizedView filename) = 0;
         ///< Say some text, without an actor ref
@@ -207,6 +229,15 @@ namespace OFBase
         virtual Sound* playFalloutSound(ESM::FormId sound, const OFWorld::ConstPtr& reference, float volume,
             Type type = Type::Sfx, PlayMode mode = PlayMode::Normal)
             = 0;
+        /// The same, from a place in the world (a sound that the record says is two-dimensional is heard as it is)
+        virtual Sound* playFalloutSoundAt(ESM::FormId sound, const osg::Vec3f& position, float volume,
+            Type type = Type::Sfx, PlayMode mode = PlayMode::Normal)
+            = 0;
+        /// Stops the sounds of the record that play from the reference (the player for an empty one)
+        virtual void stopFalloutSound(ESM::FormId sound, const OFWorld::ConstPtr& reference) = 0;
+        /// The settings of the sound record of Fallout with this form (its flags, volume and distances); none when the
+        /// record does not exist or has no file to play
+        virtual std::optional<FalloutScript::SoundData> falloutSoundData(ESM::FormId sound) = 0;
         /// Whether a sound record of Fallout has this editor id and files to play
         virtual bool hasFalloutSound(std::string_view editorId) = 0;
 

@@ -394,6 +394,63 @@ namespace OFScript
                 call.mReference, FalloutScript::formArgument(call, 0), 0, FalloutScript::intArgument(call, 1) != 0);
             return 0.0;
         });
+        // The radio: a station is on the air from the start when its record says it broadcasts all the time, and otherwise
+        // when a script puts it there
+        mInterpreter.setHandler("SetBroadcastState", [this](FalloutScript::CallContext& call) {
+            setRadioBroadcast(call.mReference, FalloutScript::intArgument(call, 0) != 0);
+            return 0.0;
+        });
+        mInterpreter.setHandler("GetBroadcastState",
+            [this](FalloutScript::CallContext& call) { return radioBroadcast(call.mReference) ? 1.0 : 0.0; });
+        mInterpreter.setHandler("PipBoyRadioOff", [this](FalloutScript::CallContext&) {
+            runOnMainThread([this] { tuneRadio(0); });
+            return 0.0;
+        });
+        // StreamMusic reads its argument and does nothing (FalloutNV.exe 0x5C2460: the handler parses the string into a
+        // buffer and returns): a script that calls it plays no music
+        mInterpreter.setHandler("StreamMusic", [](FalloutScript::CallContext&) { return 0.0; });
+        // PipboyRadio turns the radio on or off, or tunes it, by the word of its first argument (FalloutNV.exe 0x5D7FB0)
+        mInterpreter.setHandler("PipboyRadio", [this](FalloutScript::CallContext& call) {
+            std::string word;
+            if (!call.mArguments.empty())
+                word = call.mArguments[0].mIsText ? call.mArguments[0].mText
+                                                  : std::to_string(FalloutScript::intArgument(call, 0));
+            const FalloutScript::Radio::PipboyAction action = FalloutScript::Radio::pipboyActionOf(word);
+            const FalloutScript::FormId station = FalloutScript::formArgument(call, 1);
+            runOnMainThread([this, action, station] { pipboyRadioNow(action, station); });
+            return 0.0;
+        });
+        // SetRadioToDialogueOnlyMode: the radio says what is said and plays no songs (0x5E0020)
+        mInterpreter.setHandler("SetRadioToDialogueOnlyMode", [this](FalloutScript::CallContext& call) {
+            const bool on = FalloutScript::intArgument(call, 0) != 0;
+            runOnMainThread([this, on] {
+                mRadioPlayback.mDialogueOnly = on;
+                if (on)
+                    dropWorldRadioSongs();
+            });
+            return 0.0;
+        });
+        // The station that the command is called on says the topic next (0x5D82A0 calls 0x835BE0: the topic is given, or
+        // the first of the station)
+        mInterpreter.setHandler("StartRadioConversation", [this](FalloutScript::CallContext& call) {
+            const FalloutScript::FormId station = call.mReference;
+            const FalloutScript::FormId topic = FalloutScript::formArgument(call, 0);
+            runOnMainThread([this, station, topic] { startRadioConversationNow(station, topic); });
+            return 0.0;
+        });
+        // A character has a station on, or turns it off (0x5D8100: the first argument is on or off, the second the station)
+        mInterpreter.setHandler("SetNPCRadio", [this](FalloutScript::CallContext& call) {
+            const FalloutScript::FormId actor = call.mReference;
+            const bool on = FalloutScript::intArgument(call, 0) != 0;
+            const FalloutScript::FormId station = FalloutScript::formArgument(call, 1);
+            if (actor != 0 && station != 0)
+                runOnMainThread([this, actor, station, on] { setNpcRadioNow(actor, station, on); });
+            return 0.0;
+        });
+        mInterpreter.setHandler("ForceRadioStationUpdate", [this](FalloutScript::CallContext&) {
+            runOnMainThread([this] { mRadioPlayback.mUntilLook = 0.f; });
+            return 0.0;
+        });
         mInterpreter.setHandler("SayTo", [this](FalloutScript::CallContext& call) {
             sayTopic(call.mReference, FalloutScript::formArgument(call, 1), FalloutScript::formArgument(call, 0),
                 FalloutScript::intArgument(call, 2) != 0);
@@ -544,6 +601,7 @@ namespace OFScript
                     text.mHeading = gameSettingText("sQuestCompletedText");
                     text.mSound = "UIPopUpQuestComplete";
                     text.mKind = 1;
+                    playStinger(Stinger::Success);
                     break;
                 default:
                     text.mHeading = gameSettingText("sQuestFailed");
@@ -643,6 +701,7 @@ namespace OFScript
             mFireCooldowns.clear();
         }
         mWeaponLoops.clear();
+        mWeaponIdles.clear();
         mHudMessages.clear();
         mHudSubtitles.clear();
         mHudQuestText.clear();
@@ -674,6 +733,13 @@ namespace OFScript
         mActors.clear();
         mEquipment.clear();
         mCombat.clear();
+        resetMusic();
+        resetAmbient();
+        resetRadio();
+        {
+            const std::lock_guard lock(mRadioMutex);
+            mRadioBroadcast.clear();
+        }
         mOpenStates.clear();
         mDoorsWithoutCollision.clear();
         mItemHolders.clear();
@@ -836,6 +902,9 @@ namespace OFScript
                 = [this](const FalloutScript::Block& block) { return menuBlockRuns(block); };
             mQuests.updateMenu(frametime, filter);
             mObjects.updateMenu(filter);
+            // The radio goes on while a menu is open (the Pip-Boy is where it is tuned): a line that ends is followed by the
+            // next
+            updateRadio(frametime);
             return;
         }
         // A move of the player that was made since the last pass is over for the scripts when this pass has run
@@ -883,6 +952,9 @@ namespace OFScript
                 mActorValues.restore(mPlayer, AV::actionPoints, gain);
         }
         updateBreath(frametime);
+        updateMusic(frametime);
+        updateAmbient(frametime);
+        updateRadio(frametime);
         mHudTime += frametime;
         raiseCombatEvents(frametime);
         updateProgress(frametime);
@@ -2787,6 +2859,12 @@ namespace OFScript
                 painRumble();
             });
         }
+        // A blow that lands makes the pad shake: the one the player takes (0x89CEF1, not in V.A.T.S.) and the player's own
+        // with no projectile, a blow of the hand or of a melee weapon (0x89CF90)
+        if (victim == mPlayer && !mVatsOpen)
+            runOnMainThread([this] { struckRumble(); });
+        else if (attacker == mPlayer && blow.mMelee)
+            runOnMainThread([this] { hitRumble(); });
         if (limb >= 0)
         {
             // The condition of the part goes down by the damage after the armor and before the multiplier of the part,
@@ -3158,14 +3236,14 @@ namespace OFScript
         const OFWorld::Ptr reference = attacker == mPlayer ? world.getPlayerPtr() : findReference(attacker);
         if (reference.isEmpty())
             return false;
-        const VFS::Path::Normalized path(files[0]);
-        // The player hears its own weapon in 2D, which the sound manager does for the reference of the player
+        // The player hears its own weapon in 2D, which the sound manager does for the reference of the player. The sound is
+        // the record's: its volume, its curve over the distance and its pitch count.
         const OFSound::PlayMode mode = attacker == mPlayer ? OFSound::PlayMode::LoopNoEnv : OFSound::PlayMode::Loop;
-        if (sound->playSound3D(reference, path, 1.f, 1.f, OFSound::Type::Sfx, mode) == nullptr)
+        if (sound->playFalloutSound(record->mLoopSound, reference, 1.f, OFSound::Type::Sfx, mode) == nullptr)
             return false;
         WeaponLoop loop;
         loop.mWeapon = weapon;
-        loop.mFile = files[0];
+        loop.mSound = id;
         loop.mRemaining = keep;
         mWeaponLoops[attacker] = std::move(loop);
         return true;
@@ -3182,9 +3260,71 @@ namespace OFScript
         {
             const OFWorld::Ptr reference = attacker == mPlayer ? world->getPlayerPtr() : findReference(attacker);
             if (!reference.isEmpty())
-                sound->stopSound3D(reference, VFS::Path::Normalized(found->second.mFile));
+                sound->stopFalloutSound(ESM::FormId::fromUint32(found->second.mSound), reference);
         }
         mWeaponLoops.erase(found);
+    }
+
+    void FalloutScripts::weaponHandled(const OFWorld::Ptr& actor, FalloutScript::FormId weapon, bool equip)
+    {
+        if (weapon == 0 || actor.isEmpty() || !actor.isInCell() || std::this_thread::get_id() != mMainThread)
+            return;
+        const ESM4::Weapon* record = mStore.get<ESM4::Weapon>().search(refId(weapon));
+        OFBase::SoundManager* sound = OFBase::Environment::get().getSoundManager();
+        if (record == nullptr || sound == nullptr || !sound->isEnabled())
+            return;
+        const ESM::FormId id = equip ? record->mEquipSound : record->mUnequipSound;
+        if (id.isZeroOrUnset())
+            return;
+        // It is heard from where the character stands, at the record's own volume (the executable passes volume 1)
+        const osg::Vec3f position = actor.getRefData().getPosition().asVec3();
+        static int sLogged = 0;
+        if (sLogged < 20)
+        {
+            ++sLogged;
+            Log(Debug::Info) << "Weapon " << record->mEditorId << ": the sound of " << (equip ? "taking it out" : "putting it away")
+                             << " " << id.toString() << (sound->falloutSoundData(id) ? " plays" : " has no file");
+        }
+        sound->playFalloutSoundAt(id, position, 1.f, OFSound::Type::Sfx, OFSound::PlayMode::Overlap);
+    }
+
+    void FalloutScripts::weaponHeld(const OFWorld::Ptr& actor, FalloutScript::FormId weapon, bool held)
+    {
+        if (actor.isEmpty() || std::this_thread::get_id() != mMainThread)
+            return;
+        const FalloutScript::FormId reference = scriptReferenceOf(actor);
+        if (reference == 0)
+            return;
+        OFBase::SoundManager* sound = OFBase::Environment::get().getSoundManager();
+        if (sound == nullptr)
+            return;
+        const auto running = mWeaponIdles.find(reference);
+        if (running != mWeaponIdles.end())
+        {
+            // The same weapon held out again (the body and the arms of the player both say so) leaves it as it is
+            if (held && running->second == weapon)
+                return;
+            if (const ESM4::Weapon* old = mStore.get<ESM4::Weapon>().search(refId(running->second)))
+                sound->stopFalloutSound(old->mIdleSound, actor);
+            mWeaponIdles.erase(running);
+        }
+        if (!held || weapon == 0)
+            return;
+        const ESM4::Weapon* record = mStore.get<ESM4::Weapon>().search(refId(weapon));
+        if (record == nullptr || record->mIdleSound.isZeroOrUnset() || !actor.isInCell())
+            return;
+        // The player hears its own weapon as it is, the others from where they are
+        const OFSound::PlayMode mode = reference == mPlayer ? OFSound::PlayMode::LoopNoEnv : OFSound::PlayMode::Loop;
+        if (sound->playFalloutSound(record->mIdleSound, actor, 1.f, OFSound::Type::Sfx, mode) == nullptr)
+            return;
+        mWeaponIdles[reference] = weapon;
+        static int sLogged = 0;
+        if (sLogged < 20)
+        {
+            ++sLogged;
+            Log(Debug::Info) << "Weapon " << record->mEditorId << ": the sound " << record->mIdleSound.toString()
+                             << " goes on while it is held out";
+        }
     }
 
     const FalloutScripts::FightTraits& FalloutScripts::fightTraitsOf(const OFWorld::Ptr& actor)
@@ -3604,6 +3744,29 @@ namespace OFScript
                     ended.push_back(attacker);
             for (const FalloutScript::FormId attacker : ended)
                 stopWeaponLoop(attacker);
+            // What a character holds out is not heard once it is gone from the world or dead (and when it holds one out
+            // again the sound starts again)
+            if (!mWeaponIdles.empty())
+            {
+                OFBase::SoundManager* sound = OFBase::Environment::get().getSoundManager();
+                OFBase::World* world = OFBase::Environment::get().getWorld();
+                for (auto it = mWeaponIdles.begin(); it != mWeaponIdles.end();)
+                {
+                    const OFWorld::Ptr actor
+                        = it->first == mPlayer && world != nullptr ? world->getPlayerPtr() : findReference(it->first);
+                    // (a character of a cell that was unloaded is found by its form still, but its sounds were stopped with
+                    // the cell: the active cells say)
+                    if (!actor.isEmpty() && !mActors.isDead(it->first) && !leftLoadedCells(it->first))
+                    {
+                        ++it;
+                        continue;
+                    }
+                    if (sound != nullptr && !actor.isEmpty())
+                        if (const ESM4::Weapon* record = mStore.get<ESM4::Weapon>().search(refId(it->second)))
+                            sound->stopFalloutSound(record->mIdleSound, actor);
+                    it = mWeaponIdles.erase(it);
+                }
+            }
         }
         {
             // A character that wakes has its health back before any blow or fight can see it up: both steps are one
@@ -4242,6 +4405,72 @@ namespace OFScript
         mSayings.push_back(std::move(saying));
     }
 
+    void FalloutScripts::cutOffSaying(FalloutScript::FormId reference)
+    {
+        const auto saying = std::find_if(
+            mSayings.begin(), mSayings.end(), [reference](const Saying& other) { return other.mReference == reference; });
+        if (saying == mSayings.end())
+            return;
+        // The line that is said now may be another character's (in an exchange they take turns)
+        FalloutScript::FormId speaker = reference;
+        if (saying->mNext < saying->mLines.size() && saying->mLines[saying->mNext].mSpeaker != 0)
+            speaker = saying->mLines[saying->mNext].mSpeaker;
+        mSayings.erase(saying);
+        if (!OFBase::Environment::exists())
+            return;
+        OFBase::SoundManager* sound = OFBase::Environment::get().getSoundManager();
+        const OFWorld::Ptr ptr = findReference(speaker);
+        if (sound != nullptr && !ptr.isEmpty())
+            sound->stopSay(ptr);
+    }
+
+    void FalloutScripts::cutOffRadioSaying(FalloutScript::FormId reference)
+    {
+        const auto saying = std::find_if(
+            mSayings.begin(), mSayings.end(), [reference](const Saying& other) { return other.mReference == reference; });
+        if (saying != mSayings.end() && saying->mNext < saying->mLines.size() && saying->mLines[saying->mNext].mRadio)
+            cutOffSaying(reference);
+    }
+
+    void FalloutScripts::dropWorldRadioSongs()
+    {
+        // (an if, not a conditional expression: the pointer of the environment cannot be made from a null pointer)
+        OFBase::SoundManager* sound = nullptr;
+        if (OFBase::Environment::exists())
+            sound = OFBase::Environment::get().getSoundManager();
+        for (Saying& saying : mSayings)
+        {
+            if (saying.mNext >= saying.mLines.size())
+                continue;
+            // The song that plays now stops
+            if (const SaidLine& line = saying.mLines[saying.mNext]; line.mRadio && line.mSong && saying.mStarted)
+            {
+                if (const OFWorld::Ptr speaker = findReference(line.mSpeaker != 0 ? line.mSpeaker : saying.mReference);
+                    sound != nullptr && !speaker.isEmpty())
+                    sound->stopSay(speaker);
+                saying.mStarted = false;
+            }
+            // and the songs that were queued are not said (the end of what was said is kept for the line that is left)
+            bool ended = false;
+            const auto from = saying.mLines.begin() + static_cast<std::ptrdiff_t>(saying.mNext);
+            const auto removed = std::remove_if(from, saying.mLines.end(), [&ended](const SaidLine& line) {
+                if (!line.mRadio || !line.mSong)
+                    return false;
+                ended = ended || line.mEnd;
+                return true;
+            });
+            saying.mLines.erase(removed, saying.mLines.end());
+            if (ended && saying.mNext < saying.mLines.size())
+                saying.mLines.back().mEnd = true;
+        }
+    }
+
+    bool FalloutScripts::inConversationWith(FalloutScript::FormId reference)
+    {
+        const std::lock_guard lock(mDialogueMutex);
+        return mDialogue.active() && mDialogue.speaker().mReference == reference;
+    }
+
     void FalloutScripts::raiseNothingSaid()
     {
         std::vector<std::pair<FalloutScript::FormId, FalloutScript::FormId>> told;
@@ -4331,7 +4560,8 @@ namespace OFScript
                 bool voiced = false;
                 if (!line.mVoice.empty())
                 {
-                    sound->say(speaker, VFS::Path::Normalized(line.mVoice));
+                    sound->say(speaker, VFS::Path::Normalized(line.mVoice),
+                        line.mRadio ? OFSound::Type::Radio : OFSound::Type::Voice);
                     voiced = sound->sayActive(speaker);
                 }
                 saying->mWait = voiced ? 0.f : line.mSeconds;
@@ -4451,6 +4681,8 @@ namespace OFScript
             return false;
         }
         mSpeakerName = std::string(speaker.getClass().getName(speaker));
+        // What the character was saying for its radio stops: the conversation has the voice of the character now
+        runOnMainThread([this, reference] { cutOffRadioSaying(reference); });
         return true;
     }
 

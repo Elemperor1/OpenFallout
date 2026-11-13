@@ -77,6 +77,7 @@ namespace OFInput
         void setPadPick(bool pick) override;
         bool padPick() const override;
         void rumble(float strength, float seconds) override;
+        void rumble(float left, float right, float seconds) override;
         void setTriggerState(const TriggerFeel::PlayerState& player) override;
         void weaponFired() override;
 

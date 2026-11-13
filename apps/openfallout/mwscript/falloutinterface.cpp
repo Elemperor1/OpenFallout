@@ -149,14 +149,36 @@ namespace OFScript
         request.mActor = ptr;
         request.mSlot = slot;
         request.mPlayerInFirstPerson = world->isFirstPerson();
+        // A jump in armor has the sound of the armor over it (power armor its own); landing is the ground's alone
+        if (slot == FalloutScript::Footsteps::Slot::Jump)
+            request.mArmor = OFSound::armorSoundKind(ptr);
         OFSound::playFootstep(request);
     }
 
+    void FalloutScripts::rumbleFor(
+        const char* strengthSetting, double strengthDefault, const char* timeSetting, double timeDefault)
+    {
+        if (OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager(); windows != nullptr && windows->isGuiMode())
+            return;
+        if (OFBase::InputManager* input = OFBase::Environment::get().getInputManager())
+            input->rumble(static_cast<float>(gameSetting(strengthSetting, strengthDefault)),
+                static_cast<float>(gameSetting(timeSetting, timeDefault)));
+    }
+
+    // The defaults are the ones the executables register (FalloutNV.exe 0xF68A7E and the ones after it)
     void FalloutScripts::painRumble()
     {
-        if (OFBase::InputManager* input = OFBase::Environment::get().getInputManager())
-            input->rumble(static_cast<float>(gameSetting("fRumblePainStrength", 0.5)),
-                static_cast<float>(gameSetting("fRumblePainTime", 0.2)));
+        rumbleFor("fRumblePainStrength", 0.75, "fRumblePainTime", 0.5);
+    }
+
+    void FalloutScripts::struckRumble()
+    {
+        rumbleFor("fRumbleStruckStrength", 0.75, "fRumbleStruckTime", 0.3);
+    }
+
+    void FalloutScripts::hitRumble()
+    {
+        rumbleFor("fRumbleHitStrength", 0.5, "fRumbleHitTime", 0.3);
     }
 
     void FalloutScripts::updateTriggerFeel()

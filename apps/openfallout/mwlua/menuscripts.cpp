@@ -64,6 +64,7 @@ namespace OFLua
         constexpr Option screenOptions[] = {
             { "masterVolume", "Sound", "master volume", false },
             { "musicVolume", "Sound", "music volume", false },
+            { "radioVolume", "Sound", "radio volume", false },
             { "footstepsVolume", "Sound", "footsteps volume", false },
             { "voiceVolume", "Sound", "voice volume", false },
             { "effectsVolume", "Sound", "sfx volume", false },

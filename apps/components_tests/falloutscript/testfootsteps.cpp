@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <set>
 #include <string>
 #include <string_view>
@@ -203,5 +204,53 @@ namespace
         EXPECT_EQ(pickByChance({}, 0.5f), -1);
         EXPECT_EQ(pickByChance({ 0, 0 }, 0.5f), -1);
         EXPECT_EQ(pickByChance({ -5, 100 }, 0.5f), 1);
+    }
+
+    TEST(FalloutScriptFootstepsTest, a_flat_tread_with_a_step_ahead_or_behind_is_stairs)
+    {
+        const StairSettings settings;
+        // a tread of a flight going up: the next one is 14 units higher, the one before is 14 lower
+        EXPECT_TRUE(isStairs(settings, 1.f, 100.f, 114.f, 86.f));
+        // going down: only the tread ahead is lower
+        EXPECT_TRUE(isStairs(settings, 1.f, 100.f, 86.f, std::nullopt));
+        // at the top of a flight: only the one behind is lower
+        EXPECT_TRUE(isStairs(settings, 0.99f, 100.f, std::nullopt, 86.f));
+    }
+
+    TEST(FalloutScriptFootstepsTest, level_ground_a_slope_and_a_wall_are_not_stairs)
+    {
+        const StairSettings settings;
+        // a floor with a floor on both sides
+        EXPECT_FALSE(isStairs(settings, 1.f, 100.f, 100.f, 101.f));
+        // a gentle slope changes a few units over a stride: less than a step
+        EXPECT_FALSE(isStairs(settings, 1.f, 100.f, 103.f, 97.f));
+        // a ramp has a tilted normal even where it changes as much as a step
+        EXPECT_FALSE(isStairs(settings, 0.8f, 100.f, 114.f, 86.f));
+        // a ramp that rises 7 units over the reach (a tilt that passes as flat, a normal of 0.9606) rises as much as a step
+        // but evenly: the plane explains the 7 units ahead and the 7 behind, so it is not a stair
+        const float tilted = 24.f / std::sqrt(24.f * 24.f + 7.f * 7.f);
+        EXPECT_FALSE(isStairs(settings, tilted, 100.f, 107.f, 93.f, 7.f));
+        // the same ramp walked down
+        EXPECT_FALSE(isStairs(settings, tilted, 100.f, 93.f, 107.f, -7.f));
+        // while a flat that the ground goes up 14 units from is stairs, with the plane's 7 taken off the 14
+        EXPECT_TRUE(isStairs(settings, tilted, 100.f, 114.f, 86.f, 0.f));
+        EXPECT_TRUE(isStairs(settings, tilted, 100.f, 114.f, std::nullopt, 7.f));
+        // a tread that tilts sideways (the plane is level along the probe) keeps its small steps
+        EXPECT_TRUE(isStairs(settings, tilted, 100.f, 106.f, 94.f, 0.f));
+        // a ledge higher than a step is a wall, not a stair
+        EXPECT_FALSE(isStairs(settings, 1.f, 100.f, 160.f, std::nullopt));
+        // nothing found around: not stairs
+        EXPECT_FALSE(isStairs(settings, 1.f, 100.f, std::nullopt, std::nullopt));
+    }
+
+    TEST(FalloutScriptFootstepsTest, the_limits_of_a_step_are_inclusive)
+    {
+        StairSettings settings;
+        settings.mMinStep = 6.f;
+        settings.mMaxStep = 20.f;
+        EXPECT_TRUE(isStairs(settings, 1.f, 0.f, 6.f, std::nullopt));
+        EXPECT_TRUE(isStairs(settings, 1.f, 0.f, -20.f, std::nullopt));
+        EXPECT_FALSE(isStairs(settings, 1.f, 0.f, 5.9f, std::nullopt));
+        EXPECT_FALSE(isStairs(settings, 1.f, 0.f, 20.1f, std::nullopt));
     }
 }

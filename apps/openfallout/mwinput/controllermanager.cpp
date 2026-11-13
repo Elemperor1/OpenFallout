@@ -616,16 +616,17 @@ namespace OFInput
         return true;
     }
 
-    void ControllerManager::rumble(float strength, float seconds)
+    void ControllerManager::rumble(float left, float right, float seconds)
     {
-        if (!Settings::input().mGamepadRumble || strength <= 0.f || seconds <= 0.f)
+        if (!Settings::input().mGamepadRumble || (left <= 0.f && right <= 0.f) || seconds <= 0.f)
             return;
         SDL_GameController* cntrl = mBindingsManager->getControllerOrNull();
         if (cntrl == nullptr)
             return;
-        const auto motor = static_cast<Uint16>(std::clamp(strength, 0.f, 1.f) * 65535.f);
+        const auto leftMotor = static_cast<Uint16>(std::clamp(left, 0.f, 1.f) * 65535.f);
+        const auto rightMotor = static_cast<Uint16>(std::clamp(right, 0.f, 1.f) * 65535.f);
         const auto milliseconds = static_cast<Uint32>(std::clamp(seconds, 0.f, 10.f) * 1000.f);
-        SDL_GameControllerRumble(cntrl, motor, motor, milliseconds);
+        SDL_GameControllerRumble(cntrl, leftMotor, rightMotor, milliseconds);
     }
 
     TriggerDevice* ControllerManager::triggerDevice()

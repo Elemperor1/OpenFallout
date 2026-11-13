@@ -50,7 +50,9 @@ namespace OFRender
         /// takes it out and then holds it ready. The type is the animation type of the weapon record (0 to 10); a
         /// negative one is bare hands (creatures too), which only hold their hands ready. Any weapon it had is put away
         /// first.
-        void drawWeapon(std::string_view model, int animationType);
+        /// `weapon` is the form of the weapon, 0 for bare hands: its record has the sounds of taking it out and putting it
+        /// away and the one that goes on while it is held out
+        void drawWeapon(std::string_view model, int animationType, std::uint32_t weapon = 0);
         /// The weapon goes out of the hands
         void holsterWeapon();
         bool isWeaponDrawn() const { return mDrawn; }
@@ -117,6 +119,10 @@ namespace OFRender
         void playWornSound(int type);
         std::unique_ptr<SoundKeys> mSoundKeys;
         int mArmorSounds = 0;
+        /// The form of the weapon that is out, 0 for none
+        std::uint32_t mWeaponForm = 0;
+        /// The sound that the weapon makes as it is taken out (the key `Enum: Equip` of its animation)
+        void playWeaponHandled(bool equip);
 
         /// Adds the animation file to the actor and gives the name of its group, empty when it has nothing to play on
         /// this skeleton

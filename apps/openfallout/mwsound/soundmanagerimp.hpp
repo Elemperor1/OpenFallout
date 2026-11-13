@@ -94,6 +94,8 @@ namespace OFSound
         TrackList mActiveTracks;
 
         StreamPtr mMusic;
+        std::map<MusicTrackId, Stream*> mMusicTracks;
+        MusicTrackId mLastMusicTrack = 0;
         MusicType mMusicType;
 
         bool mListenerUnderwater;
@@ -114,7 +116,10 @@ namespace OFSound
 
         float mTimePassed;
 
-        const OFWorld::Cell* mLastCell;
+        /// The sound of the water near the player (a Fallout WATR sound played from a place that follows the player) and
+        /// the record it plays, and how many times its start and stop were written to the log
+        ESM::FormId mNearWaterId;
+        int mNearWaterLogged = 0;
 
         Sound* mCurrentRegionSound;
 
@@ -129,7 +134,13 @@ namespace OFSound
         std::map<std::string, unsigned> mFalloutPlayed;
         FalloutSounds* falloutSounds();
         Sound* playFalloutRecord(const FalloutSound& record, const OFWorld::ConstPtr& reference, float volume,
-            Type type, PlayMode mode);
+            Type type, PlayMode mode, const osg::Vec3f* position = nullptr);
+        /// `pitch` and `environment` (heard through the environment's effects, such as underwater) are for the loops of the
+        /// sound records of Fallout, which have a pitch of their own and may ask to be heard as they are
+        MusicTrackId startTrack(VFS::Path::NormalizedView filename, float gain, float fadeIn, bool loop, Type type,
+            float pitch = 1.f, bool environment = false);
+        Sound* playSound3DAt(const osg::Vec3f& position, SoundBuffer* sfx, float volume, float pitch, Type type,
+            PlayMode mode, const FalloutScript::SoundData& curve);
 
         // returns a decoder to start streaming, or nullptr if the sound was not found
         DecoderPtr loadVoice(VFS::Path::NormalizedView voicefile);
@@ -137,7 +148,7 @@ namespace OFSound
         SoundPtr getSoundRef();
         StreamPtr getStreamRef();
 
-        StreamPtr playVoice(DecoderPtr decoder, const osg::Vec3f& pos, bool playlocal);
+        StreamPtr playVoice(DecoderPtr decoder, const osg::Vec3f& pos, bool playlocal, Type type = Type::Voice);
 
         void streamMusicFull(VFS::Path::NormalizedView filename);
         void advanceMusic(VFS::Path::NormalizedView filename, float fadeOut = 1.f);
@@ -157,17 +168,6 @@ namespace OFSound
         void enqueueWarmSound(const ESM::RefId& soundId);
         void updateWaterSound();
         void updateMusic(float duration);
-
-        enum class WaterSoundAction
-        {
-            DoNothing,
-            SetVolume,
-            FinishSound,
-            PlaySound,
-        };
-
-        std::pair<WaterSoundAction, SoundBuffer*> getWaterSoundAction(
-            const WaterSoundUpdate& update, const OFWorld::Cell* cell) const;
 
         SoundManager(const SoundManager& rhs);
         SoundManager& operator=(const SoundManager& rhs);
@@ -205,7 +205,15 @@ namespace OFSound
         bool isMusicPlaying() override;
         ///< Returns true if music is playing
 
-        void say(const OFWorld::ConstPtr& reference, VFS::Path::NormalizedView filename) override;
+        MusicTrackId startMusicTrack(VFS::Path::NormalizedView filename, float gain, float fadeIn, bool loop) override;
+        MusicTrackId startFalloutLoop(ESM::FormId sound, float fadeIn) override;
+        MusicTrackId startRadioTrack(VFS::Path::NormalizedView filename, float gain) override;
+        void fadeMusicTrack(MusicTrackId track, float gain, float seconds, bool stopAtEnd) override;
+        bool isMusicTrackPlaying(MusicTrackId track) const override;
+        void stopMusicTrack(MusicTrackId track) override;
+
+        void say(const OFWorld::ConstPtr& reference, VFS::Path::NormalizedView filename,
+            OFSound::Type type = OFSound::Type::Voice) override;
         ///< Make an actor say some text.
         /// \param filename name of a sound file in the VFS
 
@@ -270,6 +278,10 @@ namespace OFSound
             Type type = Type::Sfx, PlayMode mode = PlayMode::Normal) override;
         Sound* playFalloutSound(ESM::FormId sound, const OFWorld::ConstPtr& reference, float volume,
             Type type = Type::Sfx, PlayMode mode = PlayMode::Normal) override;
+        Sound* playFalloutSoundAt(ESM::FormId sound, const osg::Vec3f& position, float volume,
+            Type type = Type::Sfx, PlayMode mode = PlayMode::Normal) override;
+        void stopFalloutSound(ESM::FormId sound, const OFWorld::ConstPtr& reference) override;
+        std::optional<FalloutScript::SoundData> falloutSoundData(ESM::FormId sound) override;
         bool hasFalloutSound(std::string_view editorId) override;
 
         void stopSound(Sound* sound) override;

@@ -167,18 +167,38 @@ void ESM4::Region::load(ESM4::Reader& reader)
                 std::size_t numSounds = subHdr.dataSize / sizeof(RegionSound);
                 mSounds.resize(numSounds);
                 for (std::size_t i = 0; i < numSounds; ++i)
+                {
                     reader.get(mSounds.at(i));
+                    // The sound is a form of the file's own numbering: it takes the one of the load order
+                    ESM::FormId32 sound = mSounds[i].sound;
+                    reader.adjustFormId(sound);
+                    mSounds[i].sound = sound;
+                }
 
                 break;
             }
+            case ESM::fourCC("RDSB"): // FONV: a battle media set
+                if (mData.type != RDAT_Sound || subHdr.dataSize != sizeof(std::uint32_t))
+                {
+                    reader.skipSubRecordData();
+                    break;
+                }
+                reader.getFormId(mBattleSets.emplace_back());
+                break;
+            case ESM::fourCC("RDSI"): // FONV: the incidental media set
+                if (mData.type != RDAT_Sound || subHdr.dataSize != sizeof(std::uint32_t))
+                {
+                    reader.skipSubRecordData();
+                    break;
+                }
+                reader.getFormId(mIncidentalSet);
+                break;
             case ESM::fourCC("RDGS"): // Only in Oblivion? (ToddTestRegion1) // formId
             case ESM::fourCC("RDSA"):
             case ESM::fourCC("RDWT"): // formId
             case ESM::fourCC("RDOT"): // formId
             case ESM::fourCC("MICO"): // small icon, FO3 and FONV
             case ESM::fourCC("RDID"): // FONV
-            case ESM::fourCC("RDSB"): // FONV
-            case ESM::fourCC("RDSI"): // FONV
             case ESM::fourCC("NVMI"): // TES5
             case ESM::fourCC("ANAM"): // FO4
             case ESM::fourCC("RLDM"): // FO4

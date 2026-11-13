@@ -233,6 +233,7 @@ void ESM4::Reference::load(ESM4::Reader& reader)
             case ESM::fourCC("XRDO"): // FO3
             {
                 // FIXME: completely different meaning in FO4
+                mRadio.present = true;
                 reader.get(mRadio.rangeRadius);
                 reader.get(mRadio.broadcastRange);
                 reader.get(mRadio.staticPercentage);
@@ -313,11 +314,40 @@ void ESM4::Reference::load(ESM4::Reader& reader)
                 reader.get(mCount);
                 break;
             }
+            // The audio marker of New Vegas (a reference with MMRK, the radius of its place and the shares at which the layers
+            // of its music come in); a subrecord of another size is skipped
+            case ESM::fourCC("XRDS"): // Radius or Radiance: the radius of an audio marker
+                if (subHdr.dataSize == sizeof(float))
+                    reader.get(mAudioMarker.mRadius);
+                else
+                    reader.skipSubRecordData();
+                break;
+            case ESM::fourCC("MMRK"): // FONV
+                mAudioMarker.mIsMarker = true;
+                reader.skipSubRecordData();
+                break;
+            case ESM::fourCC("BNAM"): // FONV: the flags of an audio marker
+                if (subHdr.dataSize == sizeof(std::uint32_t))
+                    reader.get(mAudioMarker.mFlags);
+                else
+                    reader.skipSubRecordData();
+                break;
+            case ESM::fourCC("MNAM"): // FONV: the share at which the middle layer of an audio marker comes in
+                if (subHdr.dataSize == sizeof(float))
+                    reader.get(mAudioMarker.mLayer2Trigger);
+                else
+                    reader.skipSubRecordData();
+                break;
+            case ESM::fourCC("NNAM"): // FONV: the share at which the inner layer comes in
+                if (subHdr.dataSize == sizeof(float))
+                    reader.get(mAudioMarker.mLayer3Trigger);
+                else
+                    reader.skipSubRecordData();
+                break;
             // lighting
             case ESM::fourCC("LNAM"): // lighting template formId
             case ESM::fourCC("XLIG"): // struct, FOV, fade, etc
             case ESM::fourCC("XEMI"): // LIGH formId
-            case ESM::fourCC("XRDS"): // Radius or Radiance
             case ESM::fourCC("XRGB"):
             case ESM::fourCC("XRGD"): // tangent data?
             case ESM::fourCC("XALP"): // alpha cutoff
@@ -371,10 +401,6 @@ void ESM4::Reference::load(ESM4::Reader& reader)
             case ESM::fourCC("XCLP"): // FO3
             case ESM::fourCC("SCDA"): // FO3
             case ESM::fourCC("RCLR"): // FO3
-            case ESM::fourCC("BNAM"): // FONV
-            case ESM::fourCC("MMRK"): // FONV
-            case ESM::fourCC("MNAM"): // FONV
-            case ESM::fourCC("NNAM"): // FONV
             case ESM::fourCC("XATO"): // FONV
             case ESM::fourCC("SCRV"): // FONV
             case ESM::fourCC("SCVR"): // FONV

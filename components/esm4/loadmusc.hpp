@@ -47,6 +47,10 @@ namespace ESM4
 
         std::string mEditorId;
         std::string mMusicFile;
+        /// ANAM (New Vegas): how much quieter the track is, in decibels, and when it is above 0 the track loops; the
+        /// size of it is what counts (FalloutNV.exe 0x830050, 0x830080)
+        float mAttenuation = 0.f;
+        bool mHasAttenuation = false;
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;

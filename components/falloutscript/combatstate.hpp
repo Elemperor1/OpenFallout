@@ -46,6 +46,8 @@ namespace FalloutScript
 
         /// The actors that fight the target, in the order of their forms
         std::vector<FormId> attackersOf(FormId target) const;
+        /// Every fight: the actor and what it fights, in the order of the actors' forms
+        std::vector<std::pair<FormId, FormId>> fights() const;
 
         /// An actor on alert looks for enemies (SetAlert)
         void setAlert(FormId actor, bool alert);

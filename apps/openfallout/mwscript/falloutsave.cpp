@@ -954,6 +954,27 @@ namespace OFScript
                 FalloutScript::readMapMarkers(mMapMarkers, in, version);
             });
         section(
+            "radio", FalloutScript::Radio::savedSectionVersion,
+            [this](FalloutScript::SaveWriter& out) {
+                FalloutScript::Radio::Saved saved;
+                {
+                    const std::lock_guard lock(mRadioMutex);
+                    saved.mBroadcast = mRadioBroadcast;
+                }
+                saved.mDiscovered = mRadioPlayback.mReceiver.discoveredStations();
+                FalloutScript::Radio::writeSaved(saved, out);
+            },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::Radio::Saved saved;
+                FalloutScript::Radio::readSaved(saved, in, version);
+                {
+                    const std::lock_guard lock(mRadioMutex);
+                    mRadioBroadcast = saved.mBroadcast;
+                }
+                for (const std::uint32_t station : saved.mDiscovered)
+                    mRadioPlayback.mReceiver.markDiscovered(station);
+            });
+        section(
             "casinos", FalloutScript::Casino::ledgerSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::Casino::writeLedger(mCasinoLedger, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {

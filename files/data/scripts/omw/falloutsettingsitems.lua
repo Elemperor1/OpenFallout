@@ -145,7 +145,7 @@ M.groups = {
             meter('footstepsVolume', 'sFootstepsVolume', VOLUME, 12, volume('footstepsVolume')),
             meter('voiceVolume', 'sVoiceVolume', VOLUME, 15, volume('voiceVolume')),
             meter('effectsVolume', 'sEffectsVolume', VOLUME, VOLUME - 1, volume('effectsVolume')),
-            meter('radioVolume', 'sRadioVolume', VOLUME, 12),
+            meter('radioVolume', 'sRadioVolume', VOLUME, 12, volume('radioVolume')),
         },
     },
     {

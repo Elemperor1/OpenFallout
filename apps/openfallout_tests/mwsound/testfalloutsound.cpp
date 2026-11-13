@@ -92,6 +92,26 @@ namespace OFSound
             EXPECT_EQ(files[0].value(), "sound/fx/step.mp3");
         }
 
+        TEST(OFSoundFalloutSoundTest, aWavThatTheArchivesHaveOnlyAsOggIsFoundAsTheOgg)
+        {
+            TestingOpenMW::VFSTestFile file("a");
+            const auto vfs
+                = TestingOpenMW::createTestVFS({ { VFS::Path::NormalizedView("sound/fx/amb/~regions/house_lp.ogg"), &file } });
+            const auto files = falloutSoundFiles("fx\\amb\\~regions\\house_lp.wav", *vfs);
+            ASSERT_EQ(files.size(), 1u);
+            EXPECT_EQ(files[0].value(), "sound/fx/amb/~regions/house_lp.ogg");
+        }
+
+        TEST(OFSoundFalloutSoundTest, aWavThatIsThereIsPlayedBeforeAnOggOfTheSameName)
+        {
+            TestingOpenMW::VFSTestFile file("a");
+            const auto vfs = TestingOpenMW::createTestVFS({ { VFS::Path::NormalizedView("sound/fx/step.wav"), &file },
+                { VFS::Path::NormalizedView("sound/fx/step.ogg"), &file } });
+            const auto files = falloutSoundFiles("fx\\step.wav", *vfs);
+            ASSERT_EQ(files.size(), 1u);
+            EXPECT_EQ(files[0].value(), "sound/fx/step.wav");
+        }
+
         TEST(OFSoundFalloutSoundTest, aFileThatIsNotThereGivesNothing)
         {
             const auto vfs = TestingOpenMW::createTestVFS({});

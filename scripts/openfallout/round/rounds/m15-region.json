@@ -1,0 +1,12 @@
+{
+  "name": "m15-region",
+  "game": "nv",
+  "save": "latest",
+  "scenario": "../scenarios/m15_region.lua",
+  "resolution": [1280, 720],
+  "framerate": 30,
+  "limit": 480,
+  "settings": { "Sound": { "master volume": "0" } },
+  "env": { "OPENFALLOUT_HEADLESS_SOUND": "1" },
+  "variants": [ { "name": "plain" } ]
+}

@@ -54,7 +54,7 @@ namespace OFInput
 
         /// Vibrates the pad (both motors) with the strength (0 to 1) for the seconds; nothing without a pad, with the
         /// setting for it off, or with a strength or time of nothing
-        void rumble(float strength, float seconds);
+        void rumble(float left, float right, float seconds);
         bool padPick() const { return mPadPick; }
 
         /// The feel of the fire trigger (the right one) for the game as it is and the weapon in the player's hands
