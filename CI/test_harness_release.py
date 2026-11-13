@@ -13,6 +13,8 @@ RUN = {"id": 42, "head_branch": "master", "head_sha": SHA, "run_number": 1, "eve
 RELEASE = {"id": 7, "tag_name": TAG, "draft": True, "prerelease": True,
            "body": "- OpenFallout-arm64.dmg: packaged-app check PASS (release mode; smoke SKIP) on macOS 26.1 (25B78), "
                    "Apple M2 (Virtual), arm64\n"
+                   "- OpenFallout-arm64.dmg: packaged-app check PASS (local mode; smoke PASS) on macOS 26.1 (25B78), "
+                   "Apple M4, arm64\n"
                    "- OpenFallout-x86_64.dmg: packaged-app check PASS (local mode; smoke SKIP) on macOS 26.1 (25B78), "
                    "Intel(R) Core(TM) i7-8700B CPU @ 3.20GHz, x86_64\n",
            "html_url": "https://example.invalid/release", "assets": [
@@ -128,12 +130,34 @@ class ReleaseTests(unittest.TestCase):
 
     def test_disk_image_without_its_tested_on_line_blocks_publish(self):
         release = copy.deepcopy(RELEASE)
-        release["body"] = release["body"].splitlines()[0]
+        release["body"] = "\n".join(line for line in release["body"].splitlines() if "x86_64" not in line)
         with self.assertRaisesRegex(ReleaseError, "macOS version and chip that OpenFallout-x86_64.dmg"):
             verify_assets(release)
         release["body"] = None
         with self.assertRaisesRegex(ReleaseError, "OpenFallout-arm64.dmg"):
             verify_assets(release)
+
+    def test_arm64_image_needs_a_release_mode_pass_and_a_smoke_pass(self):
+        release = copy.deepcopy(RELEASE)
+        verify_assets(release)
+        lines = release["body"].splitlines()
+        # only the runner's line: the game was never started on a Mac with a GPU
+        release["body"] = "\n".join(line for line in lines if "smoke PASS" not in line)
+        with self.assertRaisesRegex(ReleaseError, "smoke PASS.*OpenFallout-arm64.dmg"):
+            verify_assets(release)
+        # only the smoke run: the notarized image was never checked in release mode
+        release["body"] = "\n".join(line for line in lines if "release mode" not in line)
+        with self.assertRaisesRegex(ReleaseError, "release mode.*OpenFallout-arm64.dmg"):
+            verify_assets(release)
+        # a failed check does not count, whatever its smoke result
+        release["body"] = release["body"].replace("check PASS (local mode; smoke PASS)", "check FAIL (local mode; smoke PASS)")
+        release["body"] += "\n- OpenFallout-arm64.dmg: packaged-app check FAIL (release mode; smoke PASS) on macOS 26.1"
+        with self.assertRaises(ReleaseError):
+            verify_assets(release)
+        # one line with both is enough
+        release["body"] = ("- OpenFallout-arm64.dmg: packaged-app check PASS (release mode; smoke PASS) on macOS 26.1 (25B78), "
+                           "Apple M4, arm64\n" + lines[-1])
+        verify_assets(release)
 
     def test_failed_packaging_blocks_publishing(self):
         api = FakeGitHub()

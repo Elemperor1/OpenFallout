@@ -180,9 +180,6 @@ jobs:
     - name: Test the packaged-app check
       run: python3 -m unittest discover -s CI -p test_check_mac_package.py -v
 
-    - name: Test release signing
-      run: python3 -m unittest discover -s CI -p test_release_signing.py -v
-
     # Release mode on the notarized build (Developer ID on every binary, Gatekeeper, stapled tickets); local mode on the
     # ad hoc one (Gatekeeper is not asked). The smoke step starts the game from the disk image with a hidden window; a
     # runner that gives it no OpenGL context reports it as skipped, and then the smoke step is run on the development

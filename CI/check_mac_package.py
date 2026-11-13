@@ -12,14 +12,14 @@ PATH is OpenFallout-*.dmg or OpenFallout.app. The steps run in this order and ea
   signatures   every Mach-O file and every nested bundle has a valid signature, and so has the app as a whole; in
                release mode each of them (and the app) is also signed by a Developer ID Application identity of one
                team (--team-id, else the app's), with the hardened runtime and a secure timestamp, and none carries
-               get-task-allow
+               get-task-allow or disable-library-validation
   gatekeeper   release mode only: `spctl --assess --type open --context context:primary-signature` accepts the disk
                image, `spctl --assess --type execute` accepts the app, and `stapler validate` finds a ticket on both
   info.plist   the app and its engine app declare Game Mode, the role-playing-games category and high resolution, and
                neither carries the Carbon key
   openal       the engine links the OpenAL Soft that is in the bundle, not the system's OpenAL framework
   library-validation  when the engine has the hardened runtime, every Mach-O file in the app has its Team ID (or
-               the engine's entitlements turn library validation off); otherwise the loader would refuse the bundled
+               the engine's entitlements turn library validation off, which release mode refuses); otherwise the loader would refuse the bundled
                libraries and the game would crash at start, so the smoke step is not started
   luajit       from the bundled LuaJIT build (hardened-runtime build with MAP_JIT, or the default mprotect one) and the
                engine's signature and entitlements, the compiler state the signature allows: on, off (the hardened
@@ -28,14 +28,16 @@ PATH is OpenFallout-*.dmg or OpenFallout.app. The steps run in this order and ea
                first compiled trace: "Code Signature Invalid"). It fails on a crash, and on "off" when --expect-jit is on;
                the smoke step is then not started. See docs/openfallout/mac-luajit.md.
   smoke        the engine app is started through scripts/openfallout/mac_launch.py on the synthetic Fallout plugin, with
-               a hidden window (--headless, SDL_MAC_BACKGROUND_APP=1) and its own --config/--user-data folders; it passes
+               a hidden window (--headless, SDL_MAC_BACKGROUND_APP=1), OPENFALLOUT_LUAJIT_PROBE=1 (the engine's LuaJIT
+               probe and its log line) and its own --config/--user-data folders; it passes
                when the log shows the cell loaded, a Lua script ran, the LuaJIT compiler state that the engine logs is
                the expected one and the engine quit peacefully. The compiler state seen is always printed.
 
 Local mode accepts an ad hoc signature and skips the gatekeeper step; release mode requires the Developer ID signature,
 Gatekeeper's acceptance and the stapled tickets (CI runs it on the notarized build, CI/macos/release_signing.py).
 `--notes FILE` appends one release-notes line: the package, the result, the mode, the smoke result and the macOS version
-and chip of the machine that ran the check. `--smoke auto` runs the smoke step but reports it as
+and chip of the machine that ran the check, then which Macs the package is for (chip from the file name, notarized in
+release mode, the engine's minimum macOS). `--smoke auto` runs the smoke step but reports it as
 skipped when the machine gives the engine no OpenGL context, or only Apple's software renderer and the run does not
 finish there (a hosted CI runner has no GPU); run it with
 `--smoke run` on a Mac with a display before a release is tagged.
@@ -63,6 +65,7 @@ DMG_ALLOWED = DMG_REQUIRED | {"OpenFallout-CS.app", "AUTHORS.md", "CHANGELOG.md"
 CATEGORY = "public.app-category.role-playing-games"
 MACHO_MAGICS = {bytes.fromhex(magic) for magic in ("cffaedfe", "cefaedfe", "feedfacf", "feedface", "cafebabe", "bebafeca")}
 SYSTEM_OPENAL = "/System/Library/Frameworks/OpenAL.framework"
+DISABLE_LIBRARY_VALIDATION = "com.apple.security.cs.disable-library-validation"
 
 
 class StepFailed(Exception):
@@ -201,8 +204,11 @@ def check_release_signatures(app, machos, team_id):
             problems.append(f"{name}: no hardened runtime")
         if not re.search(r"^Timestamp=", details, re.MULTILINE):
             problems.append(f"{name}: no secure timestamp")
-        if entitlements(item).get("com.apple.security.get-task-allow") is True:
+        granted = entitlements(item)
+        if granted.get("com.apple.security.get-task-allow") is True:
             problems.append(f"{name}: carries get-task-allow (the debugging entitlement)")
+        if granted.get(DISABLE_LIBRARY_VALIDATION) is True:
+            problems.append(f"{name}: carries disable-library-validation (local hardened testing only)")
     if problems:
         raise StepFailed("not a release signature: " + "; ".join(problems))
     return expected
@@ -254,16 +260,19 @@ def entitlements(path):
         return {}
 
 
-def check_library_validation(app):
+def check_library_validation(app, mode="local"):
     """A hardened engine only loads libraries signed by its own team, unless an entitlement turns that off. An ad hoc
-    signature has no team, so a hardened ad hoc package dies in the loader at start: say so instead of starting it."""
+    signature has no team, so a hardened ad hoc package dies in the loader at start: say so instead of starting it.
+    The entitlement that turns it off is for local hardened testing; release mode refuses it."""
     engine = app / ENGINE
     if not engine.is_file():
         raise StepFailed(f"{ENGINE} is missing")
     hardened, team = signing_details(engine)
     if not hardened:
         return "no hardened runtime"
-    if entitlements(engine).get("com.apple.security.cs.disable-library-validation") is True:
+    if entitlements(engine).get(DISABLE_LIBRARY_VALIDATION) is True:
+        if mode == "release":
+            raise StepFailed(f"a release must keep library validation on, but {ENGINE} carries {DISABLE_LIBRARY_VALIDATION}")
         return "hardened runtime, library validation disabled by entitlement"
     refused = [relative(path, app) for path in app.rglob("*")
                if path != engine and is_macho(path) and (team is None or signing_details(path)[1] != team)]
@@ -486,7 +495,7 @@ def check_smoke(app, options):
         log.unlink()
     command = [sys.executable, LAUNCHER, "--app", app / ENGINE_APP, "--background",
                "--stdout", work / "stdout.log", "--stderr", work / "stderr.log", "--env", "SDL_MAC_BACKGROUND_APP=1",
-               "--", "--config", work / "config", "--replace", "config", "--user-data", work / "userdata",
+               "--env", "OPENFALLOUT_LUAJIT_PROBE=1", "--", "--config", work / "config", "--replace", "config", "--user-data", work / "userdata",
                "--data-local", work / "userdata/data", "--data", work / "data",
                "--content", "OFTest.esm", "--content", "packagesmoke.omwscripts",
                "--skip-menu", "--start", cell, "--headless", "--no-grab"]
@@ -569,7 +578,7 @@ def check_app(app, options, dmg_ok=True, dmg=None):
         results.append(skip("gatekeeper", "local mode"))
     results.append(report("info.plist", check_info_plists, app))
     results.append(report("openal", check_openal, app))
-    loadable = report("library-validation", check_library_validation, app)
+    loadable = report("library-validation", check_library_validation, app, options.mode)
     results.append(loadable)
     jit_ok = report("luajit", check_luajit, app, options.expect_jit)
     results.append(jit_ok)
@@ -603,10 +612,35 @@ def tested_on():
     return f"macOS {version} ({build}), {chip}, {platform.machine()}"
 
 
-def write_notes(path, package, mode, ok):
-    """Appends the release-notes line for this package: what was checked, with what result, on which Mac."""
+def minimum_macos(app):
+    """The oldest macOS the engine was built for (its LC_BUILD_VERSION minos), or None."""
+    try:
+        shown = run(["vtool", "-show-build", app / ENGINE]).stdout
+    except OSError:
+        return None
+    found = re.search(r"^\s*minos\s+(\S+)", shown, re.MULTILINE)
+    return found.group(1) if found else None
+
+
+def supported_macs(package, mode, minimum):
+    """What a player reads about which Macs this package is for."""
+    if "arm64" in package.name:
+        kind = "Apple Silicon Macs (arm64)"
+    elif "x86_64" in package.name:
+        kind = "Intel Macs (x86_64)"
+    else:
+        kind = "Macs"
+    signed = ("Developer ID signed and notarized" if mode == "release"
+              else "ad hoc signed, not notarized (macOS asks before the first start)")
+    needs = f"; needs macOS {minimum} or later" if minimum else ""
+    return f"For {kind}, {signed}{needs} (Game Mode: macOS 26 or later)."
+
+
+def write_notes(path, package, mode, ok, minimum=None):
+    """Appends the release-notes line for this package: what was checked, with what result, on which Mac, and which
+    Macs the package is for."""
     line = (f"- {package.name}: packaged-app check {'PASS' if ok else 'FAIL'} ({mode} mode; smoke "
-            f"{RESULTS.get('smoke', 'not run')}) on {tested_on()}")
+            f"{RESULTS.get('smoke', 'not run')}) on {tested_on()}. {supported_macs(package, mode, minimum)}")
     with path.open("a", encoding="utf-8") as file:
         file.write(line + "\n")
 
@@ -636,6 +670,7 @@ def main(argv=None):
     RESULTS.clear()
 
     package = options.package.absolute()
+    minimum = None
     if not package.exists():
         print(f"FAIL layout: {package} does not exist")
         return 1
@@ -644,14 +679,16 @@ def main(argv=None):
             with mounted(package) as volume:
                 dmg_ok = report("dmg", check_dmg_layout, volume)
                 ok = check_app(volume / "OpenFallout.app", options, dmg_ok, package)
+                minimum = minimum_macos(volume / "OpenFallout.app")
         except StepFailed as error:
             fail("dmg", str(error))
             ok = False
     else:
         ok = check_app(package, options)
+        minimum = minimum_macos(package)
     print("package check: " + ("PASS" if ok else "FAIL"))
     if options.notes:
-        write_notes(options.notes, package, options.mode, ok)
+        write_notes(options.notes, package, options.mode, ok, minimum)
     return 0 if ok else 1
 
 

@@ -57,11 +57,20 @@ def redact(text, hidden):
     return text
 
 
+def shown(command, hidden):
+    """The command as echoed: each argument is redacted before it is quoted, so quoting cannot hide a secret."""
+    parts = []
+    for part in command:
+        redacted = redact(part, hidden)
+        parts.append(redacted if redacted == "***" else shlex.quote(redacted))
+    return " ".join(parts)
+
+
 def run(command, hidden=(), check=True, quiet=False):
     """Runs a command, echoing it with secret values (the environment's and those in `hidden`) replaced by ***."""
     hidden = [*secret_values(), *hidden]
     command = [str(part) for part in command]
-    print("+ " + redact(shlex.join(command), hidden), flush=True)
+    print("+ " + shown(command, hidden), flush=True)
     result = subprocess.run(command, capture_output=True, text=True)
     if not quiet:
         for stream in (result.stdout, result.stderr):
@@ -76,7 +85,8 @@ def runner_temp():
     return Path(os.environ.get("RUNNER_TEMP") or tempfile.gettempdir())
 
 
-def append(variable, name, value):
+def append_to_github_file(variable, name, value):
+    """Appends name=value to the file named by $GITHUB_OUTPUT or $GITHUB_ENV (`variable`); nothing outside Actions."""
     path = os.environ.get(variable)
     if path:
         with open(path, "a", encoding="utf-8") as file:
@@ -131,7 +141,7 @@ def setup():
     mode, why = decide()
     if mode == "adhoc":
         print(f"{SKIPPED}: {why}")
-        append("GITHUB_OUTPUT", "mode", "adhoc")
+        append_to_github_file("GITHUB_OUTPUT", "mode", "adhoc")
         return
     folder = Path(tempfile.mkdtemp(prefix="openfallout-signing-", dir=runner_temp()))
     keychain = folder / "openfallout-signing.keychain-db"
@@ -158,9 +168,9 @@ def setup():
     except Failed:
         cleanup()
         raise
-    append("GITHUB_ENV", "OPENFALLOUT_CODESIGN_IDENTITY", identity)
-    append("GITHUB_ENV", "OPENFALLOUT_CODESIGN_TEAM_ID", os.environ["MACOS_TEAM_ID"])
-    append("GITHUB_OUTPUT", "mode", "release")
+    append_to_github_file("GITHUB_ENV", "OPENFALLOUT_CODESIGN_IDENTITY", identity)
+    append_to_github_file("GITHUB_ENV", "OPENFALLOUT_CODESIGN_TEAM_ID", os.environ["MACOS_TEAM_ID"])
+    append_to_github_file("GITHUB_OUTPUT", "mode", "release")
     print("release build: Developer ID identity imported into a temporary keychain; the package will be signed with "
           "it, notarized and stapled")
 
@@ -179,6 +189,8 @@ def cleanup():
 
 class Notary:
     def __init__(self, folder):
+        # notarytool reads the App Store Connect key only from a file: it is written owner-only (0600) into this run's
+        # temporary folder and deleted in close().
         self.key = folder / "notary-key.p8"
         self.key.touch(mode=0o600)
         self.key.write_text(os.environ["MACOS_NOTARY_API_KEY"])
@@ -217,8 +229,9 @@ def notarize(dmg):
         raise Failed(f"notarize needs {', '.join(missing)}")
     dmg = Path(dmg).absolute()
     folder = Path(tempfile.mkdtemp(prefix="openfallout-notary-", dir=runner_temp()))
-    notary = Notary(folder)
+    notary = None
     try:
+        notary = Notary(folder)
         sign_image(dmg, identity)
         notary.submit(dmg)
         mountpoint, stage = folder / "mount", folder / "stage"
@@ -242,7 +255,8 @@ def notarize(dmg):
         for item in (dmg, *apps):
             run(["xcrun", "stapler", "validate", item])
     finally:
-        notary.close()
+        if notary:
+            notary.close()
         shutil.rmtree(folder, ignore_errors=True)
     print(f"{dmg.name}: notarized and stapled (the image and {', '.join(app.name for app in apps)})")
 

@@ -313,6 +313,7 @@ class SmokeRunTests(unittest.TestCase):
         self.assertIn("-g", argv[:argv.index("--args")])
         self.assertEqual(argv[argv.index("-a") + 1], str(self.app / "Contents/Helpers/OpenFallout Engine.app"))
         self.assertIn("SDL_MAC_BACKGROUND_APP=1", argv)
+        self.assertIn("OPENFALLOUT_LUAJIT_PROBE=1", argv, "the engine runs its LuaJIT probe only when asked")
         engine = argv[argv.index("--args") + 1:]
         for flag in ("--headless", "--skip-menu", "--no-grab"):
             self.assertIn(flag, engine)
@@ -447,6 +448,8 @@ class FakeTools:
             out = {"-productVersion": "26.1\n", "-buildVersion": "25B78\n"}[command[1]]
         elif tool == "sysctl":
             out = "Apple M2 (Virtual)\n"
+        elif tool == "vtool":
+            out = f"{command[-1]}:\nLoad command 11\n      cmd LC_BUILD_VERSION\n platform MACOS\n    minos 14.8\n      sdk 26.1\n"
         return subprocess.CompletedProcess(command, status, out, err)
 
 
@@ -517,6 +520,14 @@ class ReleaseModeTests(unittest.TestCase):
         self.assertIn("Contents/Helpers/OpenFallout Engine.app: no secure timestamp", output)
         self.assertIn("Contents/MacOS/openfallout-launcher: carries get-task-allow", output)
 
+    def test_disabled_library_validation_fails_release_mode(self):
+        self.tools.entitlements["MacOS/openfallout"] = {"com.apple.security.cs.disable-library-validation": True,
+                                                        "com.apple.security.cs.allow-jit": True}
+        status, output = self.check()
+        self.assertEqual(status, 1, output)
+        self.assertIn("Contents/MacOS/openfallout: carries disable-library-validation", output)
+        self.assertIn("FAIL library-validation: a release must keep library validation on", output)
+
     def test_gatekeeper_rejection_or_missing_ticket_fails(self):
         self.tools.fails[("spctl", "--assess")] = (3, f"{self.app}: rejected\nsource=Unnotarized Developer ID\n")
         self.tools.fails[("stapler", "validate")] = (65, f"{self.app} does not have a ticket stapled to it.\n")
@@ -525,6 +536,39 @@ class ReleaseModeTests(unittest.TestCase):
         self.assertIn("FAIL gatekeeper", output)
         self.assertIn("rejected", output)
         self.assertIn("does not have a ticket stapled to it", output)
+
+    def disk_image(self, name="OpenFallout-1.0-macOS-arm64.dmg"):
+        volume = self.root / "volume"
+        volume.mkdir()
+        shutil.move(str(self.app), volume / "OpenFallout.app")
+        os.symlink("/Applications", volume / "Applications")
+        dmg = self.root / name
+        dmg.write_bytes(b"image")
+
+        @contextlib.contextmanager
+        def mounted(path):
+            yield volume
+
+        patcher = unittest.mock.patch.object(check_mac_package, "mounted", mounted)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return dmg
+
+    def test_notes_say_which_macs_the_image_is_for(self):
+        notes = self.root / "notes.md"
+        self.check("--notes", notes, package=self.disk_image())
+        line = notes.read_text()
+        self.assertIn("For Apple Silicon Macs (arm64), Developer ID signed and notarized; needs macOS 14.8 or later "
+                      "(Game Mode: macOS 26 or later).", line)
+        self.assertIn(["vtool", "-show-build", str(self.root / "volume/OpenFallout.app/Contents/MacOS/openfallout")],
+                      self.tools.calls)
+
+    def test_notes_of_the_intel_image_say_it_is_not_notarized(self):
+        notes = self.root / "notes.md"
+        run_check(self.disk_image("OpenFallout-1.0-macOS-x86_64.dmg"), "--mode", "local", "--smoke", "skip",
+                  "--notes", notes)
+        self.assertIn("For Intel Macs (x86_64), ad hoc signed, not notarized (macOS asks before the first start); "
+                      "needs macOS 14.8 or later (Game Mode: macOS 26 or later).", notes.read_text())
 
     def test_disk_image_is_assessed_as_a_download_and_its_ticket_validated(self):
         volume = self.root / "volume"

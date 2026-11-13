@@ -137,8 +137,18 @@ def verify_assets(release):
     # Each disk image carries the line CI/check_mac_package.py --notes wrote: the macOS version and chip it was checked on.
     lines = (release.get("body") or "").splitlines()
     for name in (name for name in assets if name.endswith(".dmg")):
-        if not any(line.startswith(f"- {name}:") and " on macOS " in line for line in lines):
+        mine = [line for line in lines if line.startswith(f"- {name}:") and " on macOS " in line]
+        if not mine:
             raise ReleaseError(f"Release notes lack the macOS version and chip that {name} was tested on")
+        if "arm64" not in name:
+            continue
+        # The notarized Apple Silicon image must have passed the check in release mode, and the game must have
+        # started from it (a hosted runner skips the smoke step; the run on a Mac with a GPU before tagging adds it).
+        passed = [line for line in mine if f"- {name}: packaged-app check PASS (" in line]
+        if not any("(release mode;" in line for line in passed):
+            raise ReleaseError(f"Release notes lack a packaged-app check PASS in release mode for {name}")
+        if not any("; smoke PASS)" in line for line in passed):
+            raise ReleaseError(f"Release notes lack a smoke PASS (the game started on a Mac with a GPU) for {name}")
 
 
 def find_release(api, tag):

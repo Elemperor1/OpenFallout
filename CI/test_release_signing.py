@@ -186,6 +186,16 @@ class ReleaseSigningTests(unittest.TestCase):
         self.assertNotIn(password, output)
         self.assertNotIn(password, self.github_env.read_text())
 
+    def test_password_with_quotes_is_not_printed(self):
+        password = "it's a \"quoted\" secret $(x) 9431"
+        secrets = dict(SECRETS, MACOS_DEVELOPER_ID_P12_PASSWORD=password)
+        status, output = self.run_script("setup", secrets=secrets)
+        self.assertEqual(status, 0, output)
+        self.assertNotIn("quoted", output)
+        self.assertNotIn("9431", output)
+        import_call = next(call for call in self.calls() if call[:2] == ["security", "import"])
+        self.assertEqual(import_call[import_call.index("-P") + 1], password)
+
     def test_identity_of_another_team_or_kind_is_refused(self):
         identities = f'  1) {IDENTITY_HASH} "Apple Development: Someone (OTHERTEAM1)"\n     1 valid identities found'
         status, output = self.run_script("setup", STUB_IDENTITIES=identities)
@@ -263,6 +273,12 @@ class ReleaseSigningTests(unittest.TestCase):
         self.assertEqual(dmg.read_bytes(), b"cpack image", "a rejected image is left as CPack made it")
         self.assertEqual([path for path in self.runner_temp.rglob("*.p8")], [])
         self.assert_no_secrets(output)
+
+    def test_notary_key_that_cannot_be_written_leaves_no_temporary_folder(self):
+        # an undecodable byte in the key makes writing the key file fail
+        dmg, status, output = self.notarize(MACOS_NOTARY_API_KEY="key \udcff")
+        self.assertNotEqual(status, 0, output)
+        self.assertEqual(list(self.runner_temp.glob("openfallout-notary-*")), [])
 
     def test_notarize_without_a_signing_identity_is_refused(self):
         dmg = self.root / "x.dmg"
