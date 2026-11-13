@@ -2190,6 +2190,8 @@ namespace OFScript
         /// What a character is saying stops, with what it had left to say (a radio that is turned off, a conversation that
         /// is asked for)
         void cutOffSaying(FalloutScript::FormId reference);
+        /// What a character says for its radio stops (a conversation starts with it); other sayings are left
+        void cutOffRadioSaying(FalloutScript::FormId reference);
         /// The songs that radios of the world (things in rooms, characters) are playing or have queued stop, when the radio
         /// is set to dialogue only; what else they say goes on
         void dropWorldRadioSongs();

@@ -345,6 +345,9 @@ namespace OFScript
         const ESM::FormId controllerId = marker != nullptr ? marker->mController : ESM::FormId();
         const ESM4::MediaLocationController* controller
             = controllerId.isZeroOrUnset() ? nullptr : mStore.get<ESM4::MediaLocationController>().search(controllerId);
+        // The tracks of a location set or of a dungeon set loop when the controller's looping option is 0; with any other
+        // they play once, and the controller picks a set again when they are over (FalloutNV.exe 0x598000)
+        const bool loops = controller == nullptr || FalloutScript::Music::loopsSets(controller->mMediaFlags.loopingOptions);
         // The set of the place is one of the controller's, picked by the executable's rule (FalloutNV.exe 0x595560) when the
         // player comes in, and again when a set that does not loop was played to its end. A controller that names no location
         // set of its own has them by how its faction stands to the player: a set for an enemy, a friend, an ally, and one for
@@ -560,7 +563,7 @@ namespace OFScript
                     music.mLayer = layer;
                 }
                 key = "l" + formText(locationSet->mId) + (day ? "d" : "n")
-                    + std::to_string(layer.value_or(-1)) + (combat ? "c" : "-");
+                    + std::to_string(layer.value_or(-1)) + (combat ? "c" : "-") + (loops ? "L" : "o");
             }
         }
 
@@ -570,9 +573,6 @@ namespace OFScript
             music.mStems.clear();
             music.mStemFade = 1.f;
             music.mMixer.restart();
-            // The tracks of a location set or of a dungeon set loop when the controller's looping option is 0; with any
-            // other they play once, and the controller picks a set again when they are over (FalloutNV.exe 0x598000)
-            const bool loops = controller == nullptr || FalloutScript::Music::loopsSets(controller->mMediaFlags.loopingOptions);
             const auto stem = [&](const std::string& name, float db, bool audible, bool loop = true) {
                 const auto files = OFSound::falloutMusicFiles(name, *resources->getVFS());
                 if (files.empty())

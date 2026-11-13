@@ -4417,6 +4417,14 @@ namespace OFScript
             sound->stopSay(ptr);
     }
 
+    void FalloutScripts::cutOffRadioSaying(FalloutScript::FormId reference)
+    {
+        const auto saying = std::find_if(
+            mSayings.begin(), mSayings.end(), [reference](const Saying& other) { return other.mReference == reference; });
+        if (saying != mSayings.end() && saying->mNext < saying->mLines.size() && saying->mLines[saying->mNext].mRadio)
+            cutOffSaying(reference);
+    }
+
     void FalloutScripts::dropWorldRadioSongs()
     {
         OFBase::SoundManager* sound
@@ -4664,6 +4672,8 @@ namespace OFScript
             return false;
         }
         mSpeakerName = std::string(speaker.getClass().getName(speaker));
+        // What the character was saying for its radio stops: the conversation has the voice of the character now
+        runOnMainThread([this, reference] { cutOffRadioSaying(reference); });
         return true;
     }
 

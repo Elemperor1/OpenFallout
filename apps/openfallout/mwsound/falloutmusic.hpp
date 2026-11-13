@@ -119,6 +119,14 @@ namespace OFSound
                     it = mPlaying.erase(it);
                     continue;
                 }
+                if (stem->mLoop != it->mLoop)
+                {
+                    // The stream cannot change whether it loops: it is faded out, and started again below as the stem wants
+                    sound.fadeMusicTrack(it->mId, 0.f, fadeSeconds, true);
+                    mFading.push_back(it->mId);
+                    it = mPlaying.erase(it);
+                    continue;
+                }
                 if (std::abs(stem->mGain - it->mGain) > 0.002f)
                 {
                     sound.fadeMusicTrack(it->mId, stem->mGain, fadeSeconds, false);
@@ -139,7 +147,7 @@ namespace OFSound
                     mDone.push_back(stem.mFile);
                     continue;
                 }
-                mPlaying.push_back({ stem.mFile, id, stem.mGain });
+                mPlaying.push_back({ stem.mFile, id, stem.mGain, stem.mLoop });
             }
         }
         /// Fades everything out
@@ -190,6 +198,7 @@ namespace OFSound
             VFS::Path::Normalized mFile;
             OFBase::SoundManager::MusicTrackId mId = 0;
             float mGain = 0.f;
+            bool mLoop = true;
         };
         std::vector<Playing> mPlaying;
         /// The tracks that were faded out (and stop at the end of the fade): they are not the mixer's stems any more, but

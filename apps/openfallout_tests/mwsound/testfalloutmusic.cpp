@@ -220,6 +220,25 @@ namespace OFSound
             EXPECT_EQ(mixer.size(), 1u);
         }
 
+        TEST(OFSoundFalloutMusicTest, aStemThatIsWantedWithAnotherLoopPolicyIsFadedOutAndStartedAgain)
+        {
+            FakeSound sound;
+            sound.mFadesTakeTime = true;
+            MusicMixer mixer;
+            mixer.update(sound, { stemOf("music/a.mp3", 0.5f, true) }, 2.f);
+            ASSERT_EQ(sound.mStarted.size(), 1u);
+            // the same file from a controller whose tracks play once
+            mixer.update(sound, { stemOf("music/a.mp3", 0.5f, false) }, 2.f);
+            ASSERT_EQ(sound.mStarted.size(), 2u);
+            EXPECT_FALSE(sound.mStarted[1].mLoop);
+            ASSERT_FALSE(sound.mFaded.empty());
+            EXPECT_EQ(sound.mFaded.front().first, 1u);
+            EXPECT_EQ(mixer.size(), 1u);
+            // asked again with the same policy, nothing starts
+            mixer.update(sound, { stemOf("music/a.mp3", 0.5f, false) }, 2.f);
+            EXPECT_EQ(sound.mStarted.size(), 2u);
+        }
+
         TEST(OFSoundFalloutMusicTest, theMixerIsAudibleWhileAStemFadesOutThoughItIsNotPlayingAStemAnyMore)
         {
             FakeSound sound;
