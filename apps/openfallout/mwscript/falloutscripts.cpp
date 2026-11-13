@@ -2893,6 +2893,32 @@ namespace OFScript
             const std::lock_guard lock(mPlayerDamageMutex);
             mPlayerDamage[victim] += dealt;
         }
+        // The blow throws the one that is hit back, by the force that the executables work out from the damage and the agility
+        // of the one that is hit (0x646580, used at 0x89C8CF), along the line from the one that struck. The executables' use
+        // of it has no test of the health that I could find (the tests before it are of the victim's speed value and of
+        // states of the blow), so a blow that kills throws the body as well; the body goes on by the throw as it falls.
+        if (dealt > 0 && victim != mPlayer && attacker != 0)
+        {
+            const FalloutScript::HitReactions::Settings reaction = FalloutScript::HitReactions::Settings::fromGameSettings(
+                [this](std::string_view name) -> std::optional<double> { return gameSetting(name); });
+            const double force = FalloutScript::HitReactions::knockbackForce(
+                reaction, dealt, mActorValues.current(victim, AV::agility));
+            if (force > 0)
+                runOnMainThread([this, victim, attacker, force, seconds = reaction.mKnockbackTime] {
+                    OFBase::World* world = OFBase::Environment::get().getWorld();
+                    const OFWorld::Ptr target = findReference(victim);
+                    const OFWorld::Ptr striker = attacker == mPlayer ? world->getPlayerPtr() : findReference(attacker);
+                    if (target.isEmpty() || striker.isEmpty() || !target.isInCell())
+                        return;
+                    osg::Vec3f away = target.getRefData().getPosition().asVec3() - striker.getRefData().getPosition().asVec3();
+                    away.z() = 0.f;
+                    if (away.length2() < 1.f)
+                        return;
+                    away.normalize();
+                    OFBase::Environment::get().getMechanicsManager()->knockFallout(
+                        target, away * static_cast<float>(force), static_cast<float>(seconds));
+                });
+        }
         if (mActorValues.current(victim, AV::health) > 0)
         {
             // A character that is hit reels, when its files have an animation for it
@@ -2905,31 +2931,6 @@ namespace OFScript
                             OFBase::Environment::get().getWorld()->getAnimation(ptr)))
                         animation->flinch();
                 });
-            // The blow throws it back, by the force that the executables work out from the damage and the agility of the
-            // one that is hit (0x646580), along the line from the one that struck
-            if (dealt > 0 && victim != mPlayer && attacker != 0)
-            {
-                const FalloutScript::HitReactions::Settings reaction
-                    = FalloutScript::HitReactions::Settings::fromGameSettings(
-                        [this](std::string_view name) -> std::optional<double> { return gameSetting(name); });
-                const double force = FalloutScript::HitReactions::knockbackForce(
-                    reaction, dealt, mActorValues.current(victim, AV::agility));
-                if (force > 0)
-                    runOnMainThread([this, victim, attacker, force, seconds = reaction.mKnockbackTime] {
-                        OFBase::World* world = OFBase::Environment::get().getWorld();
-                        const OFWorld::Ptr target = findReference(victim);
-                        const OFWorld::Ptr striker = attacker == mPlayer ? world->getPlayerPtr() : findReference(attacker);
-                        if (target.isEmpty() || striker.isEmpty() || !target.isInCell())
-                            return;
-                        osg::Vec3f away = target.getRefData().getPosition().asVec3() - striker.getRefData().getPosition().asVec3();
-                        away.z() = 0.f;
-                        if (away.length2() < 1.f)
-                            return;
-                        away.normalize();
-                        OFBase::Environment::get().getMechanicsManager()->knockFallout(
-                            target, away * static_cast<float>(force), static_cast<float>(seconds));
-                    });
-            }
             // A character that is hit fights back, and the attacker is in the fight too
             if (attacker != 0 && !tolerated)
             {

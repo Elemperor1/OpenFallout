@@ -155,14 +155,25 @@ return { limit = 600, delay = 4, run = function(r)
         r.log(string.format('F %s stands at height %.0f', label, ground))
         local ok, hit = pcall(r.core.combat.strike, r.form(player), r.form(target), '', -1)
         r.log('F blow: ' .. (ok and ('hit=' .. tostring(hit and hit.hit)) or ('error ' .. tostring(hit))))
+        -- (a blow that does not hit throws nothing, and a character put in the air with no throw would not fall: the round fails)
+        if not (ok and hit and hit.hit) then error('F the blow at ' .. label .. ' did not hit: there is no throw to test the fall with') end
         r.wait(0.15)
         local p = target.position
         -- (not taken to the ground: it has to be in the air)
         r.putAt(target, { pos = { p.x, p.y, p.z + up }, yaw = math.pi, onGround = false,
             label = label .. ' ' .. up .. ' units up while it is thrown' })
+        -- (the place is read as the character falls, not right after it was put up: the move happens a frame later)
+        local peak, drop = -math.huge, 0
         for i = 1, 8 do
             r.wait(0.5)
+            peak = math.max(peak, height(target))
+            drop = math.max(drop, peak - height(target))
             r.log(string.format('F %s %.1f s later at height %.0f (the ground is at %.0f)', label, i * 0.5, height(target), ground))
+        end
+        -- (it has to have come down: a character that hangs where it was put up fails the round)
+        if drop < up / 2 then
+            error(string.format('F %s did not fall: the highest place was %.0f and it came down by %.0f in four seconds (at least %.0f expected)',
+                label, peak, drop, up / 2))
         end
         r.state(label .. ' after the fall', target)
     end

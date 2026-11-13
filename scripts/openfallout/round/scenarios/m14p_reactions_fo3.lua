@@ -131,14 +131,25 @@ return { limit = 700, delay = 4, run = function(r)
         r.log(string.format('F %s stands at height %.0f', label, stands))
         local ok, hit = pcall(r.core.combat.strike, r.form(player), r.form(target), PISTOL, -1)
         r.log('F blow: ' .. (ok and ('hit=' .. tostring(hit and hit.hit)) or ('error ' .. tostring(hit))))
+        -- (a blow that does not hit throws nothing, and a character put in the air with no throw would not fall: the round fails)
+        if not (ok and hit and hit.hit) then error('F the blow at ' .. label .. ' did not hit: there is no throw to test the fall with') end
         r.wait(0.15)
         local p = target.position
         -- (not taken to the ground: it has to be in the air)
         r.putAt(target, { pos = { p.x, p.y, p.z + up }, yaw = math.pi, onGround = false,
             label = label .. ' ' .. up .. ' units up while it is thrown' })
+        -- (the place is read as the character falls, not right after it was put up: the move happens a frame later)
+        local peak, drop = -math.huge, 0
         for i = 1, 8 do
             r.wait(0.5)
+            peak = math.max(peak, height(target))
+            drop = math.max(drop, peak - height(target))
             r.log(string.format('F %s %.1f s later at height %.0f (it stood at %.0f)', label, i * 0.5, height(target), stands))
+        end
+        -- (it has to have come down: a character that hangs where it was put up fails the round)
+        if drop < up / 2 then
+            error(string.format('F %s did not fall: the highest place was %.0f and it came down by %.0f in four seconds (at least %.0f expected)',
+                label, peak, drop, up / 2))
         end
         r.state(label .. ' after the fall', target)
     end
@@ -146,6 +157,31 @@ return { limit = 700, delay = 4, run = function(r)
     r.shot('F1_after_fall', false)
     r.peace(g1)
     fall(g1, 'a', 1100)
+
+    ---------------------------------------------------------------- D: a blow that kills throws the body
+    phase('D killing blow')
+    -- b is struck with the pistol's form until it is dead; the place it was at when the killing blow was made is kept, and the
+    -- body has to have gone from it by the throw (the blow of the kill is made inside the call: the throw is of the frames after)
+    r.peace(g2)
+    r.teleport{ pos = { g2.position.x, g2.position.y - 5 * M, g2.position.z + 200 }, yaw = 0, onGround = true, label = 'five metres from b' }
+    r.wait(1.5)
+    local killedAt
+    for blow = 1, 40 do
+        local ok, hit = pcall(r.core.combat.strike, r.form(player), r.form(g2), PISTOL, -1)
+        local okd, dead = pcall(r.core.combat.isDead, r.form(g2))
+        if okd and dead then
+            killedAt = { x = g2.position.x, y = g2.position.y, z = g2.position.z }
+            r.log(string.format('D b was killed by blow %d at (%.0f, %.0f, %.0f)', blow, killedAt.x, killedAt.y, killedAt.z))
+            break
+        end
+        r.wait(0.2)
+    end
+    if killedAt == nil then error('D b was not killed by 40 blows: there is no killing blow to look at') end
+    r.wait(2)
+    local moved = distance(g2.position, killedAt)
+    r.log(string.format('D the body of b went %.0f units from where it was killed', moved))
+    if moved < 5 then error(string.format('D the body of b went only %.0f units from where it was killed: a killing blow throws it', moved)) end
+    r.state('b after the kill', g2)
     r.untrack()
     r.log('PHASE done')
 end }
