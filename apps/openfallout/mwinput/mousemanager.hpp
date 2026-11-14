@@ -1,6 +1,7 @@
 #ifndef MWINPUT_MWMOUSEMANAGER_H
 #define MWINPUT_MWMOUSEMANAGER_H
 
+#include <components/sdlutil/desktopconventions.hpp>
 #include <components/sdlutil/events.hpp>
 #include <components/settings/settings.hpp>
 #include <osg/Vec2f>
@@ -55,6 +56,9 @@ namespace OFInput
         float mGuiCursorX;
         float mGuiCursorY;
         int mMouseWheel;
+        // Whole notches of the wheel for the interface, from the precise deltas (a trackpad sends many small ones)
+        SDLUtil::WheelNotches mGuiWheelNotchesX{ SDLUtil::thisDesktopPlatform() };
+        SDLUtil::WheelNotches mGuiWheelNotchesY{ SDLUtil::thisDesktopPlatform() };
         bool mMouseLookEnabled;
         bool mGuiCursorEnabled;
         OFBase::CursorMode mCursorMode;

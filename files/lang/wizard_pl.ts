@@ -285,8 +285,8 @@ do domyślnych czcionek Morrowind. Zaznacz to pole, jeśli nadal wolisz oryginal
         <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Kreator OpenFallout pomyślnie zmodyfikował twoją istniejącą instalację Morrowind.&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The OpenFallout Wizard failed to install Morrowind on your computer.&lt;/p&gt;&lt;p&gt;Please report any bugs you might have encountered to our &lt;a href=&quot;https://github.com/Elemperor1/OpenFallout/issues&quot;&gt;bug tracker&lt;/a&gt;.&lt;br/&gt;Make sure to include the installation log.&lt;/p&gt;&lt;br/&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Kreator OpenFallout nie zainstalował Morrowind na twoim komputerze.&lt;/p&gt;&lt;p&gt;Wszelkie napotkane błędy prosimy zgłaszać do naszego &lt;a href=&quot;https://github.com/Elemperor1/OpenFallout/issues&quot;&gt;systemu śledzenia błędów&lt;/a&gt;.&lt;br/&gt;Upewnij się, aby dołączyć dziennik instalacji.&lt;/p&gt;&lt;br/&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The OpenFallout Wizard failed to install Morrowind on your computer.&lt;/p&gt;&lt;p&gt;Please report any bugs you might have encountered to our &lt;a href=&quot;https://github.com/OpenBethesda/OpenFallout/issues&quot;&gt;bug tracker&lt;/a&gt;.&lt;br/&gt;Make sure to include the installation log.&lt;/p&gt;&lt;br/&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Kreator OpenFallout nie zainstalował Morrowind na twoim komputerze.&lt;/p&gt;&lt;p&gt;Wszelkie napotkane błędy prosimy zgłaszać do naszego &lt;a href=&quot;https://github.com/OpenBethesda/OpenFallout/issues&quot;&gt;systemu śledzenia błędów&lt;/a&gt;.&lt;br/&gt;Upewnij się, aby dołączyć dziennik instalacji.&lt;/p&gt;&lt;br/&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
 </context>
 <context>

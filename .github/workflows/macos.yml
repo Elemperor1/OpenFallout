@@ -14,11 +14,36 @@ on:
         description: Runner label, when it differs from the image name
         default: ""
         type: string
+      signing-environment:
+        description: >-
+          GitHub environment that holds the release signing secrets (docs/openfallout/mac-release.md). Callers name it
+          only for the arm64 build of a tag or the default branch; empty means the job has no environment and can only
+          make the ad hoc build.
+        default: ""
+        type: string
+    # Release signing (CI/macos/release_signing.py, docs/openfallout/mac-release.md). All optional: without them, and
+    # on pull requests, the package is the ad hoc build and notarization is skipped.
+    secrets:
+      MACOS_DEVELOPER_ID_P12_BASE64:
+        required: false
+      MACOS_DEVELOPER_ID_P12_PASSWORD:
+        required: false
+      MACOS_TEAM_ID:
+        required: false
+      MACOS_NOTARY_API_KEY:
+        required: false
+      MACOS_NOTARY_API_KEY_ID:
+        required: false
+      MACOS_NOTARY_API_ISSUER_ID:
+        required: false
 
 jobs:
   MacOS:
     name: ${{ inputs.image }}
     runs-on: ${{ inputs.runner || inputs.image }}
+    # The environment's own rules (which branches and tags may use it, who must approve) decide whether this job gets
+    # the signing secrets; a tag or branch outside those rules cannot read them whatever its copy of the scripts says.
+    environment: ${{ inputs.signing-environment }}
     steps:
     - uses: actions/checkout@v7
     - run: echo "CMAKE_BUILD_TYPE=${{ inputs.build-type }}" >> "$GITHUB_ENV"
@@ -45,7 +70,7 @@ jobs:
         path: |
           /tmp/Qt
           /tmp/openmw-deps
-        key: macos-deps-${{ inputs.image }}-${{ runner.arch }}-${{ steps.deps-manifest.outputs.digest }}-${{ hashFiles('CI/macos/deps_versions.sh', 'CI/macos/fetch_deps_manifest.sh', 'CI/before_install.macos.sh') }}
+        key: macos-deps-${{ inputs.image }}-${{ runner.arch }}-${{ steps.deps-manifest.outputs.digest }}-${{ hashFiles('CI/macos/deps_versions.sh', 'CI/macos/fetch_deps_manifest.sh', 'CI/before_install.macos.sh', 'CI/macos/build_luajit_hrt.sh', 'CI/macos/luajit-osx-hrt-void-return.patch') }}
 
     - name: Install Building Dependencies
       if: steps.deps-cache.outputs.cache-hit != 'true'
@@ -117,6 +142,22 @@ jobs:
         ccache --max-size=384M
         ccache --cleanup
 
+    # Tags and the default branch with the signing secrets: import the Developer ID identity into a temporary keychain
+    # and hand it to the packaging step (OPENFALLOUT_CODESIGN_IDENTITY / _TEAM_ID through GITHUB_ENV). Anything else:
+    # "ad hoc build, notarization skipped". Only the Apple Silicon build is signed with Developer ID and notarized.
+    - name: Release signing
+      id: signing
+      if: ${{ inputs.image != 'macos-26-intel' }}
+      env:
+        OPENFALLOUT_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        MACOS_DEVELOPER_ID_P12_BASE64: ${{ github.event_name != 'pull_request' && secrets.MACOS_DEVELOPER_ID_P12_BASE64 || '' }}
+        MACOS_DEVELOPER_ID_P12_PASSWORD: ${{ github.event_name != 'pull_request' && secrets.MACOS_DEVELOPER_ID_P12_PASSWORD || '' }}
+        MACOS_TEAM_ID: ${{ github.event_name != 'pull_request' && secrets.MACOS_TEAM_ID || '' }}
+        MACOS_NOTARY_API_KEY: ${{ github.event_name != 'pull_request' && secrets.MACOS_NOTARY_API_KEY || '' }}
+        MACOS_NOTARY_API_KEY_ID: ${{ github.event_name != 'pull_request' && secrets.MACOS_NOTARY_API_KEY_ID || '' }}
+        MACOS_NOTARY_API_ISSUER_ID: ${{ github.event_name != 'pull_request' && secrets.MACOS_NOTARY_API_ISSUER_ID || '' }}
+      run: python3 CI/macos/release_signing.py setup
+
     - name: Package disk image
       run: |
         for attempt in 1 2 3; do
@@ -132,6 +173,48 @@ jobs:
           sleep 10
         done
 
+    - name: Notarize and staple
+      if: ${{ steps.signing.outputs.mode == 'release' }}
+      env:
+        MACOS_NOTARY_API_KEY: ${{ github.event_name != 'pull_request' && secrets.MACOS_NOTARY_API_KEY || '' }}
+        MACOS_NOTARY_API_KEY_ID: ${{ github.event_name != 'pull_request' && secrets.MACOS_NOTARY_API_KEY_ID || '' }}
+        MACOS_NOTARY_API_ISSUER_ID: ${{ github.event_name != 'pull_request' && secrets.MACOS_NOTARY_API_ISSUER_ID || '' }}
+      run: |
+        set -- build/OpenFallout-*.dmg
+        python3 CI/macos/release_signing.py notarize "$1"
+
+    # Always: setup can fail before it sets its output; cleanup does nothing when this job made no keychain
+    - name: Remove the signing keychain
+      if: ${{ always() }}
+      run: python3 CI/macos/release_signing.py cleanup
+
+    - name: Test the packaged-app check
+      run: python3 -m unittest discover -s CI -p test_check_mac_package.py -v
+
+    # Release mode on the notarized build (Developer ID on every binary, Gatekeeper, stapled tickets); local mode on the
+    # ad hoc one (Gatekeeper is not asked). The smoke step starts the game from the disk image with a hidden window; a
+    # runner that gives it no OpenGL context reports it as skipped, and then the smoke step is run on the development
+    # Mac on the draft release's image (`--smoke run`). The check appends the release-notes line (renderer, SHA-256,
+    # macOS version and chip).
+    - name: Check the packaged app
+      env:
+        CHECK_MODE: ${{ steps.signing.outputs.mode == 'release' && 'release' || 'local' }}
+      run: |
+        set -- build/OpenFallout-*.dmg
+        python3 CI/check_mac_package.py "$1" --mode "$CHECK_MODE" --smoke auto --work "$RUNNER_TEMP/package-check" \
+          --notes "$RUNNER_TEMP/release-notes.md"
+
+    - name: Store the packaged-app check logs
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v7
+      with:
+        name: openfallout-macos-package-check-${{ env.DMG_IDENTIFIER }}-${{ github.sha }}
+        path: |
+          ${{ runner.temp }}/package-check/config/openfallout.log
+          ${{ runner.temp }}/package-check/*.log
+          ~/Library/Logs/DiagnosticReports/openfallout*.ips
+        if-no-files-found: ignore
+
     - name: Store dmg
       uses: actions/upload-artifact@v7
       with:
@@ -144,5 +227,8 @@ jobs:
       uses: softprops/action-gh-release@v3
       with:
         files: ${{ github.workspace }}/build/OpenFallout-*.dmg
+        # one line per disk image: its SHA-256 and the macOS version and chip it was checked on (check_mac_package.py --notes)
+        body_path: ${{ runner.temp }}/release-notes.md
+        append_body: true
         prerelease: true
         draft: true
