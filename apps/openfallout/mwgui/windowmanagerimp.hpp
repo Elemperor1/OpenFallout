@@ -19,6 +19,7 @@
 
 #include <components/misc/guarded.hpp>
 #include <components/myguiplatform/myguiplatform.hpp>
+#include <components/sdlutil/desktopconventions.hpp>
 #include <components/sdlutil/events.hpp>
 #include <components/sdlutil/sdlcursormanager.hpp>
 #include <components/sdlutil/sdlvideowrapper.hpp>
@@ -303,6 +304,8 @@ namespace OFGui
         void windowVisibilityChange(bool visible) override;
         void windowResized(int x, int y) override;
         void windowClosed() override;
+        void windowModeRequested(Settings::WindowMode mode) override;
+        void saveUserSettings() override;
         bool isWindowVisible() const override;
 
         void watchActor(const OFWorld::Ptr& ptr) override;
@@ -587,6 +590,7 @@ namespace OFGui
 
         std::unique_ptr<SDLUtil::VideoWrapper> mVideoWrapper;
 
+        /// Interface units to drawable pixels: the user's interface scale times the display's pixels per point
         float mScalingFactor;
 
         struct ScheduledMessageBox
@@ -652,6 +656,12 @@ namespace OFGui
         void inventoryUpdated(const OFWorld::Ptr& ptr) const override;
 
         Files::ConfigurationManager& mCfgMgr;
+
+        SDL_Window* mSdlWindow;
+        // The size of the window on the desktop; the resolution setting is the size of the Space while it fills one
+        SDLUtil::WindowSize mWindowSize;
+
+        void setVideoMode();
     };
 }
 

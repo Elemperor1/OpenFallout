@@ -28,7 +28,8 @@ add_openfallout_dir (mwrender
 
 add_openfallout_dir (mwinput
     actions actionmanager bindingsmanager controllermanager controlswitch
-    inputmanagerimp inputlog mousemanager keyboardmanager sensormanager gyromanager
+    inputmanagerimp inputlog mousemanager keyboardmanager sensormanager gyromanager triggerfeel sdltriggerdevice
+    controllerdefaults
     )
 
 add_openfallout_dir (mwgui
@@ -248,6 +249,15 @@ if(APPLE AND BUILD_OPENFALLOUT)
     add_custom_command(TARGET openfallout
         POST_BUILD
         COMMAND cp "${OpenFallout_BINARY_DIR}/resources/version" "${BUNDLE_RESOURCES_DIR}/resources")
+
+    # Executable of the nested engine app (Contents/Helpers/OpenFallout Engine.app, its Info.plist is written by the
+    # Apple bundling block of the top-level CMakeLists.txt). It execs Contents/MacOS/openfallout of this bundle.
+    add_executable(openfallout-engine-app macos/engineappshim.cpp)
+    set_target_properties(openfallout-engine-app PROPERTIES
+        OUTPUT_NAME "OpenFallout Engine"
+        RUNTIME_OUTPUT_DIRECTORY "${OPENFALLOUT_ENGINE_APP_DIR}/Contents/MacOS")
+    # Building only the engine must still give the nested app the executable its Info.plist names.
+    add_dependencies(openfallout openfallout-engine-app)
 
     find_library(COCOA_FRAMEWORK Cocoa)
     find_library(IOKIT_FRAMEWORK IOKit)

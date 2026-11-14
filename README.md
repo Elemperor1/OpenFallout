@@ -7,7 +7,7 @@ It is built on [OpenMW](https://openmw.org), the open-source Morrowind engine, a
 
 * Version: 0.52.0 (the OpenMW release it was started from, OpenFallout has not made a release yet)
 * License: GPLv3 (see [LICENSE](LICENSE) for more information)
-* Source code and bug tracker: https://github.com/Elemperor1/OpenFallout
+* Source code and bug tracker: https://github.com/OpenBethesda/OpenFallout
 
 Font Licenses:
 * DejaVuLGCSansMono.ttf: custom (see [files/data/fonts/DejaVuFontLicense.txt](files/data/fonts/DejaVuFontLicense.txt) for more information)
@@ -36,8 +36,13 @@ Getting Started
 * [Running it on your copy of the games](docs/openfallout/playing.md)
 * [Build from source](docs/openfallout/build-baseline.md)
 * [Roadmap](docs/openfallout/gap-audit-and-roadmap.md)
-* [Report a bug](https://github.com/Elemperor1/OpenFallout/issues)
+* [Report a bug](https://github.com/OpenBethesda/OpenFallout/issues)
 * The manuals under [docs/source](docs/source) are OpenMW's and still describe the Morrowind engine that OpenFallout starts from. Program and file names in them have been updated.
+
+macOS
+-----
+
+Which Macs the release supports: the disk image for Apple Silicon (`OpenFallout-<version>-macOS-arm64.dmg`) is signed with the project's Developer ID and notarized by Apple, so it opens without a Gatekeeper warning. The Intel image (`...-macOS-x86_64.dmg`) is only ad hoc signed and not notarized: macOS refuses to open it at first, and you allow it under System Settings, Privacy & Security, Open Anyway. Both need macOS 14.8 or later (the deployment target the release is built for). Game Mode, which the engine app declares, needs macOS 26 or later; on older versions the game runs without it. The release notes say the same for each image, together with the Mac it was checked on.
 
 The data path
 -------------

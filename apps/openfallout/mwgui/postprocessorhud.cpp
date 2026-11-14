@@ -17,7 +17,6 @@
 #include <MyGUI_WidgetInput.h>
 #include <MyGUI_Window.h>
 
-#include <components/files/configurationmanager.hpp>
 #include <components/fx/technique.hpp>
 #include <components/fx/widgets.hpp>
 
@@ -51,9 +50,8 @@ namespace OFGui
         MyGUI::ListBox::onKeyButtonPressed(key, ch);
     }
 
-    PostProcessorHud::PostProcessorHud(Files::ConfigurationManager& cfgMgr)
+    PostProcessorHud::PostProcessorHud()
         : WindowBase("openmw_postprocessor_hud.layout")
-        , mCfgMgr(cfgMgr)
     {
         getWidget(mActiveList, "ActiveList");
         getWidget(mInactiveList, "InactiveList");
@@ -246,7 +244,7 @@ namespace OFGui
     void PostProcessorHud::onClose()
     {
         Settings::ShaderManager::get().save();
-        Settings::Manager::saveUser(mCfgMgr.getUserConfigPath() / "settings.cfg");
+        OFBase::Environment::get().getWindowManager()->saveUserSettings();
         toggleMode(Settings::ShaderManager::Mode::Normal);
     }
 

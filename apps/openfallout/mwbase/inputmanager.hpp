@@ -1,6 +1,7 @@
 #ifndef GAME_MWBASE_INPUTMANAGER_H
 #define GAME_MWBASE_INPUTMANAGER_H
 
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -23,6 +24,11 @@ namespace ESM
 namespace MyGUI
 {
     class Widget;
+}
+
+namespace OFInput::TriggerFeel
+{
+    struct PlayerState;
 }
 
 namespace OFBase
@@ -114,6 +120,14 @@ namespace OFBase
         virtual void rumble(float strength, float seconds) = 0;
         /// The same with a strength for each motor of the pad (the left one is the heavy one)
         virtual void rumble(float left, float right, float seconds) = 0;
+
+        /// What the game says about the player for the feel of the pad's triggers, once a frame. The input manager adds
+        /// what it knows itself (the window's focus, the windows of the engine, the setting) and clears the resistance
+        /// when any of them says so.
+        virtual void setTriggerState(const OFInput::TriggerFeel::PlayerState& player) = 0;
+        /// The player's weapon fired or swung: the fire trigger of a pad with trigger motors buzzes (on the next frame;
+        /// it may be called from any thread)
+        virtual void weaponFired() = 0;
         virtual bool isIdle() const = 0;
 
         virtual void executeAction(int action) = 0;

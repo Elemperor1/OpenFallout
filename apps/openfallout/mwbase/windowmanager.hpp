@@ -411,6 +411,9 @@ namespace OFBase
         void windowVisibilityChange(bool visible) override = 0;
         void windowResized(int x, int y) override = 0;
         void windowClosed() override = 0;
+        /// Writes the user's settings.cfg. Every save of it in the game goes through here: the resolution written is
+        /// the one to start with next time, which is not always the resolution setting of the moment
+        virtual void saveUserSettings() = 0;
         virtual bool isWindowVisible() const = 0;
 
         virtual void watchActor(const OFWorld::Ptr& ptr) = 0;

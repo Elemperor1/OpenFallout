@@ -42,12 +42,12 @@ void Wizard::ConclusionPage::initializePage()
     }
     else
     {
-        textLabel->setText(
-            tr("<html><head/><body><p>The OpenFallout Wizard failed to install Morrowind on your computer.</p>"
-               "<p>Please report any bugs you might have encountered to our "
-               "<a href=\"https://github.com/Elemperor1/OpenFallout/issues\">bug tracker</a>.<br/>Make sure to include "
-               "the "
-               "installation log.</p><br/></body></html>"));
+        textLabel->setText(tr(
+            "<html><head/><body><p>The OpenFallout Wizard failed to install Morrowind on your computer.</p>"
+            "<p>Please report any bugs you might have encountered to our "
+            "<a href=\"https://github.com/OpenBethesda/OpenFallout/issues\">bug tracker</a>.<br/>Make sure to include "
+            "the "
+            "installation log.</p><br/></body></html>"));
     }
 }
 
