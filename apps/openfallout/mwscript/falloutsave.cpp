@@ -936,10 +936,29 @@ namespace OFScript
                 FalloutScript::readReputation(mReputation, in, version);
             });
         section(
+            "destruction", FalloutScript::destructionSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeDestruction(mDestruction, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readDestruction(mDestruction, in, version);
+                showDamagedObjects();
+            });
+        section(
+            "dismember", FalloutScript::dismemberSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeDismemberment(mDismemberment, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readDismemberment(mDismemberment, in, version);
+            });
+        section(
             "objectstate", FalloutScript::objectStateSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeObjectState(mObjectState, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
                 FalloutScript::readObjectState(mObjectState, in, version);
+            });
+        section(
+            "challenges", FalloutScript::challengesSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeChallenges(mChallenges, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readChallenges(mChallenges, in, version);
             });
         section(
             "magic", FalloutScript::magicSectionVersion,

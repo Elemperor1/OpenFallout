@@ -157,6 +157,8 @@ namespace FalloutScript
         });
         interpreter.setHandler(
             "GetSecondsPassed", [&objects](CallContext&) { return static_cast<double>(objects.secondsPassed()); });
+        interpreter.setHandler(
+            "ScriptEffectElapsedSeconds", [&objects](CallContext&) { return objects.effectSeconds(); });
         interpreter.setHandler("GetRandomPercent",
             [random = std::move(random)](CallContext&) { return random ? static_cast<double>(random()) : 0.0; });
     }

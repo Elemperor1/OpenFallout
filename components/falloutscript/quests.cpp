@@ -35,6 +35,8 @@ namespace FalloutScript
         mQuests.clear();
         mPrepared.clear();
         mNesting = 0;
+        mActive = 0;
+        mShowQuestItems = false;
         mRecords.forEachQuest([this](const ESM4::Quest& record) {
             const FormId id = record.mId.toUint32();
             QuestState& quest = mQuests[id];
@@ -204,6 +206,11 @@ namespace FalloutScript
 
     void QuestManager::tell(FormId quest, QuestEvent::Kind kind, std::string text)
     {
+        // The player follows the quest that was added when it follows none, and stops following one that is over
+        if (kind == QuestEvent::Kind::Added && mActive == 0)
+            mActive = quest;
+        else if ((kind == QuestEvent::Kind::Completed || kind == QuestEvent::Kind::Failed) && mActive == quest)
+            mActive = 0;
         if (!mEventListener)
             return;
         QuestEvent event;
@@ -379,6 +386,34 @@ namespace FalloutScript
         mInterpreter.runResult(instance);
     }
 
+    void QuestManager::setActiveQuest(FormId quest)
+    {
+        if (find(quest) != nullptr)
+            mActive = quest;
+    }
+
+    void QuestManager::resetQuest(FormId id)
+    {
+        QuestState* quest = find(id);
+        if (quest == nullptr)
+            return;
+        QuestState fresh;
+        fresh.mRecord = quest->mRecord;
+        fresh.mRunning = (quest->mRecord->mData.flags & ESM4::Quest::Flag_StartGameEnabled) != 0;
+        fresh.mTimer = quest->mTimer;
+        fresh.mDelay = quest->mDelay;
+        fresh.mInstance = std::move(quest->mInstance);
+        *quest = std::move(fresh);
+        if (mActive == id && !quest->listed())
+            mActive = 0;
+    }
+
+    void QuestManager::killUpdates()
+    {
+        if (mUpdatesKiller)
+            mUpdatesKiller();
+    }
+
     void QuestManager::log(const std::string& message)
     {
         mInterpreter.host().log(message);
@@ -433,6 +468,23 @@ namespace FalloutScript
         });
         interpreter.setHandler("GetObjectiveCompleted", [&quests](CallContext& call) {
             return quests.objectiveCompleted(formArgument(call, 0), intArgument(call, 1)) ? 1.0 : 0.0;
+        });
+        interpreter.setHandler("ForceActiveQuest", [&quests](CallContext& call) {
+            quests.setActiveQuest(formArgument(call, 0));
+            return 1.0;
+        });
+        interpreter.setHandler("ResetQuest", [&quests](CallContext& call) {
+            quests.resetQuest(formArgument(call, 0));
+            return 1.0;
+        });
+        // A number above 0 turns it on (0x5C6B12: the test is "greater than")
+        interpreter.setHandler("SetShowQuestItems", [&quests](CallContext& call) {
+            quests.setShowQuestItems(argument(call, 0) > 0);
+            return 1.0;
+        });
+        interpreter.setHandler("KillQuestUpdates", [&quests](CallContext&) {
+            quests.killUpdates();
+            return 1.0;
         });
     }
 }

@@ -373,10 +373,8 @@ namespace FalloutScript
                 state.setCombatStyle(call.mReference, formArgument(call, 0));
             return 0.0;
         });
-        // The answers of the executables when a character has no cause of death, a thing no stage of destruction and a
-        // dead character nobody fed on
-        interpreter.setHandler("GetCauseofDeath", [](CallContext&) { return -1.0; });
-        interpreter.setHandler("GetDestructionStage", [](CallContext&) { return -1.0; });
+        // The answer of the executables for a dead character nobody fed on (the cause of a death and the stage of a
+        // destruction are kept by dismember.cpp and destruction.cpp)
         interpreter.setHandler("HasBeenEaten", [](CallContext&) { return 0.0; });
     }
 }

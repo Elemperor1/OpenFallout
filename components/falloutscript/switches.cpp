@@ -21,14 +21,17 @@ namespace FalloutScript
             { "MatchFaceGeometry", "the face of a character does not change" },
             { "AgeRace", "the race of a character does not change" },
             { "ResetInventory", "an inventory is not rebuilt from the form of the character" },
-            { "UnlockChallenge", "the challenges are not kept" },
-            { "IncrementScriptedChallenge", "the challenges are not kept" },
             { "PlayBink", "videos are not played" },
             { "SetNoActivationSound", "an activation that does nothing makes no sound" },
             { "ClearNoActivationSound", "an activation that does nothing makes no sound" },
             { "SetActorAlpha", "the transparency of a character is not drawn" },
             { "PlayMagicShaderVisuals", "the shaders of effects are not drawn" },
             { "StopMagicShaderVisuals", "the shaders of effects are not drawn" },
+            { "PlayMagicEffectVisuals", "the visuals of effects are not drawn" },
+            { "StopMagicEffectVisuals", "the visuals of effects are not drawn" },
+            { "SetActorRefraction", "the refraction of a character is not drawn" },
+            { "PreloadMagicEffect", "there is nothing to load ahead for an effect" },
+            { "ShowQuestStages", "the stages of a quest are written to the console of the games, which this engine does not feed" },
             { "SendAssaultAlarm", "there is no crime that could be reported" },
             // The leveled lists that scripts add to are those of vendors and loot, which nothing here rolls (the only
             // lists that are rolled are those of the armor that characters wear)
@@ -58,8 +61,6 @@ namespace FalloutScript
             { "SetPCToddler", "the body of the player does not change with its age", false },
             { "SetLocationSpecificLoadScreensOnly", "load screens are not chosen by the place", false },
             { "AutoDisplayObjectives", "objectives are not shown on the screen by themselves", false },
-            { "KillQuestUpdates", "the messages of quest updates are not held back", false },
-            { "ForceActiveQuest", "there is no active quest to show", true },
         };
 
         void tell(CallContext& call, Switches& switches, const char* name, const char* reason)
@@ -141,8 +142,6 @@ namespace FalloutScript
         interpreter.setHandler("IsXBox", [](CallContext&) { return 0.0; });
         interpreter.setHandler("IsPS3", [](CallContext&) { return 0.0; });
         interpreter.setHandler("GetVampire", [](CallContext&) { return 0.0; });
-        // The games read the bits of the limbs that were torn off (dismemberment), which nothing here sets
-        interpreter.setHandler("IsLimbGone", [](CallContext&) { return 0.0; });
         // The games work the disposition out of the character's records and skills (the formula was not read from the
         // executables), which this does not: the answer is 0
         interpreter.setHandler("GetDisposition", [&switches](CallContext& call) {

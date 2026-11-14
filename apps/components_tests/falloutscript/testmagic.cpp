@@ -11,6 +11,7 @@
 #include <functional>
 #include <map>
 #include <set>
+#include <tuple>
 
 namespace
 {
@@ -52,6 +53,23 @@ namespace
     constexpr FormId twinAbilitySecondEffect = 0x0020000C;
     constexpr FormId twinAbilityFirstScript = 0x00300006;
     constexpr FormId twinAbilitySecondScript = 0x00300007;
+    constexpr FormId powerSpell = 0x0010000B;
+    constexpr FormId poisonSpell = 0x0010000C;
+    constexpr FormId addictionSpell = 0x0010000D;
+    constexpr FormId pairSpell = 0x0010000E;
+    constexpr FormId gatedScriptedAbility = 0x0010000F;
+    constexpr FormId doubleGatedAbility = 0x00100010;
+    constexpr FormId enchantment = 0x00110001;
+    constexpr FormId aidItem = 0x00110002;
+    constexpr FormId ingredient = 0x00110003;
+    constexpr FormId powerEffect = 0x0020000D;
+    constexpr FormId poisonEffect = 0x0020000E;
+    constexpr FormId addictionEffect = 0x0020000F;
+    constexpr FormId pairFirstEffect = 0x00200010;
+    constexpr FormId pairSecondEffect = 0x00200011;
+    constexpr FormId gatedScriptEffect = 0x00200012;
+    constexpr FormId itemEffect = 0x00200013;
+    constexpr FormId gatedScript = 0x00300008;
 
     constexpr std::uint16_t OpAddSpell = 0x101C;
     constexpr std::uint16_t OpRemoveSpell = 0x101D;
@@ -59,6 +77,11 @@ namespace
     constexpr std::uint16_t OpHasMagicEffect = 0x10D6;
     constexpr std::uint16_t OpIsSpellTarget = 0x10DF;
     constexpr std::uint16_t OpCastImmediateOnSelf = 0x11D9;
+    constexpr std::uint16_t OpSelectPlayerSpell = 0x10B3;
+    constexpr std::uint16_t OpDispel = 0x1142;
+    constexpr std::uint16_t OpDispelAllSpells = 0x1148;
+    constexpr std::uint16_t OpEvaluateSpellConditions = 0x119D;
+    constexpr std::uint16_t OpGetSpellUsageNum = 0x122B;
 
     class FakeRecords : public FalloutScript::MagicRecords
     {
@@ -114,6 +137,41 @@ namespace
             twinKept.mEffects.push_back({ twinAbilityFirstEffect, 1, -1, 0, 0, false });
             twinKept.mEffects.push_back({ twinAbilitySecondEffect, 1, -1, 0, 0, false });
             mSpells[twinAbility] = twinKept;
+            // Spells of the other kinds the dispel of everything tells apart: a power, a poison and an addiction
+            SpellInfo power;
+            power.mType = 2;
+            power.mEffects.push_back({ powerEffect, 0, -1, 7, 20, false });
+            mSpells[powerSpell] = power;
+            SpellInfo poison;
+            poison.mType = 5;
+            poison.mEffects.push_back({ poisonEffect, 0, -1, 4, 20, true });
+            mSpells[poisonSpell] = poison;
+            SpellInfo addiction;
+            addiction.mType = 10;
+            addiction.mEffects.push_back({ addictionEffect, 0, -1, 1, 20, true });
+            mSpells[addictionSpell] = addiction;
+            // A spell with two effects that last
+            SpellInfo pair;
+            pair.mType = 0;
+            pair.mEffects.push_back({ pairFirstEffect, 0, -1, 3, 10, false });
+            pair.mEffects.push_back({ pairSecondEffect, 0, -1, 4, 10, false });
+            mSpells[pairSpell] = pair;
+            // An ability with a script effect that is on the character only while a condition holds
+            SpellInfo gatedScripted;
+            gatedScripted.mType = 4;
+            gatedScripted.mEffects.push_back({ gatedScriptEffect, 1, -1, 0, 0, false });
+            gatedScripted.mEffects.back().mConditions.emplace_back();
+            mSpells[gatedScriptedAbility] = gatedScripted;
+            // An ability with two effects that are the same magic effect, each with a condition of its own
+            SpellInfo doubled;
+            doubled.mType = 4;
+            for (const float comparison : { 1.0f, 2.0f })
+            {
+                doubled.mEffects.push_back({ gatedBoost, 0, FalloutScript::ActorValue::strength, 2, 0, false });
+                doubled.mEffects.back().mConditions.emplace_back();
+                doubled.mEffects.back().mConditions.back().comparison = comparison;
+            }
+            mSpells[doubleGatedAbility] = doubled;
         }
 
         bool spell(FormId spell, SpellInfo& info) override
@@ -134,7 +192,12 @@ namespace
                 : effect == twinSecondEffect        ? twinSecondScript
                 : effect == twinAbilityFirstEffect  ? twinAbilityFirstScript
                 : effect == twinAbilitySecondEffect ? twinAbilitySecondScript
+                : effect == gatedScriptEffect       ? gatedScript
                                                     : 0;
+        }
+        int itemKind(FormId item) override
+        {
+            return item == enchantment ? 6 : item == aidItem ? 7 : item == ingredient ? 8 : -1;
         }
     };
 
@@ -156,9 +219,13 @@ namespace
         std::vector<double> mSeconds;
         /// What the scripts do when a stage has been noted (a script that casts or takes away a spell)
         std::function<void(FormId, Magic::ScriptStage)> mOnStage;
+        /// The effects that were ended before their time: the character, the spell or item and the magic effect
+        std::vector<std::tuple<FormId, FormId, FormId>> mEnded;
 
         Runner()
         {
+            mMagic.setEnder(
+                [this](FormId actor, FormId source, FormId effect) { mEnded.emplace_back(actor, source, effect); });
             mMagic.setScriptRunner(
                 [this](FormId actor, FormId script, Magic::ScriptStage stage, Magic::EffectId id, double seconds) {
                     EXPECT_EQ(actor, courier);
@@ -640,5 +707,400 @@ namespace
         const std::set<Magic::EffectId> started = { run.mEffectIds[3], run.mEffectIds[4] };
         EXPECT_EQ(started.size(), 2u);
         EXPECT_EQ(started.count(run.mEffectIds[0]), 0u);
+    }
+
+    TEST(FalloutScriptMagicTest, dispel_ends_the_effects_of_one_spell_and_leaves_those_of_the_others)
+    {
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { blast });
+        run.call(OpCastImmediateOnSelf, courier, { restSpell });
+        run.mStages.clear();
+
+        EXPECT_EQ(run.call(OpDispel, courier, { blast }), 1.0);
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { fire }), 0.0);
+        EXPECT_EQ(run.call(OpIsSpellTarget, courier, { blast }), 0.0);
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { restEffect }), 1.0);
+        EXPECT_THAT(run.mEnded, ElementsAre(std::make_tuple(courier, blast, fire)));
+        // The script of the other spell went on
+        EXPECT_TRUE(run.mStages.empty());
+    }
+
+    TEST(FalloutScriptMagicTest, the_end_of_every_dispelled_entry_is_done_before_a_script_finishes)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { twinSpell });
+        run.mStages.clear();
+        // What whoever kept the effects was told when each script finished: a script that finishes can cast again, and
+        // the end of an entry that came after it would take its cast away
+        std::vector<std::size_t> endedWhenFinished;
+        run.mOnStage = [&](FormId, Stage stage) {
+            if (stage == Stage::Finish)
+                endedWhenFinished.push_back(run.mEnded.size());
+        };
+        EXPECT_EQ(run.mMagic.dispel(courier, twinSpell), 2);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(twinFirstScript, Stage::Finish), Pair(twinSecondScript, Stage::Finish)));
+        EXPECT_THAT(endedWhenFinished, ElementsAre(2u, 2u));
+    }
+
+    TEST(FalloutScriptMagicTest, a_dispelled_script_effect_finishes_once_and_is_not_run_again)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { restSpell });
+        run.mStages.clear();
+
+        run.call(OpDispel, courier, { restSpell });
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(restScript, Stage::Finish)));
+        run.mStages.clear();
+        run.mMagic.update(200);
+        run.call(OpDispel, courier, { restSpell });
+        EXPECT_TRUE(run.mStages.empty());
+        EXPECT_EQ(run.mEnded.size(), 1u);
+    }
+
+    TEST(FalloutScriptMagicTest, dispelling_an_ability_changes_the_value_back_and_the_spell_stays_on_the_list)
+    {
+        Runner run;
+        run.call(OpAddSpell, courier, { ability });
+        run.call(OpDispel, courier, { ability });
+        EXPECT_THAT(run.mChanges,
+            ElementsAre(
+                Pair(FalloutScript::ActorValue::strength, 2.0), Pair(FalloutScript::ActorValue::strength, -2.0)));
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { strengthBoost }), 0.0);
+        EXPECT_TRUE(run.mMagic.hasSpell(courier, ability));
+
+        // Taking the spell away takes nothing back a second time
+        run.call(OpRemoveSpell, courier, { ability });
+        EXPECT_EQ(run.mChanges.size(), 2u);
+    }
+
+    TEST(FalloutScriptMagicTest, dispel_by_magic_effect_ends_only_that_effect_of_the_spell)
+    {
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { pairSpell });
+        EXPECT_EQ(run.mMagic.dispel(courier, pairSpell, pairFirstEffect), 1);
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { pairFirstEffect }), 0.0);
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { pairSecondEffect }), 1.0);
+        EXPECT_EQ(run.call(OpIsSpellTarget, courier, { pairSpell }), 1.0);
+        EXPECT_EQ(run.mMagic.dispel(courier, pairSpell), 1);
+        EXPECT_EQ(run.call(OpIsSpellTarget, courier, { pairSpell }), 0.0);
+        EXPECT_THAT(run.mEnded,
+            ElementsAre(std::make_tuple(courier, pairSpell, pairFirstEffect),
+                std::make_tuple(courier, pairSpell, pairSecondEffect)));
+    }
+
+    TEST(FalloutScriptMagicTest, dispel_ends_nothing_for_a_form_without_effects_or_one_that_is_no_character)
+    {
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { blast });
+        EXPECT_EQ(run.mMagic.dispel(courier, restSpell), 0);
+        EXPECT_EQ(run.mMagic.dispel(courier, 0), 0);
+        EXPECT_EQ(run.mMagic.dispel(0, blast), 0);
+        EXPECT_EQ(run.mMagic.dispelAll(0), 0);
+        // The command asks first whether the reference is a character
+        EXPECT_EQ(run.call(OpDispel, crate, { blast }), 1.0);
+        EXPECT_EQ(run.call(OpDispelAllSpells, crate), 1.0);
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { fire }), 1.0);
+        EXPECT_TRUE(run.mEnded.empty());
+    }
+
+    TEST(FalloutScriptMagicTest, dispelling_everything_ends_spells_powers_and_items_and_keeps_the_rest)
+    {
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { blast });
+        run.call(OpCastImmediateOnSelf, courier, { powerSpell });
+        run.call(OpCastImmediateOnSelf, courier, { poisonSpell });
+        run.call(OpCastImmediateOnSelf, courier, { addictionSpell });
+        run.call(OpAddSpell, courier, { disease });
+        run.call(OpAddSpell, courier, { ability });
+        run.mMagic.noteEffect(courier, itemEffect, aidItem, 30);
+        run.mMagic.noteEffect(courier, itemEffect, ingredient, 30);
+        run.mMagic.noteEffect(courier, itemEffect, enchantment, 30);
+
+        EXPECT_EQ(run.call(OpDispelAllSpells, courier), 1.0);
+        // A spell, a power, an aid item and an ingredient are ended
+        EXPECT_THAT(run.mEnded,
+            UnorderedElementsAre(std::make_tuple(courier, blast, fire), std::make_tuple(courier, powerSpell, powerEffect),
+                std::make_tuple(courier, aidItem, itemEffect), std::make_tuple(courier, ingredient, itemEffect)));
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { fire }), 0.0);
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { powerEffect }), 0.0);
+        // A poison, an addiction, a disease, an ability and an enchantment are not
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { poisonEffect }), 1.0);
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { addictionEffect }), 1.0);
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { sickness }), 1.0);
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { strengthBoost }), 1.0);
+        EXPECT_EQ(run.call(OpIsSpellTarget, courier, { enchantment }), 1.0);
+        EXPECT_EQ(run.mMagic.dispelAll(courier), 0);
+    }
+
+    TEST(FalloutScriptMagicTest, the_usage_of_a_spell_is_the_sum_of_the_magnitudes_of_its_running_effects)
+    {
+        Runner run;
+        EXPECT_EQ(run.call(OpGetSpellUsageNum, courier, { pairSpell }), 0.0);
+        run.call(OpCastImmediateOnSelf, courier, { pairSpell });
+        run.call(OpCastImmediateOnSelf, courier, { blast });
+        EXPECT_EQ(run.call(OpGetSpellUsageNum, courier, { pairSpell }), 7.0);
+        EXPECT_EQ(run.call(OpGetSpellUsageNum, courier, { blast }), 5.0);
+        // An item that was used has the magnitude it started with
+        run.mMagic.noteEffect(courier, itemEffect, aidItem, 30, 12);
+        EXPECT_EQ(run.mMagic.usage(courier, aidItem), 12.0);
+        EXPECT_EQ(run.call(OpGetSpellUsageNum, crate, { blast }), 0.0);
+
+        run.call(OpDispel, courier, { pairSpell });
+        EXPECT_EQ(run.call(OpGetSpellUsageNum, courier, { pairSpell }), 0.0);
+        run.mMagic.update(11);
+        EXPECT_EQ(run.call(OpGetSpellUsageNum, courier, { blast }), 0.0);
+    }
+
+    TEST(FalloutScriptMagicTest, the_conditions_of_an_effect_an_ability_keeps_are_asked_again_each_interval)
+    {
+        Runner run;
+        bool holds = false;
+        int asked = 0;
+        run.mMagic.setConditions([&](const std::vector<ESM4::TargetCondition>&, const FalloutScript::ConditionContext&) {
+            ++asked;
+            return holds;
+        });
+        run.call(OpAddSpell, courier, { gatedAbility });
+        EXPECT_EQ(asked, 1);
+        EXPECT_TRUE(run.mChanges.empty());
+        EXPECT_EQ(run.call(OpGetSpellUsageNum, courier, { gatedAbility }), 0.0);
+
+        // Not before the interval (a second) has passed
+        run.mMagic.update(0.5);
+        EXPECT_EQ(asked, 1);
+        run.mMagic.update(0.6);
+        EXPECT_EQ(asked, 2);
+        EXPECT_TRUE(run.mChanges.empty());
+
+        // It begins when the condition holds, and ends when it stops holding
+        holds = true;
+        run.mMagic.update(1.2);
+        EXPECT_THAT(run.mChanges, ElementsAre(Pair(FalloutScript::ActorValue::strength, 2.0)));
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { gatedBoost }), 1.0);
+        EXPECT_EQ(run.call(OpIsSpellTarget, courier, { gatedAbility }), 1.0);
+        run.mMagic.update(1.2);
+        EXPECT_EQ(run.mChanges.size(), 1u);
+
+        holds = false;
+        run.mMagic.update(1.2);
+        EXPECT_THAT(run.mChanges,
+            ElementsAre(
+                Pair(FalloutScript::ActorValue::strength, 2.0), Pair(FalloutScript::ActorValue::strength, -2.0)));
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { gatedBoost }), 0.0);
+        EXPECT_TRUE(run.mMagic.hasSpell(courier, gatedAbility));
+
+        // The interval is the setting's, and a number that is no interval is a second
+        run.mMagic.setConditionInterval(5);
+        asked = 0;
+        run.mMagic.update(4);
+        EXPECT_EQ(asked, 0);
+        run.mMagic.update(1);
+        EXPECT_EQ(asked, 1);
+        run.mMagic.setConditionInterval(0);
+        run.mMagic.update(0.2);
+        EXPECT_EQ(asked, 1);
+        run.mMagic.update(0.2);
+        EXPECT_EQ(asked, 2);
+    }
+
+    TEST(FalloutScriptMagicTest, evaluating_the_spell_conditions_asks_them_at_once_and_runs_the_script_of_an_effect_again)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        bool holds = false;
+        run.mMagic.setConditions([&](const std::vector<ESM4::TargetCondition>&, const FalloutScript::ConditionContext&) {
+            return holds;
+        });
+        run.call(OpAddSpell, courier, { gatedScriptedAbility });
+        EXPECT_TRUE(run.mStages.empty());
+
+        holds = true;
+        run.call(OpEvaluateSpellConditions, courier);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(gatedScript, Stage::Start)));
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { gatedScriptEffect }), 1.0);
+        run.mStages.clear();
+        run.call(OpEvaluateSpellConditions, courier);
+        EXPECT_TRUE(run.mStages.empty());
+
+        holds = false;
+        run.call(OpEvaluateSpellConditions, courier);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(gatedScript, Stage::Finish)));
+        run.mStages.clear();
+
+        // An effect that is not on the character has nothing to finish when its spell is taken away
+        run.call(OpRemoveSpell, courier, { gatedScriptedAbility });
+        EXPECT_TRUE(run.mStages.empty());
+        run.call(OpEvaluateSpellConditions, crate);
+    }
+
+    TEST(FalloutScriptMagicTest, the_script_of_an_effect_whose_conditions_do_not_hold_is_not_updated)
+    {
+        using Stage = Magic::ScriptStage;
+        Runner run;
+        bool holds = false;
+        run.mMagic.setConditions([&](const std::vector<ESM4::TargetCondition>&, const FalloutScript::ConditionContext&) {
+            return holds;
+        });
+        // The condition fails when the ability is added: no start, and no update before one
+        run.call(OpAddSpell, courier, { gatedScriptedAbility });
+        run.mMagic.update(0.4);
+        EXPECT_TRUE(run.mStages.empty());
+
+        // It starts when the condition holds and is updated while it does
+        holds = true;
+        run.mMagic.update(1.2);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(gatedScript, Stage::Start)));
+        run.mStages.clear();
+        run.mMagic.update(0.2);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(gatedScript, Stage::Update)));
+        run.mStages.clear();
+
+        // It finishes when the condition stops holding and is not updated after its finish
+        holds = false;
+        run.mMagic.update(1.2);
+        EXPECT_THAT(run.mStages, ElementsAre(Pair(gatedScript, Stage::Update), Pair(gatedScript, Stage::Finish)));
+        run.mStages.clear();
+        run.mMagic.update(0.2);
+        run.mMagic.update(0.2);
+        EXPECT_TRUE(run.mStages.empty());
+    }
+
+    TEST(FalloutScriptMagicTest, a_dispelled_effect_that_was_not_on_the_character_changes_and_finishes_nothing)
+    {
+        Runner run;
+        run.mMagic.setConditions(
+            [](const std::vector<ESM4::TargetCondition>&, const FalloutScript::ConditionContext&) { return false; });
+        run.call(OpAddSpell, courier, { gatedAbility });
+        run.call(OpAddSpell, courier, { gatedScriptedAbility });
+        EXPECT_EQ(run.mMagic.dispel(courier, gatedAbility), 1);
+        EXPECT_EQ(run.mMagic.dispel(courier, gatedScriptedAbility), 1);
+        EXPECT_TRUE(run.mChanges.empty());
+        EXPECT_TRUE(run.mStages.empty());
+    }
+
+    TEST(FalloutScriptMagicTest, the_chosen_spell_is_kept_and_forgotten_with_a_new_game)
+    {
+        Runner run;
+        EXPECT_EQ(run.mMagic.selectedSpell(), 0u);
+        EXPECT_EQ(run.call(OpSelectPlayerSpell, courier, { powerSpell }), 1.0);
+        EXPECT_EQ(run.mMagic.selectedSpell(), powerSpell);
+        run.mMagic.clear();
+        EXPECT_EQ(run.mMagic.selectedSpell(), 0u);
+    }
+
+    TEST(FalloutScriptMagicTest, a_saved_game_keeps_the_magnitudes_the_conditions_and_the_chosen_spell)
+    {
+        Runner run;
+        run.call(OpCastImmediateOnSelf, courier, { pairSpell });
+        run.mMagic.setConditions(
+            [](const std::vector<ESM4::TargetCondition>&, const FalloutScript::ConditionContext&) { return false; });
+        run.call(OpAddSpell, courier, { gatedAbility });
+        run.mMagic.selectSpell(powerSpell);
+        FalloutScript::SaveWriter out;
+        FalloutScript::writeMagic(run.mMagic, out);
+
+        Runner other;
+        bool holds = false;
+        other.mMagic.setConditions(
+            [&](const std::vector<ESM4::TargetCondition>&, const FalloutScript::ConditionContext&) { return holds; });
+        const std::string bytes = out.take();
+        FalloutScript::SaveReader in(bytes);
+        FalloutScript::readMagic(other.mMagic, in, FalloutScript::magicSectionVersion);
+        EXPECT_TRUE(in.atEnd());
+        EXPECT_EQ(other.mMagic.selectedSpell(), powerSpell);
+        EXPECT_EQ(other.call(OpGetSpellUsageNum, courier, { pairSpell }), 7.0);
+        // The effect that was not on the character is still not
+        EXPECT_EQ(other.call(OpHasMagicEffect, courier, { gatedBoost }), 0.0);
+
+        // Its condition is asked of the records again, and it begins when it holds
+        holds = true;
+        other.call(OpEvaluateSpellConditions, courier);
+        EXPECT_EQ(other.call(OpHasMagicEffect, courier, { gatedBoost }), 1.0);
+        EXPECT_THAT(other.mChanges, ElementsAre(Pair(FalloutScript::ActorValue::strength, 2.0)));
+    }
+
+    TEST(FalloutScriptMagicTest, a_saved_game_gives_each_of_two_effects_of_the_same_kind_the_condition_of_its_own)
+    {
+        // The first effect holds when its condition's number is 2, and only the second does
+        const auto holdsFor2 = [](const std::vector<ESM4::TargetCondition>& conditions,
+                                   const FalloutScript::ConditionContext&) {
+            return !conditions.empty() && conditions.front().comparison == 2.0f;
+        };
+        Runner run;
+        run.mMagic.setConditions(holdsFor2);
+        run.call(OpAddSpell, courier, { doubleGatedAbility });
+        EXPECT_THAT(run.mChanges, ElementsAre(Pair(FalloutScript::ActorValue::strength, 2.0)));
+        FalloutScript::SaveWriter out;
+        FalloutScript::writeMagic(run.mMagic, out);
+
+        Runner other;
+        other.mMagic.setConditions(holdsFor2);
+        const std::string bytes = out.take();
+        FalloutScript::SaveReader in(bytes);
+        FalloutScript::readMagic(other.mMagic, in, FalloutScript::magicSectionVersion);
+        EXPECT_TRUE(in.atEnd());
+        EXPECT_EQ(other.call(OpHasMagicEffect, courier, { gatedBoost }), 1.0);
+        // The conditions are asked again: the effect that was on stays on, with nothing taken away or given twice
+        other.call(OpEvaluateSpellConditions, courier);
+        EXPECT_TRUE(other.mChanges.empty());
+        EXPECT_EQ(other.call(OpGetSpellUsageNum, courier, { doubleGatedAbility }), 2.0);
+    }
+
+    TEST(FalloutScriptMagicTest, a_game_saved_before_the_magnitude_was_kept_loads_with_the_effects_on_the_character)
+    {
+        // The section as version 2 wrote it: no spells and one running effect with a number, and no chosen spell
+        FalloutScript::SaveWriter out;
+        out.count(0);
+        out.count(1);
+        out.form(courier);
+        out.form(fire);
+        out.form(blast);
+        out.f64(8);
+        out.i32(-1);
+        out.f64(0);
+        out.u64(7);
+        const std::string bytes = out.take();
+
+        Runner run;
+        run.mMagic.selectSpell(powerSpell);
+        FalloutScript::SaveReader in(bytes);
+        FalloutScript::readMagic(run.mMagic, in, 2);
+        EXPECT_TRUE(in.atEnd());
+        EXPECT_EQ(run.mMagic.selectedSpell(), 0u);
+        EXPECT_EQ(run.call(OpHasMagicEffect, courier, { fire }), 1.0);
+        EXPECT_EQ(run.mMagic.usage(courier, blast), 0.0);
+    }
+
+    TEST(FalloutScriptMagicTest, a_dispel_needs_neither_a_runner_nor_a_modifier_nor_an_ender)
+    {
+        FakeRecords records;
+        Magic magic(records);
+        magic.castOnSelf(courier, blast);
+        magic.castOnSelf(courier, restSpell);
+        magic.addSpell(courier, ability);
+        EXPECT_EQ(magic.dispelAll(courier), 2);
+        EXPECT_EQ(magic.dispel(courier, ability), 1);
+        EXPECT_FALSE(magic.hasEffect(courier, strengthBoost));
+    }
+
+    TEST(FalloutScriptMagicTest, a_spell_cast_with_a_scale_has_the_magnitude_of_each_effect_multiplied)
+    {
+        Runner run;
+        std::vector<double> told;
+        run.mMagic.setCaster([&](FormId, FormId, const std::vector<FalloutScript::SpellEffect>& effects) {
+            for (const FalloutScript::SpellEffect& effect : effects)
+                told.push_back(effect.mMagnitude);
+        });
+        run.mMagic.castOnSelf(courier, pairSpell, 0.5);
+        EXPECT_THAT(told, ElementsAre(1.5, 2.0));
+        EXPECT_EQ(run.mMagic.usage(courier, pairSpell), 3.5);
+
+        // Without a scale the effects are as the record says
+        told.clear();
+        run.mMagic.castOnSelf(courier, blast);
+        EXPECT_THAT(told, ElementsAre(5.0));
+        EXPECT_EQ(run.mMagic.usage(courier, blast), 5.0);
     }
 }

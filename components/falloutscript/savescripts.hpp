@@ -15,8 +15,9 @@ namespace FalloutScript
     /// the manager has (a quest or an object that the records no longer have is left out), after reset() or clear().
 
     /// How far the player is in each quest: whether it runs, its stage and the stages done, the objectives, the
-    /// journal, the time to the next run of its script and the variables of the script
-    constexpr std::uint32_t questsSectionVersion = 1;
+    /// journal, the time to the next run of its script and the variables of the script. Version 2 adds the quest the
+    /// player follows and the flag of SetShowQuestItems.
+    constexpr std::uint32_t questsSectionVersion = 2;
     void writeQuests(const QuestManager& quests, SaveWriter& out);
     void readQuests(QuestManager& quests, SaveReader& in, std::uint32_t version);
 

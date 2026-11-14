@@ -3,6 +3,7 @@
 
 #include <array>
 #include <atomic>
+#include <cmath>
 #include <deque>
 #include <filesystem>
 #include <functional>
@@ -34,6 +35,7 @@
 #include <components/falloutscript/calendar.hpp>
 #include <components/falloutscript/caravan.hpp>
 #include <components/falloutscript/casino.hpp>
+#include <components/falloutscript/challenges.hpp>
 #include <components/falloutscript/chargen.hpp>
 #include <components/falloutscript/combatcommands.hpp>
 #include <components/falloutscript/combatstate.hpp>
@@ -41,6 +43,8 @@
 #include <components/falloutscript/conditions.hpp>
 #include <components/falloutscript/crafting.hpp>
 #include <components/falloutscript/damage.hpp>
+#include <components/falloutscript/destruction.hpp>
+#include <components/falloutscript/dismember.hpp>
 #include <components/falloutscript/derivedstats.hpp>
 #include <components/falloutscript/detection.hpp>
 #include <components/falloutscript/dialogue.hpp>
@@ -95,6 +99,7 @@
 #include <osg/observer_ptr>
 
 #include "../mwsound/falloutmusic.hpp"
+#include "falloutchallenges.hpp"
 #include "../mwworld/ptr.hpp"
 
 namespace ESM
@@ -180,7 +185,9 @@ namespace OFScript
                                  private FalloutScript::PerkRecords,
                                  private FalloutScript::UseRecords,
                                  private FalloutScript::RecipeRecords,
-                                 private FalloutScript::LimbRecords
+                                 private FalloutScript::LimbRecords,
+                                 private FalloutScript::DestructionRecords,
+                                 private FalloutScript::DismemberRecords
     {
         template <class T>
         friend struct FalloutScript::SaveAccess;
@@ -294,9 +301,40 @@ namespace OFScript
 
         /// Who fights whom and how the characters stand to each other
         FalloutScript::CombatState& combat() { return mCombat; }
+        /// What took damage and what shows it, and the limbs that are gone (the rules of damage; the rounds ask them)
+        FalloutScript::Destruction& destruction() { return mDestruction; }
+        FalloutScript::Dismemberment& dismemberment() { return mDismemberment; }
+        /// FireWeapon and PushActorAway as scripts ask them (the rounds do too): the character fires the weapon once; the
+        /// origin throws the character away from itself
+        void fireWeaponOf(FalloutScript::FormId actor, FalloutScript::FormId weapon) { fireWeaponFor(actor, weapon); }
+        /// A command of the script language run by name, on the reference (0 for none), with numbers as arguments: what the
+        /// rounds use to call the commands as a script does. NaN for a command that is not known.
+        double runCommand(std::string_view name, FalloutScript::FormId reference, const std::vector<double>& numbers)
+        {
+            const FalloutScript::CommandInfo* command = mCommands.find(name);
+            if (command == nullptr)
+                return std::nan("");
+            std::vector<FalloutScript::Value> arguments;
+            for (const double number : numbers)
+                arguments.push_back({ number, {}, false });
+            return mInterpreter.call(command->mOpcode, reference, reference != 0, std::move(arguments));
+        }
+        void pushActorAwayFrom(FalloutScript::FormId origin, FalloutScript::FormId actor, double force)
+        {
+            pushActorAway(origin, actor, force);
+        }
         /// What the player has earned and the perks of the characters
         FalloutScript::PlayerProgress& progress() { return mProgress; }
         FalloutScript::PerkEngine& perkEngine() { return mPerks; }
+        /// What the perks of the owner make of a number for the entry point; a change is written to the log (what: the number's
+        /// name there)
+        double perkNumber(int entryPoint, FalloutScript::FormId owner, double value, std::string_view what);
+        /// What a character can carry: the actor value of Carry Weight, changed by the perks (the entry point 22)
+        double maxCarryWeight(FalloutScript::FormId actor);
+        /// Calls a command of the script language by its name, outside of a script, with numbers for arguments (a form is
+        /// its id), and writes the value it gives to the log ("Command: ..."). A tool of the rounds and of developers: only the
+        /// main thread may call it.
+        double debugCommand(std::string_view name, FalloutScript::FormId reference, const std::vector<double>& arguments);
         FalloutScript::ItemUse& itemUse() { return mItemUse; }
 
         /// The character uses an item that is used up (an aid item, a book); a weapon or armor is for equipment().
@@ -397,6 +435,8 @@ namespace OFScript
             FalloutScript::FormId mId = 0;
             std::string mName;
             bool mCompleted = false;
+            /// The quest the player follows (ForceActiveQuest, or the first that was added)
+            bool mActive = false;
             std::vector<PipboyObjective> mObjectives;
         };
         std::vector<PipboyQuest> pipboyQuests();
@@ -2316,6 +2356,7 @@ namespace OFScript
         bool consumable(FalloutScript::FormId item, FalloutScript::Consumable& result) override;
         bool spell(FalloutScript::FormId spell, FalloutScript::SpellInfo& info) override;
         FalloutScript::FormId effectScript(FalloutScript::FormId effect) override;
+        int itemKind(FalloutScript::FormId item) override;
         /// What one effect of an item or a spell is, false for one that is of no use
         bool effectOf(const ESM4::EffectEntry& entry, FalloutScript::ConsumableEffect& made);
         /// The character takes the effects of a spell it cast on itself
@@ -2326,6 +2367,33 @@ namespace OFScript
         bool recipe(FalloutScript::FormId id, FalloutScript::Recipe& result) override;
         bool allowed(FalloutScript::FormId recipe, FalloutScript::FormId crafter) override;
         bool bodyParts(FalloutScript::FormId actor, std::vector<FalloutScript::BodyPart>& parts) override;
+        /// What can be destroyed and what is torn off (falloutdamage.cpp): the records the rules ask, the commands they
+        /// give, and what the host does when a thing is damaged
+        bool destructionData(FalloutScript::FormId reference, FalloutScript::DestructionData& data) override;
+        double destructionBaseHealth(FalloutScript::FormId reference) override;
+        std::optional<double> destructionActorHealth(FalloutScript::FormId reference) override;
+        bool dismemberIsActor(FalloutScript::FormId reference) override;
+        void criticalStageSet(FalloutScript::FormId actor, int stage) override;
+        void setUpDamage();
+        void updateDamage(float frametime);
+        void noteDeathTime(FalloutScript::FormId actor);
+        void destructionChanged(FalloutScript::FormId reference, const FalloutScript::DestructionOutcome& outcome);
+        void showDestruction(FalloutScript::FormId reference, const FalloutScript::DestructionOutcome& outcome);
+        void destructionRestored(FalloutScript::FormId reference);
+        void reinsertObject(const OFWorld::Ptr& ptr);
+        /// After a game is loaded: the models of the stages that things were in
+        void showDamagedObjects();
+        /// The model of the stage that a damaged thing was in when the game was saved, for the thing itself when it is in the
+        /// scene already
+        void showSavedDamage(FalloutScript::FormId reference, const OFWorld::Ptr& placed);
+        void resetDamage();
+        FalloutScript::DismemberSettings dismemberSettings();
+        /// The blow that killed the character: what killed it, and the limbs that the rule of the executable tears off
+        void goreOfKill(FalloutScript::FormId victim, FalloutScript::FormId attacker, FalloutScript::FormId weapon,
+            int limb, bool melee);
+        void pushActorAway(FalloutScript::FormId origin, FalloutScript::FormId actor, double force);
+        void fireWeaponFor(FalloutScript::FormId actor, FalloutScript::FormId weapon);
+        void killAllActors(FalloutScript::FormId killer);
         /// What the weapon says that V.A.T.S. needs, for the weapon a character holds (the hands when none)
         FalloutScript::Vats::Weapon vatsWeapon(FalloutScript::FormId attacker);
         const FalloutScript::Vats::Rules& vatsRules();
@@ -2338,6 +2406,16 @@ namespace OFScript
         void awardKillExperience(FalloutScript::FormId victim);
         /// Experience is rewarded to the player; the perks that change what is gained apply
         void rewardExperience(int amount);
+        /// The challenges (New Vegas) count what the player does: the records are the plugins', the script of a challenge
+        /// that is completed runs on the player, and the notices go to the message line (falloutchallenges.cpp)
+        void setUpChallenges();
+        void noteChallengeAcquired(FalloutScript::FormId item, int count);
+        void noteChallengeUsed(FalloutScript::FormId item);
+        void noteChallengeMarker(FalloutScript::FormId marker);
+        void noteChallengeCrafted(FalloutScript::FormId recipe);
+        void noteChallengeHit(FalloutScript::FormId victim, const FalloutScript::CombatState::Hit& hit);
+        void noteChallengeKill(
+            FalloutScript::FormId victim, FalloutScript::FormId killer, FalloutScript::FormId weapon);
         bool baseFormOf(FalloutScript::FormId reference, FalloutScript::FormId& base) override;
         FalloutScript::FormId worldspaceOf(FalloutScript::FormId reference) override;
         FalloutScript::FormId linkedRef(FalloutScript::FormId reference, FalloutScript::FormId keyword) override;
@@ -2557,11 +2635,20 @@ namespace OFScript
         FalloutScript::PerkEngine mPerks;
         FalloutScript::ItemUse mItemUse;
         FalloutScript::Magic mMagic;
+        ChallengeRecordSource mChallengeRecords;
+        FalloutScript::Challenges mChallenges;
         /// The needs of the hardcore mode (New Vegas)
         FalloutScript::HardcoreNeeds mHardcore;
         std::atomic<bool> mHardcoreOn{ false };
         FalloutScript::Crafting mCrafting;
         FalloutScript::Limbs mLimbs;
+        /// What took damage and what it shows (destruction), and the limbs that are gone, what killed and the critical
+        /// stage (dismember); falloutdamage.cpp
+        FalloutScript::Destruction mDestruction;
+        FalloutScript::Dismemberment mDismemberment;
+        std::mutex mDamageMutex;
+        /// The references that a stage of destruction disabled (ClearDestruction enables them again)
+        std::set<FalloutScript::FormId> mDisabledByDestruction;
         std::atomic<bool> mVatsOpen{ false };
         /// The seconds of breath that the player has left (-1 until the first frame has filled it) and whether its head
         /// is under the water

@@ -35,6 +35,8 @@
 #include <components/esm/formid.hpp>
 #include <components/esm/path.hpp>
 
+#include "destruction.hpp"
+
 #include "script.hpp"
 
 namespace ESM4
@@ -78,6 +80,9 @@ namespace ESM4
         ESM::FormId mScriptId;
         ESM::FormId mPasswordNote;
         ESM::FormId mSound;
+
+        /// DEST and its stages (what happens to the thing when it takes damage)
+        Destruction mDestruction;
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;

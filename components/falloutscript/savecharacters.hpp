@@ -23,8 +23,8 @@ namespace FalloutScript
     /// out.
 
     /// The items and factions that scripts gave or took, who is dead and who killed them, and the deaths and item
-    /// changes that the game has not raised the events of yet
-    constexpr std::uint32_t actorsSectionVersion = 1;
+    /// changes that the game has not raised the events of yet. Version 2 keeps the weapon of each death that is waiting.
+    constexpr std::uint32_t actorsSectionVersion = 2;
     void writeActors(ActorState& state, SaveWriter& out);
     void readActors(ActorState& state, SaveReader& in, std::uint32_t version);
 
@@ -57,8 +57,9 @@ namespace FalloutScript
     void writePerks(PerkEngine& perks, ActorValues& values, SaveWriter& out);
     void readPerks(PerkEngine& perks, ActorValues& values, SaveReader& in, std::uint32_t version);
 
-    /// The effects of chems and food that are running, and the addictions
-    constexpr std::uint32_t itemUseSectionVersion = 1;
+    /// The effects of chems and food that are running, and the addictions. Version 2 holds the item or spell and the magic
+    /// effect that each running effect comes from.
+    constexpr std::uint32_t itemUseSectionVersion = 2;
     void writeItemUse(ItemUse& use, SaveWriter& out);
     void readItemUse(ItemUse& use, SaveReader& in, std::uint32_t version);
 

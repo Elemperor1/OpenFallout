@@ -11,6 +11,7 @@
 #include <functional>
 #include <map>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 namespace
@@ -741,5 +742,146 @@ namespace
         f.mUse.use(thePlayer, doctorBag);
         EXPECT_EQ(f.mValues.current(thePlayer, ActorValue::firstCondition + 2),
             f.mValues.permanent(thePlayer, ActorValue::firstCondition + 2));
+    }
+
+    TEST(FalloutScriptItemUseTest, endingTheEffectsOfAnItemTakesBackWhatTheyHeldAndStopsTheRest)
+    {
+        Fixture f;
+        constexpr FormId effectId = 0x01000800;
+        f.mRecords.mConsumables[radX].mEffects[0].mEffect = effectId;
+        const double before = f.mValues.current(thePlayer, radiationResistance);
+        f.mUse.use(thePlayer, radX);
+        f.mUse.use(thePlayer, mentats);
+        EXPECT_EQ(f.mValues.current(thePlayer, radiationResistance), before + 25);
+        ASSERT_EQ(f.mUse.active(thePlayer).size(), 3u);
+
+        // Another magic effect of the same item is not the one asked for
+        EXPECT_EQ(f.mUse.end(thePlayer, radX, effectId + 1), 0);
+        EXPECT_EQ(f.mUse.end(thePlayer, radX, effectId), 1);
+        EXPECT_EQ(f.mValues.current(thePlayer, radiationResistance), before);
+        EXPECT_EQ(f.mUse.active(thePlayer).size(), 2u);
+        // Nothing was left of it to run out
+        f.mUse.update(300);
+        EXPECT_EQ(f.mValues.current(thePlayer, radiationResistance), before);
+        EXPECT_EQ(f.mUse.end(thePlayer, radX), 0);
+    }
+
+    TEST(FalloutScriptItemUseTest, endingAnItemEffectEndsEveryEffectItHasOnTheCharacter)
+    {
+        Fixture f;
+        const double intelligence = f.mValues.current(thePlayer, ActorValue::intelligence);
+        const double perception = f.mValues.current(thePlayer, ActorValue::perception);
+        f.mUse.use(thePlayer, mentats);
+        EXPECT_EQ(f.mUse.end(thePlayer, mentats), 2);
+        EXPECT_EQ(f.mValues.current(thePlayer, ActorValue::intelligence), intelligence);
+        EXPECT_EQ(f.mValues.current(thePlayer, ActorValue::perception), perception);
+        EXPECT_TRUE(f.mUse.active(thePlayer).empty());
+    }
+
+    TEST(FalloutScriptItemUseTest, aCharacterThatLivedOnAHealthBoostDiesWhenTheBoostIsEnded)
+    {
+        Fixture f;
+        const double full = f.mValues.current(victim, ActorValue::health);
+        f.mRecords.mConsumables[poison].mEffects = { effect(ActorValue::health, 50, 10, false, true) };
+        f.mState.addItem(victim, poison, 1);
+        f.mUse.use(victim, poison);
+        f.mValues.damage(victim, ActorValue::health, full + 25);
+        EXPECT_FALSE(f.mState.isDead(victim));
+        EXPECT_EQ(f.mUse.end(victim, poison), 1);
+        EXPECT_TRUE(f.mState.isDead(victim));
+    }
+
+    TEST(FalloutScriptItemUseTest, aBoostOfAnotherValueEndsWithoutTheCheckOfTheHealth)
+    {
+        Fixture f;
+        f.mUse.use(thePlayer, radX);
+        f.mValues.damage(thePlayer, ActorValue::health, 20);
+        EXPECT_EQ(f.mUse.end(thePlayer, radX), 1);
+        EXPECT_FALSE(f.mState.isDead(thePlayer));
+        // Nothing of another character
+        EXPECT_EQ(f.mUse.end(victim, radX), 0);
+    }
+
+    TEST(FalloutScriptItemUseTest, theListenerIsToldTheMagnitudeOfAnEffectThatLasts)
+    {
+        Fixture f;
+        std::vector<std::tuple<FormId, FormId, double, double>> told;
+        f.mUse.setEffectListener([&](FormId, FormId effectId, FormId source, double seconds, double magnitude) {
+            told.emplace_back(source, effectId, seconds, magnitude);
+        });
+        constexpr FormId effectId = 0x01000801;
+        f.mRecords.mConsumables[radX].mEffects[0].mEffect = effectId;
+        f.mUse.use(thePlayer, radX);
+        EXPECT_THAT(told, ElementsAre(std::make_tuple(radX, effectId, 240.0, 25.0)));
+    }
+
+    TEST(FalloutScriptItemUseTest, aSpellCastOnTheCharacterIsEndedBySpellAndEffect)
+    {
+        Fixture f;
+        constexpr FormId spell = 0x01000802;
+        constexpr FormId spellEffect = 0x01000803;
+        ConsumableEffect boost = effect(radiationResistance, 10, 30, false, true);
+        boost.mEffect = spellEffect;
+        const double before = f.mValues.current(thePlayer, radiationResistance);
+        f.mUse.cast(thePlayer, { boost }, spell);
+        EXPECT_EQ(f.mValues.current(thePlayer, radiationResistance), before + 10);
+        EXPECT_EQ(f.mUse.end(thePlayer, spell, spellEffect), 1);
+        EXPECT_EQ(f.mValues.current(thePlayer, radiationResistance), before);
+
+        // A cast that tells no spell cannot be ended by one
+        f.mUse.cast(thePlayer, { boost });
+        EXPECT_EQ(f.mUse.end(thePlayer, spell), 0);
+        EXPECT_EQ(f.mUse.active(thePlayer).size(), 1u);
+    }
+
+    class HalvingRadiationPerk final : public FalloutScript::PerkRecords
+    {
+    public:
+        static constexpr FormId id = 0x0100A0B1;
+
+        bool perk(FormId perk, FalloutScript::PerkInfo& info) override
+        {
+            if (perk != id)
+                return false;
+            info.mId = id;
+            info.mRanks = 1;
+            info.mPlayable = true;
+            FalloutScript::PerkEntry entry;
+            entry.mType = FalloutScript::PerkEntry::EntryPoint;
+            entry.mEntryPoint = FalloutScript::EntryPoint::radiationConsumed;
+            entry.mFunction = 3;
+            entry.mValue = 0.5;
+            info.mEntries = { entry };
+            return true;
+        }
+        std::vector<FormId> perks() override { return { id }; }
+        bool abilityEffects(FormId, std::vector<FalloutScript::AbilityEffect>&) override { return false; }
+    };
+
+    TEST(FalloutScriptItemUseTest, aPerkThatHalvesTheRadiationOfFoodWorksOnFoodThatGivesRadiationOnly)
+    {
+        Fixture f;
+        constexpr FormId meal = 0x01000040;
+        constexpr FormId pill = 0x01000041;
+        f.mRecords.mConsumables[meal].mFood = true;
+        f.mRecords.mConsumables[meal].mEffects = { effect(radiationLevel, 20, 0, true), effect(ActorValue::health, 10) };
+        f.mRecords.mConsumables[pill].mEffects = { effect(radiationLevel, 20, 0, true) };
+        f.mState.addItem(thePlayer, meal, 2);
+        f.mState.addItem(thePlayer, pill, 1);
+        const double start = f.mValues.current(thePlayer, radiationLevel);
+
+        // Without the perk the food gives all of it
+        f.mUse.use(thePlayer, meal);
+        EXPECT_EQ(f.mValues.current(thePlayer, radiationLevel), start + 20);
+
+        HalvingRadiationPerk records;
+        FalloutScript::PerkEngine perks(records, f.mProgress, f.mValues);
+        f.mUse.setPerks(&perks);
+        f.mProgress.addPerk(thePlayer, HalvingRadiationPerk::id);
+        f.mUse.use(thePlayer, meal);
+        EXPECT_EQ(f.mValues.current(thePlayer, radiationLevel), start + 30);
+        // An item without the food flag gives its radiation as it is
+        f.mUse.use(thePlayer, pill);
+        EXPECT_EQ(f.mValues.current(thePlayer, radiationLevel), start + 50);
     }
 }

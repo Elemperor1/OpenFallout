@@ -33,6 +33,7 @@
 
 #include <components/debug/debuglog.hpp>
 
+#include "destruction.hpp"
 #include "reader.hpp"
 // #include "writer.hpp"
 
@@ -221,6 +222,14 @@ void ESM4::Creature::load(ESM4::Reader& reader)
                 else
                     reader.skipSubRecordData();
                 break;
+            case ESM::fourCC("DEST"):
+            case ESM::fourCC("DSTD"):
+            case ESM::fourCC("DMDL"):
+            case ESM::fourCC("DMDT"):
+            case ESM::fourCC("DMDS"):
+            case ESM::fourCC("DSTF"): // Destructible: health, stages and their models
+                readDestructionSubRecord(reader, mDestruction);
+                break;
             case ESM::fourCC("MODT"):
             case ESM::fourCC("EAMT"): // FO3
             case ESM::fourCC("NAM4"): // FO3
@@ -228,11 +237,6 @@ void ESM4::Creature::load(ESM4::Reader& reader)
             case ESM::fourCC("CNAM"): // FO3
             case ESM::fourCC("LNAM"): // FO3
             case ESM::fourCC("EITM"): // FO3
-            case ESM::fourCC("DEST"): // FO3
-            case ESM::fourCC("DSTD"): // FO3
-            case ESM::fourCC("DSTF"): // FO3
-            case ESM::fourCC("DMDL"): // FO3
-            case ESM::fourCC("DMDT"): // FO3
             case ESM::fourCC("COED"): // FO3
                 reader.skipSubRecordData();
                 break;

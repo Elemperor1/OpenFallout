@@ -41,8 +41,6 @@ namespace
     constexpr std::uint16_t OpSetCombatStyle = 0x10B1;
     constexpr std::uint16_t OpGetPCEnemyofFaction = 0x10C5;
     constexpr std::uint16_t OpSetPCEnemyofFaction = 0x10C6;
-    constexpr std::uint16_t OpGetCauseofDeath = 0x118D;
-    constexpr std::uint16_t OpGetDestructionStage = 0x11D7;
     constexpr FormId style = 0x00100008;
 
     class FakeRecords : public FalloutScript::ObjectStateRecords
@@ -292,11 +290,9 @@ namespace
         EXPECT_EQ(run.mState.combatStyle(guard), 0u);
     }
 
-    TEST(FalloutScriptObjectStateTest, the_death_stage_and_feeding_questions_give_the_answers_of_no_data)
+    TEST(FalloutScriptObjectStateTest, the_feeding_question_gives_the_answer_of_no_data)
     {
         Runner run;
-        EXPECT_EQ(run.call(OpGetCauseofDeath, guard), -1.0);
-        EXPECT_EQ(run.call(OpGetDestructionStage, crate), -1.0);
         EXPECT_EQ(run.call(OpHasBeenEaten, guard), 0.0);
     }
 }

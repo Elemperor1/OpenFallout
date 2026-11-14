@@ -117,13 +117,17 @@ namespace FalloutScript
         /// Whether the conditions of an effect hold for the character who uses the item
         void setConditions(
             std::function<bool(const std::vector<ESM4::TargetCondition>&, const ConditionContext&)> check);
-        /// Told of each effect with a duration that an item starts on a character: the magic effect, the item and the
-        /// seconds it lasts
+        /// Told of each effect with a duration that an item starts on a character: the magic effect, the item, the
+        /// seconds it lasts and its magnitude
         void setEffectListener(
-            std::function<void(FormId actor, FormId effect, FormId source, double seconds)> listener);
+            std::function<void(FormId actor, FormId effect, FormId source, double seconds, double magnitude)> listener);
         /// The character is hit by the effects of a spell it cast on itself, for the time each lasts (no perk changes
-        /// how long)
-        void cast(FormId actor, const std::vector<ConsumableEffect>& effects);
+        /// how long). The source is the spell, which dispelling it ends the effects of (0 when none is known).
+        void cast(FormId actor, const std::vector<ConsumableEffect>& effects, FormId source = 0);
+        /// Ends the running effects of the character that come from the item or spell (and, when it is not 0, from
+        /// that magic effect): a change that was held is taken back as it is when the effect runs out, and the points
+        /// a second was to give are not given. Returns how many it ended.
+        int end(FormId actor, FormId source, FormId effect = 0);
         /// A number from 0 to 1 that decides whether an addiction happens (a random one by default)
         void setRandom(std::function<double()> random);
         /// The player, whose counters of the Pip-Boy count what is used
@@ -151,6 +155,10 @@ namespace FalloutScript
             int mActorValue = 0;
             double mMagnitude = 0;
             double mRemaining = 0;
+            /// The item or the spell it comes from and the magic effect, 0 when not known (a game saved before they were
+            /// kept)
+            FormId mSource = 0;
+            FormId mEffect = 0;
             /// Whether it is a change that is undone (mMagnitude is added once and taken back at the end) or a number
             /// of points each second
             bool mTemporary = false;
@@ -165,7 +173,7 @@ namespace FalloutScript
         void clear();
 
     private:
-        void applyEffect(FormId actor, const ConsumableEffect& effect, double durationScale);
+        void applyEffect(FormId actor, const ConsumableEffect& effect, double durationScale, FormId source = 0);
         /// Changes a value by an amount: at once, or, when seconds is more than 0, the share of an effect that lasts
         /// that those seconds make (the amount is then the magnitude of each second times the seconds)
         void instant(FormId actor, int actorValue, double amount, bool detrimental, double seconds = 0);
@@ -180,7 +188,7 @@ namespace FalloutScript
         PerkEngine* mPerks = nullptr;
         std::function<bool(const std::vector<ESM4::TargetCondition>&, const ConditionContext&)> mConditions;
         std::function<double()> mRandom;
-        std::function<void(FormId, FormId, FormId, double)> mEffectListener;
+        std::function<void(FormId, FormId, FormId, double, double)> mEffectListener;
         std::function<bool(FormId)> mFighting;
         double mBookPoints = 1;
         bool mChemDurationNeedsAddiction = false;

@@ -119,9 +119,12 @@ namespace FalloutScript
                 if (quest.mInstance)
                     writeVariables(*quest.mInstance, out);
             }
+            // Version 2: the quest the player follows and the flag of SetShowQuestItems
+            out.form(quests.mActive);
+            out.boolean(quests.mShowQuestItems);
         }
 
-        static void read(QuestManager& quests, SaveReader& in, std::uint32_t)
+        static void read(QuestManager& quests, SaveReader& in, std::uint32_t version)
         {
             const std::size_t count = in.count(4);
             for (std::size_t i = 0; i < count; ++i)
@@ -181,6 +184,13 @@ namespace FalloutScript
                 quest.mDelay = state.mDelay;
                 if (hasInstance && quest.mInstance)
                     applyVariables(*quest.mInstance, variables);
+            }
+            if (version >= 2)
+            {
+                const std::optional<FormId> active = in.form();
+                quests.mShowQuestItems = in.boolean();
+                // A quest the records no longer have is not the active one
+                quests.mActive = active && quests.mQuests.count(*active) != 0 ? *active : 0;
             }
         }
     };

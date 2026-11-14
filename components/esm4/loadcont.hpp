@@ -35,6 +35,8 @@
 #include <components/esm/formid.hpp>
 #include <components/esm/path.hpp>
 
+#include "destruction.hpp"
+
 #include "inventory.hpp" // InventoryItem
 
 namespace ESM4
@@ -60,6 +62,9 @@ namespace ESM4
         ESM::FormId mScriptId; // TES4 only
 
         std::vector<InventoryItem> mInventory;
+
+        /// DEST and its stages (what happens to the thing when it takes damage)
+        Destruction mDestruction;
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;

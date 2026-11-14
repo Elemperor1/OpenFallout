@@ -9,10 +9,18 @@ GetVampire,exact,nothing here makes a vampire and the games keep the command for
 ShowWarning,exact,the retail executables format the text and show it nowhere
 Cast,exact,the command does nothing in the executables (magic.cpp)
 GetDisposition,stand-in,answers 0: the disposition of a character towards another is not worked out
-IsLimbGone,stand-in,answers 0: dismemberment is not built and nothing sets the limb bits
 GetCasinoWinningsLevel,stand-in,answers 0: the casino of New Vegas is not built
 SetCasinoWinningsLevel,stand-in,changes nothing: the casino of New Vegas is not built
-GetWeaponHealthPerc,stand-in,answers 100: nothing wears a weapon out yet
-GetCauseofDeath,stand-in,answers -1: the cause of a death is not kept
-GetDestructionStage,stand-in,answers -1: the stages of destruction are not kept
 HasBeenEaten,stand-in,answers 0: nothing feeds on a dead character
+ResetFallDamageTimer,exact,the executable only reads the timer of the process and changes nothing
+GetForceHitReaction,stand-in,answers 0: the byte of the character that the executable reads is not kept
+GetKnockedState,stand-in,answers 0: the knock state of the character is not kept
+PlayMagicEffectVisuals,stand-in,accepted and ignored: the visuals of an effect are drawn by the renderer (effect shaders and models), not built
+StopMagicEffectVisuals,stand-in,accepted and ignored: nothing draws the visuals of an effect, so there is none to stop
+PlayMagicShaderVisuals,stand-in,accepted and ignored: an effect shader (EFSH) changes how the renderer draws a reference, which is renderer work
+StopMagicShaderVisuals,stand-in,accepted and ignored: nothing draws an effect shader
+SetActorAlpha,stand-in,accepted and ignored: the transparency of a character is not set by the renderer
+SetActorRefraction,stand-in,accepted and ignored: the refraction of a character is not drawn
+PreloadMagicEffect,stand-in,accepted and ignored: nothing is loaded ahead for an effect
+ShowQuestStages,stand-in,accepted and ignored: the stages are written to the console of the games and this engine does not feed it
+AutoDisplayObjectives,stand-in,kept as a switch: the HUD reminder of the objectives is not drawn

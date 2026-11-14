@@ -113,7 +113,7 @@ namespace OFScript
                     status.mStimpaks += count;
         status.mHealth = mActorValues.current(companion, AV::health);
         status.mMaxHealth = mActorValues.permanent(companion, AV::health);
-        status.mCapacity = mActorValues.permanent(companion, AV::carryWeight);
+        status.mCapacity = maxCarryWeight(companion);
         std::vector<std::pair<FalloutScript::FormId, int>> carried;
         if (mActors.items(companion, carried))
         {

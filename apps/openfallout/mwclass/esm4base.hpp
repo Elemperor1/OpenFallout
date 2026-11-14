@@ -18,6 +18,7 @@
 #include "../mwworld/registeredclass.hpp"
 
 #include "classmodel.hpp"
+#include "modeloverride.hpp"
 
 namespace OFClass
 {
@@ -138,6 +139,10 @@ namespace OFClass
 
         VFS::Path::NormalizedView getModel(const OFWorld::ConstPtr& ptr) const override
         {
+            // What a thing shows once it is damaged enough takes the place of its record's model
+            if (const VFS::Path::Normalized* swapped = ModelOverrides::get().find(ptr.getCellRef().getRefNum()))
+                return *swapped;
+
             const VFS::Path::NormalizedView model = getClassModel<Record>(ptr);
 
             // TODO: There should be a better way to hide markers

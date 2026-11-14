@@ -24,6 +24,7 @@
 #include <components/esm4/loadamef.hpp>
 #include <components/esm4/loadccrd.hpp>
 #include <components/esm4/loadcdck.hpp>
+#include <components/esm4/loadchal.hpp>
 #include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadcmny.hpp>
 #include <components/esm4/loadcsno.hpp>

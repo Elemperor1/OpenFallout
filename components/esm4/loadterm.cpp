@@ -30,6 +30,7 @@
 #include <cstddef>
 #include <stdexcept>
 
+#include "destruction.hpp"
 #include "reader.hpp"
 #include "recordreader.hpp"
 // #include "writer.hpp"
@@ -183,6 +184,14 @@ void ESM4::Terminal::load(ESM4::Reader& reader)
                 else
                     reader.skipSubRecordData();
                 break;
+            case ESM::fourCC("DEST"):
+            case ESM::fourCC("DSTD"):
+            case ESM::fourCC("DMDL"):
+            case ESM::fourCC("DMDT"):
+            case ESM::fourCC("DMDS"):
+            case ESM::fourCC("DSTF"): // Destructible: health, stages and their models
+                readDestructionSubRecord(reader, mDestruction);
+                break;
             case ESM::fourCC("CIS1"):
             case ESM::fourCC("CIS2"):
             case ESM::fourCC("MODT"): // Model data
@@ -191,12 +200,6 @@ void ESM4::Terminal::load(ESM4::Reader& reader)
             case ESM::fourCC("MODF"): // Model data end
             case ESM::fourCC("MODB"):
             case ESM::fourCC("MODD"):
-            case ESM::fourCC("DEST"): // Destruction data
-            case ESM::fourCC("DSTD"):
-            case ESM::fourCC("DSTF"):
-            case ESM::fourCC("DMDL"):
-            case ESM::fourCC("DMDT"):
-            case ESM::fourCC("DMDS"):
             case ESM::fourCC("SCDA"):
             case ESM::fourCC("SCHR"):
             case ESM::fourCC("SCRO"):

@@ -346,7 +346,7 @@ namespace OFScript
                 }
             }
         }
-        stats.mMaxWeight = mActorValues.permanent(mPlayer, AV::carryWeight);
+        stats.mMaxWeight = maxCarryWeight(mPlayer);
         stats.mCaps = mActors.itemCount(mPlayer, masterForm(capsNumber));
         stats.mSkillPoints = mProgress.skillPoints();
         stats.mPerkPoints = mProgress.perkPoints();
@@ -369,11 +369,13 @@ namespace OFScript
     std::vector<FalloutScripts::PipboyQuest> FalloutScripts::pipboyQuests()
     {
         std::vector<PipboyQuest> result;
-        mQuests.forEachState([&result](FalloutScript::FormId id, const FalloutScript::QuestState& state) {
+        const FalloutScript::FormId active = mQuests.activeQuest();
+        mQuests.forEachState([&result, active](FalloutScript::FormId id, const FalloutScript::QuestState& state) {
             if (!state.listed())
                 return;
             PipboyQuest quest;
             quest.mId = id;
+            quest.mActive = id == active;
             quest.mName = state.mRecord->mQuestName;
             quest.mCompleted = state.mCompleted || state.mFailed;
             for (const ESM4::QuestObjective& objective : state.mRecord->mObjectives)

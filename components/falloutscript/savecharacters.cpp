@@ -118,6 +118,7 @@ namespace FalloutScript
             {
                 out.form(death.mActor);
                 out.form(death.mKiller);
+                out.form(death.mWeapon);
             }
             out.count(state.mChanges.size());
             for (const ActorState::ItemChange& change : state.mChanges)
@@ -128,7 +129,7 @@ namespace FalloutScript
             }
         }
 
-        static void read(ActorState& state, SaveReader& in, std::uint32_t)
+        static void read(ActorState& state, SaveReader& in, std::uint32_t version)
         {
             std::map<FormId, ActorState::Holder> holders;
             const std::size_t count = in.count(22);
@@ -160,13 +161,15 @@ namespace FalloutScript
             std::map<FormId, FormId> killers = readPairs(in);
             std::map<FormId, int> limbs = readCounts(in);
             std::vector<ActorState::Death> deaths;
-            const std::size_t deathCount = in.count(8);
+            // (version 1 did not keep the weapon of a death)
+            const std::size_t deathCount = in.count(version >= 2 ? 12 : 8);
             for (std::size_t i = 0; i < deathCount; ++i)
             {
                 const std::optional<FormId> actor = in.form();
                 const std::optional<FormId> killer = in.form();
+                const std::optional<FormId> weapon = version >= 2 ? in.form() : std::nullopt;
                 if (actor)
-                    deaths.push_back({ *actor, killer.value_or(0) });
+                    deaths.push_back({ *actor, killer.value_or(0), weapon.value_or(0) });
             }
             std::vector<ActorState::ItemChange> changes;
             const std::size_t changeCount = in.count(12);
@@ -510,6 +513,9 @@ namespace FalloutScript
                 out.f64(active.mMagnitude);
                 out.f64(active.mRemaining);
                 out.boolean(active.mTemporary);
+                // Version 2: where the effect comes from, which dispelling it needs
+                out.form(active.mSource);
+                out.form(active.mEffect);
             }
             out.count(use.mAddictions.size());
             for (const auto& [actor, item] : use.mAddictions)
@@ -519,7 +525,7 @@ namespace FalloutScript
             }
         }
 
-        static void read(ItemUse& use, SaveReader& in, std::uint32_t)
+        static void read(ItemUse& use, SaveReader& in, std::uint32_t version)
         {
             std::vector<ItemUse::Active> active;
             const std::size_t count = in.count(25);
@@ -531,6 +537,12 @@ namespace FalloutScript
                 effect.mMagnitude = in.f64();
                 effect.mRemaining = in.f64();
                 effect.mTemporary = in.boolean();
+                if (version >= 2)
+                {
+                    // What comes from a plugin that is gone is not dispelled by anything, and runs on
+                    effect.mSource = in.form().value_or(0);
+                    effect.mEffect = in.form().value_or(0);
+                }
                 if (actor)
                 {
                     effect.mActor = *actor;

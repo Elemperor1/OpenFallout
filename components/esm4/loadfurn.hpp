@@ -34,6 +34,8 @@
 #include <components/esm/formid.hpp>
 #include <components/esm/path.hpp>
 
+#include "destruction.hpp"
+
 namespace ESM4
 {
     class Reader;
@@ -52,6 +54,9 @@ namespace ESM4
 
         ESM::FormId mScriptId;
         std::uint32_t mActiveMarkerFlags = 0; // MNAM, which a record may leave out
+
+        /// DEST and its stages (what happens to the thing when it takes damage)
+        Destruction mDestruction;
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;

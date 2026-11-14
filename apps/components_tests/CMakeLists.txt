@@ -206,11 +206,14 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testcombatstate.cpp
     falloutscript/testcrafting.cpp
     falloutscript/testdamage.cpp
+    falloutscript/testdestruction.cpp
+    falloutscript/testdismember.cpp
     falloutscript/testdetection.cpp
     falloutscript/testhacking.cpp
     falloutscript/testblackjack.cpp
     falloutscript/testcaravan.cpp
     falloutscript/testcasino.cpp
+    falloutscript/testchallenges.cpp
     falloutscript/testslots.cpp
     falloutscript/testsounddata.cpp
     falloutscript/testhotkeys.cpp

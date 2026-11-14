@@ -28,6 +28,7 @@
 
 #include <stdexcept>
 
+#include "destruction.hpp"
 #include "reader.hpp"
 //#include "writer.hpp"
 
@@ -56,15 +57,17 @@ void ESM4::MovableStatic::load(ESM4::Reader& reader)
             case ESM::fourCC("SNAM"):
                 reader.getFormId(mLoopingSound);
                 break;
-            case ESM::fourCC("DAMC"): // Destructible
             case ESM::fourCC("DEST"):
-            case ESM::fourCC("DMDC"):
+            case ESM::fourCC("DSTD"):
             case ESM::fourCC("DMDL"):
             case ESM::fourCC("DMDT"):
             case ESM::fourCC("DMDS"):
+            case ESM::fourCC("DSTF"): // Destructible: health, stages and their models
+                readDestructionSubRecord(reader, mDestruction);
+                break;
+            case ESM::fourCC("DAMC"): // Destructible
+            case ESM::fourCC("DMDC"):
             case ESM::fourCC("DSTA"):
-            case ESM::fourCC("DSTD"):
-            case ESM::fourCC("DSTF"): // Destructible end
             case ESM::fourCC("OBND"): // object bounds
             case ESM::fourCC("KSIZ"):
             case ESM::fourCC("KWDA"):

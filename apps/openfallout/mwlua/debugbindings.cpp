@@ -22,8 +22,12 @@
 #include <components/esm/refid.hpp>
 #include <components/lua/luastate.hpp>
 
+#include <charconv>
+#include <cstdint>
 #include <stdexcept>
 #include <string>
+#include <string_view>
+#include <vector>
 
 namespace OFLua
 {
@@ -65,6 +69,50 @@ namespace OFLua
         api["isMWScriptEnabled"] = []() { return OFBase::Environment::get().getWorld()->getScriptsEnabled(); };
 
         api["reloadLua"] = []() { OFBase::Environment::get().getLuaManager()->reloadAllScripts(); };
+
+        // Calls a command of the script language of Fallout by its name, on a reference ("player", or a form id as text; none
+        // for a command that needs none) and with numbers (a form id as text is its number): a tool of the rounds and of
+        // developers. It runs on the next frame, in the main thread, and writes the value the command gives to the log
+        // ("Command: Name on 0x14 (1, 2) = 3").
+        api["scriptCommand"] = [context](std::string_view name, sol::optional<std::string_view> reference,
+                                   sol::optional<sol::table> arguments) {
+            const auto number = [](std::string_view text) -> double {
+                if (text.starts_with("0x"))
+                {
+                    std::uint32_t value = 0;
+                    const char* end = text.data() + text.size();
+                    const auto [stop, error] = std::from_chars(text.data() + 2, end, value, 16);
+                    if (error != std::errc() || stop != end)
+                        throw std::runtime_error("\"" + std::string(text) + "\" is not a form id");
+                    return value;
+                }
+                const ESM::RefId refId = ESM::RefId::deserializeText(text);
+                const ESM::FormId* id = refId.getIf<ESM::FormId>();
+                if (id == nullptr)
+                    throw std::runtime_error("\"" + std::string(text) + "\" is not a form id");
+                return id->toUint32();
+            };
+            std::vector<double> numbers;
+            // The arguments are the entries 1 to the length, in that order (the traversal of a table has no order)
+            if (arguments)
+                for (std::size_t index = 1; index <= arguments->size(); ++index)
+                {
+                    const sol::object value = arguments->get<sol::object>(index);
+                    if (value.is<std::string_view>())
+                        numbers.push_back(number(value.as<std::string_view>()));
+                    else
+                        numbers.push_back(value.as<double>());
+                }
+            const bool player = reference && *reference == "player";
+            const double form = reference && !player && !reference->empty() ? number(*reference) : 0.0;
+            context.mLuaManager->addAction(
+                [command = std::string(name), player, form, numbers = std::move(numbers)] {
+                    OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts();
+                    if (scripts == nullptr)
+                        return;
+                    scripts->debugCommand(command, player ? scripts->playerReference() : static_cast<FalloutScript::FormId>(form), numbers);
+                });
+        };
 
         // Gives the player an item of Fallout by its form id ("FormId:0x10e3778"), as the AddItem of a script does
         api["giveItem"] = [context](std::string_view form, sol::optional<int> count) {

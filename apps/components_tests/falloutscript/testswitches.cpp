@@ -16,9 +16,8 @@ namespace
     constexpr std::uint16_t OpSetHardcore = 0x124B;
     constexpr std::uint16_t OpIsHardcore = 0x124A;
     constexpr std::uint16_t OpIsXBox = 0x1135;
-    constexpr std::uint16_t OpForceActiveQuest = 0x11DD;
+    constexpr std::uint16_t OpAutoDisplayObjectives = 0x1225;
     constexpr std::uint16_t OpPlayBink = 0x1114;
-    constexpr std::uint16_t OpKillQuestUpdates = 0x1231;
 
     struct Runner
     {
@@ -48,13 +47,13 @@ namespace
         EXPECT_EQ(run.call(OpIsHardcore), 0.0);
     }
 
-    TEST(FalloutScriptSwitchesTest, a_switch_without_an_argument_is_on_and_a_form_is_kept_by_its_id)
+    TEST(FalloutScriptSwitchesTest, a_switch_without_an_argument_is_on_and_one_with_0_is_off)
     {
         Runner run;
-        run.call(OpKillQuestUpdates);
-        EXPECT_EQ(run.mSwitches.get("KillQuestUpdates"), 1);
-        run.call(OpForceActiveQuest, { 0x00100001 });
-        EXPECT_EQ(run.mSwitches.get("ForceActiveQuest"), 0x00100001);
+        run.call(OpAutoDisplayObjectives);
+        EXPECT_EQ(run.mSwitches.get("AutoDisplayObjectives"), 1);
+        run.call(OpAutoDisplayObjectives, { 0 });
+        EXPECT_EQ(run.mSwitches.get("AutoDisplayObjectives"), 0);
     }
 
     TEST(FalloutScriptSwitchesTest, a_command_that_does_nothing_says_so_once_and_gives_nothing)
@@ -86,7 +85,7 @@ namespace
         FalloutScript::Switches switches;
         switches.set("SetHardcore", 1);
         switches.set("SetPCYoung", 0);
-        switches.set("ForceActiveQuest", 0x00100001);
+        switches.set("AutoDisplayObjectives", 1);
         FalloutScript::SaveWriter out;
         FalloutScript::writeSwitches(switches, out);
         const std::string bytes = out.take();
@@ -96,7 +95,7 @@ namespace
         FalloutScript::readSwitches(loaded, in, FalloutScript::switchesSectionVersion);
         EXPECT_TRUE(in.atEnd());
         EXPECT_EQ(loaded.get("SetHardcore"), 1);
-        EXPECT_EQ(loaded.get("ForceActiveQuest"), 0x00100001);
+        EXPECT_EQ(loaded.get("AutoDisplayObjectives"), 1);
         // A switch that is off is the same as one never set
         EXPECT_EQ(loaded.all().count("SetPCYoung"), 0u);
         loaded.clear();

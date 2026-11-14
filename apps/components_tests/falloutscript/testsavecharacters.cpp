@@ -105,7 +105,7 @@ namespace
         SaveWriter out;
         FalloutScript::writeActors(state, out);
         SaveReader in(out.bytes());
-        FalloutScript::readActors(loaded, in, 1);
+        FalloutScript::readActors(loaded, in, FalloutScript::actorsSectionVersion);
         EXPECT_TRUE(in.atEnd());
         SaveWriter again;
         FalloutScript::writeActors(loaded, again);
@@ -124,6 +124,52 @@ namespace
         EXPECT_FALSE(loaded.takeChanges().empty());
     }
 
+    TEST(FalloutScriptSaveCharactersTest, a_death_that_waits_keeps_the_weapon_of_the_blow_that_killed)
+    {
+        Records records;
+        ActorState state(records);
+        state.setDead(raider, true, guard, 2, pistol);
+        SaveWriter out;
+        FalloutScript::writeActors(state, out);
+        ActorState loaded(records);
+        SaveReader in(out.bytes());
+        FalloutScript::readActors(loaded, in, FalloutScript::actorsSectionVersion);
+        EXPECT_TRUE(in.atEnd());
+        const std::vector<ActorState::Death> deaths = loaded.takeDeaths();
+        ASSERT_EQ(deaths.size(), 1u);
+        EXPECT_EQ(deaths[0].mKiller, guard);
+        EXPECT_EQ(deaths[0].mWeapon, pistol);
+    }
+
+    TEST(FalloutScriptSaveCharactersTest, a_game_saved_before_a_death_kept_its_weapon_still_loads)
+    {
+        // The section as version 1 wrote it: one actor dead, killed by a character, and the death waiting to be told
+        SaveWriter out;
+        out.count(0); // no holders
+        out.count(1); // dead
+        out.form(raider);
+        out.count(0); // start known
+        out.count(1); // killers
+        out.form(raider);
+        out.form(guard);
+        out.count(0); // limbs
+        out.count(1); // deaths: the actor and the killer
+        out.form(raider);
+        out.form(guard);
+        out.count(0); // item changes
+        Records records;
+        ActorState loaded(records);
+        SaveReader in(out.bytes());
+        FalloutScript::readActors(loaded, in, 1);
+        EXPECT_TRUE(in.atEnd());
+        EXPECT_TRUE(loaded.isDead(raider));
+        const std::vector<ActorState::Death> deaths = loaded.takeDeaths();
+        ASSERT_EQ(deaths.size(), 1u);
+        EXPECT_EQ(deaths[0].mActor, raider);
+        EXPECT_EQ(deaths[0].mKiller, guard);
+        EXPECT_EQ(deaths[0].mWeapon, 0u);
+    }
+
     TEST(FalloutScriptSaveCharactersTest, what_the_save_says_of_a_plugin_that_is_gone_is_left_out)
     {
         Records records;
@@ -140,7 +186,7 @@ namespace
                 return std::nullopt;
             return saved;
         });
-        FalloutScript::readActors(loaded, in, 1);
+        FalloutScript::readActors(loaded, in, FalloutScript::actorsSectionVersion);
         EXPECT_EQ(loaded.itemCount(guard, pistol), 1);
         EXPECT_EQ(loaded.itemCount(fromGonePlugin, pistol), 0);
         EXPECT_EQ(loaded.itemCount(guard, fromGonePlugin), 0);
@@ -166,7 +212,7 @@ namespace
         ActorState otherState(records);
         Equipment loaded(records, otherState);
         SaveReader itemsIn(items.bytes());
-        FalloutScript::readActors(otherState, itemsIn, 1);
+        FalloutScript::readActors(otherState, itemsIn, FalloutScript::actorsSectionVersion);
         SaveReader in(out.bytes());
         FalloutScript::readEquipment(loaded, in, 1);
         EXPECT_TRUE(in.atEnd());
@@ -419,7 +465,7 @@ namespace
         PlayerProgress otherProgress;
         ItemUse loaded(uses, otherState, otherValues, otherProgress);
         SaveReader in(out.bytes());
-        FalloutScript::readItemUse(loaded, in, 1);
+        FalloutScript::readItemUse(loaded, in, FalloutScript::itemUseSectionVersion);
         EXPECT_TRUE(in.atEnd());
         const std::vector<ItemUse::Active> active = loaded.active(player);
         ASSERT_THAT(active, SizeIs(1));
@@ -429,6 +475,62 @@ namespace
         SaveWriter again;
         FalloutScript::writeItemUse(loaded, again);
         EXPECT_EQ(again.bytes(), out.bytes());
+    }
+
+    TEST(FalloutScriptSaveCharactersTest, a_running_chem_keeps_where_it_comes_from_and_an_old_save_leaves_it_unknown)
+    {
+        Records records;
+        Uses uses;
+        constexpr FormId source = 0x01000900;
+        constexpr FormId magicEffect = 0x01000901;
+        FalloutScript::ConsumableEffect effect;
+        effect.mEffect = magicEffect;
+        effect.mActorValue = strength;
+        effect.mMagnitude = 5;
+        effect.mDuration = 240;
+        effect.mRecover = true;
+        ActorState state(records);
+        ActorValues values;
+        PlayerProgress progress;
+        ItemUse use(uses, state, values, progress);
+        use.setPlayer(player);
+        use.cast(player, { effect }, source);
+        ASSERT_THAT(use.active(player), SizeIs(1));
+
+        SaveWriter out;
+        FalloutScript::writeItemUse(use, out);
+        ActorState otherState(records);
+        ActorValues otherValues;
+        PlayerProgress otherProgress;
+        ItemUse loaded(uses, otherState, otherValues, otherProgress);
+        SaveReader in(out.bytes());
+        FalloutScript::readItemUse(loaded, in, FalloutScript::itemUseSectionVersion);
+        EXPECT_TRUE(in.atEnd());
+        const std::vector<ItemUse::Active> active = loaded.active(player);
+        ASSERT_THAT(active, SizeIs(1));
+        EXPECT_EQ(active[0].mSource, source);
+        EXPECT_EQ(active[0].mEffect, magicEffect);
+        // What was loaded can be ended by the spell, and takes the change back
+        EXPECT_EQ(loaded.end(player, source), 1);
+        EXPECT_TRUE(loaded.active(player).empty());
+
+        // A game saved before the source was kept: the entries load without one, and run on
+        SaveWriter old;
+        old.count(1);
+        old.form(player);
+        old.i32(strength);
+        old.f64(5);
+        old.f64(100);
+        old.boolean(true);
+        old.count(0);
+        ItemUse earlier(uses, otherState, otherValues, otherProgress);
+        SaveReader oldIn(old.bytes());
+        FalloutScript::readItemUse(earlier, oldIn, 1);
+        EXPECT_TRUE(oldIn.atEnd());
+        const std::vector<ItemUse::Active> kept = earlier.active(player);
+        ASSERT_THAT(kept, SizeIs(1));
+        EXPECT_EQ(kept[0].mSource, 0u);
+        EXPECT_EQ(earlier.end(player, 0), 1);
     }
 
     class Locks final : public FalloutScript::ReferenceRecords
@@ -479,7 +581,7 @@ namespace
         ActorState otherState(records);
         Equipment loaded(records, otherState);
         SaveReader itemsIn(items.bytes());
-        FalloutScript::readActors(otherState, itemsIn, 1);
+        FalloutScript::readActors(otherState, itemsIn, FalloutScript::actorsSectionVersion);
         SaveReader wornIn(worn.bytes());
         FalloutScript::readEquipment(loaded, wornIn, 1);
         SaveReader wearIn(wear.bytes());
@@ -570,7 +672,7 @@ namespace
         for (std::size_t size = 0; size < bytes.size(); ++size)
         {
             SaveReader in(std::string_view(bytes).substr(0, size));
-            EXPECT_THROW(FalloutScript::readActors(loaded, in, 1), SaveError) << size;
+            EXPECT_THROW(FalloutScript::readActors(loaded, in, FalloutScript::actorsSectionVersion), SaveError) << size;
         }
         // What the failed reads did not touch is what the load started with
         EXPECT_EQ(loaded.itemCount(player, stimpak), 4);

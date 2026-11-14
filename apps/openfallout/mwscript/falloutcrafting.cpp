@@ -192,6 +192,8 @@ namespace OFScript
         if (!this->recipe(recipe, record) || record.mCategory != menu->mCategory)
             return std::string();
         const FalloutScript::Crafting::Status status = mCrafting.craft(mPlayer, recipe);
+        if (status == FalloutScript::Crafting::Status::Ready)
+            noteChallengeCrafted(recipe);
         return status == FalloutScript::Crafting::Status::Ready ? "made" : statusWord(status);
     }
 }

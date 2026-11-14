@@ -413,7 +413,7 @@ namespace FalloutScript
         return mDead.count(actor) != 0;
     }
 
-    bool ActorState::setDead(FormId actor, bool dead, FormId killer, int limb)
+    bool ActorState::setDead(FormId actor, bool dead, FormId killer, int limb, FormId weapon)
     {
         if (actor == 0)
             return false;
@@ -427,7 +427,7 @@ namespace FalloutScript
                     return false;
                 constexpr std::size_t mostDeaths = 1024;
                 if (mDeaths.size() < mostDeaths)
-                    mDeaths.push_back({ actor, killer });
+                    mDeaths.push_back({ actor, killer, weapon });
                 if (killer != 0)
                     mKillers[actor] = killer;
                 // A death that no blow caused has no part of the body

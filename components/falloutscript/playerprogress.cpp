@@ -188,10 +188,22 @@ namespace FalloutScript
 
     void PlayerProgress::modifyMiscStat(int stat, int amount)
     {
+        std::function<void(int, int)> listener;
+        {
+            const std::lock_guard lock(mMutex);
+            int& value = mMiscStats[stat];
+            value = static_cast<int>(std::clamp<std::int64_t>(
+                static_cast<std::int64_t>(value) + amount, 0, std::numeric_limits<int>::max()));
+            listener = mMiscStatListener;
+        }
+        if (listener && amount != 0 && stat >= 0 && stat < miscStatCount)
+            listener(stat, amount);
+    }
+
+    void PlayerProgress::setMiscStatListener(std::function<void(int, int)> listener)
+    {
         const std::lock_guard lock(mMutex);
-        int& value = mMiscStats[stat];
-        value = static_cast<int>(
-            std::clamp<std::int64_t>(static_cast<std::int64_t>(value) + amount, 0, std::numeric_limits<int>::max()));
+        mMiscStatListener = std::move(listener);
     }
 
     int PlayerProgress::miscStat(int stat) const

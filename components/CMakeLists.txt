@@ -369,7 +369,8 @@ add_component_dir (falloutmenu
     )
 
 add_component_dir (falloutscript
-    actors actortraits actorvalues aimemory ambient animationcommands animgroups barter blackjack calendar caravan casino chargen combatcommands combatstate commandtable conditions crafting damage derivedstats detection dialogue enableparents equipment exesettings extendercommands falldamage fightai footsteps formlists furniture hacking hardcore hitreactions hotkeys hud interaction itemuse levelling limbs loadingmenu loadscreens lockpick magic mapmarkers messagecommands perks pipboy messagetext music nearwater objectcommands objects objectstate packagecommands placementcommands playercontrols playerprogress presentation queries referencestate regionline repair radio reputation roulette slots savecharacters savescripts facelook facecontrolfile savestate saveworld script interpreter settingtext sounddata specialscreen switches quests triggervolumes vanillacommands vats voicefiles wear itemmods
+    actors actortraits actorvalues aimemory ambient animationcommands animgroups barter blackjack calendar caravan casino chargen combatcommands combatstate commandtable conditions crafting damage derivedstats destruction dismember detection dialogue enableparents equipment exesettings extendercommands falldamage fightai footsteps formlists furniture hacking hardcore hitreactions hotkeys hud interaction itemuse levelling limbs loadingmenu loadscreens lockpick magic mapmarkers messagecommands perks pipboy messagetext music nearwater objectcommands objects objectstate packagecommands placementcommands playercontrols playerprogress presentation queries referencestate regionline repair radio reputation roulette slots savecharacters savescripts facelook facecontrolfile savestate saveworld script interpreter settingtext sounddata specialscreen switches quests triggervolumes vanillacommands vats voicefiles wear itemmods
+    challenges
     )
 
 add_component_dir (misc

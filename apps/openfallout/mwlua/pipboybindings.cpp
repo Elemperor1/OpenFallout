@@ -310,6 +310,7 @@ namespace OFLua
                 row["id"] = idText(quest.mId);
                 row["name"] = quest.mName;
                 row["completed"] = quest.mCompleted;
+                row["active"] = quest.mActive;
                 sol::table objectives(lua, sol::create);
                 int objective = 1;
                 for (const OFScript::FalloutScripts::PipboyObjective& entry : quest.mObjectives)

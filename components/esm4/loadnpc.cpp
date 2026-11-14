@@ -31,6 +31,7 @@
 #include <string> // getline
 #include <vector>
 
+#include "destruction.hpp"
 #include "reader.hpp"
 //#include "writer.hpp"
 
@@ -316,15 +317,17 @@ void ESM4::Npc::load(ESM4::Reader& reader)
             case ESM::fourCC("DPLT"):
                 reader.getFormId(mDefaultPkg);
                 break; // AI package list
-            case ESM::fourCC("DAMC"): // Destructible
             case ESM::fourCC("DEST"):
-            case ESM::fourCC("DMDC"):
+            case ESM::fourCC("DSTD"):
             case ESM::fourCC("DMDL"):
             case ESM::fourCC("DMDT"):
             case ESM::fourCC("DMDS"):
+            case ESM::fourCC("DSTF"): // Destructible: health, stages and their models
+                readDestructionSubRecord(reader, mDestruction);
+                break;
+            case ESM::fourCC("DAMC"): // Destructible
+            case ESM::fourCC("DMDC"):
             case ESM::fourCC("DSTA"):
-            case ESM::fourCC("DSTD"):
-            case ESM::fourCC("DSTF"): // Destructible end
             case ESM::fourCC("NAM6"): // height mult
             case ESM::fourCC("NAM7"): // weight mult
             case ESM::fourCC("ATKR"):

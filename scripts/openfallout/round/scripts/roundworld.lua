@@ -66,6 +66,9 @@ local r = {}
 
 function r.log(...) log('note', ...) end
 
+-- A step of a scenario that failed: a line that starts with `error`, which fails the round (r.log is only a note)
+function r.error(...) log('error', ...) end
+
 function r.wait(seconds)
     coroutine.yield({ at = now() + seconds })
 end
@@ -306,6 +309,17 @@ function r.give(record, count, actor, label)
     return outcome('give', ok, err, tostring(label or record), tostring(count or 1))
 end
 
+-- A command of the script language of Fallout by its name, on a reference ("player" or a form id as text; none for a command that
+-- needs none) with numbers or form ids as text: it runs on the next frame and the value it gives is in the engine log
+function r.command(name, reference, arguments)
+    local reply = ask('command', { name = name, reference = reference, arguments = arguments })
+    r.wait(0.4)
+    return reply
+end
+-- Uses an item of the player (the Pip-Boy's own use: an aid item is eaten or drunk), by its form id as text
+function r.pipboyUse(form, label) return ask('pipboyUse', { form = form, label = label }) end
+-- The quests the Pip-Boy lists: how many, and the one that is followed (the Pip-Boy's own list of quests)
+function r.pipboyQuests(label) return ask('pipboyQuests', { label = label }) end
 -- The player's weapon, ammunition and what is in the hand; `weapon{label}` logs it, `equip(record)` puts a weapon of the inventory in the hand
 function r.weapon(label) return ask('weapon', { label = label }) end
 -- `equip(record)`: the weapon with that record in the hand; without one, the first ranged weapon that has rounds (`pick`: the nth)

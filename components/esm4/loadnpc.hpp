@@ -37,6 +37,7 @@
 #include <components/esm/path.hpp>
 
 #include "actor.hpp"
+#include "destruction.hpp"
 #include "inventory.hpp"
 
 namespace ESM4
@@ -245,6 +246,9 @@ namespace ESM4
         // Whether the record takes the thing that the flag names (one of TemplateFlags) from its template. A record of
         // Oblivion has no template flags.
         bool takesFromTemplate(std::uint16_t flag) const;
+
+        /// DEST and its stages (what happens to the thing when it takes damage)
+        Destruction mDestruction;
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;
