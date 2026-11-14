@@ -50,7 +50,7 @@ return { limit = 240, delay = 6, run = function(r)
     step('Q list before')
     local before = r.pipboyQuests('before')
     if before == nil or before.count == nil or before.count < 2 then
-        r.log('error', 'Q the Pip-Boy lists fewer than two quests: there is nothing to choose between')
+        r.error('Q the Pip-Boy lists fewer than two quests: there is nothing to choose between')
         return
     end
     local pick

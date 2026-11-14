@@ -1,4 +1,5 @@
--- M16 spawn2 (second round): the game that m16_spawn2_placed.lua saved is loaded and shows the same state. The level that the actors a cell places are rolled for, on the real data of Fallout 3 and New Vegas. The plugins
+-- M16 spawn2 (second round): the game that m16_spawn2_placed.lua saved is loaded and shows the same state. (The round loads the
+-- newest save of the profile, which is the one the placement round wrote: run that round first and this one right after it.) The level that the actors a cell places are rolled for, on the real data of Fallout 3 and New Vegas. The plugins
 -- of neither game place a reference whose base is a levelled list; their characters and creatures take a levelled list as their
 -- template, which the executable resolves once when the actor is made, for the level of its zone (or the player) turned one
 -- higher, one lower or not in turn, times the multiplier of the level modifier of the reference. Nobody touches the screen; the

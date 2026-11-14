@@ -164,6 +164,7 @@ actor list holds no Fallout character (they live in `FalloutActors`), so witness
 
 ## Not done
 
+- Review fixes: StopCombatAlarmOnActor also runs `Law::stopAlarm` (the crimes the character is the victim of or a witness to are forgotten, and the enemy flags nothing else holds are cleared, under the law's lock); `IsTrespassing` asks about the trespasser (the player while any watcher holds a trespass package) and not about the watcher that warns; the restrictions on waiting and travel read that trespass state, and the alarm sounds while a character that an alarm turned on the player still fights it (the alarm package of the executable is not run here); a character with no mind (nothing to do, no one to fight) is a witness too (`FalloutActors` keeps the loaded ones without a mind). Not done: the owner's karma for a hacked terminal is the default when no owner stands near (the karma of an NPC base record that is not loaded is not read), and `IsActorDetected` leaves the player out as an observer.
 - Crime expiry (0x971FD0) was not read: crimes and player-enemy flags last until a command or `StopCombatAlarmOnActor`
   clears them. A faction's enemy flag therefore stays set for the rest of the game unless a script clears it.
 - Pickpocketing has a rule (`Law::pickpocket`) and a command table entry but no event: the Fallout interface has no

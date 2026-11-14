@@ -101,6 +101,8 @@ namespace
             return target == mPlayer && mEnemiesOfPlayer.count(faction) != 0;
         }
         bool essentialByMode(FormId actor) override { return mCompanions.count(actor) != 0; }
+        std::vector<FormId> mAlarmsStopped;
+        void alarmStopped(FormId actor) override { mAlarmsStopped.push_back(actor); }
         std::optional<CombatState::Relation> recordedRelation(FormId first, FormId second) override
         {
             const auto found = mRecorded.find({ first, second });
@@ -276,6 +278,8 @@ namespace
         EXPECT_FALSE(setup.mCombat.inCombat(raider));
         EXPECT_FALSE(setup.mCombat.inCombat(ghoul));
         EXPECT_FALSE(setup.mCombat.inCombat(guard));
+        // the game is told, to forget the crimes of the alarm and release what they set
+        EXPECT_THAT(setup.mWorld.mAlarmsStopped, ElementsAre(guard));
     }
 
     TEST(FalloutScriptCombatCommandsTest, a_script_tells_what_the_character_notices)

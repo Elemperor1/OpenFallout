@@ -2417,6 +2417,7 @@ namespace OFScript
         std::optional<FalloutScript::CombatState::Relation> recordedRelation(
             FalloutScript::FormId first, FalloutScript::FormId second) override;
         bool playerEnemyOf(FalloutScript::FormId faction, FalloutScript::FormId target) override;
+        void alarmStopped(FalloutScript::FormId actor) override;
         /// What a weapon does with a blow, for the attacker that holds it; the hands for a weapon that is none. The
         /// condition of the weapon is the one of the copy in the hands (`condition`, in tenths of a percent, names another)
         FalloutScript::WeaponDamage describeWeapon(
@@ -2535,6 +2536,9 @@ namespace OFScript
         void reinsertObject(const OFWorld::Ptr& ptr);
         /// After a game is loaded: the models of the stages that things were in
         void showDamagedObjects();
+        /// The model of the stage that a damaged thing was in when the game was saved, for the thing itself when it is in the
+        /// scene already
+        void showSavedDamage(FalloutScript::FormId reference, const OFWorld::Ptr& placed);
         void resetDamage();
         FalloutScript::DismemberSettings dismemberSettings();
         /// The blow that killed the character: what killed it, and the limbs that the rule of the executable tears off
@@ -2563,7 +2567,8 @@ namespace OFScript
         void noteChallengeMarker(FalloutScript::FormId marker);
         void noteChallengeCrafted(FalloutScript::FormId recipe);
         void noteChallengeHit(FalloutScript::FormId victim, const FalloutScript::CombatState::Hit& hit);
-        void noteChallengeKill(FalloutScript::FormId victim, FalloutScript::FormId killer);
+        void noteChallengeKill(
+            FalloutScript::FormId victim, FalloutScript::FormId killer, FalloutScript::FormId weapon);
         bool baseFormOf(FalloutScript::FormId reference, FalloutScript::FormId& base) override;
         FalloutScript::FormId worldspaceOf(FalloutScript::FormId reference) override;
         FalloutScript::FormId linkedRef(FalloutScript::FormId reference, FalloutScript::FormId keyword) override;
@@ -2819,8 +2824,10 @@ namespace OFScript
         FalloutScript::RespawnState mRespawn;
         FalloutScript::ItemValues mItemValues;
         FalloutScript::NameOverrides mNameOverrides;
-        /// The day the merchants were last looked at
+        /// The day the merchants were last looked at, and whether a cell was loaded since (the merchants in it are looked at
+        /// too: the day of each is kept by the respawn state, so none is restocked twice in a day)
         std::int64_t mMerchantCheckedDay = -1;
+        std::atomic<bool> mMerchantScanDue{ false };
         std::atomic<bool> mQuickSaveRequested{ false };
         /// The texts that the names scripts gave stand for, kept so that a view of one stays valid
         mutable std::mutex mNameTextMutex;

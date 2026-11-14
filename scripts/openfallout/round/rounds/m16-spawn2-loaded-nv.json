@@ -1,7 +1,7 @@
 {
   "name": "m16-spawn2-loaded-nv",
   "game": "nv",
-  "save": "/Users/jacobcyber/Documents/OpenFallout/scratch-m16/spawn2/saves-nv/Quicksave.omwsave",
+  "save": "latest",
   "scenario": "../scenarios/m16_spawn2_loaded.lua",
   "resolution": [1280, 720],
   "framerate": 30,

@@ -1,3 +1,5 @@
+-- (Start this round from a save that has not visited the cells below: a zone level that an earlier visit locked, or a placement
+-- it stored, shows in P1 to P3 as it was kept and not as the engine rolls it, and no command forgets that state.)
 -- M16 spawn2: the level that the actors a cell places are rolled for, on the real data of Fallout 3 and New Vegas. The plugins
 -- of neither game place a reference whose base is a levelled list; their characters and creatures take a levelled list as their
 -- template, which the executable resolves once when the actor is made, for the level of its zone (or the player) turned one

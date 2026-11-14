@@ -221,13 +221,16 @@ namespace OFScript
             return found != mHost.mItemHolders.end() ? found->second : 0;
         }
 
-        FalloutScript::FormId dropItem(FalloutScript::FormId holder, FalloutScript::FormId item, int count) override
+        FalloutScript::FormId dropItem(FalloutScript::FormId holder, FalloutScript::FormId item, int count, int condition,
+            int mods) override
         {
             if (holder == 0 || item == 0 || count <= 0)
                 return 0;
             const FalloutScript::FormId made = mHost.placeAtMe(holder, item, 1, 0.0, 0);
             if (made == 0)
                 return 0;
+            // The object keeps how worn the copies were and the mods in them, to be picked up with them
+            mHost.mReferenceState.setCondition(made, condition, mods);
             // The stack is made as one object at the start of the next frame
             const std::lock_guard lock(mHost.mMadeMutex);
             if (const auto asked = mHost.mPendingMade.find(made); asked != mHost.mPendingMade.end())
@@ -425,8 +428,10 @@ namespace OFScript
 
         int level = 0;
         int levelMod = 0;
-        const bool made
-            = mSpawnLevels.placedLevel(key, baseLevel, placed->mLevelModifier, leveledTemplate, level, levelMod);
+        // (only an actor whose template is a levelled list is rolled for the level of its zone: any other is for the level of
+        // the player as it is)
+        const bool made = mSpawnLevels.placedLevel(
+            key, leveledTemplate ? baseLevel : playerLevel, placed->mLevelModifier, leveledTemplate, level, levelMod);
         if (made && leveledTemplate)
             Log(Debug::Verbose) << "Placed actor " << hex(key) << " rolled for level " << level << " (zone level "
                                 << baseLevel << ", modifier " << placed->mLevelModifier << ", player " << playerLevel
@@ -468,6 +473,9 @@ namespace OFScript
         mRespawn.clear();
         mItemValues.clear();
         mNameOverrides.clear();
+        // A game that was loaded looks at the merchants again, whatever day the one before it had last looked on
+        mMerchantCheckedDay = -1;
+        mMerchantScanDue = false;
         const std::lock_guard lock(mWorldRollMutex);
         mWorldRolls.clear();
     }
@@ -489,7 +497,9 @@ namespace OFScript
         if (mQuickSaveRequested.exchange(false))
             OFBase::Environment::get().getStateManager()->quickSave();
         const auto today = static_cast<std::int64_t>(std::floor(gameDaysPassed()));
-        if (today == mMerchantCheckedDay)
+        // A new day, or a cell that was loaded since: the merchants that came in after the first look of the day are
+        // looked at too (each is restocked once a day, whenever it comes)
+        if (!mMerchantScanDue.exchange(false) && today == mMerchantCheckedDay)
             return;
         mMerchantCheckedDay = today;
         // On the days the settings name, the merchants that are up (loaded characters and creatures with a container
@@ -615,6 +625,7 @@ namespace OFScript
 
     void FalloutScripts::spawnCellLoaded(OFWorld::CellStore& cell)
     {
+        mMerchantScanDue = true;
         const FalloutScript::FormId key = cellKey(cell);
         if (key == 0)
             return;
@@ -667,6 +678,8 @@ namespace OFScript
                     // The cell reset: an actor that is up to be made new goes back to its own base and resolves its
                     // template again, for the level of the player now (0x550C60 through 0x47CE10)
                     mSpawnLevels.forget(reference);
+                    // (what was read from the old template is read again from the new one)
+                    mFightTraits.erase(reference);
                     ptr.getRefData().setCustomData(nullptr);
                     ++rerolled;
                 }
@@ -688,6 +701,8 @@ namespace OFScript
                 mRespawn.revived(reference);
                 mRespawn.resetInventory(reference);
                 mActors.resetItems(reference);
+                // It is dressed from its record again, as what a looted corpse lost is carried again
+                mEquipment.reset(reference);
                 ++revived;
             }
             else if (ptr.getType() == ESM4::Container::sRecordId)

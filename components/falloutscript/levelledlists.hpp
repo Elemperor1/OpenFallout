@@ -43,7 +43,9 @@ namespace FalloutScript
         FormId mForm = 0;
         std::uint16_t mLevel = 1;
         std::uint16_t mCount = 1;
-        /// What condition an item from the list has, in percent (items only)
+        /// What condition an item from the list has, in percent (items only). It is kept with the entry and saved, but
+        /// nothing that rolls a list takes a condition from it: the entries that a roll gives are a form and a count
+        /// (ESM4::LevelledChoice), and the items that the inventories and the world make from them are made whole.
         float mHealth = 100.f;
 
         bool operator==(const LevelledAddition&) const = default;

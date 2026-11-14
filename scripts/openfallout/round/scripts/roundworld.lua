@@ -66,6 +66,9 @@ local r = {}
 
 function r.log(...) log('note', ...) end
 
+-- A step of a scenario that failed: a line that starts with `error`, which fails the round (r.log is only a note)
+function r.error(...) log('error', ...) end
+
 function r.wait(seconds)
     coroutine.yield({ at = now() + seconds })
 end
@@ -252,9 +255,13 @@ function r.rest(o)
             r.wait(1)
             last = ask('restProgress', {})
         until last == nil or not last.active or now() >= deadline
-        log('waitFor', 'rest ' .. tostring(o.label or '-'), (last ~= nil and not last.active) and 'ok' or 'timeout',
-            last and string.format('done=%.0f/%.0f', last.done, last.total) or '-')
-        passed = (r.clock() or before) - before
+        -- (a rest that ends early is not completed: the binding says why it stopped)
+        local completed = last ~= nil and not last.active and (last.stopped == nil or last.stopped == '')
+        log('waitFor', 'rest ' .. tostring(o.label or '-'), completed and 'ok' or ((last ~= nil and not last.active) and 'stopped' or 'timeout'),
+            last and string.format('done=%.0f/%.0f%s', last.done, last.total,
+                (last.stopped ~= nil and last.stopped ~= '') and (' stopped=' .. tostring(last.stopped)) or '') or '-')
+        local after = r.clock()
+        passed = (after and before) and (after - before) or 0
     end
     log('rested', tostring(o.label or '-'), 'screen=' .. tostring(reply.screen), 'started=' .. tostring(reply.started), string.format('passed=%.2f', passed))
     reply.passed = passed
@@ -271,7 +278,10 @@ function r.needs(label) return ask('needs', { label = label }) end
 function r.travel(label)
     local before = r.clock()
     local reply = ask('travel', { label = label })
-    if reply and reply.went then log('travelled', tostring(label or '-'), string.format('passed=%.2f', (r.clock() or before) - before)) end
+    if reply and reply.went then
+        local after = r.clock()
+        log('travelled', tostring(label or '-'), string.format('passed=%.2f', (after and before) and (after - before) or 0))
+    end
     return reply
 end
 

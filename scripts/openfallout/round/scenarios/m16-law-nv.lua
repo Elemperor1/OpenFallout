@@ -40,7 +40,8 @@ return { limit = 700, delay = 4, run = function(r)
         local okp, stats = pcall(r.core.pipboy.stats)
         if okp and stats then karma = stats.karma end
         if not ok or law == nil then
-            r.log('SNAP ' .. label .. ' law error ' .. tostring(law))
+            -- a scenario that cannot read the law has nothing to check: it is a failure and not a note
+            r.error('SNAP ' .. label .. ' law error ' .. tostring(law))
             return
         end
         local text = string.format('SNAP %s: karma=%s minor=%s major=%s murderer=%s crimes=%s', label, tostring(karma), tostring(law.minor),

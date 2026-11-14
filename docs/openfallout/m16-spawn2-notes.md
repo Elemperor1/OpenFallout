@@ -83,6 +83,8 @@ modifier multiplier and the floor of 1, an actor without a levelled template, fo
 merchant days), `FalloutScriptSpawnCommandsTest` (SetActorFullName keys the base record), `ESM4ActorReferenceTest` (XEZN and XLCM kept,
 and none when absent).
 
+The loaded rounds take `"save": "latest"`, the quicksave that the placement round wrote, so they run right after it; the placement rounds must start from a save that has not visited their cells (a zone level that was locked or a placement that was stored by an earlier visit shows as it was kept).
+
 Hidden real-data rounds (`rounds/m16-spawn2-placed-{nv,fo3}.json` with `scenarios/m16_spawn2_placed.lua`; `rounds/m16-spawn2-loaded-{nv,fo3}.json`
 with `scenarios/m16_spawn2_loaded.lua`); all PASS, 0 scenario errors, the engine never frontmost. The scenario enters interior cells that
 cells place levelled-template actors in, at different player levels, and reads what the engine rolled for each actor
@@ -127,6 +129,11 @@ cells place levelled-template actors in, at different player levels, and reads w
   without saving, where the executable resolves again; the executable's rule for an actor made while the cell loads (before the player's
   level is known) was not read.
 - A reference whose base is a levelled list itself (none exist in the files) still goes through the cell loader's fixed level 5.
+- A cell reset that gives an actor another template (the re-roll in `spawnCellLoaded`) clears its custom data and the cached fight traits
+  after the cell has been inserted into the scene (`Scene::loadCell` builds the render and physics objects and the mind, and copies the
+  package list, before `FalloutScripts::cellLoaded`), so the body, the collision shape and the packages of the actor stay those of the template
+  it had until the cell is loaded again. A true fix rolls the template before the actor is inserted (a step in `insertCell`) or rebuilds the
+  actor's scene objects and mind; neither is a local change. The name and the AI data it reads follow the new template.
 - The merchants' days are not saved (a loaded game restocks again on the same day) and the stock itself was not looked at in the barter menu.
 - Body cleanup (above), zone run-time timers, flora resets, the equipped and quest items of `RemoveAllTypedItems`, `PlaceAtMeHealthPercent`
   (the executable hands the percent to the placement worker 0x5C4B30; nothing here has a condition), `GetIsLockBroken`,

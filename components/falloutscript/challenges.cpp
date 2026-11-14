@@ -64,8 +64,9 @@ namespace FalloutScript
 
     bool Challenges::counts(const Entry& entry) const
     {
-        // A challenge that is over does not count, unless it recurs; one that starts disabled counts once unlocked
-        if (entry.mState.mCompleted && (entry.mRecord.mFlags & ChallengeFlag::recurring) == 0)
+        // A challenge that is over does not count (a recurring one that can go on is never over: its last completion is the
+        // one after its recurring was taken away); one that starts disabled counts once unlocked
+        if (entry.mState.mCompleted)
             return false;
         if ((entry.mRecord.mFlags & ChallengeFlag::startDisabled) != 0 && !entry.mState.mUnlocked)
             return false;
@@ -214,12 +215,18 @@ namespace FalloutScript
     {
         ChallengeRecord record;
         int progress = 0;
+        bool reached = false;
+        bool last = false;
         std::function<void(FormId)> runner;
         std::function<void(const ChallengeNotice&)> notice;
         std::function<void(int, int)> counter;
         {
             const std::lock_guard lock(mMutex);
             Entry& entry = mEntries.at(id);
+            // Whether it counts is asked again here, with the count: another thread, or the script of a completion that
+            // came meanwhile, may have completed it since the caller looked
+            if (!counts(entry))
+                return false;
             entry.mState.mProgress += amount;
             record = entry.mRecord;
             progress = entry.mState.mProgress;
@@ -229,9 +236,25 @@ namespace FalloutScript
             // The player is told only when the setting lets it, and the record has a name and a description (0x5F5CA4)
             if (!mShowUpdates)
                 notice = nullptr;
+            // The completion is taken here, before the callbacks run (they run with the lock free and may count again): a
+            // recurring challenge starts over, with what went beyond the threshold, and any other is over
+            if (progress >= record.mThreshold)
+            {
+                reached = true;
+                if ((record.mFlags & ChallengeFlag::recurring) != 0 && !entry.mState.mRecurringRemoved)
+                {
+                    entry.mState.mProgress -= record.mThreshold;
+                    entry.mState.mRepeated = true;
+                }
+                else
+                {
+                    entry.mState.mCompleted = true;
+                    last = true;
+                }
+            }
         }
         const bool named = !record.mName.empty() && !record.mDescription.empty();
-        if (progress < record.mThreshold)
+        if (!reached)
         {
             // The progress is told when it is a multiple of the interval (0 counts), and never before the first count
             const int step = record.mInterval != 0 ? record.mInterval : defaultInterval;
@@ -248,18 +271,7 @@ namespace FalloutScript
             counter(challengesCompletedStat, 1);
         if (named && notice)
             notice({ id, noticeText(record, record.mThreshold), record.mIcon, true });
-
-        const std::lock_guard lock(mMutex);
-        Entry& entry = mEntries.at(id);
-        if ((record.mFlags & ChallengeFlag::recurring) != 0 && !entry.mState.mRecurringRemoved)
-        {
-            // It starts over, with what went beyond the threshold
-            entry.mState.mProgress -= record.mThreshold;
-            entry.mState.mRepeated = true;
-            return false;
-        }
-        entry.mState.mCompleted = true;
-        return true;
+        return last;
     }
 
     void Challenges::unlock(FormId challenge)

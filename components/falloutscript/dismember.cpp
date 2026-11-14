@@ -252,6 +252,14 @@ namespace FalloutScript
                 return DeathCause::weapon;
             return DeathCause::other;
         }
+
+        double wholeHours(double daysPassed, double hourOfDay)
+        {
+            // The world's days are whole (its hour is kept apart); a number that is not one counts as none
+            if (!std::isfinite(daysPassed) || !std::isfinite(hourOfDay))
+                return 0.0;
+            return std::floor(std::floor(daysPassed) * 24.0 + hourOfDay);
+        }
     }
 
     bool Dismemberment::isGone(FormId actor, int limb)

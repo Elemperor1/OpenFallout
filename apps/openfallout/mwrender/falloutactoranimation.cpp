@@ -1265,6 +1265,14 @@ namespace OFRender
                 SceneUtil::FindByNameVisitor find("Bip01 Spine");
                 mObjectRoot->accept(find);
                 mSpineNode = find.mFoundNode;
+                // The bone of a skeleton that has none of that name is the one after it (the executable asks for the
+                // second name when the first is not there)
+                if (mSpineNode == nullptr)
+                {
+                    SceneUtil::FindByNameVisitor second("Bip01 Spine01");
+                    mObjectRoot->accept(second);
+                    mSpineNode = second.mFoundNode;
+                }
                 mSpineSearched = mSpineNode != nullptr;
             }
             if (mSpineNode != nullptr)

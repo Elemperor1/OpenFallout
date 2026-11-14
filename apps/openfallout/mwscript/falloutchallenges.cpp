@@ -188,13 +188,15 @@ namespace OFScript
         }
     }
 
-    void FalloutScripts::noteChallengeKill(FalloutScript::FormId victim, FalloutScript::FormId killer)
+    void FalloutScripts::noteChallengeKill(
+        FalloutScript::FormId victim, FalloutScript::FormId killer, FalloutScript::FormId weapon)
     {
         if (victim == 0 || victim == mPlayer || mPlayer == 0 || killer != mPlayer)
             return;
         FalloutScript::FormId base = 0;
         baseFormOf(victim, base);
-        const FalloutScript::FormId weapon = mEquipment.weapon(mPlayer);
+        // The weapon is the one the killing blow was struck with, told with the death: the last round can leave the hands
+        // before the death is told (a death that no blow caused has none)
         const int kind = weaponKind(mStore, weapon);
         // The skill of the weapon (unarmed without one)
         int skill = unarmedSkill;

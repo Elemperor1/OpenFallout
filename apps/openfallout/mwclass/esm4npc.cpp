@@ -270,7 +270,7 @@ namespace OFClass
 
         if (base->mIsFONV)
         {
-            data->mEquippedArmor = ESM4::wornArmor(armorSource, *base, roll.mLevel, seed);
+            data->mEquippedArmor = ESM4::wornArmor(armorSource, *base, roll.mLevel, seed, nullptr, roll.mLevelMod);
             for (const ESM::FormId package : ESM4::characterPackages(npcRecs))
                 data->mPackages.push_back(store->get<ESM4::AIPackage>().search(package));
         }
@@ -410,6 +410,11 @@ namespace OFClass
         const ESM4::Npc* const baseData = getCustomData(ptr).mBaseData;
         if (baseData == nullptr)
             return {};
+        // The name of the record that gives the traits (a template) that a script changed comes after the own one
+        if (baseData != ptr.get<ESM4::Npc>()->mBase)
+            if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
+                if (const std::string_view given = scripts->nameGivenToBase(baseData->mId); !given.empty())
+                    return given;
         return baseData->mFullName;
     }
 }

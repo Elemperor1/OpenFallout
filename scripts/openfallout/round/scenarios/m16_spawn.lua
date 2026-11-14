@@ -77,7 +77,8 @@ return { limit = 900, delay = 4, run = function(r)
         if zone ~= nil then args[3] = form(zone) end
         local made = call('PlaceLeveledActorAtMe', PLAYER, args)
         if made == nil or made == 0 then
-            r.log(string.format('SPAWN %s: nothing was made', label))
+            -- every placement of the scenario is one the data allows, so a failure is a defect and not a quiet case
+            r.error(string.format('SPAWN %s: nothing was made', label))
             return nil
         end
         local id = hex(made)
@@ -126,6 +127,9 @@ return { limit = 900, delay = 4, run = function(r)
         end
     end
     r.log('A made ' .. tostring(#made))
+    if #made < 2 * #cases then
+        r.error(string.format('A only %d of %d characters were made', #made, 2 * #cases))
+    end
 
     ---------------------------------------------------------------- B: an entry that a script added
     phase('B added entries')
@@ -224,7 +228,7 @@ return { limit = 900, delay = 4, run = function(r)
         end
     end
     if actor == nil then
-        r.log('E no character that comes back was made: nothing to test')
+        r.error('E no character that comes back was made: the respawn is not tested')
     else
         r.log('E actor ' .. actor .. ' has the flag that makes it come back')
         call('KillActor', actor, {})
@@ -264,6 +268,9 @@ return { limit = 900, delay = 4, run = function(r)
         r.wait(10)
         r.log(string.format('E back: dead=%s deathHour=%s generation=%s', tostring(core.spawn.dead(actor)),
             tostring(core.spawn.deathHour(actor)), tostring(core.spawn.generation(actor))))
+        if core.spawn.dead(actor) then
+            r.error('E actor ' .. actor .. ' is still dead after the respawn interval')
+        end
         for _, box in ipairs(boxes) do
             local kinds, total = countItems(box.id)
             r.log(string.format('E container %s after the reset: %s kinds (%s items), generation %s', box.id, tostring(kinds),

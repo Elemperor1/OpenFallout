@@ -11,7 +11,7 @@ return { limit = 360, delay = 4, run = function(r)
     local function ask(name, reference, arguments)
         local ok, id = pcall(W.run, name, reference, arguments)
         if not ok then
-            r.log('ASK ' .. name .. ' failed: ' .. tostring(id))
+            r.error('ASK ' .. name .. ' failed: ' .. tostring(id))
             return nil
         end
         local value
@@ -108,7 +108,8 @@ return { limit = 360, delay = 4, run = function(r)
     if near == nil then
         r.log('no character near the player: line of sight is not asked')
     else
-        local other = tostring(near.id)
+        -- the form id the scripts know it by (the id of the Lua object is not one)
+        local other = r.form(near)
         r.log(string.format('NEAR id=%s dist=%.0f', other, apart))
         r.aimAt(near, 'at it')
         r.wait(1)

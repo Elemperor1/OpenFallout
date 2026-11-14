@@ -586,7 +586,10 @@ namespace OFScript
             const float frameSeconds = mObjects.secondsPassed();
             if (stage == Stage::Update && seconds > 0)
                 mObjects.setSecondsPassed(static_cast<float>(seconds));
-            // ScriptEffectElapsedSeconds tells the same seconds in an update and 0 in the start and the end
+            // ScriptEffectElapsedSeconds tells the same seconds in an update and 0 in the start and the end. A script of an
+            // update can end or start another effect, whose blocks run inside this one: the seconds of this update are
+            // put back after them.
+            const double effectSeconds = mObjects.effectSeconds();
             mObjects.setEffectSeconds(stage == Stage::Update ? seconds : 0.0);
             mObjects.runEffect(actor, script,
                 stage == Stage::Start        ? FalloutScript::BlockType::ScriptEffectStart
@@ -594,7 +597,7 @@ namespace OFScript
                                              : FalloutScript::BlockType::ScriptEffectFinish,
                 effect);
             mObjects.setSecondsPassed(frameSeconds);
-            mObjects.setEffectSeconds(0.0);
+            mObjects.setEffectSeconds(effectSeconds);
         });
         // The conditions of a log entry of a stage are about the player, who nobody else is in the way of
         mQuests.setConditionCheck([this](const std::vector<ESM4::TargetCondition>& conditions) {
@@ -660,6 +663,9 @@ namespace OFScript
 
     FalloutScripts::~FalloutScripts()
     {
+        // The two hooks of the levelled lists capture this object and are process wide, so they go with it
+        ESM4::setLevelledAdditions({});
+        ESM4::setSpawnRollProvider({});
         reportMissingCommands();
     }
 
@@ -2401,7 +2407,7 @@ namespace OFScript
             {
                 const OFClass::StoreWornArmorSource source(mStore);
                 const ESM4::CharacterArmor given
-                    = ESM4::characterArmor(source, *npc, roll.mLevel, itemSeed);
+                    = ESM4::characterArmor(source, *npc, roll.mLevel, seed, nullptr, roll.mLevelMod, itemSeed);
                 for (const ESM4::ListedArmor& piece : given.mFromLists)
                     give(numberOf(piece.mArmor->mId), piece.mCount);
                 for (const ESM4::ListedItem& item : given.mOtherFromLists)
@@ -2524,8 +2530,8 @@ namespace OFScript
         if (traitsOwner == nullptr)
             traitsOwner = npc;
         const bool female = (traitsOwner->mBaseConfig.fo3.flags & ESM4::Npc::FO3_Female) != 0;
-        const ESM4::WornPieces worn
-            = ESM4::wornPieces(ESM4::wornArmor(source, *npc, roll.mLevel, itemSeed), female);
+        const ESM4::WornPieces worn = ESM4::wornPieces(
+            ESM4::wornArmor(source, *npc, roll.mLevel, seed, nullptr, roll.mLevelMod, itemSeed), female);
         for (const ESM4::WornPiece& piece : worn.mPieces)
             armor.push_back(numberOf(piece.mArmor->mId));
         return true;
@@ -3071,7 +3077,7 @@ namespace OFScript
         else
         {
             // Of two blows that kill at once, the one that marks the death is the killing blow
-            result.mKilled = mActors.setDead(victim, true, attacker, limb);
+            result.mKilled = mActors.setDead(victim, true, attacker, limb, weapon);
             // The rule of dismemberment runs for the blow that killed
             if (result.mKilled)
                 goreOfKill(victim, attacker, weapon, limb, blow.mMelee);
@@ -4029,7 +4035,7 @@ namespace OFScript
             // One that fought nobody and had no package has no mind yet, and its body falls by it
             evaluatePackage(death.mActor);
             awardKillExperience(death.mActor);
-            noteChallengeKill(death.mActor, death.mKiller);
+            noteChallengeKill(death.mActor, death.mKiller, death.mWeapon);
         }
         for (const FalloutScript::CombatState::Change& change : changes)
         {
@@ -6632,7 +6638,7 @@ namespace OFScript
             for (const PendingSave::Request& request : pending.mRequests)
             {
                 mPendingMade[request.mId] = MadeObject{ request.mBase, request.mNear, request.mDirection,
-                    request.mDistance, Place{ request.mCell, request.mPosition, request.mAngle } };
+                    request.mDistance, Place{ request.mCell, request.mPosition, request.mAngle }, request.mCount };
                 mMadeBases[request.mId] = request.mBase;
             }
             pending.mRequests.clear();
@@ -6737,6 +6743,9 @@ namespace OFScript
             const std::lock_guard lock(mMadeMutex);
             mMadeBases[id] = actual.toUint32();
         }
+        // A thing that was damaged before the game was saved shows the model of its stage (the load gave the models before
+        // this object was made, and the world knew it by no number then)
+        showSavedDamage(id, placed);
         // An actor that is made sets triggers off like those of the cells (when its cell is loaded again, the cell
         // tells of it)
         if (isCharacterOrCreature(placed))

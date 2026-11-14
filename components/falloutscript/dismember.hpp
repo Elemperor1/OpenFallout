@@ -158,6 +158,10 @@ namespace FalloutScript
         /// What GetCauseofDeath says for a blow whose source is of that kind (the executable's form types: 0x28 the
         /// weapon, 0x33 a projectile, the explosion by its own test)
         int causeOf(bool fromExplosion, bool fromProjectile, bool fromWeapon);
+
+        /// The whole hours of the game's clock that GetTimeDead counts from (0x867E30 floors the days passed, a number with
+        /// a fraction in the executables, times 24): the whole days that the world counts, and the hour of the day it is
+        double wholeHours(double daysPassed, double hourOfDay);
     }
 
     /// Which limbs of each character are gone, what killed it and who. A limb is a type of part (0 to 14). It can be

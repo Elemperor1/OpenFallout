@@ -196,3 +196,15 @@ Vegas master file has no scripted-type challenge; the add-on ones need their plu
 - DispelAll leaves enchantment effects (the field at +0x34 was not read).
 - Entry points listed above as left to other packages.
 - No Fallout 3 round: the profile has no Fallout 3 save, so the drink rule (entry 26) is covered by unit tests only.
+
+## Review fixes
+
+- The script of an effect whose conditions do not hold gets no update (it has not started, or it has finished); the entry stays for the
+  conditions to be asked again. Ending entries (dispel, removal of a source) first undoes their changes and tells whoever kept them, for all
+  of them, and then finishes the scripts, so a script that casts again is not undone by the end of an earlier entry.
+- A saved game gives two effects of one spell that are the same magic effect the conditions of their own (by their order).
+- `ScriptEffectElapsedSeconds` is 0 for a start, an end and a script with no effect, and the seconds of an update that was running come back
+  after a nested effect script.
+- A completed challenge never counts again (also when a recurring one was ended and unlocked), and a completion is taken under the lock before its
+  script, counter and notice run.
+

@@ -295,6 +295,45 @@ namespace
         EXPECT_EQ(run.mMessages.size(), 2u);
     }
 
+    namespace
+    {
+        // A notification that is no use once it was moved from, as a function of any size may be
+        struct Notifier
+        {
+            std::vector<Reputation::Bump>* mTold;
+            bool mAlive = true;
+
+            explicit Notifier(std::vector<Reputation::Bump>* told)
+                : mTold(told)
+            {
+            }
+            Notifier(const Notifier&) = default;
+            Notifier(Notifier&& other) noexcept
+                : mTold(other.mTold)
+            {
+                other.mAlive = false;
+            }
+            void operator()(const Reputation::Bump& bump) const
+            {
+                if (mAlive)
+                    mTold->push_back(bump);
+            }
+        };
+    }
+
+    TEST(FalloutScriptReputationTest, every_command_that_changes_a_reputation_tells_the_player)
+    {
+        Runner run;
+        std::vector<Reputation::Bump> told;
+        FalloutScript::addReputationCommands(run.mInterpreter, run.mReputation, Notifier(&told));
+        run.call(OpSetReputation, { ncr, 1, 20 });
+        run.call(OpAddReputation, { ncr, 1, 1 });
+        run.call(OpAddReputationExact, { ncr, 1, 2 });
+        run.call(OpRemoveReputation, { ncr, 1, 1 });
+        run.call(OpRemoveReputationExact, { ncr, 1, 2 });
+        EXPECT_EQ(told.size(), 4u);
+    }
+
     TEST(FalloutScriptReputationTest, a_removal_lowers_a_side_by_a_step_or_by_points_down_to_nothing)
     {
         Runner run;
