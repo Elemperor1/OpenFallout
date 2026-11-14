@@ -4,17 +4,17 @@
 #include <cstddef>
 #include <map>
 #include <memory>
+#include <vector>
 
 #include <components/esm/formid.hpp>
 #include <components/esm3/refnum.hpp>
 
 #include <osg/Vec3f>
 
+#include "../mwworld/ptr.hpp"
 namespace OFWorld
 {
     class CellStore;
-    class LiveCellRefBase;
-    class Ptr;
 }
 
 namespace OFMechanics
@@ -82,8 +82,9 @@ namespace OFMechanics
 
         std::size_t size() const { return mMinds.size(); }
 
-        /// The characters it follows that are within `radius` units of `position` (the same space is for the caller to
-        /// check)
+        /// The characters it follows, and those that are loaded and have no mind (nothing to do and no one to fight, such as
+        /// a character that stands by and sees what the player does), that are within `radius` units of `position` (the same
+        /// space is for the caller to check)
         void getObjectsInRange(const osg::Vec3f& position, float radius, std::vector<OFWorld::Ptr>& objects) const;
 
         /// What the game keeps of one actor
@@ -103,6 +104,8 @@ namespace OFMechanics
         static void obey(Mind& mind, const Command& command);
 
         std::map<const OFWorld::LiveCellRefBase*, std::unique_ptr<Mind>> mMinds;
+        /// The characters of the cells that are loaded and that have no mind: they are there to be seen, and to see
+        std::map<const OFWorld::LiveCellRefBase*, OFWorld::Ptr> mUnminded;
         std::map<ESM::RefNum, Command> mCommands;
     };
 }

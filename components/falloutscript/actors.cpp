@@ -60,6 +60,12 @@ namespace FalloutScript
         for (const auto& [item, count] : entry.mItems)
             if (count > 0)
                 noteChange(id, item, -count);
+        // Before the records could be asked what the holder has, the count that scripts gave it was its count
+        // (removeCountLocked takes from the same): the inventory is cleared of it as of the rest
+        if (!entry.mItemsKnown)
+            for (const auto& [item, edit] : entry.mItemEdits)
+                if (const std::int64_t pending = edit.apply(0); pending > 0)
+                    noteChange(id, item, -static_cast<int>(pending));
         entry.mItems.clear();
         entry.mWorn.clear();
         entry.mItemEdits.clear();
@@ -429,7 +435,7 @@ namespace FalloutScript
         return mDead.count(actor) != 0;
     }
 
-    bool ActorState::setDead(FormId actor, bool dead, FormId killer, int limb)
+    bool ActorState::setDead(FormId actor, bool dead, FormId killer, int limb, FormId weapon)
     {
         if (actor == 0)
             return false;
@@ -443,7 +449,7 @@ namespace FalloutScript
                     return false;
                 constexpr std::size_t mostDeaths = 1024;
                 if (mDeaths.size() < mostDeaths)
-                    mDeaths.push_back({ actor, killer });
+                    mDeaths.push_back({ actor, killer, weapon });
                 if (killer != 0)
                     mKillers[actor] = killer;
                 // A death that no blow caused has no part of the body

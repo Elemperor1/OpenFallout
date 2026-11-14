@@ -124,8 +124,11 @@ namespace FalloutScript
     /// The challenges of New Vegas: what the player does is counted by the challenges that count it, and a challenge
     /// that reaches its threshold runs its script, counts as completed and tells the player (FalloutNV.exe
     /// 0x5F5950, the function that every counter calls, and 0x5F6110 for the scripted ones). A challenge is on a list
-    /// of its type while it can be counted: one that is completed and does not recur, or that starts disabled and has
-    /// not been unlocked, is on none. It can be used from any thread.
+    /// of its type while it can be counted: one that is completed (a recurring one is completed only by the completion after
+    /// its recurring was taken away), or that starts disabled and has not been unlocked, is on none. It can be used from
+    /// any thread: whether a challenge counts is asked again when the count is made, and a completion is taken before its
+    /// script, counter and notice run (with the lock free), so that a count of theirs or of another thread comes too late
+    /// to complete it again.
     class Challenges
     {
         template <class T>

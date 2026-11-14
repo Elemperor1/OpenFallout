@@ -493,6 +493,43 @@ namespace
         EXPECT_THAT(run.mChallenges.active(Type::killAny), Not(Contains(repeating)));
     }
 
+    TEST(FalloutScriptChallengesTest, a_recurring_challenge_that_was_completed_for_good_is_not_counted_again_when_unlocked)
+    {
+        Runner run;
+        ChallengeEvent event;
+        event.mType = Type::killAny;
+        event.mSecond = 9;
+        event.mAmount = 2;
+        run.mChallenges.removeRecurring(repeating);
+        run.mChallenges.event(event);
+        ASSERT_TRUE(run.mChallenges.completed(repeating));
+        ASSERT_THAT(run.mCounter, SizeIs(1));
+        // Unlocking puts it on its list again, but a challenge that is completed does not count
+        run.mChallenges.unlock(repeating);
+        run.mChallenges.event(event);
+        EXPECT_THAT(run.mCounter, SizeIs(1));
+        EXPECT_EQ(run.mChallenges.progress(repeating), 2);
+    }
+
+    TEST(FalloutScriptChallengesTest, a_count_made_by_the_script_of_a_completion_comes_too_late_to_complete_it_again)
+    {
+        Runner run;
+        ChallengeEvent event;
+        event.mType = Type::useItem;
+        event.mFormA = stimpak;
+        event.mAmount = 2;
+        int scripts = 0;
+        // The reward script counts the same event again (as another thread or another script could)
+        run.mChallenges.setScriptRunner([&](FormId) {
+            ++scripts;
+            run.mChallenges.event(event);
+        });
+        run.mChallenges.event(event);
+        EXPECT_EQ(scripts, 1);
+        EXPECT_TRUE(run.mChallenges.completed(itemUse));
+        EXPECT_THAT(run.mCounter, ElementsAre(Pair(FalloutScript::challengesCompletedStat, 1)));
+    }
+
     TEST(FalloutScriptChallengesTest, the_list_has_the_challenges_the_player_can_see)
     {
         Runner run;

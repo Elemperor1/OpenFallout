@@ -2,6 +2,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <functional>
+#include <string>
+#include <string_view>
+#include <utility>
 
 #include "arguments.hpp"
 
@@ -267,7 +271,8 @@ namespace FalloutScript
     void addReputationCommands(
         Interpreter& interpreter, Reputation& reputation, std::function<void(const Reputation::Bump&)> message)
     {
-        interpreter.setHandler("AddReputation", [&reputation, message = std::move(message)](CallContext& call) {
+        // (the one function is copied into every handler: moving it into the first would leave the others none)
+        interpreter.setHandler("AddReputation", [&reputation, message](CallContext& call) {
             const Reputation::Bump bump
                 = reputation.add(formArgument(call, 0), intArgument(call, 1), intArgument(call, 2));
             if (bump.mApplied && message)

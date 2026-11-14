@@ -62,6 +62,8 @@ namespace OFScript
             ESM::RefId mCell;
             osg::Vec3f mPosition;
             osg::Vec3f mAngle;
+            /// How many of an item it stands for (a dropped stack)
+            int mCount = 1;
         };
         std::vector<Request> mRequests;
 

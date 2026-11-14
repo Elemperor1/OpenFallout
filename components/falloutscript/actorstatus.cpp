@@ -159,25 +159,34 @@ namespace FalloutScript
             mOverrides[actor] = state;
     }
 
+    void ActorStatus::editOverride(FormId actor, bool ActorOverride::*flag, bool on)
+    {
+        if (actor == 0)
+            return;
+        // One lock for the read, the change and the write: two scripts that set two flags at once keep both
+        const std::lock_guard lock(mMutex);
+        const auto found = mOverrides.find(actor);
+        ActorOverride state = found == mOverrides.end() ? ActorOverride() : found->second;
+        state.*flag = on;
+        if (state.empty())
+            mOverrides.erase(actor);
+        else
+            mOverrides[actor] = state;
+    }
+
     void ActorStatus::setAiOff(FormId actor, bool off)
     {
-        ActorOverride state = overrideOf(actor);
-        state.mAiOff = off;
-        setOverride(actor, state);
+        editOverride(actor, &ActorOverride::mAiOff, off);
     }
 
     void ActorStatus::setForceRun(FormId actor, bool on)
     {
-        ActorOverride state = overrideOf(actor);
-        state.mForceRun = on;
-        setOverride(actor, state);
+        editOverride(actor, &ActorOverride::mForceRun, on);
     }
 
     void ActorStatus::setForceSneak(FormId actor, bool on)
     {
-        ActorOverride state = overrideOf(actor);
-        state.mForceSneak = on;
-        setOverride(actor, state);
+        editOverride(actor, &ActorOverride::mForceSneak, on);
     }
 
     std::vector<std::pair<FormId, ActorOverride>> ActorStatus::overrides() const

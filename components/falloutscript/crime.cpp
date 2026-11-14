@@ -294,6 +294,8 @@ namespace FalloutScript
     {
         std::vector<FormId> cleared;
         {
+            // (the flags are cleared under the same lock that new crimes are made under: a crime that was made after the
+            // check would otherwise lose the flag it just set)
             const std::lock_guard lock(mMutex);
             std::vector<FormId> released;
             std::vector<Crime> kept;
@@ -316,8 +318,8 @@ namespace FalloutScript
                 if (!held)
                     cleared.push_back(faction);
             }
+            clearEnemyFlags(cleared);
         }
-        clearEnemyFlags(cleared);
         return cleared;
     }
 
@@ -355,7 +357,17 @@ namespace FalloutScript
     std::size_t Law::record(CrimeKind kind, FormId victim, std::int64_t value)
     {
         if (mCrimes.size() >= maxCrimes)
+        {
+            // A faction that only the crime that goes held as an enemy is released with it: nothing could release it later
+            const std::vector<FormId> held = mCrimes.front().mFactions;
             mCrimes.erase(mCrimes.begin());
+            std::vector<FormId> released;
+            for (const FormId faction : held)
+                if (std::none_of(mCrimes.begin(), mCrimes.end(),
+                        [faction](const Crime& crime) { return contains(crime.mFactions, faction); }))
+                    released.push_back(faction);
+            clearEnemyFlags(released);
+        }
         Crime crime;
         crime.mNumber = mNextCrime++;
         crime.mKind = kind;
@@ -649,6 +661,12 @@ namespace FalloutScript
     {
         const std::lock_guard lock(mMutex);
         return mTrespass.count(watcher) != 0;
+    }
+
+    bool Law::anyTrespass()
+    {
+        const std::lock_guard lock(mMutex);
+        return !mTrespass.empty();
     }
 
     Law::KarmaChange Law::karma(const LawSettings& settings, int current, int change)

@@ -109,6 +109,11 @@ namespace FalloutScript
         /// is below the thing's, the number of stages when none is
         int stage(const DestructionData& data, double health, double maxHealth);
 
+        /// Whether a thing that has `health` left has been taken out of the world by its stages: a stage with the disable
+        /// flag was crossed on the way down from its most (what the blows that brought it here did, told from where it is,
+        /// so that a loaded game need not keep it). False for a thing that was never damaged (health below 0).
+        bool disables(const DestructionData& data, double health, double maxHealth);
+
         /// A blow of `amount` to a thing with `health` (negative for a thing that was never damaged: it has its most).
         /// `resulting` is the health afterwards for a character, whose health is taken from its actor value and not
         /// from the blow. Not applied when the blow is not above 0 or the health is 0 already. The outcome says what the
@@ -119,7 +124,10 @@ namespace FalloutScript
 
     /// What can be destroyed: the health that a thing has taken from, the stage it is in, the model it shows and the damage
     /// it takes from itself. The state starts as the records say (no thing has taken any damage) and is kept as blows made it.
-    /// It can be used from any thread.
+    /// It can be used from any thread: a blow changes the state and the destroyed mark of the reference together, under the
+    /// lock that a clear (restore) takes, so one of them comes wholly before the other. The listeners are told after, with
+    /// the lock free (they call back into the host), so what they cause is ordered by the host: the engine queues it for the
+    /// main thread, where a clear's work comes after the work of the blows that came before it.
     class Destruction
     {
         template <class T>
@@ -154,6 +162,9 @@ namespace FalloutScript
         int selfDamage(FormId reference);
         /// Whether the reference has taken damage (it is not as the record made it)
         bool isDamaged(FormId reference);
+        /// Whether a stage that it went through took it out of the world (disabled it); told from its health, so it holds
+        /// after a load as well
+        bool disabledByStage(FormId reference);
         /// Every reference that has taken damage and is not in its first state (for the host to show again after a load)
         std::vector<FormId> damaged();
         /// Whether the reference has destruction data, and how it reads

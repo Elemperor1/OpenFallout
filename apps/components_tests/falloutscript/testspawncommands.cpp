@@ -128,6 +128,8 @@ namespace
         {
             FormId mHolder, mItem;
             int mCount;
+            int mCondition;
+            int mMods;
         };
         std::set<FormId> mExisting;
         std::vector<Leveled> mLeveled;
@@ -136,6 +138,8 @@ namespace
         std::map<FormId, int> mTypes;
         std::map<FormId, FormId> mParents;
         int mPurged = 0;
+        /// The world takes no drop (nothing can be placed)
+        bool mRefuseDrops = false;
 
         bool exists(FormId reference) override { return mExisting.count(reference) != 0; }
         FormId placeLeveledActor(FormId near, FormId base, int levelMod, FormId zoneForm) override
@@ -148,9 +152,11 @@ namespace
             const auto found = mHolders.find(item);
             return found == mHolders.end() ? 0 : found->second;
         }
-        FormId dropItem(FormId holder, FormId item, int count) override
+        FormId dropItem(FormId holder, FormId item, int count, int condition, int mods) override
         {
-            mDropped.push_back({ holder, item, count });
+            if (mRefuseDrops)
+                return 0;
+            mDropped.push_back({ holder, item, count, condition, mods });
             return made;
         }
         int formTypeOf(FormId form) override
@@ -339,6 +345,67 @@ namespace
         EXPECT_EQ(setup.mActors.itemCount(guard, pistol), 0);
         ASSERT_EQ(setup.mWorld.mDropped.size(), 1u); // the second has nothing left
         EXPECT_EQ(setup.mWorld.mDropped[0].mCount, 4);
+    }
+
+    TEST(FalloutScriptSpawnCommandsTest, aDroppedItemKeepsItsConditionAndItsModsOneStackAtATime)
+    {
+        Runner setup;
+        setup.mActors.addItem(guard, pistol, 3, 1000, 0);
+        setup.mActors.addItem(guard, pistol, 2, 400, 5);
+        setup.mActors.addItem(guard, pistol, 1, 650, 0);
+        ScriptBuilder builder;
+        const std::uint16_t item = builder.form(pistol);
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + command(OpDrop, arguments(2).add(refArg(item)).add(intArg(5))) + end());
+
+        setup.run(builder);
+
+        // The best are dropped first, and the copies that differ are not made into one stack
+        ASSERT_EQ(setup.mWorld.mDropped.size(), 3u);
+        EXPECT_EQ(setup.mWorld.mDropped[0].mCount, 3);
+        EXPECT_EQ(setup.mWorld.mDropped[0].mCondition, 1000);
+        EXPECT_EQ(setup.mWorld.mDropped[0].mMods, 0);
+        EXPECT_EQ(setup.mWorld.mDropped[1].mCount, 1);
+        EXPECT_EQ(setup.mWorld.mDropped[1].mCondition, 650);
+        EXPECT_EQ(setup.mWorld.mDropped[2].mCount, 1);
+        EXPECT_EQ(setup.mWorld.mDropped[2].mCondition, 400);
+        EXPECT_EQ(setup.mWorld.mDropped[2].mMods, 5);
+        EXPECT_EQ(setup.mActors.itemCount(guard, pistol), 1);
+    }
+
+    TEST(FalloutScriptSpawnCommandsTest, theItemThatDropsItselfKeepsItsCondition)
+    {
+        Runner setup;
+        setup.mActors.addItem(guard, pistol, 1, 300, 2);
+        setup.mWorld.mHolders[pistol] = guard;
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate) + command(OpDropMe, arguments(0)) + end());
+
+        setup.run(builder, pistol);
+
+        ASSERT_EQ(setup.mWorld.mDropped.size(), 1u);
+        EXPECT_EQ(setup.mWorld.mDropped[0].mCondition, 300);
+        EXPECT_EQ(setup.mWorld.mDropped[0].mMods, 2);
+    }
+
+    TEST(FalloutScriptSpawnCommandsTest, aDropThatTheWorldDoesNotTakeLeavesTheItemsWithTheHolder)
+    {
+        Runner setup;
+        setup.mActors.addItem(guard, pistol, 2, 400, 1);
+        setup.mWorld.mRefuseDrops = true;
+        ScriptBuilder builder;
+        const std::uint16_t item = builder.form(pistol);
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + command(OpDrop, arguments(2).add(refArg(item)).add(intArg(2))) + end());
+
+        setup.run(builder);
+
+        EXPECT_THAT(setup.mWorld.mDropped, IsEmpty());
+        EXPECT_EQ(setup.mActors.itemCount(guard, pistol), 2);
+        // and with the condition they had
+        ASSERT_EQ(setup.mActors.conditions(guard, pistol).size(), 1u);
+        EXPECT_EQ(setup.mActors.conditions(guard, pistol)[0].mCondition, 400);
+        EXPECT_EQ(setup.mActors.conditions(guard, pistol)[0].mMods, 1);
     }
 
     TEST(FalloutScriptSpawnCommandsTest, itemsOfOneKindAreMovedAndTheRestStay)

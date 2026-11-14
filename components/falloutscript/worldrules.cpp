@@ -157,7 +157,8 @@ namespace FalloutScript::World
             // Only what the camera shows can be seen by the player; nothing is cast for anything else
             if (!facts.mInFrustum)
                 return false;
-            if (anyRay(facts, ray, sightFractions.size()))
+            // (a target that is not loaded, or is in another space, is no use to a ray: its place means nothing here)
+            if (facts.mTargetLoaded && facts.mSameSpace && anyRay(facts, ray, sightFractions.size()))
                 return true;
             // What is left is the test of an actor, which for the player holds no sightings but the near distance
             return near;
@@ -172,6 +173,29 @@ namespace FalloutScript::World
             return true;
         const std::size_t rays = facts.mTargetIsPlayer || facts.mTargetIsViewerTarget ? sightFractions.size() : 1;
         return anyRay(facts, ray, rays);
+    }
+
+    double depthInBox(const Vec3& from, const Vec3& to, const Vec3& low, const Vec3& high)
+    {
+        double length = 0;
+        for (std::size_t i = 0; i < 3; ++i)
+            length += (to[i] - from[i]) * (to[i] - from[i]);
+        length = std::sqrt(length);
+        if (length <= 0)
+            return 0;
+        double depth = length;
+        for (std::size_t i = 0; i < 3; ++i)
+        {
+            if (to[i] < low[i] || to[i] > high[i])
+                return 0;
+            const double direction = (to[i] - from[i]) / length;
+            if (std::abs(direction) < 1e-9)
+                continue;
+            // Going back along the ray, the coordinate falls when the ray rises, and so the low side is the one reached
+            const double side = direction > 0 ? low[i] : high[i];
+            depth = std::min(depth, (to[i] - side) / direction);
+        }
+        return std::max(depth, 0.0);
     }
 
     void PlayerActions::clear()
@@ -277,6 +301,8 @@ namespace FalloutScript::World
 
     void ScreenSplatter::spawn(Group group)
     {
+        // The textures that are set now are the ones of this group, whatever is set after it
+        group.mTextures = mTextures;
         mGroups.push_back(std::move(group));
     }
 

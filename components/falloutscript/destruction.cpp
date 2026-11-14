@@ -41,6 +41,29 @@ namespace FalloutScript
             return result;
         }
 
+        bool disables(const DestructionData& data, double health, double maxHealth)
+        {
+            if (health < 0)
+                return false;
+            // The stages that the health went down through, from the most to where it is, as `damage` crosses them: those
+            // with a percentage below the one at the start and not below the one now, up to a stage that caps the health
+            const int before = percent(maxHealth, maxHealth);
+            int after = percent(health, maxHealth);
+            if (after == 0 && health > 0)
+                after = 1;
+            for (const DestructionStage& stage : data.mStages)
+            {
+                const int percentOfStage = std::clamp(stage.mHealthPercent, 0, 255);
+                if (percentOfStage >= before || percentOfStage < after)
+                    continue;
+                if ((stage.mFlags & DestructionStage::disable) != 0)
+                    return true;
+                if ((stage.mFlags & DestructionStage::capDamage) != 0)
+                    break;
+            }
+            return false;
+        }
+
         DestructionOutcome damage(const DestructionData& data, double maxHealth, double health, double amount,
             std::optional<double> resulting)
         {
@@ -183,10 +206,12 @@ namespace FalloutScript
                 state.mDamageStage = outcome.mDamageStage;
             if (!outcome.mCrossed.empty())
                 state.mSelfDamage = outcome.mSelfDamage;
+            // The mark is set with the state, under the same lock as a clear takes it away under: a clear that comes after
+            // this blow also takes this mark away, and one that came before it is not undone (the state it cleared is gone)
+            if (outcome.mDestroyed)
+                mReferences.setDestroyed(reference, true);
             listener = mListener;
         }
-        if (outcome.mDestroyed)
-            mReferences.setDestroyed(reference, true);
         if (listener)
             listener(reference, outcome);
         return outcome;
@@ -240,6 +265,18 @@ namespace FalloutScript
         return mStates.count(reference) != 0;
     }
 
+    bool Destruction::disabledByStage(FormId reference)
+    {
+        DestructionData data;
+        if (!dataOf(reference, data))
+            return false;
+        const double baseHealth = mRecords.destructionBaseHealth(reference);
+        const double maxHealth = baseHealth >= 0 ? baseHealth : static_cast<double>(data.mHealth);
+        const std::lock_guard lock(mMutex);
+        const auto found = mStates.find(reference);
+        return found != mStates.end() && DestructionRule::disables(data, found->second.mHealth, maxHealth);
+    }
+
     std::vector<FormId> Destruction::damaged()
     {
         const std::lock_guard lock(mMutex);
@@ -256,9 +293,9 @@ namespace FalloutScript
             const std::lock_guard lock(mMutex);
             if (mStates.erase(reference) == 0)
                 return false;
+            mReferences.setDestroyed(reference, false);
             listener = mRestoreListener;
         }
-        mReferences.setDestroyed(reference, false);
         if (listener)
             listener(reference);
         return true;

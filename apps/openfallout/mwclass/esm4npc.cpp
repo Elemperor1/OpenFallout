@@ -270,7 +270,7 @@ namespace OFClass
 
         if (base->mIsFONV)
         {
-            data->mEquippedArmor = ESM4::wornArmor(armorSource, *base, roll.mLevel, seed);
+            data->mEquippedArmor = ESM4::wornArmor(armorSource, *base, roll.mLevel, seed, nullptr, roll.mLevelMod);
             for (const ESM::FormId package : ESM4::characterPackages(npcRecs))
                 data->mPackages.push_back(store->get<ESM4::AIPackage>().search(package));
         }

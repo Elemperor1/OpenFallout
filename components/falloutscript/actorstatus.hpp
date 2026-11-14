@@ -188,6 +188,9 @@ namespace FalloutScript
         std::size_t activeCount() const;
 
     private:
+        /// Sets one flag of the overrides of the actor, holding the lock for all of it
+        void editOverride(FormId actor, bool ActorOverride::*flag, bool on);
+
         mutable std::mutex mMutex;
         std::map<FormId, ActorOverride> mOverrides;
         std::map<FormId, ActorActivity> mActivity;

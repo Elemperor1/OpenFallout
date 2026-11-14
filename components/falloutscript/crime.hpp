@@ -354,6 +354,8 @@ namespace FalloutScript
         int trespassLevel(FormId watcher);
         /// Whether the watcher has a trespass package
         bool trespassing(FormId watcher);
+        /// Whether any watcher has one: the player is trespassing (the query of the trespasser and not of a watcher)
+        bool anyTrespass();
 
         // ---- the karma ----
 

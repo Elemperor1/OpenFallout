@@ -32,6 +32,9 @@ namespace FalloutScript
         /// Whether the faction counts the player as its enemy (the flag that a seen crime or SetPCEnemyofFaction sets) and
         /// the target is the player: the executables let that flag win over every relation (0x8B87A0)
         virtual bool playerEnemyOf(FormId /*faction*/, FormId /*target*/) { return false; }
+        /// StopCombatAlarmOnActor was run for the character, after the fight was ended: what else the alarm held goes (the
+        /// crimes it is the victim of or a witness to, and the enemy flags they set; Law::stopAlarm)
+        virtual void alarmStopped(FormId /*actor*/) {}
     };
 
     /// How the actor stands to the target by the factions they are in, in what scripts said or else what the records

@@ -1,6 +1,7 @@
 #include "spawncommands.hpp"
 
 #include <algorithm>
+#include <vector>
 
 #include "actors.hpp"
 #include "arguments.hpp"
@@ -125,8 +126,9 @@ namespace FalloutScript
     namespace
     {
         /// Takes the copies of the stacks of an item out of a holder and puts them into another (if there is one),
-        /// keeping their condition and mods. Tells how many were moved.
-        int moveItem(ActorState& actors, FormId from, FormId to, FormId item, int count)
+        /// keeping their condition and mods. Tells how many were moved, and (when asked) the stacks that were.
+        int moveItem(ActorState& actors, FormId from, FormId to, FormId item, int count,
+            std::vector<ActorState::ConditionStack>* stacks = nullptr)
         {
             int moved = 0;
             for (const ActorState::ConditionStack& stack : actors.conditions(from, item))
@@ -137,10 +139,22 @@ namespace FalloutScript
                 const int taken = actors.removeItem(from, item, wanted, stack.mCondition, stack.mMods);
                 if (taken > 0 && to != 0)
                     actors.addItem(to, item, taken, stack.mCondition, stack.mMods);
+                if (taken > 0 && stacks != nullptr)
+                    stacks->push_back({ stack.mCondition, taken, stack.mMods });
                 moved += taken;
                 count -= taken;
             }
             return moved;
+        }
+
+        /// Puts the stacks that were taken out of a holder into the world, each in its own condition with its own mods; a
+        /// stack that the world does not take is given back to the holder
+        void dropStacks(ActorState& actors, SpawnWorld& world, FormId holder, FormId item,
+            const std::vector<ActorState::ConditionStack>& stacks)
+        {
+            for (const ActorState::ConditionStack& stack : stacks)
+                if (world.dropItem(holder, item, stack.mCount, stack.mCondition, stack.mMods) == 0)
+                    actors.addItem(holder, item, stack.mCount, stack.mCondition, stack.mMods);
         }
     }
 
@@ -200,8 +214,9 @@ namespace FalloutScript
             const FormId holder = item != 0 ? world.holderOfItem(item) : 0;
             if (holder == 0)
                 return 0.0;
-            if (moveItem(actors, holder, 0, item, 1) > 0)
-                world.dropItem(holder, item, 1);
+            std::vector<ActorState::ConditionStack> stacks;
+            if (moveItem(actors, holder, 0, item, 1, &stacks) > 0)
+                dropStacks(actors, world, holder, item, stacks);
             return 0.0;
         });
 
@@ -211,9 +226,9 @@ namespace FalloutScript
             const int count = intArgument(call, 1);
             if (call.mReference == 0 || item == 0 || count <= 0)
                 return 0.0;
-            const int taken = moveItem(actors, call.mReference, 0, item, count);
-            if (taken > 0)
-                world.dropItem(call.mReference, item, taken);
+            std::vector<ActorState::ConditionStack> stacks;
+            if (moveItem(actors, call.mReference, 0, item, count, &stacks) > 0)
+                dropStacks(actors, world, call.mReference, item, stacks);
             return 0.0;
         });
 
