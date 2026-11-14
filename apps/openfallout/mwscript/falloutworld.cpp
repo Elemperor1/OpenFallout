@@ -113,7 +113,9 @@ namespace OFScript
             facts.mTarget = { to.x(), to.y(), to.z() };
             const osg::Vec3f extents = world->getHalfExtents(seen);
             facts.mTargetHeight = 2.0 * extents.z();
-            mRayTolerance = std::max(extents.x(), extents.y());
+            // The box of the target that a ray ends in: its place is at its feet, in the middle of it
+            mTargetLow = { to.x() - extents.x(), to.y() - extents.y(), to.z() };
+            mTargetHigh = { to.x() + extents.x(), to.y() + extents.y(), to.z() + 2.0 * extents.z() };
             facts.mViewCone = mHost.gameSetting("fDetectionViewCone", 190);
             facts.mAllVisible = mHost.mWorldState.allVisible();
             if (facts.mViewerIsPlayer)
@@ -152,9 +154,11 @@ namespace OFScript
             const float apart = (goal - start).length();
             if (apart < 1.f)
                 return true;
-            // The ray ends inside the target's own bound, so what it hits there is the target and not a wall
+            // The ray ends inside the target's own bound, so what it hits within the length it travels inside that box is
+            // the target and not a wall
             const float reach = OFBase::Environment::get().getWorld()->getDistToNearestRayHit(start, goal - start, apart);
-            return reach >= apart - 1.f - static_cast<float>(mRayTolerance);
+            const double inside = FalloutScript::World::depthInBox(from, to, mTargetLow, mTargetHigh);
+            return reach >= apart - 1.f - static_cast<float>(inside);
         }
 
         std::optional<std::string> cellNameOfReference(FalloutScript::FormId reference) override
@@ -514,7 +518,8 @@ namespace OFScript
         std::mutex mMutex;
         int mPersistent = -1;
         std::mt19937 mRandom{ std::random_device{}() };
-        double mRayTolerance = 0;
+        FalloutScript::World::Vec3 mTargetLow{};
+        FalloutScript::World::Vec3 mTargetHigh{};
         std::set<std::string> mNoted;
     };
 

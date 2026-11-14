@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <numbers>
 #include <vector>
 
 namespace
@@ -191,16 +192,16 @@ namespace
         EXPECT_FALSE(World::seesTarget(behind, clear));
         // The edge of the cone is 95 degrees to each side
         SightFacts side = facts();
-        side.mTarget = { 500 * std::sin(94.0 * M_PI / 180), 500 * std::cos(94.0 * M_PI / 180), 0 };
+        side.mTarget = { 500 * std::sin(94.0 * std::numbers::pi / 180), 500 * std::cos(94.0 * std::numbers::pi / 180), 0 };
         EXPECT_TRUE(World::seesTarget(side, clear));
-        side.mTarget = { 500 * std::sin(96.0 * M_PI / 180), 500 * std::cos(96.0 * M_PI / 180), 0 };
+        side.mTarget = { 500 * std::sin(96.0 * std::numbers::pi / 180), 500 * std::cos(96.0 * std::numbers::pi / 180), 0 };
         EXPECT_FALSE(World::seesTarget(side, clear));
     }
 
     TEST(FalloutScriptWorldRulesTest, the_facing_of_a_character_turns_the_cone)
     {
         SightFacts turned = facts();
-        turned.mFacing = M_PI;
+        turned.mFacing = std::numbers::pi;
         EXPECT_FALSE(World::seesTarget(turned, clear));
         turned.mTarget = { 0, -500, 0 };
         EXPECT_TRUE(World::seesTarget(turned, clear));
@@ -287,6 +288,46 @@ namespace
         player.mInFrustum = true;
         EXPECT_TRUE(World::seesTarget(player, clear));
         EXPECT_FALSE(World::seesTarget(player, blocked));
+    }
+
+    TEST(FalloutScriptWorldRulesTest, a_ray_is_inside_a_box_for_the_length_between_its_end_and_the_side_it_came_in_by)
+    {
+        const World::Vec3 low{ -30, -30, 0 };
+        const World::Vec3 high{ 30, 30, 120 };
+        // straight at the middle of the box, level: it came in 30 units before its end
+        EXPECT_NEAR(World::depthInBox({ 0, -500, 60 }, { 0, 0, 60 }, low, high), 30.0, 1e-9);
+        // along the long way of a wide box
+        EXPECT_NEAR(World::depthInBox({ 0, -500, 60 }, { 0, 0, 60 }, { -100, -30, 0 }, { 100, 30, 120 }), 30.0, 1e-9);
+        // from above and steeply down onto the top: the way in is the top, a short way up the ray
+        EXPECT_NEAR(World::depthInBox({ 0, 0, 500 }, { 0, 0, 100 }, low, high), 20.0, 1e-9);
+        // a slanting ray comes in by the side it reaches first going back along it, not by the middle of the box
+        EXPECT_NEAR(World::depthInBox({ -500, 0, 60 }, { 0, 0, 60 }, low, high), 30.0, 1e-9);
+        EXPECT_NEAR(World::depthInBox({ -300, -400, 60 }, { 0, 0, 60 }, low, high), 37.5, 1e-9);
+    }
+
+    TEST(FalloutScriptWorldRulesTest, a_ray_that_ends_outside_the_box_or_starts_inside_it_has_the_depth_that_is_left)
+    {
+        const World::Vec3 low{ -30, -30, 0 };
+        const World::Vec3 high{ 30, 30, 120 };
+        EXPECT_DOUBLE_EQ(World::depthInBox({ 0, -500, 60 }, { 0, -100, 60 }, low, high), 0.0);
+        EXPECT_DOUBLE_EQ(World::depthInBox({ 0, -500, 60 }, { 0, 0, 200 }, low, high), 0.0);
+        EXPECT_DOUBLE_EQ(World::depthInBox({ 0, 0, 0 }, { 0, 0, 0 }, low, high), 0.0);
+        // it starts inside the box: all of it is inside
+        EXPECT_NEAR(World::depthInBox({ 0, -10, 60 }, { 0, 0, 60 }, low, high), 10.0, 1e-9);
+    }
+
+    TEST(FalloutScriptWorldRulesTest, the_player_does_not_see_a_target_that_is_not_loaded_or_is_in_another_space)
+    {
+        SightFacts player = facts();
+        player.mViewerIsPlayer = true;
+        player.mInFrustum = true;
+        ASSERT_TRUE(World::seesTarget(player, clear));
+        SightFacts unloaded = player;
+        unloaded.mTargetLoaded = false;
+        EXPECT_FALSE(World::seesTarget(unloaded, clear));
+        SightFacts other = player;
+        other.mSameSpace = false;
+        EXPECT_FALSE(World::seesTarget(other, clear));
     }
 
     TEST(FalloutScriptWorldRulesTest, the_player_sees_a_near_target_in_view_whatever_lies_between)
@@ -433,6 +474,20 @@ namespace
         EXPECT_NEAR(splatter.groups()[0].mAlpha, 1.0 - (6.0 - 8.0) / 2.0, 1e-9);
     }
 
+    TEST(FalloutScriptWorldRulesTest, a_group_keeps_the_textures_that_were_set_when_it_was_made)
+    {
+        World::ScreenSplatter splatter;
+        splatter.setDefaultTextures({ "a.dds", "b.dds", "c.dds" });
+        splatter.triggerCustom(1, 1, 1, 1, half());
+        splatter.setTexture(0, "x.dds");
+        splatter.triggerCustom(1, 1, 1, 1, half());
+        const std::vector<World::ScreenSplatter::Group> groups = splatter.groups();
+        ASSERT_EQ(groups.size(), 2u);
+        EXPECT_EQ(groups[0].mTextures[0], "a.dds");
+        EXPECT_EQ(groups[1].mTextures[0], "x.dds");
+        EXPECT_EQ(groups[1].mTextures[1], "b.dds");
+    }
+
     TEST(FalloutScriptWorldRulesTest, the_textures_are_set_by_slot_and_a_clear_gives_them_back)
     {
         World::ScreenSplatter splatter;
@@ -525,7 +580,7 @@ namespace
 
     TEST(FalloutScriptWorldRulesTest, an_angle_is_given_in_degrees)
     {
-        EXPECT_NEAR(World::degreesOf(M_PI), 180.0, 1e-4);
+        EXPECT_NEAR(World::degreesOf(std::numbers::pi), 180.0, 1e-4);
         EXPECT_EQ(World::degreesOf(0), 0.0);
     }
 

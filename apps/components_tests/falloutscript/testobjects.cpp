@@ -1337,6 +1337,48 @@ namespace
         EXPECT_EQ(setup.mHost.mGlobals[seconds], 0.0);
     }
 
+    TEST(FalloutScriptObjectsTest, a_script_effect_that_starts_ends_or_runs_for_no_effect_is_told_no_seconds)
+    {
+        constexpr FormId effectScript = 0x01002100;
+        constexpr FormId started = 0x01000901;
+        constexpr FormId finished = 0x01000902;
+        constexpr FormId updated = 0x01000903;
+        Runner setup;
+        ScriptBuilder builder;
+        const std::uint16_t startedGlobal = builder.form(started);
+        const std::uint16_t finishedGlobal = builder.form(finished);
+        const std::uint16_t updatedGlobal = builder.form(updated);
+        builder.code(scriptName() + begin(BlockType::ScriptEffectStart)
+            + setTo(var('f', 1), callToken(OpScriptEffectElapsedSeconds, Bytes()))
+            + setTo(Bytes().u8('G').u16(startedGlobal), var('f', 1)) + end() + begin(BlockType::ScriptEffectUpdate)
+            + setTo(var('f', 1), callToken(OpScriptEffectElapsedSeconds, Bytes()))
+            + setTo(Bytes().u8('G').u16(updatedGlobal), var('f', 1)) + end() + begin(BlockType::ScriptEffectFinish)
+            + setTo(var('f', 1), callToken(OpScriptEffectElapsedSeconds, Bytes()))
+            + setTo(Bytes().u8('G').u16(finishedGlobal), var('f', 1)) + end());
+        builder.variable(1, floatVariable, "elapsed");
+        setup.addScript(effectScript, builder);
+        setup.mHost.mGlobals[started] = -1;
+        setup.mHost.mGlobals[finished] = -1;
+        setup.mHost.mGlobals[updated] = -1;
+
+        // The seconds of an update that is running (an outer one) are not told to the start and the end of another effect
+        // that runs inside it, and are there again after them
+        setup.mObjects.setEffectSeconds(2.5);
+        EXPECT_TRUE(setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectStart, 1));
+        EXPECT_EQ(setup.mHost.mGlobals[started], 0.0);
+        EXPECT_EQ(setup.mObjects.effectSeconds(), 2.5);
+        EXPECT_TRUE(setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectFinish, 1));
+        EXPECT_EQ(setup.mHost.mGlobals[finished], 0.0);
+        EXPECT_EQ(setup.mObjects.effectSeconds(), 2.5);
+        // A script that runs for no effect (number 0) has none to ask, and the once-run one is such a script
+        EXPECT_TRUE(setup.mObjects.runEffect(player, effectScript, BlockType::ScriptEffectUpdate));
+        EXPECT_EQ(setup.mHost.mGlobals[updated], 0.0);
+        setup.mHost.mGlobals[started] = -1;
+        EXPECT_TRUE(setup.mObjects.runEffectOnce(player, effectScript));
+        EXPECT_EQ(setup.mHost.mGlobals[started], 0.0);
+        EXPECT_EQ(setup.mObjects.effectSeconds(), 2.5);
+    }
+
     TEST(FalloutScriptObjectsTest, a_script_run_once_starts_and_is_forgotten_without_upsetting_a_running_effect)
     {
         constexpr FormId effectScript = 0x01002100;

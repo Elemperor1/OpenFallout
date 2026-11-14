@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
+#include <tuple>
 
 #include "actorvalues.hpp"
 #include "arguments.hpp"
@@ -365,15 +367,17 @@ namespace FalloutScript
             {
                 // An effect that lasts until its spell is removed has no seconds left to count
                 const double left = it->mRemaining;
+                // The script of an effect whose conditions do not hold is not running: it has not begun, or it has
+                // finished; the entry stays so that the conditions are asked again
                 if (it->mRemaining > 0 && (it->mRemaining -= seconds) <= 0)
                 {
-                    if (it->mScript != 0)
+                    if (it->mScript != 0 && it->mEnabled)
                         finished.push_back({ it->mActor, it->mScript, it->mId, std::min(left, seconds) });
                     it = mRunning.erase(it);
                 }
                 else
                 {
-                    if (it->mScript != 0)
+                    if (it->mScript != 0 && it->mEnabled)
                         running.push_back({ it->mActor, it->mScript, it->mId, seconds });
                     ++it;
                 }
@@ -536,20 +540,20 @@ namespace FalloutScript
                     ++it;
             }
         }
-        // What the effects did is undone, their scripts finish and whoever kept what they changed is told, all outside
-        // the lock: they call back into the host
+        // What the effects did is undone and whoever kept what they changed is told, for all of them, and then their scripts
+        // finish: all outside the lock, since they call back into the host. A script that finishes may cast the spell
+        // again, and the end of an earlier entry (which takes away every entry of the source) must not take that cast away.
         for (const Ended& one : ended)
         {
-            if (one.mEnabled)
-            {
-                if (modifier && one.mActorValue >= 0 && one.mDelta != 0)
-                    modifier(actor, one.mActorValue, -one.mDelta);
-                if (scripts && one.mScript != 0)
-                    scripts(actor, one.mScript, ScriptStage::Finish, one.mId, 0.0);
-            }
+            if (one.mEnabled && modifier && one.mActorValue >= 0 && one.mDelta != 0)
+                modifier(actor, one.mActorValue, -one.mDelta);
             if (ender)
                 ender(actor, one.mSource, one.mEffect);
         }
+        if (scripts)
+            for (const Ended& one : ended)
+                if (one.mEnabled && one.mScript != 0)
+                    scripts(actor, one.mScript, ScriptStage::Finish, one.mId, 0.0);
         return static_cast<int>(ended.size());
     }
 
@@ -652,6 +656,10 @@ namespace FalloutScript
                     spells[*actor] = std::move(held);
             }
             std::vector<Magic::Running> running;
+            // The effects of one source that are the same magic effect (an ability can have two, with conditions of their
+            // own) were written in the order of the spell's list, together: the first that was read takes the conditions of
+            // the first of them, the second those of the second
+            std::map<std::tuple<FormId, FormId, FormId>, std::size_t> sameEffect;
             const std::size_t count = in.count(32);
             for (std::size_t i = 0; i < count; ++i)
             {
@@ -679,12 +687,23 @@ namespace FalloutScript
                     // What an ability or a disease keeps its effect by is asked of the records again
                     SpellInfo info;
                     if (entry.mRemaining <= 0 && magic.mRecords.spell(*source, info) && appliedWhenAdded(info.mType))
+                    {
+                        std::size_t skip = sameEffect[std::make_tuple(*actor, *source, *effect)]++;
+                        const SpellEffect* chosen = nullptr;
                         for (const SpellEffect& candidate : info.mEffects)
                             if (candidate.mEffect == *effect)
                             {
-                                entry.mConditions = candidate.mConditions;
-                                break;
+                                if (chosen == nullptr)
+                                    chosen = &candidate;
+                                if (skip-- == 0)
+                                {
+                                    chosen = &candidate;
+                                    break;
+                                }
                             }
+                        if (chosen != nullptr)
+                            entry.mConditions = chosen->mConditions;
+                    }
                     running.push_back(entry);
                 }
             }

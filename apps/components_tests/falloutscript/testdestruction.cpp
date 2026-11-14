@@ -289,6 +289,65 @@ namespace
         EXPECT_THAT(fixture.mDestruction.damaged(), ElementsAre(truck));
     }
 
+    TEST(FalloutScriptDestructionTest, a_stage_with_the_disable_flag_takes_the_thing_out_of_the_world_once_it_is_reached)
+    {
+        DestructionData data;
+        data.mHealth = 100;
+        data.mStages = { stage(80, 0, 0), stage(50, 1, DestructionStage::disable), stage(20, 2, DestructionStage::capDamage),
+            stage(10, 3, DestructionStage::disable) };
+        EXPECT_FALSE(Rule::disables(data, -1, 100)); // never damaged
+        EXPECT_FALSE(Rule::disables(data, 100, 100));
+        EXPECT_FALSE(Rule::disables(data, 51, 100)); // above the stage at 50
+        EXPECT_TRUE(Rule::disables(data, 50, 100));
+        EXPECT_TRUE(Rule::disables(data, 30, 100));
+        // The health stops at the cap, so the stage under it is never reached
+        DestructionData capped;
+        capped.mHealth = 100;
+        capped.mStages = { stage(20, 0, DestructionStage::capDamage), stage(20, 1, DestructionStage::disable) };
+        EXPECT_FALSE(Rule::disables(capped, 20, 100));
+        EXPECT_FALSE(Rule::disables(DestructionData(), 0, 100));
+    }
+
+    TEST(FalloutScriptDestructionTest, what_a_stage_disabled_is_told_from_the_health_and_a_clear_takes_it_back)
+    {
+        Fixture fixture;
+        EXPECT_FALSE(fixture.mDestruction.disabledByStage(shell));
+        fixture.mDestruction.damage(shell, 5);
+        EXPECT_FALSE(fixture.mDestruction.disabledByStage(shell));
+        const DestructionOutcome outcome = fixture.mDestruction.damage(shell, 100);
+        EXPECT_TRUE(outcome.mDisable);
+        EXPECT_TRUE(fixture.mDestruction.disabledByStage(shell));
+        // A character goes by the health it has left
+        fixture.mRecords.mActorHealth[turret] = 0;
+        EXPECT_TRUE(fixture.mDestruction.damage(turret, 10).mDisable);
+        EXPECT_TRUE(fixture.mDestruction.disabledByStage(turret));
+        // A thing whose stages never disable it is not marked, and one with no data is not
+        fixture.mDestruction.damage(truck, 400);
+        EXPECT_FALSE(fixture.mDestruction.disabledByStage(truck));
+        EXPECT_FALSE(fixture.mDestruction.disabledByStage(plain));
+
+        EXPECT_TRUE(fixture.mDestruction.restore(shell));
+        EXPECT_FALSE(fixture.mDestruction.disabledByStage(shell));
+    }
+
+    TEST(FalloutScriptDestructionTest, what_a_stage_disabled_is_known_again_after_the_game_is_loaded)
+    {
+        Fixture fixture;
+        fixture.mDestruction.damage(shell, 100);
+        fixture.mDestruction.damage(truck, 400);
+        FalloutScript::SaveWriter out;
+        FalloutScript::writeDestruction(fixture.mDestruction, out);
+
+        Fixture loaded;
+        FalloutScript::SaveReader in(out.bytes());
+        FalloutScript::readDestruction(loaded.mDestruction, in, FalloutScript::destructionSectionVersion);
+        EXPECT_TRUE(loaded.mDestruction.disabledByStage(shell));
+        EXPECT_FALSE(loaded.mDestruction.disabledByStage(truck));
+        // and the clear that follows is told of the thing that has to be put back
+        EXPECT_TRUE(loaded.mDestruction.restore(shell));
+        EXPECT_THAT(loaded.mRestored, ElementsAre(shell));
+    }
+
     TEST(FalloutScriptDestructionTest, a_thing_with_no_data_takes_nothing)
     {
         Fixture fixture;

@@ -131,6 +131,13 @@ namespace FalloutScript::World
     ///   the first only.
     bool seesTarget(const SightFacts& facts, const SightRay& ray);
 
+    /// How far the ray from `from` to `to` travels inside the box (low corner, high corner) before it ends at `to`: the
+    /// distance back along the ray from `to` to where it came into the box, at most the length of the ray (so a ray
+    /// that starts inside the box is inside for all of it). 0 when `to` is not inside the box. A ray that ends inside
+    /// the bound of a target and is stopped within this distance of its end was stopped by the target and by nothing
+    /// before it.
+    double depthInBox(const Vec3& from, const Vec3& to, const Vec3& low, const Vec3& high);
+
     // ---- The player's last actions ----------------------------------------------------------------------------------
 
     /// The player's list of actions that IsPlayerActionActive and GetLastPlayerAction answer from (the list at the
@@ -210,6 +217,8 @@ namespace FalloutScript::World
             double mDuration = 0;
             double mAlpha = 1;
             std::vector<Quad> mQuads;
+            /// The textures (colour, alpha, flare) that were set when the group was made
+            std::array<std::string, 3> mTextures;
         };
 
         explicit ScreenSplatter(SplatterSettings settings = SplatterSettings());

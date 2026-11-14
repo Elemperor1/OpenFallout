@@ -81,12 +81,15 @@ namespace FalloutScript
             return 0;
         }
 
-        /// Puts `count` of the item into the world as one object next to the holder
-        virtual FormId dropItem(FormId holder, FormId item, int count)
+        /// Puts `count` of the item into the world as one object next to the holder, in the condition and with the mods
+        /// that the copies had (a condition of 1000 is full, 0 mods none). 0 when nothing was put there.
+        virtual FormId dropItem(FormId holder, FormId item, int count, int condition = 1000, int mods = 0)
         {
             (void)holder;
             (void)item;
             (void)count;
+            (void)condition;
+            (void)mods;
             return 0;
         }
 

@@ -66,6 +66,9 @@ local r = {}
 
 function r.log(...) log('note', ...) end
 
+-- A step of a scenario that failed: a line that starts with `error`, which fails the round (r.log is only a note)
+function r.error(...) log('error', ...) end
+
 function r.wait(seconds)
     coroutine.yield({ at = now() + seconds })
 end
