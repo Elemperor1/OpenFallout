@@ -1309,6 +1309,10 @@ namespace OFScript
                             mActorValues.current(mPlayer, AV::healRate), Restrictions::travelHealingSeconds));
                 mItemUse.update(seconds);
                 mMagic.update(seconds);
+                // The needs or an effect can have taken the last of the health: the trip ends there, with no more
+                // hours and no move (as the rest ends)
+                if (mActors.isDead(mPlayer))
+                    return;
             }
             // A little above the marker, which stands about where a character would. IsPlayerMovingIntoNewSpace is on
             // for the whole trip (the executable's worker of the fast travel sets it and clears it).

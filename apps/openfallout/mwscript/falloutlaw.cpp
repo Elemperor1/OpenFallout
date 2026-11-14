@@ -235,10 +235,15 @@ namespace OFScript
 
     bool LawGlue::detected(FormId actor)
     {
-        // Anyone else that sees the character in full
+        // Anyone else that sees the character in full, except one that fights it already (its combat target is the
+        // character, as the executable has it at 0x973550)
         for (const FalloutScript::Witness& witness : watchers(0))
-            if (witness.mActor != actor && detectionLevel(witness.mActor, actor) >= 3)
+        {
+            if (witness.mActor == actor || mHost.mCombat.target(witness.mActor) == actor)
+                continue;
+            if (detectionLevel(witness.mActor, actor) >= 3)
                 return true;
+        }
         return false;
     }
 
@@ -397,7 +402,8 @@ namespace OFScript
         input.mFactionPair = pair.mFound;
         input.mFactionReaction = pair.mReaction;
         input.mWeaponDrawn = mHost.mEquipment.weaponDrawn(other);
-        input.mSame = mHost.ownerForm(self) == mHost.ownerForm(other);
+        // The same character is the same reference (two characters of one base record are not the same)
+        input.mSame = self == other;
         return true;
     }
 
@@ -529,7 +535,8 @@ namespace OFScript
             if (!faction)
             {
                 const int karmaClass = FalloutScript::Standing::karmaClass(standingSettings(), karmaOf(theft.mVictim));
-                theft.mOwnerNotEvil = karmaClass != 2 && karmaClass != 4;
+                // (a character of an evil faction is evil whatever its karma is)
+                theft.mOwnerNotEvil = karmaClass != 2 && karmaClass != 4 && !isEvil(theft.mVictim);
             }
         }
         const FalloutScript::Outcome outcome = mLaw.steal(theft);
