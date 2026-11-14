@@ -539,10 +539,11 @@ namespace OFScript
     void FalloutScripts::killAllActors(FalloutScript::FormId killer)
     {
         // Every character and creature of the loaded cells but the player: the executables go through the list of the actors
-        // that are loaded with a body (0x11E0E80) and kill each as Kill does (0x89D900)
+        // that are loaded with a body (0x11E0E80) and kill each as Kill does (0x89D900). A character that a saved game
+        // brought back in a cell that is not loaded is known to the scripts but has no body, so it is not on that list.
         std::vector<FalloutScript::FormId> actors;
         for (const auto& [reference, ptr] : mReferences)
-            if (reference != mPlayer && isActorRecord(ptr) && ptr.isInCell())
+            if (reference != mPlayer && isActorRecord(ptr) && ptr.isInCell() && !leftLoadedCells(reference))
                 actors.push_back(reference);
         int killed = 0;
         int dead = 0;
