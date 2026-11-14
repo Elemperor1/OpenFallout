@@ -10,6 +10,7 @@
 #include <map>
 #include <set>
 #include <thread>
+#include <vector>
 
 namespace
 {
@@ -288,6 +289,39 @@ namespace
         ESM4::setLevelledAdditions({});
         ESM4::LevelledRandom gone(1);
         EXPECT_EQ(ESM4::resolveLevelledRecord<Thing>(find, findList, id(0x20), 9, gone)->mValue, 1);
+    }
+
+    TEST(ESM4LevelledTest, clearingTheAdditionsHookWaitsForTheCallThatRunsIt)
+    {
+        std::promise<void> entered;
+        std::promise<void> release;
+        std::shared_future<void> released = release.get_future().share();
+        ESM4::setLevelledAdditions([&entered, released](ESM::FormId, const std::vector<ESM4::LVLO>& entries,
+                                       std::vector<ESM4::LVLO>& merged) {
+            entered.set_value();
+            released.wait();
+            merged = entries;
+            return true;
+        });
+        std::atomic<bool> cleared{ false };
+        std::vector<ESM4::LVLO> storage;
+        const std::vector<ESM4::LVLO> entries{ entry(1, 0x21) };
+        std::thread caller([&] { ESM4::levelledEntriesOf(id(0x20), entries, storage); });
+        entered.get_future().wait();
+        std::thread clearer([&cleared] {
+            ESM4::setLevelledAdditions({});
+            cleared = true;
+        });
+        // the call has not returned, so what the hook captures is still in use and the clear has not finished
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        EXPECT_FALSE(cleared.load());
+        release.set_value();
+        caller.join();
+        clearer.join();
+        EXPECT_TRUE(cleared.load());
+        // with no hook the entries of the file stand
+        std::vector<ESM4::LVLO> other;
+        EXPECT_EQ(&ESM4::levelledEntriesOf(id(0x20), entries, other), &entries);
     }
 
     TEST(ESM4LevelledTest, clearingTheSpawnRollProviderWaitsForTheCallThatRunsIt)

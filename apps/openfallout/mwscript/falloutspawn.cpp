@@ -691,6 +691,9 @@ namespace OFScript
                 mActors.resetItems(reference);
                 // It is dressed from its record again, as what a looted corpse lost is carried again
                 mEquipment.reset(reference);
+                // The blows it took are forgotten with its health: a character that a destruction stage had taken out of
+                // the world is put back, with its own model
+                mDestruction.restore(reference);
                 ++revived;
             }
             else if (ptr.getType() == ESM4::Container::sRecordId)

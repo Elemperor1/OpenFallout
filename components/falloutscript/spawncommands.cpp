@@ -297,13 +297,8 @@ namespace FalloutScript
             return 0.0;
         });
 
-        // GetInCellParam cell, reference: GetInCell for another reference than the calling one (0x59EF60)
-        interpreter.setHandler("GetInCellParam", [&objects](CallContext& call) {
-            const FormId cell = formArgument(call, 0);
-            const FormId named = formArgument(call, 1);
-            const FormId reference = named != 0 ? named : call.mReference;
-            return reference != 0 && cell != 0 && objects.inCell(reference, cell) ? 1.0 : 0.0;
-        });
+        // (GetInCellParam is not given here: it compares the names of the cells, which is the rule of the world commands,
+        // and a handler set here would replace theirs, as the one that is set last is the one that runs)
 
         interpreter.setHandler("GetParentRef", [&world](CallContext& call) {
             return call.mReference != 0 ? static_cast<double>(world.parentOf(call.mReference)) : 0.0;

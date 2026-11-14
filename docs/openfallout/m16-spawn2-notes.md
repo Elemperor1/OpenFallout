@@ -50,13 +50,16 @@ has the same commands and was not read function by function), **seen in a runnin
 The `spawn` section is **version 3**. Version 1 held the levelled additions, the table of placements (the counter and the level and
 modifier of each reference), the respawn clocks, the item values and the names. Version 2 adds the levels that the zones locked, after
 the placements, which the table of the first wave did not have; version 3 adds the day each merchant was last restocked, after the
-inventory generations. A game saved as version 1 or 2 still loads: it has no zone locked yet (the next visit locks one) and no merchant
-restocked today (so a merchant whose day it is gets new stock once).
+inventory generations. A game saved as version 1 still loads: it has no zone locked yet (the next visit locks one). A game saved as
+version 1 or 2 has no merchant restocked today (so a merchant whose day it is gets new stock once).
 - `FalloutScripts::placedActorRoll` (mwscript/falloutspawn.cpp) is what the provider of `ESM4::setSpawnRollProvider` asks for a
   reference of a cell: the zone chain, `zoneLevel`, the player's level. Everything that rolled "level 5" for a placed actor (the
   template chain, the worn armor, the inventory, the creature body parts) goes through that provider and now gets the real roll.
 - When a cell resets, the rolls of its living actors (and of dead ones that are due and whose base has the respawn flag, which come back; a dead one that stays dead keeps what it has) are forgotten and the cached template data of the
-  actor is dropped, so the next look rolls again for the player's level of that time (`spawnCellLoaded`).
+  actor is dropped, so the next look rolls again for the player's level of that time (`spawnCellLoaded`). A dead character that comes back
+also has its destruction state cleared (as `ClearDestruction` does), so one that a destruction stage had disabled is enabled again with
+its own model. A living character of the cell is not given back its health or inventory: the executable's rule for it was not read (the
+respawn clocks say a living actor is always due).
 - `SetActorFullName` gives the name to the **base record** (0x5D1920 copies the full name of the form that is named into the base of
   the actor: +0xD0 of the actor's base, and marks it changed) and `ESM4Npc::getName` / `ESM4Creature::getName` return it, so every
   reference of that record shows it (the crosshair and the Pip-Boy ask `getName`). The text is the full name of the named form (a
@@ -146,7 +149,8 @@ cells place levelled-template actors in, at different player levels, and reads w
   package list, before `FalloutScripts::cellLoaded`), so the body, the collision shape and the packages of the actor stay those of the template
   it had until the cell is loaded again. A true fix rolls the template before the actor is inserted (a step in `insertCell`) or rebuilds the
   actor's scene objects and mind; neither is a local change. The name and the AI data it reads follow the new template.
-- The merchants' days are not saved (a loaded game restocks again on the same day) and the stock itself was not looked at in the barter menu.
+- The stock of a restocked merchant was not looked at in the barter menu (the days are saved from version 3 of the section, so a load
+  on the same day does not restock again).
 - Body cleanup (above), zone run-time timers, flora resets, the equipped and quest items of `RemoveAllTypedItems`, `PlaceAtMeHealthPercent`
   (the executable hands the percent to the placement worker 0x5C4B30; nothing here has a condition), `GetIsLockBroken`,
   `DuplicateNPCStats`, `PlaceAtReticle`, `SetCellFullName` (still only kept) and the names of the world that the HUD draws for a cell.

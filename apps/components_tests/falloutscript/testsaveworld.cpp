@@ -412,6 +412,51 @@ namespace
         EXPECT_FALSE(loaded.knows(0x05000300));
     }
 
+    TEST(FalloutScriptSaveWorldTest, aStackThatADropTookOutOfAHolderSurvivesTheSection)
+    {
+        SaveWriter out;
+        FalloutScript::writeSavedDrop(out, { true, 640, 5 });
+        FalloutScript::writeSavedDrop(out, {});
+        EXPECT_EQ(out.bytes().size(), 2 * FalloutScript::savedDropBytes(FalloutScript::referencesSectionVersion));
+
+        SaveReader in(out.bytes());
+        const FalloutScript::SavedDrop drop = FalloutScript::readSavedDrop(in, FalloutScript::referencesSectionVersion);
+        EXPECT_TRUE(drop.mDropped);
+        EXPECT_EQ(drop.mCondition, 640);
+        EXPECT_EQ(drop.mMods, 5);
+        const FalloutScript::SavedDrop plain = FalloutScript::readSavedDrop(in, FalloutScript::referencesSectionVersion);
+        EXPECT_FALSE(plain.mDropped);
+        EXPECT_EQ(plain.mCondition, 1000);
+        EXPECT_EQ(plain.mMods, 0);
+        EXPECT_EQ(in.remaining(), 0u);
+    }
+
+    TEST(FalloutScriptSaveWorldTest, aRequestSavedBeforeVersion3IsNotADropAndTakesNoBytes)
+    {
+        // versions 1 and 2 of the section have nothing of the stack after the request
+        EXPECT_EQ(FalloutScript::savedDropBytes(1), 0u);
+        EXPECT_EQ(FalloutScript::savedDropBytes(2), 0u);
+        EXPECT_EQ(FalloutScript::savedDropBytes(3), 9u);
+        for (const std::uint32_t version : { 1u, 2u })
+        {
+            SaveReader in("");
+            const FalloutScript::SavedDrop drop = FalloutScript::readSavedDrop(in, version);
+            EXPECT_FALSE(drop.mDropped);
+            EXPECT_EQ(drop.mCondition, 1000);
+            EXPECT_EQ(drop.mMods, 0);
+        }
+    }
+
+    TEST(FalloutScriptSaveWorldTest, aCutShortDropIsAnError)
+    {
+        SaveWriter out;
+        FalloutScript::writeSavedDrop(out, { true, 1, 2 });
+        std::string bytes = out.bytes();
+        bytes.pop_back();
+        SaveReader in(bytes);
+        EXPECT_THROW(FalloutScript::readSavedDrop(in, FalloutScript::referencesSectionVersion), FalloutScript::SaveError);
+    }
+
     TEST(FalloutScriptSaveWorldTest, aTruncatedSectionIsAnError)
     {
         OpenStates states;

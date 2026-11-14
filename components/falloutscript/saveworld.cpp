@@ -209,6 +209,29 @@ namespace FalloutScript
         SaveAccess<TriggerVolumes>::restore(triggers, trigger, saved);
     }
 
+    std::size_t savedDropBytes(std::uint32_t version)
+    {
+        return version >= 3 ? 1 + 4 + 4 : 0;
+    }
+
+    void writeSavedDrop(SaveWriter& out, const SavedDrop& drop)
+    {
+        out.boolean(drop.mDropped);
+        out.i32(drop.mCondition);
+        out.i32(drop.mMods);
+    }
+
+    SavedDrop readSavedDrop(SaveReader& in, std::uint32_t version)
+    {
+        SavedDrop drop;
+        if (version < 3)
+            return drop;
+        drop.mDropped = in.boolean();
+        drop.mCondition = in.i32();
+        drop.mMods = in.i32();
+        return drop;
+    }
+
     void writeOpenStates(OpenStates& states, SaveWriter& out)
     {
         SaveAccess<OpenStates>::write(states, out);

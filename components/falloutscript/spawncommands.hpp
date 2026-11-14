@@ -115,8 +115,9 @@ namespace FalloutScript
 
     /// Gives the commands that bring things into the world and take them out to the interpreter: PlaceLeveledActorAtMe,
     /// PlaceAtMeHealthPercent, Exists, RemoveMe, DropMe, Drop, RemoveAllTypedItems, ResetInventory, ResetInterior,
-    /// SetZoneRespawns, PurgeCellBuffers, GetInCellParam, GetParentRef, GetContainerInventoryCount, SetItemValue,
-    /// SetActorFullName and SetCellFullName. Those that the command table does not have are left out.
+    /// SetZoneRespawns, PurgeCellBuffers, GetParentRef, GetContainerInventoryCount, SetItemValue, SetActorFullName
+    /// and SetCellFullName. Those that the command table does not have are left out. GetInCellParam is one of the world
+    /// commands (addWorldCommands): it compares the names of the cells.
     struct SpawnParts
     {
         ActorState& mActors;

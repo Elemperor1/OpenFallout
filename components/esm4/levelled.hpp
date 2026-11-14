@@ -110,7 +110,8 @@ namespace ESM4
     };
     using SpawnRollProvider = std::function<SpawnRoll(ESM::FormId reference)>;
     // Setting or clearing a provider waits for the calls that are running one already (so that the host that it captures
-    // can go away after clearing it; the wait ends after a few seconds at most). The same holds for the additions above.
+    // can go away after clearing it; the wait ends when they have returned). The same holds for the additions above. A
+    // hook must not set or clear a hook itself.
     void setSpawnRollProvider(SpawnRollProvider provider);
     // The roll of the reference: the provider's, or the fallback level with no modifier. It is called from any thread.
     SpawnRoll spawnRollOf(ESM::FormId reference, int fallbackLevel);

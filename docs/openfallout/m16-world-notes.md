@@ -158,9 +158,12 @@ writes (keys `World.<Table>.<hex>`); no new section was added to the save.
 
 `core.worldCommands` (`apps/openfallout/mwlua/falloutworldbindings.cpp`, in Lua `r.core.worldCommands`) runs a command of
 the script language by its name, the way a condition calls it: `run(name, reference, arguments)` queues the call for the
-thread of the frame and gives a number; `result(number)` gives the answer once the frame has run it (nil before). A
-reference and an argument are numbers, forms as text (`"0x..."` or `"FormId:0x..."`) or text; a text that is a form
-also carries its number. Round `rounds/m16-world-sky.json` with `scenarios/m16_world_sky.lua` uses it.
+thread of the frame and gives a number; `result(number)` gives the answer once the frame has run it (nil before). The
+second parameter, `reference`, is the reference the command is called on: a form id as text (`"0x..."` or
+`"FormId:0x..."`), `""` or nil for none (the command then runs with no calling reference, as from a quest). It is not
+one of the command's arguments, which are the third parameter, a list. An argument is a number, a form as text (the
+same forms) or text; a text that is a form also carries its number. Round `rounds/m16-world-sky.json` with
+`scenarios/m16_world_sky.lua` uses it.
 
 ## What was run
 
