@@ -345,6 +345,11 @@ namespace
         EXPECT_NEAR(runner.call("GetStartingAngle", door, { number('Z') }), 90.0, 1e-4);
         EXPECT_EQ(runner.call("GetStartingPos", door, { number('Q') }), 0.0);
         EXPECT_EQ(runner.call("GetStartingPos", guard, { number('X') }), 0.0);
+        // the letter as text, as a call from Lua gives it
+        EXPECT_EQ(runner.call("GetStartingPos", door, { text("Y") }), 20.0);
+        EXPECT_EQ(runner.call("GetStartingPos", door, { text("z") }), 30.0);
+        EXPECT_NEAR(runner.call("GetStartingAngle", door, { text("Z") }), 90.0, 1e-4);
+        EXPECT_EQ(runner.call("GetStartingPos", door, { text("YY") }), 0.0);
     }
 
     TEST(FalloutScriptWorldCommandsTest, set_at_start_makes_the_pose_it_has_now_the_start)
