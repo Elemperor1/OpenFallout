@@ -597,6 +597,48 @@ namespace
         EXPECT_FALSE(g.mLaw.anyTrespass());
     }
 
+    TEST(FalloutScriptCrimeTest, the_characters_an_alarm_turned_on_the_player_are_kept_in_a_save)
+    {
+        Fixture f;
+        f.mLaw.addAlarmResponder(doc);
+        f.mLaw.addAlarmResponder(trudy);
+        f.mLaw.addAlarmResponder(0); // no one
+        f.mLaw.removeAlarmResponder(trudy);
+        f.mLaw.addAlarmResponder(sheriff);
+        EXPECT_TRUE(f.mLaw.isAlarmResponder(doc));
+        EXPECT_FALSE(f.mLaw.isAlarmResponder(trudy));
+        FalloutScript::SaveWriter out;
+        FalloutScript::writeLaw(f.mLaw, out);
+        const std::string bytes = out.take();
+
+        Fixture g;
+        g.mLaw.addAlarmResponder(raider); // what the game before the load had is not part of it
+        FalloutScript::SaveReader in(bytes);
+        FalloutScript::readLaw(g.mLaw, in, FalloutScript::lawSectionVersion);
+        EXPECT_THAT(g.mLaw.alarmResponders(), UnorderedElementsAre(doc, sheriff));
+        EXPECT_FALSE(g.mLaw.isAlarmResponder(raider));
+        g.mLaw.clear();
+        EXPECT_THAT(g.mLaw.alarmResponders(), IsEmpty());
+    }
+
+    TEST(FalloutScriptCrimeTest, a_law_saved_before_the_alarm_characters_were_kept_loads_with_none)
+    {
+        Fixture f;
+        FalloutScript::SaveWriter out;
+        FalloutScript::writeLaw(f.mLaw, out);
+        std::string bytes = out.take();
+        // version 1 ends where the list of the alarm characters (here an empty one, a count of 4 bytes) begins
+        ASSERT_GE(bytes.size(), 4u);
+        bytes.resize(bytes.size() - 4);
+
+        Fixture g;
+        g.mLaw.addAlarmResponder(doc);
+        FalloutScript::SaveReader in(bytes);
+        FalloutScript::readLaw(g.mLaw, in, 1);
+        EXPECT_THAT(g.mLaw.alarmResponders(), IsEmpty());
+        EXPECT_EQ(in.remaining(), 0u);
+    }
+
     TEST(FalloutScriptCrimeTest, a_cell_that_is_off_limits_gives_no_warning)
     {
         Fixture f;

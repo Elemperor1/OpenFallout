@@ -129,7 +129,8 @@ namespace ESM4
     {
         /// The calls of a hook that are running on some thread. A call takes a copy of the hook and runs it outside the
         /// lock, so a hook that is cleared (the host that its copy captures goes away right after) waits for the calls that
-        /// hold a copy to return. The wait is bounded: a call that never returns must not keep the process from ending.
+        /// hold a copy to return. The wait has no limit: the host may not go away under a call that is still running, and a
+        /// hook is a short lookup that does not wait for the thread that clears it. A hook must not clear a hook itself.
         class RunningCalls
         {
         public:
@@ -139,9 +140,8 @@ namespace ESM4
             void leave() { mCount.fetch_sub(1, std::memory_order_acq_rel); }
             void drain() const
             {
-                const auto limit = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-                while (mCount.load(std::memory_order_acquire) != 0 && std::chrono::steady_clock::now() < limit)
-                    std::this_thread::yield();
+                while (mCount.load(std::memory_order_acquire) != 0)
+                    std::this_thread::sleep_for(std::chrono::microseconds(100));
             }
 
             class Call

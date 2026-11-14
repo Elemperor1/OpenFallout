@@ -882,8 +882,17 @@ namespace OFMechanics
         if (found == mMinds.end() || found->second->mPackage == nullptr)
             return;
         found->second->mDurationHundredths = hundredths;
-        // (the package begins again from now, as the duration counts from when the call is made)
+        // (the package begins again from now, as the duration counts from when the call is made; one that had run out
+        // runs again, and runs out again at the end of the new duration)
         found->second->mStartedHours = gameHours(OFBase::Environment::get().getWorld()->getTimeStamp());
+        if (found->second->mExpired)
+        {
+            // (it is not done any more: a Dialogue package says its line again, and runs out again with the new duration,
+            // or with none when the duration is 0)
+            found->second->mExpired = false;
+            found->second->mDone.erase(found->second->mPackage);
+            found->second->mChangeTold = false;
+        }
         keepState(*found->second);
     }
 
@@ -1022,7 +1031,7 @@ namespace OFMechanics
             int claims = 0;
             if (frame.mMinds != nullptr)
                 for (const auto& [key, other] : *frame.mMinds)
-                    if (other.get() != &mind && other->mPackage != nullptr && !other->mAtGoal
+                    if (other.get() != &mind && other->mPackage != nullptr && !other->mAtGoal && !other->mExpired
                         && other->mGoal.mBehaviour == ESM4::PackageBehaviour::Use && other->mGoal.mTarget == furniture)
                         ++claims;
             return claims;
@@ -2427,6 +2436,16 @@ namespace OFMechanics
                     review(frame, mind);
             }
             mind.mWait = std::max(0.f, mind.mWait - duration);
+
+            // A package that ran out (SetPackDuration) is over: when no other package is on, the review keeps it as the one
+            // that is followed, but what it asks (a walk, a follow, a roam) is not carried on: the character stays where
+            // it is until a package comes on
+            if (mind.mPackage != nullptr && mind.mExpired)
+            {
+                if (mind.mWalking)
+                    stopWalking(mind);
+                continue;
+            }
 
             switch (mind.mGoal.mBehaviour)
             {

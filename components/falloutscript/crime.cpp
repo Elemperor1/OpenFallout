@@ -142,6 +142,7 @@ namespace FalloutScript
         mNextCrime = 1;
         mClock = 0;
         mTrespass.clear();
+        mAlarmResponders.clear();
         mLineVictim = 0;
     }
 
@@ -647,6 +648,32 @@ namespace FalloutScript
         mTrespass.erase(watcher);
     }
 
+    void Law::addAlarmResponder(FormId actor)
+    {
+        if (actor == 0)
+            return;
+        const std::lock_guard lock(mMutex);
+        mAlarmResponders.insert(actor);
+    }
+
+    void Law::removeAlarmResponder(FormId actor)
+    {
+        const std::lock_guard lock(mMutex);
+        mAlarmResponders.erase(actor);
+    }
+
+    bool Law::isAlarmResponder(FormId actor)
+    {
+        const std::lock_guard lock(mMutex);
+        return mAlarmResponders.count(actor) != 0;
+    }
+
+    std::vector<FormId> Law::alarmResponders()
+    {
+        const std::lock_guard lock(mMutex);
+        return std::vector<FormId>(mAlarmResponders.begin(), mAlarmResponders.end());
+    }
+
     int Law::trespassLevel(FormId watcher)
     {
         const std::lock_guard lock(mMutex);
@@ -812,9 +839,10 @@ namespace FalloutScript
                 out.f64(state.mTimer);
                 out.boolean(state.mAlarmed);
             }
+            writeForms(out, std::vector<FormId>(law.mAlarmResponders.begin(), law.mAlarmResponders.end()));
         }
 
-        static void read(Law& law, SaveReader& in, std::uint32_t)
+        static void read(Law& law, SaveReader& in, std::uint32_t version)
         {
             std::map<FormId, Law::FactionRecord> factions;
             for (std::size_t i = 0, count = in.count(15); i < count; ++i)
@@ -879,6 +907,13 @@ namespace FalloutScript
                 if (watcher)
                     trespass[*watcher] = state;
             }
+            // (a game saved before the section kept them has none: the alarm that was sounding is over)
+            std::set<FormId> alarmResponders;
+            if (version >= 2)
+            {
+                const std::vector<FormId> forms = readForms(in);
+                alarmResponders.insert(forms.begin(), forms.end());
+            }
             const std::lock_guard lock(law.mMutex);
             law.mFactions = std::move(factions);
             law.mActorMinor = std::move(actorMinor);
@@ -894,6 +929,7 @@ namespace FalloutScript
             law.mCrimes = std::move(crimes);
             law.mNextCrime = std::max(nextCrime, 1);
             law.mTrespass = std::move(trespass);
+            law.mAlarmResponders = std::move(alarmResponders);
             // The clock and the stamps of the crimes are not saved: a crime that was loaded counts as made at the moment of
             // the load, so the clock starts again and the loaded crimes are stamped 0 (the clock of a game that was
             // running has gone on past the age that the yield forgets them at)

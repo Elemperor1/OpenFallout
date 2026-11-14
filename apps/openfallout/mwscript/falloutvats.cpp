@@ -356,26 +356,28 @@ namespace OFScript
         }
         namespace AV = FalloutScript::ActorValue;
         mActorValues.damage(mPlayer, AV::actionPoints, state.mCost);
+        // The attack is being played from the moment it is made: GetVATSValue answers for it until the screen closes or
+        // the next attack, and the perks that the blow asks about (their conditions read it) must see this attack, not
+        // the one before. The record is made with the hit set; what the blow turned out to be is written into it
+        // afterwards.
+        namespace VV = FalloutScript::VatsValue;
+        VV::Action played = vatsActionFor(target, stats.mWeapon, aimed->mGroup, apart);
+        // The kind of the attack by the weapon's animation type: the hands and guns keep theirs (0 to 8), a launcher is
+        // 0x10, a grenade 0x11 and a mine 0x13 (a choice of the port; the executable's numbering is in its table at
+        // 0x66DE14 and is not tied to the weapon records)
+        const std::uint32_t type = played.mWeaponKind;
+        played.mKind = type <= 8 ? type : type == 9 ? 0x10 : type == 10 ? 0x11 : 0x13;
+        setVatsValue(VV::Playback, played);
         // The blow tells the part by its type
         const FireResult fired = fire(mPlayer, target, aimed->mType, aimed->mChance / 100.0, true);
         result.mHit = fired.mHit;
         result.mStrike = fired.mStrike;
-        // The attack is being played: GetVATSValue answers for it until the screen closes or the next attack
-        {
-            namespace VV = FalloutScript::VatsValue;
-            VV::Action played = vatsActionFor(target, stats.mWeapon, aimed->mGroup, apart);
-            // The kind of the attack by the weapon's animation type: the hands and guns keep theirs (0 to 8), a launcher is
-            // 0x10, a grenade 0x11 and a mine 0x13 (a choice of the port; the executable's numbering is in its table at
-            // 0x66DE14 and is not tied to the weapon records)
-            const std::uint32_t type = played.mWeaponKind;
-            played.mKind = type <= 8 ? type : type == 9 ? 0x10 : type == 10 ? 0x11 : 0x13;
-            played.mHits = fired.mHit;
-            if (fired.mStrike.mKilled)
-                played.mFlags |= VV::Fatal;
-            if (fired.mStrike.mCrippled)
-                played.mFlags |= VV::LimbCrippled;
-            setVatsValue(VV::Playback, played);
-        }
+        played.mHits = fired.mHit;
+        if (fired.mStrike.mKilled)
+            played.mFlags |= VV::Fatal;
+        if (fired.mStrike.mCrippled)
+            played.mFlags |= VV::LimbCrippled;
+        setVatsValue(VV::Playback, played);
         if (!fired.mFired)
             result.mRefused = fired.mOutOfAmmo ? "ammo" : "points";
         return result;

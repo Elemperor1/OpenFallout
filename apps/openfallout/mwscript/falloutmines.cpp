@@ -16,6 +16,7 @@
 #include <components/falloutscript/arguments.hpp>
 #include <components/falloutscript/combatcommands.hpp>
 #include <components/falloutscript/placedexplosives.hpp>
+#include <components/falloutscript/worldrules.hpp>
 
 #include "falloutlaw.hpp"
 
@@ -156,12 +157,32 @@ namespace OFScript
         const osg::Vec3f centre(laid.mPosition[0], laid.mPosition[1], laid.mPosition[2]);
         const double buffer = gameSetting("fExplosionLOSBuffer", 16.0);
         OFBase::World* world = OFBase::Environment::get().getWorld();
-        // What stands in the way of the blast keeps it off (a ray from just above the explosion to the middle of the target)
-        const auto reaches = [&](const osg::Vec3f& at) {
+        // What stands in the way of the blast keeps it off (a ray from just above the explosion to the middle of the target).
+        // The ray of a thing that is not a character ends inside the box of that thing, and what it hits within the length
+        // it travels inside the box is the thing itself, not a wall (the ray cast has no reference to leave out, and a large
+        // solid object would keep the blast off itself).
+        const auto reaches = [&](const OFWorld::Ptr& target) {
+            const osg::Vec3f at = target.getRefData().getPosition().asVec3();
             const osg::Vec3f from = centre + osg::Vec3f(0.f, 0.f, 8.f);
-            const osg::Vec3f to = at + osg::Vec3f(0.f, 0.f, 48.f);
+            // (a thing that is not a character is aimed at in the middle of its box, which is inside it however low it is)
+            osg::Vec3f extents;
+            const bool character = isCharacterOrCreature(target);
+            // (the box of the model is as large as the scale of the reference makes it; its turn and its offset are not known)
+            if (!character)
+                extents = world->getHalfExtents(target) * target.getCellRef().getScale();
+            const osg::Vec3f to = at + osg::Vec3f(0.f, 0.f, character ? 48.f : extents.z());
             const float apart = (to - from).length();
-            return apart < 1.f || world->getDistToNearestRayHit(from, to - from, apart) >= apart - static_cast<float>(buffer);
+            if (apart < 1.f)
+                return true;
+            double inside = 0.0;
+            if (!character)
+            {
+                inside = FalloutScript::World::depthInBox({ from.x(), from.y(), from.z() }, { to.x(), to.y(), to.z() },
+                    { at.x() - extents.x(), at.y() - extents.y(), at.z() },
+                    { at.x() + extents.x(), at.y() + extents.y(), at.z() + 2.0 * extents.z() });
+            }
+            return world->getDistToNearestRayHit(from, to - from, apart)
+                >= apart - static_cast<float>(buffer) - static_cast<float>(inside);
         };
         int actorsHit = 0;
         int objectsHit = 0;
@@ -181,7 +202,7 @@ namespace OFScript
             if (!inSpaceOfLaid(laid, ptr))
                 continue;
             const osg::Vec3f where = ptr.getRefData().getPosition().asVec3();
-            if ((where - centre).length() > radius || !reaches(where))
+            if ((where - centre).length() > radius || !reaches(ptr))
                 continue;
             // A blast of an attack that was to do no damage is still a hit (the victim hears of it, the law judges it and it
             // fights back, as for a blow); only its health and its destruction stay as they were
@@ -241,8 +262,10 @@ namespace OFScript
             }
             ++actorsHit;
         }
-        // The things that can be destroyed take the damage as a blow, by the rule of destruction
-        if (damage > 0)
+        // Every thing that the blast reaches hears of it as of a blow (its script's OnHit blocks), and the things that can be
+        // destroyed take the damage as a blow, by the rule of destruction. A blast of an attack that was to do no damage is
+        // still a hit, as for the characters.
+        if (damage > 0 || laid.mNoDamage)
         {
             std::vector<FalloutScript::FormId> objects;
             for (const auto& [reference, ptr] : mReferences)
@@ -256,9 +279,17 @@ namespace OFScript
             for (const FalloutScript::FormId reference : objects)
             {
                 const OFWorld::Ptr ptr = findReference(reference);
-                if (ptr.isEmpty() || !reaches(ptr.getRefData().getPosition().asVec3()))
+                if (ptr.isEmpty() || !reaches(ptr))
                     continue;
-                mDestruction.damage(reference, damage);
+                if (damage > 0)
+                    mDestruction.damage(reference, damage);
+                // An object has no health and is not attacked in the sense of GetAttacked (as for a blow of a weapon), but its
+                // script hears of the blast
+                FalloutScript::CombatState::Hit struck;
+                struck.mAttacker = laid.mOwner;
+                struck.mWeapon = laid.mWeapon;
+                struck.mDamage = damage;
+                mCombat.noteHit(reference, struck, true);
                 ++objectsHit;
             }
         }

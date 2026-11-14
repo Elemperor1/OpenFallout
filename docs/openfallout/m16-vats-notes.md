@@ -55,8 +55,9 @@ What the code does (all of it tested in `testvatsvalue.cpp`): the table above, e
 * When the state exists in the port. The executable has the state while the game plays V.A.T.S.; the port has it in two
   places: `vatsParts` sets the selecting mode (2) with the target and the part while it works out the chance of each part, so
   that a perk whose condition asks GetVATSValue (the entry point 8 of the hit chance) sees the part that is aimed at, and puts
-  back what was there; `vatsAttack` sets the playback mode (4) after the blow, with the hit, the kill (0x10) and the cripple
-  (0x80) of the result. `setVatsOpen(false)` clears it. The flags 0x04, 0x20 and 0x40 are never set (nothing in the port says
+  back what was there; `vatsAttack` sets the playback mode (4) before the blow (so the perk conditions that the blow asks
+  about see this attack, not the one before it) and again after it, with the hit, the kill (0x10) and the cripple (0x80) of the
+  result. `setVatsOpen(false)` clears it. The flags 0x04, 0x20 and 0x40 are never set (nothing in the port says
   the blow took a limb off at that point), so values 8, 12, 13 answer 0.
 * The kind of the action by the weapon. The executable's kinds are numbers of its own; the port writes 0 to 8 for a weapon of
   the animation types 0 to 8, 0x10 for a launcher, 0x11 for a grenade and 0x13 for a mine; the kind of an attack the player
@@ -123,6 +124,13 @@ Rules read in the executable, all in `placedexplosives.cpp` and tested in `testp
   with the no-damage flag does no damage (explosives section version 2). PlaceAtReticle still puts the object in front of the
   player: the hit position of the reticle is known, but the placement path (`placeAtMe`) takes a reference, a distance and a
   direction, not a position.
+* Follow-up fixes: every thing that is not a character and that the blast reaches hears of it as of a blow of a weapon (the
+  last hit is noted, so its `OnHit` blocks run), a blast of an attack with the no-damage flag included; only the destruction damage
+  stays conditional on the blast having damage. The ray that tells whether something stands in the way of the blast ends inside the
+  box of such a thing (half extents of the world, standing on its feet), and what the ray hits within the length it travels inside
+  that box is the thing and not a wall, so a large solid object does not keep the blast off itself (the world's ray cast has no
+  reference to leave out). The box is upright and axis aligned, so for a thing that is turned or off centre the tolerance is off by
+  that difference.
 * Delay (0x9C3D1C to 0x9C3D5E): after it is set off a mine counts down fMinesDelayMin (0.2), and for the player, that plus the
   Explosives skill (floor, 0 to 100) times the record's timer over 100.
 * Disarm (0x9C43E0): needs the can-be-disabled flag and not to be disabled yet; sets run-time flag 0x200; the player gets

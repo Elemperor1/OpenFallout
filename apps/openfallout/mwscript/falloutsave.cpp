@@ -488,6 +488,7 @@ namespace FalloutScript
         static constexpr std::size_t requestBytes = 4 + 4 + 4 + 1 + 4 + 1 + 24;
         /// (version 2 of the section adds the count of a stack that was dropped)
         static constexpr std::size_t requestCountBytes = 4;
+        /// (version 3 of the section adds what is needed to give a dropped stack back: see savedDropBytes)
 
         static void writeReferences(OFScript::FalloutScripts& host, SaveWriter& out)
         {
@@ -638,6 +639,9 @@ namespace FalloutScript
                     saved.mPosition = request.mWhere.mPosition;
                     saved.mAngle = request.mWhere.mAngle;
                     saved.mCount = request.mCount;
+                    saved.mDropped = request.mDropped;
+                    saved.mCondition = request.mCondition;
+                    saved.mMods = request.mMods;
                     requests.push_back(saved);
                 }
             }
@@ -651,6 +655,7 @@ namespace FalloutScript
                 out.f32(request.mDistance);
                 writePlace(out, { request.mCell, request.mPosition, request.mAngle });
                 out.i32(request.mCount);
+                writeSavedDrop(out, { request.mDropped, request.mCondition, request.mMods });
             }
         }
 
@@ -720,7 +725,8 @@ namespace FalloutScript
                     made.push_back(entry);
             }
             std::vector<OFScript::PendingSave::Request> requests;
-            const std::size_t asked = in.count(requestBytes + (version >= 2 ? requestCountBytes : 0));
+            const std::size_t asked
+                = in.count(requestBytes + (version >= 2 ? requestCountBytes : 0) + savedDropBytes(version));
             for (std::size_t i = 0; i < asked; ++i)
             {
                 const std::optional<FormId> id = in.form();
@@ -733,14 +739,28 @@ namespace FalloutScript
                 const bool placed = readPlace(in, where);
                 // (a game saved before the count was kept has the one object)
                 request.mCount = version >= 2 ? std::max(in.i32(), 1) : 1;
-                if (!id || !base || !near || !placed || request.mDirection > 3)
+                // (an older save does not say that the request was a drop, so a stack that no object is made for is lost,
+                // as it was)
+                const SavedDrop drop = readSavedDrop(in, version);
+                if (!id || !base || !near || request.mDirection > 3)
                     continue;
+                // A cell of a plugin that is not loaded now makes the place of the request unknown; a stack that a drop took
+                // out of its holder is still owed to the holder, which is where the request gives it back
+                if (!placed)
+                {
+                    if (!drop.mDropped)
+                        continue;
+                    where.mCell = ESM::RefId();
+                }
                 request.mId = *id;
                 request.mBase = *base;
                 request.mNear = *near;
                 request.mCell = where.mCell;
                 request.mPosition = where.mPosition;
                 request.mAngle = where.mAngle;
+                request.mDropped = drop.mDropped;
+                request.mCondition = drop.mCondition;
+                request.mMods = drop.mMods;
                 requests.push_back(request);
             }
 
@@ -1133,11 +1153,11 @@ namespace OFScript
             "characters", 1, [this](FalloutScript::SaveWriter& out) { Access::writeCharacters(*this, out); },
             [this](
                 FalloutScript::SaveReader& in, std::uint32_t version) { Access::readCharacters(*this, in, version); });
-        sections.push_back(
-            { "references", 2, [this](FalloutScript::SaveWriter& out) { Access::writeReferences(*this, out); },
-                [this](FalloutScript::SaveReader& in, std::uint32_t version) {
-                    Access::readReferences(*this, in, version);
-                } });
+        sections.push_back({ "references", FalloutScript::referencesSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { Access::writeReferences(*this, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                Access::readReferences(*this, in, version);
+            } });
         return sections;
     }
 

@@ -97,8 +97,10 @@ script's entries put in. `FalloutScript::LevelledLists` keeps the additions (the
   lists in it are rolled again, and what the character wears is forgotten so that it is dressed from its record again (as for a
   character that comes back by respawn). `SetZoneRespawns zone, value` sets or clears the flag that says the zone never resets (value 0 sets it,
   0x5DAB90). `PurgeCellBuffers` (0x5B6CD0) drops memory the games keep: nothing is kept here, so nothing is done.
-- `GetInCellParam cell, reference` is `GetInCell` for another reference (0x59EF60; exec 0x5C7590); `GetParentRef` gives the reference
-  that enables the calling one (the enable parent of its record: 0x5CE630); `GetContainerInventoryCount` is the total of the items
+- `GetInCellParam cell, reference` is a test of cell names for another reference (0x59EF60; exec 0x5C7590): it is one of the world
+  commands (a prefix of the name of the cell, see the world notes), and these commands do not set it, so that theirs is not replaced;
+  `GetParentRef` gives the reference that enables the calling one (the enable parent of its record: 0x5CE630);
+  `GetContainerInventoryCount` is the total of the items
   (0x5E0100; chosen: the count is the sum of the stacks); `SetItemValue` keeps a value that every trade uses instead of the one of the
   record (0x5D3E30); `SetActorFullName` and `SetCellFullName` keep the message that gives the name (0x5D1920, 0x5D1890; the world
   does not show it yet).
@@ -188,8 +190,13 @@ with 0 scenario errors and the engine never frontmost (Fallout 3: 131 s from a n
 - A reference's own `XEZN` (a zone set on the reference) is ignored: the loader does not keep it.
 - `RemoveMe` and `DropMe` return "stop the script" in the executable; the interpreter has no way to stop the calling script.
 - The names of `SetActorFullName` and `SetCellFullName` are kept, not shown.
-- A pending `PlaceAtMe` of a stack (a dropped item with a count) that was not yet made when the game was saved is made again with count 1.
+- A pending `PlaceAtMe` that was not yet made when the game was saved is made again, with its count. From version 3 of the `references`
+  section a request also keeps whether it was a drop (and the condition and the mods of the stack), so a stack that no object can be
+  made for after a load goes back to its holder as it would have before. A game saved as version 2 has no such mark: its pending
+  drops are made again as plain objects, and the stack is lost if no object can be made.
 - `Drop` and `DropMe` take the stacks out of the holder at once and the world makes the object at the start of the next frame. The count,
   the condition and the mods of a stack are part of the request from the moment it is published, and when no object can be made (the
-  holder is not in a loaded cell by then, or the world refuses it) the stack goes back to the holder with its condition and mods. A
-  request that was saved before it was made has no holder to give back to after a load (it is made again as above).
+  holder is not in a loaded cell by then, or the world refuses it) the stack goes back to the holder with its condition and mods. When
+  the object is made, its script runs its `OnDrop` block (after its `OnLoad`), with the holder that dropped it as the actor; chosen:
+  the executable's rule for when the block runs for a drop that a script makes was not read. `OnDrop` is not raised for an item that
+  leaves a holder by `RemoveItem` or `RemoveMe`.

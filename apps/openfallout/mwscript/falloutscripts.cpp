@@ -728,12 +728,15 @@ namespace OFScript
         reportMissingCommands();
         mGlobals.clear();
         mDisabled.clear();
+        // A quick save that a script asked for in the game that ends is not made in the next one
+        mQuickSaveRequested = false;
         {
             const std::lock_guard lock(mTalkingActorMutex);
             mTalkingActors.clear();
         }
         mPendingToggle.clear();
         mPendingLoad.clear();
+        mPendingDropped.clear();
         mLoadWhenEnabled.clear();
         mPendingEnabledLoad.clear();
         mPendingMoves.clear();
@@ -1353,6 +1356,21 @@ namespace OFScript
             }
             else
                 mObjects.setLoaded(reference, true);
+        }
+        // The objects that a dropped stack became have their script now: the OnDrop block of it runs after its OnLoad, for
+        // the holder that dropped it. A block that names a container is for that container, or for a character made from
+        // that record.
+        std::vector<std::pair<FalloutScript::FormId, FalloutScript::FormId>> dropped;
+        dropped.swap(mPendingDropped);
+        for (const auto& [object, holder] : dropped)
+        {
+            FalloutScript::FormId base = 0;
+            baseFormOf(holder, base);
+            mObjects.trigger(object, FalloutScript::BlockType::OnDrop, holder,
+                [holder, base](const FalloutScript::Block& block) {
+                    return block.mNames != FalloutScript::BlockNames::Form || block.mForm == holder
+                        || block.mForm == base;
+                });
         }
         std::vector<FalloutScript::FormId> enabled;
         enabled.swap(mPendingEnabledLoad);
@@ -6615,6 +6633,9 @@ namespace OFScript
                 ref.getPtr(), near, near.getCell(), request.mDirection, request.mDistance);
             spawnPlaced(id, placed, guessed);
             adoptObject(id, placed, true);
+            // The stack is in the world now, which is when the item hears that it was dropped
+            if (request.mDropped)
+                mPendingDropped.emplace_back(id, request.mNear);
         }
         catch (const std::exception& error)
         {
@@ -6692,9 +6713,10 @@ namespace OFScript
             const std::lock_guard lock(mMadeMutex);
             for (const PendingSave::Request& request : pending.mRequests)
             {
+                // (a stack that a drop took out of its holder is given back to it if the object cannot be made now)
                 mPendingMade[request.mId] = MadeObject{ request.mBase, request.mNear, request.mDirection,
-                    request.mDistance, Place{ request.mCell, request.mPosition, request.mAngle }, request.mCount, false, 1000,
-                    0 };
+                    request.mDistance, Place{ request.mCell, request.mPosition, request.mAngle }, request.mCount,
+                    request.mDropped, request.mCondition, request.mMods };
                 mMadeBases[request.mId] = request.mBase;
             }
             pending.mRequests.clear();

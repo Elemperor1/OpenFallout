@@ -29,7 +29,6 @@ namespace
     constexpr FormId crate = 0x01000101;
     constexpr FormId crateBase = 0x01000201;
     constexpr FormId cellA = 0x01000A00;
-    constexpr FormId cellB = 0x01000A01;
     constexpr FormId gangerBase = 0x01000500;
     constexpr FormId zone = 0x01000C00;
     constexpr FormId pistol = 0x01000400;
@@ -574,35 +573,13 @@ namespace
         EXPECT_EQ(setup.mWorld.mPurged, 1);
     }
 
-    TEST(FalloutScriptSpawnCommandsTest, aNamedReferenceIsInACellByTheCellOfThatReference)
+    TEST(FalloutScriptSpawnCommandsTest, theCommandThatComparesCellNamesIsLeftToTheWorldCommands)
     {
+        // GetInCellParam is a test of names (a prefix of the name of the cell the reference is in): a handler that these
+        // commands set would replace the one of the world commands, which is installed first
         Runner setup;
-        setup.mObjectWorld.mCells = { { guard, cellA }, { crate, cellB } };
-        ScriptBuilder builder;
-        const std::uint16_t a = builder.form(cellA);
-        const std::uint16_t other = builder.form(crate);
-        builder.code(scriptName() + begin(BlockType::OnActivate)
-            + setTo(var('s', 1), callToken(OpGetInCellParam, arguments(2).add(refArg(a)).add(refArg(other))))
-            + setTo(var('s', 2), callToken(OpGetInCellParam, arguments(2).add(refArg(a)).add(refArg(other))))
-            + end());
-        builder.variable(1, integerVariable, "other").variable(2, integerVariable, "again");
-
-        setup.run(builder);
-
-        EXPECT_EQ(setup.variable(1), 0); // the crate is in the other cell
-        EXPECT_EQ(setup.variable(2), 0);
-        // the calling reference is in the first
-        ScriptBuilder own;
-        const std::uint16_t cellIndex = own.form(cellA);
-        const std::uint16_t self = own.form(guard);
-        own.code(scriptName() + begin(BlockType::OnActivate)
-            + setTo(var('s', 1), callToken(OpGetInCellParam, arguments(2).add(refArg(cellIndex)).add(refArg(self))))
-            + end());
-        own.variable(1, integerVariable, "own");
-        Runner second;
-        second.mObjectWorld.mCells = { { guard, cellA } };
-        second.run(own);
-        EXPECT_EQ(second.variable(1), 1);
+        EXPECT_FALSE(setup.mInterpreter.hasHandler(OpGetInCellParam));
+        EXPECT_TRUE(setup.mInterpreter.hasHandler(OpGetParentRef));
     }
 
     TEST(FalloutScriptSpawnCommandsTest, theParentIsWhatTheHostSays)

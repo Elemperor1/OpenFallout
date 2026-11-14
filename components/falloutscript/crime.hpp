@@ -7,6 +7,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <string_view>
 #include <vector>
 
@@ -359,6 +360,14 @@ namespace FalloutScript
         /// Every watcher that has a trespass package, including the ones that a save brought back
         std::vector<FormId> trespassWatchers();
 
+        /// The characters that fight the player because an alarm turned them on it: what the alarm sounding stands for. They
+        /// are kept with the law, so that a game saved in the middle of such a fight loads with the alarm still sounding
+        /// (from version 2 of the section).
+        void addAlarmResponder(FormId actor);
+        void removeAlarmResponder(FormId actor);
+        bool isAlarmResponder(FormId actor);
+        std::vector<FormId> alarmResponders();
+
         // ---- the karma ----
 
         struct KarmaChange
@@ -453,11 +462,12 @@ namespace FalloutScript
         /// is called with the lock held.
         std::vector<FormId> forget(const std::function<bool(const Crime&)>& drop);
         std::map<FormId, Trespass> mTrespass;
+        std::set<FormId> mAlarmResponders;
         FormId mLineVictim = 0;
     };
 
-    /// The section of a saved game that holds the law
-    constexpr std::uint32_t lawSectionVersion = 1;
+    /// The section of a saved game that holds the law (version 2 adds the characters that an alarm turned on the player)
+    constexpr std::uint32_t lawSectionVersion = 2;
     void writeLaw(Law& law, SaveWriter& out);
     void readLaw(Law& law, SaveReader& in, std::uint32_t version);
 

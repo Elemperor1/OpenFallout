@@ -64,6 +64,11 @@ namespace OFScript
             osg::Vec3f mAngle;
             /// How many of an item it stands for (a dropped stack)
             int mCount = 1;
+            /// A stack that Drop or DropMe took out of the holder mNear: how worn it was and its mods, to give it back to
+            /// the holder if no object is made
+            bool mDropped = false;
+            int mCondition = 1000;
+            int mMods = 0;
         };
         std::vector<Request> mRequests;
 

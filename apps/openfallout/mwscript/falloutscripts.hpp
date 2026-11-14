@@ -3033,6 +3033,9 @@ namespace OFScript
         /// The objects PlaceAtMe made. Scripts name one by a number of its own (0xFF and a counter, as the games do),
         /// which is not the id the world gave it. An object that is asked for waits for the start of the next frame.
         std::map<FalloutScript::FormId, MadeObject> mPendingMade;
+        /// The objects that were made from a dropped stack this frame, with the holder that dropped each: their OnDrop
+        /// blocks run once the objects have been loaded (the thread of the frame only)
+        std::vector<std::pair<FalloutScript::FormId, FalloutScript::FormId>> mPendingDropped;
         std::map<FalloutScript::FormId, ESM::FormId> mMade;
         std::map<ESM::FormId, FalloutScript::FormId> mMadeIds;
         /// The counter of the numbers and the objects that are asked for, which a script that Lua starts uses from the
