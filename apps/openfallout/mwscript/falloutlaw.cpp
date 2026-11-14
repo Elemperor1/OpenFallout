@@ -327,7 +327,9 @@ namespace OFScript
         switch (reaction.mKind)
         {
             case Kind::Attack:
-                if (!mHost.mCombat.inCombat(reaction.mActor)
+                // Every character that answers fights the player: one that fights someone else turns on the player (the
+                // fight is started over with the new target), and one that fights the player already is left as it is
+                if (mHost.mCombat.target(reaction.mActor) != mHost.mPlayer
                     && FalloutScript::startFight(mHost.mCombat, mHost.mActors, reaction.mActor, mHost.mPlayer))
                     mHost.evaluatePackage(reaction.mActor);
                 // One that fights the player because of an alarm is what the alarm sounding stands for
@@ -371,7 +373,8 @@ namespace OFScript
                 FalloutScript::DispositionInput input;
                 int now = 0;
                 if (dispositionInput(victim, mHost.mPlayer, input))
-                    now = mStanding.disposition(victim, mHost.mPlayer, input);
+                    now = mStanding.disposition(victim, mHost.mPlayer, input,
+                        [this, victim](double value) { return adjustDisposition(victim, mHost.mPlayer, value); });
                 mStanding.modifyDisposition(victim, mHost.mPlayer, outcome.mVictimDisposition, now);
             }
             if (outcome.mCrime != 0 || !outcome.mEnemies.empty())
@@ -408,7 +411,8 @@ namespace OFScript
         input.mFactionPair = pair.mFound;
         input.mFactionReaction = pair.mReaction;
         input.mWeaponDrawn = mHost.mEquipment.weaponDrawn(other);
-        input.mSame = mHost.ownerForm(self) == mHost.ownerForm(other);
+        // The same character is the same reference (two characters of one base record are not the same)
+        input.mSame = self == other;
         return true;
     }
 
@@ -417,7 +421,9 @@ namespace OFScript
         FalloutScript::DispositionInput input;
         if (!dispositionInput(self, mHost.mPlayer, input))
             return -1;
-        return mStanding.disposition(self, mHost.mPlayer, input);
+        // With the perks that change it, as GetDisposition does, so that the answers of both agree
+        return mStanding.disposition(
+            self, mHost.mPlayer, input, [this, self](double value) { return adjustDisposition(self, mHost.mPlayer, value); });
     }
 
     double LawGlue::adjustDisposition(FormId self, FormId other, double value)
@@ -581,7 +587,8 @@ namespace OFScript
             if (!faction)
             {
                 const int karmaClass = FalloutScript::Standing::karmaClass(standingSettings(), karmaOf(theft.mVictim));
-                theft.mOwnerNotEvil = karmaClass != 2 && karmaClass != 4;
+                // (a character of an evil faction is evil whatever its karma is)
+                theft.mOwnerNotEvil = karmaClass != 2 && karmaClass != 4 && !isEvil(theft.mVictim);
             }
         }
         const FalloutScript::Outcome outcome = mLaw.steal(theft);
@@ -605,15 +612,20 @@ namespace OFScript
 
     void LawGlue::pickedUp(FormId reference, FormId item, int count)
     {
-        theftOf(reference, static_cast<std::int64_t>(count) * mHost.itemValue(item));
+        // The owner and the character that is robbed are looked up in the world, which only the thread of the frame may ask
+        mHost.runOnMainThread([this, reference, item, count] {
+            theftOf(reference, static_cast<std::int64_t>(count) * mHost.itemValue(item));
+        });
     }
 
     void LawGlue::takenFrom(FormId container, FormId item, int count)
     {
-        // What is taken from a character (a body, its pockets) is not taken from anyone's place
-        if (mHost.isActor(container))
-            return;
-        theftOf(container, static_cast<std::int64_t>(count) * mHost.itemValue(item));
+        mHost.runOnMainThread([this, container, item, count] {
+            // What is taken from a character (a body, its pockets) is not taken from anyone's place
+            if (mHost.isActor(container))
+                return;
+            theftOf(container, static_cast<std::int64_t>(count) * mHost.itemValue(item));
+        });
     }
 
     void LawGlue::theftOf(FormId reference, std::int64_t value)

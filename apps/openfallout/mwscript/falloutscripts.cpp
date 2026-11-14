@@ -262,9 +262,14 @@ namespace OFScript
             return found == mItemHolders.end() ? 0.0 : static_cast<double>(found->second);
         });
         // Whether the character moves with the stance of sneaking: the player's stance is the key it holds, and the
-        // others do not sneak (a package that makes them is not read yet)
+        // others sneak when a script forced them to (SetForceSneak: the gait their walk and their animation follow); a
+        // package that makes them is not read yet
         mInterpreter.setHandler("IsSneaking", [this](FalloutScript::CallContext& call) {
-            if (call.mReference == 0 || call.mReference != mPlayer || std::this_thread::get_id() != mMainThread)
+            if (call.mReference == 0)
+                return 0.0;
+            if (call.mReference != mPlayer)
+                return mActorStatus.overrideOf(call.mReference).mForceSneak ? 1.0 : 0.0;
+            if (std::this_thread::get_id() != mMainThread)
                 return 0.0;
             const OFWorld::Ptr body = OFBase::Environment::get().getWorld()->getPlayerPtr();
             return !body.isEmpty() && OFBase::Environment::get().getMechanicsManager()->isSneaking(body) ? 1.0 : 0.0;
@@ -2679,6 +2684,30 @@ namespace OFScript
                        & ESM4::Creature::FO3_Essential)
                 != 0;
         return false;
+    }
+
+    bool FalloutScripts::respawnsAsRecord(const ESM4::Npc& record, FalloutScript::FormId reference)
+    {
+        if (!record.mIsFONV)
+            return false;
+        // The seed and the roll are those of essentialByRecord: a levelled list of characters gives the one that the
+        // cell shows for this reference
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(reference), record.mId);
+        return (templateRecordOf(mStore, record, ESM4::Npc::Template_UseBaseData, seed, rollOf(reference))
+                       .mBaseConfig.fo3.flags
+                   & ESM4::Npc::FO3_Respawn)
+            != 0;
+    }
+
+    bool FalloutScripts::respawnsAsRecord(const ESM4::Creature& record, FalloutScript::FormId reference)
+    {
+        if (!record.mIsFONV)
+            return false;
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(reference), record.mId);
+        return (templateRecordOf(mStore, record, ESM4::Creature::Template_UseBaseData, seed, rollOf(reference))
+                       .mBaseConfig.fo3.flags
+                   & ESM4::Creature::FO3_Respawn)
+            != 0;
     }
 
     std::optional<FalloutScript::CombatState::Relation> FalloutScripts::recordedRelation(
@@ -6517,6 +6546,12 @@ namespace OFScript
     FalloutScript::FormId FalloutScripts::placeAtMe(
         FalloutScript::FormId reference, FalloutScript::FormId base, int count, double distance, int direction)
     {
+        return placeObjects(reference, base, count, distance, direction, nullptr);
+    }
+
+    FalloutScript::FormId FalloutScripts::placeObjects(FalloutScript::FormId reference, FalloutScript::FormId base,
+        int count, double distance, int direction, const DroppedStack* stack)
+    {
         Place near;
         if (!whereIs(reference, near))
         {
@@ -6532,8 +6567,11 @@ namespace OFScript
                 const FalloutScript::FormId id = 0xff000000u | ++mMadeCount;
                 // Asked for at once, so that the rest of the script finds the object it was told the number of (also
                 // when a script that Lua started runs on the thread of Lua); the world makes it at the next frame
+                // (the stack of a drop is part of the request from the start: the frame can make the object as soon as the
+                // lock is let go)
                 mPendingMade[id] = MadeObject{ base, reference, direction >= 0 && direction <= 3 ? direction : 0,
-                    static_cast<float>(distance), near, 1 };
+                    static_cast<float>(distance), near, stack != nullptr ? stack->mCount : 1, stack != nullptr,
+                    stack != nullptr ? stack->mCondition : 1000, stack != nullptr ? stack->mMods : 0 };
                 mMadeBases[id] = base;
                 if (first == 0)
                     first = id;
@@ -6554,6 +6592,7 @@ namespace OFScript
         {
             log("PlaceAtMe: " + FalloutScript::hex(request.mNear) + " is not in a loaded cell, so nothing is made next "
                 "to it");
+            giveBackDropped(id, request);
             return;
         }
         try
@@ -6575,7 +6614,18 @@ namespace OFScript
         catch (const std::exception& error)
         {
             log("PlaceAtMe: an object of " + FalloutScript::hex(request.mBase) + " can not be made: " + error.what());
+            giveBackDropped(id, request);
         }
+    }
+
+    void FalloutScripts::giveBackDropped(FalloutScript::FormId id, const MadeObject& request)
+    {
+        if (!request.mDropped)
+            return;
+        // The stack left the holder when the script dropped it; with no object to hold it, it is not lost
+        mActors.addItem(request.mNear, request.mBase, request.mCount, request.mCondition, request.mMods);
+        mReferenceState.setCondition(id, 1000, 0);
+        log("Drop: the stack of " + FalloutScript::hex(request.mBase) + " went back to " + FalloutScript::hex(request.mNear));
     }
 
     namespace
@@ -6638,7 +6688,8 @@ namespace OFScript
             for (const PendingSave::Request& request : pending.mRequests)
             {
                 mPendingMade[request.mId] = MadeObject{ request.mBase, request.mNear, request.mDirection,
-                    request.mDistance, Place{ request.mCell, request.mPosition, request.mAngle }, request.mCount };
+                    request.mDistance, Place{ request.mCell, request.mPosition, request.mAngle }, request.mCount, false, 1000,
+                    0 };
                 mMadeBases[request.mId] = request.mBase;
             }
             pending.mRequests.clear();

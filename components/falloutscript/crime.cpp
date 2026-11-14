@@ -346,12 +346,9 @@ namespace FalloutScript
 
     std::vector<FormId> Law::forgetRecent(double seconds)
     {
-        double now = 0;
-        {
-            const std::lock_guard lock(mMutex);
-            now = mClock;
-        }
-        return forget([now, seconds](const Crime& crime) { return !(seconds < now - crime.mTime); });
+        // (the clock is read where the crimes are removed, under the one lock: another thread that moves the clock and
+        // makes a crime in between would otherwise have the crime that is new judged by the clock of before it)
+        return forget([this, seconds](const Crime& crime) { return !(seconds < mClock - crime.mTime); });
     }
 
     std::size_t Law::record(CrimeKind kind, FormId victim, std::int64_t value)
@@ -897,6 +894,10 @@ namespace FalloutScript
             law.mCrimes = std::move(crimes);
             law.mNextCrime = std::max(nextCrime, 1);
             law.mTrespass = std::move(trespass);
+            // The clock and the stamps of the crimes are not saved: a crime that was loaded counts as made at the moment of
+            // the load, so the clock starts again and the loaded crimes are stamped 0 (the clock of a game that was
+            // running has gone on past the age that the yield forgets them at)
+            law.mClock = 0;
         }
     };
 

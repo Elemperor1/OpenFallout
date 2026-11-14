@@ -47,6 +47,7 @@ namespace FalloutScript
                 return false;
             // The stages that the health went down through, from the most to where it is, as `damage` crosses them: those
             // with a percentage below the one at the start and not below the one now, up to a stage that caps the health
+            // where the health has stopped
             const int before = percent(maxHealth, maxHealth);
             int after = percent(health, maxHealth);
             if (after == 0 && health > 0)
@@ -58,7 +59,9 @@ namespace FalloutScript
                     continue;
                 if ((stage.mFlags & DestructionStage::disable) != 0)
                     return true;
-                if ((stage.mFlags & DestructionStage::capDamage) != 0)
+                // The health stops at a cap only while it is at the cap; a thing that is under it was blown through the
+                // cap by a later blow, which went on to the stages under it
+                if ((stage.mFlags & DestructionStage::capDamage) != 0 && percentOfStage <= after)
                     break;
             }
             return false;

@@ -684,6 +684,28 @@ namespace
         EXPECT_EQ(f.mLaw.crimeCount(), 0u);
     }
 
+    TEST(FalloutScriptCrimeTest, a_crime_that_was_loaded_counts_as_made_at_the_moment_of_the_load)
+    {
+        Fixture f;
+        Law::Blow blow;
+        blow.mVictim = doc;
+        blow.mVictimFactions = { town };
+        f.mLaw.attack(blow, { watcher(trudy, { town }) });
+        FalloutScript::SaveWriter out;
+        FalloutScript::writeLaw(f.mLaw, out);
+        const std::string bytes = out.take();
+
+        // The game that loads it has been running for longer than the yield looks back
+        Fixture g;
+        g.mLaw.advance(500.0);
+        FalloutScript::SaveReader in(bytes);
+        FalloutScript::readLaw(g.mLaw, in, FalloutScript::lawSectionVersion);
+        ASSERT_EQ(g.mLaw.crimeCount(), 1u);
+        g.mLaw.advance(4.0);
+        EXPECT_THAT(g.mLaw.forgetRecent(10.0), UnorderedElementsAre(town));
+        EXPECT_EQ(g.mLaw.crimeCount(), 0u);
+    }
+
     TEST(FalloutScriptCrimeTest, a_faction_held_only_by_a_crime_that_is_forgotten_for_newer_ones_is_released)
     {
         Fixture f;

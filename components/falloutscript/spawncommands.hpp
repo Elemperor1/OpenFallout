@@ -10,6 +10,7 @@
 namespace FalloutScript
 {
     class ActorState;
+    class Equipment;
     class FormLists;
     class Interpreter;
     class ObjectWorld;
@@ -125,6 +126,8 @@ namespace FalloutScript
         RespawnState& mRespawn;
         ItemValues& mItemValues;
         NameOverrides& mNames;
+        /// What characters wear: a character that gets a new inventory is dressed from its record again
+        Equipment& mEquipment;
     };
     void addSpawnCommands(Interpreter& interpreter, const SpawnParts& parts);
 }

@@ -311,6 +311,8 @@ namespace OFMechanics
                 state.mDurationHundredths = mind.mDurationHundredths;
                 state.mStartedHours = mind.mStartedHours;
             }
+            // So does why it is done: a package that ran out does not keep a character in its furniture
+            state.mExpired = mind.mPackage != nullptr && mind.mExpired;
             if (mind.mCommanded)
             {
                 state.mFollows = true;
@@ -360,6 +362,7 @@ namespace OFMechanics
                     // The package goes on with the time it had (a cell that was unloaded, a game that was loaded)
                     mind.mDurationHundredths = saved->mDurationHundredths;
                     mind.mStartedHours = saved->mStartedHours;
+                    mind.mExpired = saved->mExpired;
                 }
         }
 
@@ -1492,16 +1495,18 @@ namespace OFMechanics
         void review(const Frame& frame, FalloutActors::Mind& mind)
         {
             // SetPackDuration: a package that has run for its duration is done (FalloutNV.exe 0x8F4020), as one that has
-            // got to its goal is
-            if (mind.mPackage != nullptr && mind.mDone.count(mind.mPackage) == 0 && !mind.mOrdered
+            // got to its goal is. A package that is done already (a character that got to the furniture of a Find or Use
+            // Item At package) still runs out, which lets the character leave the furniture; it is not told as done twice.
+            if (mind.mPackage != nullptr && !mind.mExpired && !mind.mOrdered
                 && FalloutScript::World::packageTimeIsUp(
                     mind.mDurationHundredths, gameHours(frame.mWorld.getTimeStamp()), mind.mStartedHours))
             {
-                mind.mDone.insert(mind.mPackage);
+                const bool wasDone = !mind.mDone.insert(mind.mPackage).second;
                 mind.mDurationHundredths = 0;
                 mind.mExpired = true;
                 keepState(mind);
-                raise(frame, mind.mPtr, *mind.mPackage, OFScript::FalloutScripts::PackageEvent::Done);
+                if (!wasDone)
+                    raise(frame, mind.mPtr, *mind.mPackage, OFScript::FalloutScripts::PackageEvent::Done);
             }
             Choice fresh; // the first that is on and not done
             Choice current; // the one that is followed, when it is done and still on

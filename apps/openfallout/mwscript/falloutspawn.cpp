@@ -60,8 +60,6 @@ namespace OFScript
             return id != nullptr ? numberFor(*id) : 0;
         }
 
-        /// The base flag of a character or creature that makes it come back (the flag of Fallout 3 and New Vegas)
-        constexpr std::uint32_t respawnFlag = 0x00000008;
         /// The flag of a container that makes it fill again
         constexpr std::uint8_t containerRespawnFlag = 0x02;
     }
@@ -228,15 +226,14 @@ namespace OFScript
         {
             if (holder == 0 || item == 0 || count <= 0)
                 return 0;
-            const FalloutScript::FormId made = mHost.placeAtMe(holder, item, 1, 0.0, 0);
+            // The stack is made as one object at the start of the next frame, and the request says so from the start
+            // (also how worn the copies were and the mods in them, to give the stack back if no object can be made)
+            const FalloutScripts::DroppedStack stack{ count, condition, mods };
+            const FalloutScript::FormId made = mHost.placeObjects(holder, item, 1, 0.0, 0, &stack);
             if (made == 0)
                 return 0;
             // The object keeps how worn the copies were and the mods in them, to be picked up with them
             mHost.mReferenceState.setCondition(made, condition, mods);
-            // The stack is made as one object at the start of the next frame
-            const std::lock_guard lock(mHost.mMadeMutex);
-            if (const auto asked = mHost.mPendingMade.find(made); asked != mHost.mPendingMade.end())
-                asked->second.mCount = count;
             return made;
         }
 
@@ -321,7 +318,7 @@ namespace OFScript
         mSpawnAdapter = std::make_shared<SpawnAdapter>(*this);
         FalloutScript::addLevelledListCommands(mInterpreter, mLevelledLists, *mSpawnAdapter);
         const FalloutScript::SpawnParts parts{ mActors, mFormLists, *this, *mSpawnAdapter, mRespawn, mItemValues,
-            mNameOverrides };
+            mNameOverrides, mEquipment };
         FalloutScript::addSpawnCommands(mInterpreter, parts);
 
         // What scripts added to a list is part of the list for every roll of it, wherever it is rolled
@@ -477,9 +474,9 @@ namespace OFScript
         if (actor == 0 || !baseOf(actor, base) || base.isZeroOrUnset())
             return false;
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
-            return npc->mIsFONV && (npc->mBaseConfig.fo3.flags & respawnFlag) != 0;
+            return respawnsAsRecord(*npc, actor);
         if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
-            return creature->mIsFONV && (creature->mBaseConfig.fo3.flags & respawnFlag) != 0;
+            return respawnsAsRecord(*creature, actor);
         return false;
     }
 
@@ -676,12 +673,11 @@ namespace OFScript
                 }
                 if (!dead || !due)
                     return true;
-                std::uint32_t flags = 0;
-                if (ptr.getType() == ESM4::Npc::sRecordId)
-                    flags = ptr.get<ESM4::Npc>()->mBase->mBaseConfig.fo3.flags;
-                else
-                    flags = ptr.get<ESM4::Creature>()->mBase->mBaseConfig.fo3.flags;
-                if ((flags & respawnFlag) == 0)
+                // The flag of the record that has the base data (a template can give it)
+                const bool respawns = ptr.getType() == ESM4::Npc::sRecordId
+                    ? respawnsAsRecord(*ptr.get<ESM4::Npc>()->mBase, reference)
+                    : respawnsAsRecord(*ptr.get<ESM4::Creature>()->mBase, reference);
+                if (!respawns)
                     return true;
                 {
                     // Alive again and with its health back in one step, as ResurrectActor does it

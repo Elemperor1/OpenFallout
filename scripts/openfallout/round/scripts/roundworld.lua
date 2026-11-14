@@ -255,11 +255,13 @@ function r.rest(o)
             r.wait(1)
             last = ask('restProgress', {})
         until last == nil or not last.active or now() >= deadline
-        -- (a rest that ends early is not completed: the binding says why it stopped)
-        local completed = last ~= nil and not last.active and (last.stopped == nil or last.stopped == '')
+        -- (a rest that ends early is not completed: the binding says why it stopped, and the player script answers with
+        -- the number of characters of that text)
+        local stoppedChars = last and last.stoppedChars or 0
+        local completed = last ~= nil and not last.active and stoppedChars == 0
         log('waitFor', 'rest ' .. tostring(o.label or '-'), completed and 'ok' or ((last ~= nil and not last.active) and 'stopped' or 'timeout'),
             last and string.format('done=%.0f/%.0f%s', last.done, last.total,
-                (last.stopped ~= nil and last.stopped ~= '') and (' stopped=' .. tostring(last.stopped)) or '') or '-')
+                stoppedChars > 0 and (' stoppedChars=' .. tostring(stoppedChars)) or '') or '-')
         local after = r.clock()
         passed = (after and before) and (after - before) or 0
     end

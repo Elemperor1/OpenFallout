@@ -172,6 +172,10 @@ return { limit = 900, delay = 4, run = function(r)
         -- everything (-1)
         call('RemoveAllTypedItems', holder, { 0, 0, 1, -1 })
         r.log('C after all: ' .. describeItems(holder))
+        local _, left = countItems(holder)
+        if left ~= 0 then
+            r.error('C RemoveAllTypedItems with type -1 left ' .. tostring(left) .. ' items on the holder')
+        end
     end
 
     -- the same command on a container: the aid items (47) and the ammunition (41) go out of the game, the rest stays

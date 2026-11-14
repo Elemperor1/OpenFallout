@@ -1067,7 +1067,8 @@ namespace OFScript
                 FalloutScript::readFormLists(mFormLists, in, version);
             });
         section(
-            "spawn", 2,
+            // (version 2 adds the levels that the zones locked, version 3 the day each merchant was restocked)
+            "spawn", 3,
             [this](FalloutScript::SaveWriter& out) {
                 mLevelledLists.write(out);
                 mSpawnLevels.write(out);
