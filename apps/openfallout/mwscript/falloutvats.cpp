@@ -197,6 +197,12 @@ namespace OFScript
         const FalloutScript::FormId victim = scriptReferenceOf(target);
         if (victim == 0 || victim == mPlayer || mActors.isDead(victim) || mCombat.unconscious(victim))
             return false;
+        // SetVATSTarget turns the record's answer round (a character is a target unless its reference carries the mark)
+        {
+            const std::lock_guard lock(mVatsValueMutex);
+            if (!FalloutScript::VatsValue::targetable(true, mVatsMarks.marked(victim)))
+                return false;
+        }
         double apart = 0;
         return distance(mPlayer, victim, apart) && apart <= vatsState().mRange;
     }
@@ -261,10 +267,29 @@ namespace OFScript
         };
 
         const std::vector<FalloutScript::BodyPart> parts = mLimbs.partsOf(victim);
+        // The perks that weigh the chance may ask GetVATSValue about the part that is aimed at: V.A.T.S. is choosing, with
+        // that part, while each chance is worked out, and what was there before is put back after
+        int previousMode = 0;
+        FalloutScript::VatsValue::Action previousAction;
+        {
+            const std::lock_guard lock(mVatsValueMutex);
+            previousMode = mVatsValueMode;
+            previousAction = mVatsValueAction;
+        }
+        struct Restore
+        {
+            FalloutScripts& mHost;
+            int mMode;
+            const FalloutScript::VatsValue::Action& mAction;
+            ~Restore() { mHost.setVatsValue(mMode, mAction); }
+        } restore{ *this, previousMode, previousAction };
+        FalloutScript::VatsValue::Action choosing = vatsActionFor(target, held, -1, apart);
         for (std::size_t i = 0; i < parts.size(); ++i)
         {
             if (parts[i].mTarget.empty())
                 continue;
+            choosing.mPart = parts[i].mCondition;
+            setVatsValue(FalloutScript::VatsValue::Selecting, choosing);
             VatsPart part;
             part.mIndex = static_cast<int>(i);
             part.mType = parts[i].mType;
@@ -335,6 +360,22 @@ namespace OFScript
         const FireResult fired = fire(mPlayer, target, aimed->mType, aimed->mChance / 100.0, true);
         result.mHit = fired.mHit;
         result.mStrike = fired.mStrike;
+        // The attack is being played: GetVATSValue answers for it until the screen closes or the next attack
+        {
+            namespace VV = FalloutScript::VatsValue;
+            VV::Action played = vatsActionFor(target, stats.mWeapon, aimed->mGroup, apart);
+            // The kind of the attack by the weapon's animation type: the hands and guns keep theirs (0 to 8), a launcher is
+            // 0x10, a grenade 0x11 and a mine 0x13 (a choice of the port; the executable's numbering is in its table at
+            // 0x66DE14 and is not tied to the weapon records)
+            const std::uint32_t type = played.mWeaponKind;
+            played.mKind = type <= 8 ? type : type == 9 ? 0x10 : type == 10 ? 0x11 : 0x13;
+            played.mHits = fired.mHit;
+            if (fired.mStrike.mKilled)
+                played.mFlags |= VV::Fatal;
+            if (fired.mStrike.mCrippled)
+                played.mFlags |= VV::LimbCrippled;
+            setVatsValue(VV::Playback, played);
+        }
         if (!fired.mFired)
             result.mRefused = fired.mOutOfAmmo ? "ammo" : "points";
         return result;
@@ -343,5 +384,8 @@ namespace OFScript
     void FalloutScripts::setVatsOpen(bool open)
     {
         mVatsOpen = open;
+        // Whatever V.A.T.S. was choosing or playing is over with the screen
+        if (!open)
+            clearVatsValue();
     }
 }

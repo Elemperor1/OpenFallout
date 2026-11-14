@@ -54,10 +54,10 @@ namespace OFLua
 
         // Whether the object is a character or creature that is alive and within the reach of the weapon
         api["canTarget"]
-            = [](sol::optional<LObject> target) { return target && scripts().vatsCanTarget(target->ptr()); };
+            = [](const Object* target) { return target && scripts().vatsCanTarget(target->ptr()); };
 
         // What the screen shows of a target: its name, how far it is from the player and its health
-        api["describe"] = [lua](sol::optional<LObject> target) {
+        api["describe"] = [lua](const Object* target) {
             sol::table row(lua, sol::create);
             if (!target)
                 return row;
@@ -73,7 +73,7 @@ namespace OFLua
         // name, what V.A.T.S. calls it, the chance in percent of a hit with the weapon the player holds, and the
         // condition of the part in percent; `group` is the actor value of the condition of the part (the parts that
         // share one are a group)
-        api["parts"] = [lua](sol::optional<LObject> target) {
+        api["parts"] = [lua](const Object* target) {
             sol::table list(lua, sol::create);
             if (!target)
                 return list;
@@ -96,7 +96,7 @@ namespace OFLua
         // Where a bone of the target is in the world (nil when its model has no bone of that name): the screen of
         // V.A.T.S. puts the bracket of a part of the body where the game projects the node of that part (the name is
         // the `target` of a part)
-        api["partPosition"] = [](sol::optional<LObject> target, std::string_view bone) -> sol::optional<osg::Vec3f> {
+        api["partPosition"] = [](const Object* target, std::string_view bone) -> sol::optional<osg::Vec3f> {
             if (!target)
                 return sol::nullopt;
             const OFRender::Animation* animation = OFBase::Environment::get().getWorld()->getAnimation(target->ptr());
@@ -114,7 +114,7 @@ namespace OFLua
         // The player attacks the part of the target: the action points are spent and the blow struck when the roll is
         // below the chance. `refused` says why nothing was done ("points", "ammo", "range", "dead", "none"), and is
         // nil when the attack was made.
-        api["attack"] = [lua](sol::optional<LObject> target, int part) {
+        api["attack"] = [lua](const Object* target, int part) {
             const OFScript::FalloutScripts::VatsAttackResult result
                 = scripts().vatsAttack(target ? target->ptr() : OFWorld::Ptr(), part);
             sol::table row(lua, sol::create);

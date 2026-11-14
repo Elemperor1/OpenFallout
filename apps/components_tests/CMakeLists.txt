@@ -269,6 +269,8 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testsaveworld.cpp
     falloutscript/testsavestate.cpp
     falloutscript/testvats.cpp
+    falloutscript/testvatsvalue.cpp
+    falloutscript/testplacedexplosives.cpp
     falloutscript/testcommandtable.cpp
     falloutscript/testconditions.cpp
     falloutscript/testdialoguerules.cpp

@@ -521,6 +521,17 @@ def kill_engine(process):
         return False
 
 
+def sweep_engine_group(process):
+    """Ends whatever of the engine's process group is left once the engine itself is gone. An engine that crashes (the Lua state is
+    closed with references left in it when it quits) forks the crash handler, a copy of the engine that stays up, and on macOS shows
+    in the Dock as an application that cannot be opened; the polite SIGTERM that ends the engine leaves that copy behind, one more
+    with every run. The group of an engine started with `start_new_session` is the engine's own, so nothing else is hit."""
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass
+
+
 def stop_engine(process, guard=None, patience=30.0):
     """Asks the engine's process group to quit (a polite SIGTERM, the engine quits on its own way), and ends it if it does not within
     `patience` seconds, or at once when the guard trips while it waits (the kill switch, a window system that stopped answering).
@@ -604,6 +615,7 @@ def run_engine(command, run_dir, limit, env_extra=None, priority="low", guard=No
                 guard.state.stop(reason + "\n")
             except roundguard.Refused as refused:
                 print("; ".join(refused.reasons), flush=True)
+    sweep_engine_group(process)
     sampler.stop()
     os.close(master)
     return process.returncode, time.monotonic() - started, sampler, timed_out, ended_early, tripped
