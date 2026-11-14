@@ -821,9 +821,10 @@ void CSVDoc::View::infoAbout()
             "%3\n\n"
             "<table>"
             "<tr><td>%4</td><td><a "
-            "href=\"https://github.com/Elemperor1/OpenFallout\">https://github.com/Elemperor1/OpenFallout</a></td></tr>"
+            "href=\"https://github.com/OpenBethesda/OpenFallout\">https://github.com/OpenBethesda/OpenFallout</a>"
+            "</td></tr>"
             "<tr><td>%5</td><td><a "
-            "href=\"https://github.com/Elemperor1/OpenFallout/issues\">https://github.com/Elemperor1/OpenFallout/"
+            "href=\"https://github.com/OpenBethesda/OpenFallout/issues\">https://github.com/OpenBethesda/OpenFallout/"
             "issues</a></td></tr>"
             "</table>"
             "</p>")

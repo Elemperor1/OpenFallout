@@ -13,7 +13,7 @@ trigger:
         type: PullRequest
         spec:
           connectorRef: account.connector_Github_7cd1
-          repoName: Elemperor1/OpenFallout
+          repoName: OpenBethesda/OpenFallout
           autoAbortPreviousExecutions: true
           payloadConditions:
           - key: targetBranch
@@ -24,7 +24,7 @@ trigger:
           - Reopen
           - Synchronize
           - ReadyForReview
-          jexlCondition: <+trigger.payload.pull_request.head.repo.full_name> == "Elemperor1/OpenFallout"
+          jexlCondition: <+trigger.payload.pull_request.head.repo.full_name> == "OpenBethesda/OpenFallout"
             && <+trigger.payload.pull_request.draft> == false
   inputYaml: |
     pipeline:

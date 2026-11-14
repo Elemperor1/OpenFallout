@@ -254,7 +254,7 @@ namespace Crash
         {
             std::string message = "OpenFallout has encountered a fatal error.\nCrash dump saved to '"
                 + Misc::StringUtils::u8StringToString(getCrashDumpPath(*mShm).u8string())
-                + "'.\nPlease report this to https://github.com/Elemperor1/OpenFallout/issues !";
+                + "'.\nPlease report this to https://github.com/OpenBethesda/OpenFallout/issues !";
             SDL_ShowSimpleMessageBox(0, "Fatal Error", message.c_str(), nullptr);
         }
         else if (monitorStatus == CrashSHM::Status::Dumping)

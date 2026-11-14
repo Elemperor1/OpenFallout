@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+    Entitlements for OpenFallout.app (the game), applied with the hardened runtime when the package is signed with a
+    Developer ID identity. Plug-ins and libraries inside the bundle take these from the process that loads them.
+    Never add com.apple.security.get-task-allow here: it must not be present in a release.
+-->
+<plist version="1.0">
+<dict>
+    <!--
+        LUAJIT ENTITLEMENT: LuaJIT is built with LUAJIT_ENABLE_OSX_HRT (CI/macos/build_luajit_hrt.sh), so it maps its
+        machine code with MAP_JIT and switches write protection per thread, which the hardened runtime allows with
+        allow-jit alone. Decision and evidence: docs/openfallout/mac-luajit.md. Do not swap this for
+        allow-unsigned-executable-memory without redoing that evidence; a LuaJIT built without the flag is killed at
+        its first compiled trace under allow-jit, and CI/check_mac_package.py fails such a package before starting it.
+    -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+</dict>
+</plist>

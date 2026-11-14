@@ -117,6 +117,15 @@ local function placement(size, box, region)
     }
 end
 
+-- The notches a wheel event turns, the files' way round: up is -1 (the scrollbars add `wheelmoved` to the place). The
+-- engine's whole notches, so that a trackpad's many small deltas scroll as far as a wheel and not a notch each, and a
+-- fast wheel keeps every notch it turned; without them one step the way of the delta.
+function module.wheelNotches(e)
+    if e.notches then return -e.notches.y end
+    local delta = e.delta.y
+    return delta > 0 and -1 or (delta < 0 and 1 or 0)
+end
+
 local Shown = {}
 Shown.__index = Shown
 
@@ -498,8 +507,7 @@ function module.open(file, options)
                 shown:refresh()
             end),
             mouseWheel = async:callback(function(e)
-                -- The files count the wheel the other way round: up is -1 (the scrollbars add `wheelmoved` to the place)
-                local notches = e.delta.y > 0 and -1 or (e.delta.y < 0 and 1 or 0)
+                local notches = module.wheelNotches(e)
                 if notches ~= 0 then
                     -- the wheel event has the cursor in the window, the menu is in the pixels of the element
                     local tile = shown.menu:wheel(e.position.x - shown.origin.x, e.position.y - shown.origin.y, notches)

@@ -606,13 +606,14 @@ namespace LuaUi
         });
     }
 
-    void WidgetExtension::mouseWheel(MyGUI::Widget*, float left, float top, float x, float y)
+    void WidgetExtension::mouseWheel(const MouseWheel& wheel)
     {
         protectedCall([=, this](LuaUtil::LuaView& view) {
             propagateEvent("mouseWheel", [&](auto w) {
                 sol::table event = view.newTable();
-                event["position"] = osg::Vec2f(left, top);
-                event["delta"] = osg::Vec2f(x, y);
+                event["position"] = osg::Vec2f(wheel.mLeft, wheel.mTop);
+                event["delta"] = osg::Vec2f(wheel.mDeltaX, wheel.mDeltaY);
+                event["notches"] = osg::Vec2f(static_cast<float>(wheel.mNotchesX), static_cast<float>(wheel.mNotchesY));
                 return event;
             });
         });

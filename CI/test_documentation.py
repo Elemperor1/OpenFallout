@@ -33,11 +33,11 @@ class DocumentationLinkTest(unittest.TestCase):
 
     def test_repository_rst_links_require_canonical_existing_target(self):
         text = (
-            "`topic <https://github.com/Elemperor1/OpenFallout/blob/master/"
+            "`topic <https://github.com/OpenBethesda/OpenFallout/blob/master/"
             "docs/guide/topic.md>`_\n"
-            "`missing <https://github.com/Elemperor1/OpenFallout/blob/master/"
+            "`missing <https://github.com/OpenBethesda/OpenFallout/blob/master/"
             "docs/guide/missing.md>`_\n"
-            "`wrong branch <https://github.com/Elemperor1/OpenFallout/blob/main/"
+            "`wrong branch <https://github.com/OpenBethesda/OpenFallout/blob/main/"
             "docs/guide/topic.md>`_"
         )
         errors = check_documentation.check_repo_blob_links(
@@ -45,6 +45,13 @@ class DocumentationLinkTest(unittest.TestCase):
         self.assertEqual(len(errors), 2)
         self.assertIn("missing repository link target", errors[0])
         self.assertIn("non-canonical repository link", errors[1])
+
+    def test_repository_rst_links_to_the_former_owner_are_not_canonical(self):
+        text = "`topic <https://github.com/Elemperor1/OpenFallout/blob/master/docs/guide/topic.md>`_"
+        errors = check_documentation.check_repo_blob_links(
+            text, Path("docs/source/openfallout.rst"), self.root)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("non-canonical repository link", errors[0])
 
     def test_sphinx_doc_roles_and_toctree_resolve_rst_files(self):
         text = """See :doc:`Reference <reference>`.

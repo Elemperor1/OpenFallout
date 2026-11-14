@@ -8,6 +8,7 @@
 #include <components/settings/values.hpp>
 
 #include "../mwbase/environment.hpp"
+#include "../mwbase/statemanager.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
 
@@ -51,6 +52,8 @@ namespace OFInput
     {
         // Enable all controls
         mControlSwitch->clear();
+        // The player of the game that is left has no weapon until the next one says so
+        setTriggerState({});
     }
 
     InputManager::~InputManager() {}
@@ -61,6 +64,8 @@ namespace OFInput
 
         mInputWrapper->setMouseVisible(OFBase::Environment::get().getWindowManager()->getCursorVisible());
         mInputWrapper->capture(disableEvents);
+
+        updateTriggers(disableControls);
 
         if (disableControls)
         {
@@ -117,6 +122,33 @@ namespace OFInput
     void InputManager::rumble(float strength, float seconds)
     {
         mControllerManager->rumble(strength, strength, seconds);
+    }
+
+    void InputManager::setTriggerState(const TriggerFeel::PlayerState& player)
+    {
+        mTriggerPlayer = player;
+    }
+
+    void InputManager::weaponFired()
+    {
+        mTriggerShotPending = true;
+    }
+
+    void InputManager::updateTriggers(bool disableControls)
+    {
+        OFBase::WindowManager* windows = OFBase::Environment::get().getWindowManager();
+        TriggerFeel::Situation situation;
+        situation.mEnabled = Settings::input().mGamepadTriggerEffects;
+        // A pad that is off for the game still gets the situation, so that a resistance it was given is cleared
+        situation.mControllerEnabled = Settings::input().mEnableController;
+        situation.mFocused = mInputWrapper->windowHasFocus();
+        // A loading screen or a film (no controls), a window of the engine, a screen of the game, or no game running
+        situation.mMenu = disableControls || mTriggerPlayer.mMenuOpen || (windows != nullptr && windows->isGuiMode())
+            || OFBase::Environment::get().getStateManager()->getState() != OFBase::StateManager::State_Running;
+        situation.mWeaponDrawn = mTriggerPlayer.mWeaponDrawn;
+        mControllerManager->updateTriggers(situation, mTriggerPlayer.mWeapon);
+        if (mTriggerShotPending.exchange(false))
+            mControllerManager->weaponFired();
     }
 
     bool InputManager::padPick() const
