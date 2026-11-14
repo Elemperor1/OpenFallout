@@ -69,7 +69,8 @@ special idle: 36 uses) and 2 (an attack: 5 uses), both of which the port already
 - Engine: `FalloutActors::setPackageDuration` (through `MechanicsManager::setFalloutPackageDuration`) keeps the duration and the game hour in the
   character's mind; `review` marks the package done when the time is up (the same `mDone` and `Done` event as a goal reached), and a new package
   clears the duration. The duration counts from the call (**chosen**: the executable's start moment is the package's own; the port's mind keeps
-  its own).
+  its own). A package that ran out and is still the one followed (no other is on) does not carry on its goal: the character stops where it
+  is, and a new `SetPackDuration` on it makes it run again until the new duration is up.
 
 ### The credits after `ExitGame`
 
