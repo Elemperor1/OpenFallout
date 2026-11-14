@@ -167,8 +167,9 @@ namespace OFScript
             // (a thing that is not a character is aimed at in the middle of its box, which is inside it however low it is)
             osg::Vec3f extents;
             const bool character = isCharacterOrCreature(target);
+            // (the box of the model is as large as the scale of the reference makes it; its turn and its offset are not known)
             if (!character)
-                extents = world->getHalfExtents(target);
+                extents = world->getHalfExtents(target) * target.getCellRef().getScale();
             const osg::Vec3f to = at + osg::Vec3f(0.f, 0.f, character ? 48.f : extents.z());
             const float apart = (to - from).length();
             if (apart < 1.f)

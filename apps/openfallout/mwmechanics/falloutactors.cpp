@@ -885,9 +885,10 @@ namespace OFMechanics
         // (the package begins again from now, as the duration counts from when the call is made; one that had run out
         // runs again, and runs out again at the end of the new duration)
         found->second->mStartedHours = gameHours(OFBase::Environment::get().getWorld()->getTimeStamp());
-        if (hundredths > 0 && found->second->mExpired)
+        if (found->second->mExpired)
         {
-            // (it is not done any more: a Dialogue package says its line again, and runs out again with the new duration)
+            // (it is not done any more: a Dialogue package says its line again, and runs out again with the new duration,
+            // or with none when the duration is 0)
             found->second->mExpired = false;
             found->second->mDone.erase(found->second->mPackage);
         }
