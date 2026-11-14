@@ -308,6 +308,21 @@ command,GetPCSleepHours,docs/openfallout/m16-needs-notes.md: exec 0x5CDE00 reads
 command,ShowSleepWaitMenu,docs/openfallout/m16-needs-notes.md: exec 0x5E0090 (second argument 1 takes the checked path 0x969FA0) in the executable
 command,CreateDetectionEvent,M16 law2 (docs/openfallout/m16-law2-notes.md): exec 0x5DAC80 over HighProcess vt+0xFC 0x903E40 (event record at process+0x3DC) in the executable
 command,PlaceAtMeHealthPercent,"M16 spawn2: exec 0x5D90A0 in the New Vegas executable passes the percent to the placement worker 0x5C4B30 (the health is not applied here)"
+command,SetVATSTarget,exec 0x5DAAE0 (the reference carries a mark in bit 0x04000000 of its flags that turns the record's answer round; the record's flag is read at 0x576100) in the executable
+command,GetVatsTargetHeight,"eval 0x5A25F0 (playback mode 4 only, for an attack kind from the table at 0x66DE14: the world height of the aimed node minus the player's) in the executable"
+command,GetVATSFrontAreaFree,"eval 0x8BD830 (ray from the actor raised by fVATSSmartCameraCheckHeight, heading plus the side angle, 10000 units; FLT_MAX for no hit) in the executable"
+command,GetVATSBackAreaFree,eval 0x8BD830 with the side angle 3.14159 (0x102B3C8) in the executable
+command,GetVATSLeftAreaFree,eval 0x8BD830 with the side angle 4.71239 (0x101FF34) in the executable
+command,GetVATSRightAreaFree,eval 0x8BD830 with the side angle 1.5708 (0x101FF38) in the executable
+command,GetVATSFrontTargetVisible,"eval 0x8BDBD0 (steps of fVATSSmartCameraCheckStepDistance, at most fVATSSmartCameraCheckStepCount, along the side; the distance of the last step that sees the target) in the executable"
+command,GetVATSBackTargetVisible,eval 0x8BDBD0 with the side angle 3.14159 in the executable
+command,GetVATSLeftTargetVisible,eval 0x8BDBD0 with the side angle 4.71239 in the executable
+command,GetVATSRightTargetVisible,eval 0x8BDBD0 with the side angle 1.5708 in the executable
+command,DisableAllMines,"exec 0x5DE110 (every laid projectile that is a mine, virtual +0x318 at 0x9BDF80, and can be disabled is disabled silently) in the executable"
+command,DetonatePlacedExplosives,exec 0x5DDF90 (the projectiles the actor laid whose record has the detonate flag 0x400 get run-time flag 0x100000) in the executable
+command,GetThreatRatio,"formula read in the executable: level times health over (1 minus the share the damage threshold stops, threshold over 30, at most 0.99); which actor is on top is not read; docs/openfallout/m16-vats-notes.md"
+command,ObjectUnderReticle,the camera ray of the reticle is cut at 50000 units in the executable; docs/openfallout/m16-vats-notes.md
+command,PlaceAtReticle,the camera ray of the reticle is cut at 50000 units in the executable; docs/openfallout/m16-vats-notes.md
 command,IsLeftUp,docs/openfallout/m16-tail2-notes.md: eval 0x5A0800 tests entry [2][2] of the world rotation of the spine bone above 0
 command,IsGuard,docs/openfallout/m16-fo3-notes.md: Fallout3.exe eval 0x511420 tests bit 1 of the class flags (0x54D490: the byte at class +0x54, the 16th byte of the record's DATA) in the executable
 command,PlaceLeveledActorAtMe,docs/openfallout/m16-fo3-notes.md: Fallout3.exe exec 0x52EC90 (level step 0x4EC070, zone level 0x4BFB20) has the same steps as 0x5D9810 in the executable

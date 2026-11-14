@@ -98,7 +98,9 @@
 #include <components/falloutscript/switches.hpp>
 #include <components/falloutscript/triggervolumes.hpp>
 #include <components/falloutscript/vanillacommands.hpp>
+#include <components/falloutscript/placedexplosives.hpp>
 #include <components/falloutscript/vats.hpp>
+#include <components/falloutscript/vatsvalue.hpp>
 #include <components/falloutscript/voicefiles.hpp>
 #include <components/falloutscript/wear.hpp>
 #include <components/falloutscript/worldcommands.hpp>
@@ -1576,6 +1578,9 @@ namespace OFScript
         VatsAttackResult vatsAttack(const OFWorld::Ptr& target, int part);
         /// V.A.T.S. is open or not (GetVATSMode answers it; the screen of Lua says it)
         void setVatsOpen(bool open);
+        /// What GetVATSValue reads: the mode of V.A.T.S. (VatsValue::Mode) and the action it describes. Any thread.
+        void setVatsValue(int mode, const FalloutScript::VatsValue::Action& action);
+        void clearVatsValue();
 
         /// What a character in a fight does about it, for the AI of the actors (main thread)
         struct FightStance
@@ -2509,6 +2514,19 @@ namespace OFScript
         bool dismemberIsActor(FalloutScript::FormId reference) override;
         void criticalStageSet(FalloutScript::FormId actor, int stage) override;
         void setUpDamage();
+        /// V.A.T.S. values, the reticle and the threat of an actor (falloutvatscommands.cpp)
+        void setUpVatsCommands();
+        /// Mines and the explosives that are laid (falloutmines.cpp)
+        void setUpExplosives();
+        void updateExplosives(float frametime);
+        /// A weapon that lays a mine or a charge (a land mine, a thrown mine, a grenade) lays it in front of the attacker
+        /// in place of striking; false for any other weapon
+        bool layExplosive(FalloutScript::FormId attacker, FalloutScript::FormId weapon, const OFWorld::Ptr& target);
+        /// The explosion of a laid projectile: what is in its radius loses health (falloutmines.cpp)
+        void explodeLaid(const FalloutScript::Explosives::Placed& laid, FalloutScript::FormId cause);
+        /// The action of V.A.T.S. for a part of a target (falloutvatscommands.cpp)
+        FalloutScript::VatsValue::Action vatsActionFor(
+            const OFWorld::Ptr& target, FalloutScript::FormId weapon, int group, double distance);
         void updateDamage(float frametime);
         void noteDeathTime(FalloutScript::FormId actor);
         void destructionChanged(FalloutScript::FormId reference, const FalloutScript::DestructionOutcome& outcome);
@@ -2838,6 +2856,14 @@ namespace OFScript
         /// The references that a stage of destruction disabled (ClearDestruction enables them again)
         std::set<FalloutScript::FormId> mDisabledByDestruction;
         std::atomic<bool> mVatsOpen{ false };
+        /// What GetVATSValue reads, and the references SetVATSTarget turned round
+        mutable std::mutex mVatsValueMutex;
+        int mVatsValueMode = 0;
+        FalloutScript::VatsValue::Action mVatsValueAction;
+        FalloutScript::VatsValue::TargetMarks mVatsMarks;
+        /// The mines and charges that are laid
+        mutable std::mutex mExplosivesMutex;
+        FalloutScript::Explosives::Laid mLaid;
         /// The seconds of breath that the player has left (-1 until the first frame has filled it) and whether its head
         /// is under the water
         std::atomic<double> mBreathLeft{ -1.0 };

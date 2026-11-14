@@ -9,7 +9,6 @@ GetVampire,exact,nothing here makes a vampire and the games keep the command for
 ShowWarning,exact,the retail executables format the text and show it nowhere
 Cast,exact,the command does nothing in the executables (magic.cpp)
 GetDisposition,stand-in,answers 0: the disposition of a character towards another is not worked out
-IsLimbGone,stand-in,answers 0: dismemberment is not built and nothing sets the limb bits
 GetCasinoWinningsLevel,stand-in,answers 0: the casino of New Vegas is not built
 SetCasinoWinningsLevel,stand-in,changes nothing: the casino of New Vegas is not built
 HasBeenEaten,stand-in,answers 0: nothing feeds on a dead character
@@ -24,14 +23,10 @@ SetActorRefraction,stand-in,accepted and ignored: the refraction of a character 
 PreloadMagicEffect,stand-in,accepted and ignored: nothing is loaded ahead for an effect
 ShowQuestStages,stand-in,accepted and ignored: the stages are written to the console of the games and this engine does not feed it
 AutoDisplayObjectives,stand-in,kept as a switch: the HUD reminder of the objectives is not drawn
-SetActorFullName,stand-in,the name is kept with the game (as a message of the files) but the world shows the name of the record
 SetCellFullName,stand-in,the name is kept with the game (as a message of the files) but the world shows the name of the record
 PlaceAtMeHealthPercent,stand-in,the objects are made as PlaceAtMe makes them: nothing here has a condition that the health could set
 PurgeCellBuffers,exact,the command drops the cells the games keep in memory for a quick return; nothing a script can see changes
-IsLimbGone,stand-in,answers 0: dismemberment is not built and nothing sets the limb bits
 GetWeaponHealthPerc,stand-in,answers 100: nothing wears a weapon out yet
-GetCauseofDeath,stand-in,answers -1: the cause of a death is not kept
-GetDestructionStage,stand-in,answers -1: the stages of destruction are not kept
 HasBeenEaten,stand-in,answers 0 until a corpse is marked as eaten: nothing feeds on a dead character here
 WhichServiceMenu,exact,the executables never give the value anything but -1 (FalloutNV.exe 0x119F344)
 IsNoHumanGoreExe,exact,the executable answers a fixed 0 (FalloutNV.exe 0x5DFDE0)
@@ -88,4 +83,8 @@ SkipAnim,stand-in,accepted and does nothing: the animation that plays is not ski
 SetClass,stand-in,accepted and does nothing: the class of a character is the one its record gives
 GetActorAggroRadiusViolated,stand-in,answers 0: the aggression radius is not watched
 IsContinuingPackagePCNear,stand-in,answers 0: the packages that go on while the player is near are not told apart
+GetPlayerGrabbedRef,stand-in,answers 0: the player cannot grab objects here
+IsPlayerGrabbedRef,stand-in,answers 0: the player cannot grab objects here
+ForceTakeCover,stand-in,accepted and does nothing: the AI has no cover to take
+GetPlantedExplosive,stand-in,answers 0: a laid explosive of the port is not an object of the world that has a reference
 EnableLoadingMenu,stand-in,keeps the flag that IsLoadingMenuEnabled answers; the command does not show or hide the loading menu (0x457D70) itself

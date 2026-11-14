@@ -56,6 +56,8 @@ add_openfallout_dir (mwscript
     guiextensions soundextensions skyextensions statsextensions containerextensions
     aiextensions controlextensions extensions globalscripts ref dialogueextensions
     animationextensions transformationextensions consoleextensions userextensions falloutscripts falloutprogress falloutreputation falloutobjectstate falloutdetection falloutinterface falloutpresentation falloutpipboy falloutinteraction falloutmusic falloutambient falloutradio falloutcrafting falloutbarter falloutrepair falloutlook falloutmods falloutcompanion falloutcasino falloutcaravan fallouthotkeys falloutregionline falloutvats falloutsave falloutdamage falloutchallenges falloutperks falloutdebug
+    falloutvatscommands
+    falloutmines
     falloutspawn
     falloutworld
     falloutlaw

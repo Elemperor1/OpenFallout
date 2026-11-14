@@ -654,6 +654,8 @@ namespace OFScript
         });
         // The rules of damage and destruction register last, so that their commands are the ones that answer
         setUpDamage();
+        setUpVatsCommands();
+        setUpExplosives();
     }
 
     FalloutScripts::~FalloutScripts()
@@ -790,6 +792,16 @@ namespace OFScript
         mActors.clear();
         mEquipment.clear();
         mCombat.clear();
+        {
+            const std::lock_guard lock(mExplosivesMutex);
+            mLaid.clear();
+        }
+        {
+            const std::lock_guard lock(mVatsValueMutex);
+            mVatsMarks.clear();
+            mVatsValueMode = 0;
+            mVatsValueAction = FalloutScript::VatsValue::Action();
+        }
         resetMusic();
         resetAmbient();
         resetRadio();
@@ -991,6 +1003,7 @@ namespace OFScript
         mObjects.setSecondsPassed(frametime);
         updateWorldRules(frametime);
         updateFurniture();
+        updateExplosives(frametime);
         updateDoors();
         applyPlayerStance();
         updateTextureSwaps();
@@ -3307,6 +3320,9 @@ namespace OFScript
         // A weapon with a sound for its loop (a minigun, a flamer) plays that for as long as it fires
         if (!keepWeaponLoop(attacker, stats.mWeapon, stats.mInterval))
             playWeaponSound(attacker, stats.mWeapon, false);
+        // A mine, and a grenade with no target, is laid where the attacker stands and not struck at anything
+        if (layExplosive(attacker, stats.mWeapon, target))
+            return result;
         const FalloutScript::FormId victim = target.isEmpty() ? 0 : scriptReferenceOf(target);
         if (victim == 0 || victim == attacker)
             return result;

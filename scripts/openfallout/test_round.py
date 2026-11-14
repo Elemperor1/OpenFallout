@@ -926,6 +926,28 @@ class StopEngine(unittest.TestCase):
         with mock.patch.object(round_runner.os, "killpg", side_effect=ProcessLookupError):
             self.assertTrue(round_runner.kill_engine(process))
 
+    def test_what_is_left_of_the_engines_group_is_ended_with_it(self):
+        # a crash handler that outlives the engine (a copy of it, forked when it crashes): the sweep after the run ends it
+        import signal
+        import subprocess
+        leader = subprocess.Popen(["sh", "-c", "sleep 60 & wait"], start_new_session=True)
+        time.sleep(0.5)
+        os.kill(leader.pid, signal.SIGKILL)
+        leader.wait(timeout=10)
+        os.killpg(leader.pid, 0)  # a member of the group is still there
+        round_runner.sweep_engine_group(leader)
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            try:
+                os.killpg(leader.pid, 0)
+            except ProcessLookupError:
+                break
+            time.sleep(0.1)
+        with self.assertRaises(ProcessLookupError):
+            os.killpg(leader.pid, 0)
+        with mock.patch.object(round_runner.os, "killpg", side_effect=ProcessLookupError):
+            round_runner.sweep_engine_group(leader)  # nothing left: no error
+
 
 def roundguard_state(tmp):
     """The guards' state of the folder of results `<tmp>/out`."""

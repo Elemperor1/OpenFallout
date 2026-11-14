@@ -1025,6 +1025,26 @@ namespace OFScript
                 FalloutScript::Casino::readCaravanRecord(mCaravanRecord, in, version);
             });
         section(
+            "explosives", FalloutScript::Explosives::explosivesSectionVersion,
+            [this](FalloutScript::SaveWriter& out) {
+                const std::lock_guard lock(mExplosivesMutex);
+                FalloutScript::Explosives::writeExplosives(mLaid, out);
+            },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                const std::lock_guard lock(mExplosivesMutex);
+                FalloutScript::Explosives::readExplosives(mLaid, in, version);
+            });
+        section(
+            "vatsmarks", FalloutScript::VatsValue::targetMarksSectionVersion,
+            [this](FalloutScript::SaveWriter& out) {
+                const std::lock_guard lock(mVatsValueMutex);
+                FalloutScript::VatsValue::writeTargetMarks(mVatsMarks, out);
+            },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                const std::lock_guard lock(mVatsValueMutex);
+                FalloutScript::VatsValue::readTargetMarks(mVatsMarks, in, version);
+            });
+        section(
             "chargen", FalloutScript::chargenSectionVersion,
             [this](FalloutScript::SaveWriter& out) { mChargen.write(out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) { mChargen.read(in, version); });
