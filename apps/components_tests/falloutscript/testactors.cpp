@@ -669,6 +669,24 @@ namespace
         EXPECT_EQ(state.factionRank(guard, legion), -1);
     }
 
+    TEST(FalloutScriptActorStateTest, resetting_an_inventory_that_was_not_known_yet_takes_back_what_was_added)
+    {
+        FakeRecords records;
+        records.mUnknown.insert(guard);
+        ActorState state(records);
+
+        state.addItem(guard, stimpak, 7);
+        ASSERT_THAT(state.takeChanges(), ElementsAre(Field(&ActorState::ItemChange::mCount, 7)));
+
+        state.resetItems(guard);
+
+        const std::vector<ActorState::ItemChange> changes = state.takeChanges();
+        ASSERT_EQ(changes.size(), 1u);
+        EXPECT_EQ(changes[0].mHolder, guard);
+        EXPECT_EQ(changes[0].mItem, stimpak);
+        EXPECT_EQ(changes[0].mCount, -7);
+    }
+
     TEST(FalloutScriptActorStateTest, a_holder_lists_what_it_has_and_the_changes_are_told_once)
     {
         FakeRecords records;

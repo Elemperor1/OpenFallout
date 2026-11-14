@@ -90,6 +90,9 @@ namespace FalloutScript
 
         /// Forgets everything, as for a new game
         void clear();
+        /// Forgets what one character has on, so that it is dressed from its record again the next time it is asked
+        /// about: a character that came back by respawn with a new inventory
+        void reset(FormId actor);
 
         enum class Outcome
         {

@@ -6,9 +6,11 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <numbers>
 #include <map>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace
@@ -336,7 +338,7 @@ namespace
         Runner runner;
         World::Pose pose;
         pose.mPosition = { 10, 20, 30 };
-        pose.mAngle = { 0, 0, M_PI / 2 };
+        pose.mAngle = { 0, 0, std::numbers::pi / 2 };
         runner.mWorld.mRecorded[door] = pose;
         EXPECT_EQ(runner.call("GetStartingPos", door, { number('Y') }), 20.0);
         EXPECT_EQ(runner.call("GetStartingPos", door, { number(2) }), 30.0);
@@ -412,7 +414,7 @@ namespace
         runner.mWorld.mSeconds = 0.5;
         runner.call("Rotate", door, { number('Z'), number(90) });
         ASSERT_EQ(runner.mPlacements.mAngles.size(), 1u);
-        const double expected = std::fmod(6.0 + M_PI / 4, 2 * M_PI);
+        const double expected = std::fmod(6.0 + std::numbers::pi / 4, 2 * std::numbers::pi);
         EXPECT_EQ(std::get<1>(runner.mPlacements.mAngles[0]), 2);
         EXPECT_NEAR(std::get<2>(runner.mPlacements.mAngles[0]), expected, 1e-9);
         runner.call("Rotate", door, { number('Q'), number(90) });
@@ -427,7 +429,7 @@ namespace
         runner.mWorld.mSeconds = 1.0;
         runner.call("Rotate", door, { number('X'), number(-90) });
         ASSERT_EQ(runner.mPlacements.mAngles.size(), 1u);
-        EXPECT_NEAR(std::get<2>(runner.mPlacements.mAngles[0]), 3 * M_PI / 2, 1e-9);
+        EXPECT_NEAR(std::get<2>(runner.mPlacements.mAngles[0]), 3 * std::numbers::pi / 2, 1e-9);
     }
 
     TEST(FalloutScriptWorldCommandsTest, the_navigation_mesh_is_told_by_hexadecimal_text)

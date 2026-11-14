@@ -225,19 +225,20 @@ namespace ESM4
         return nullptr;
     }
 
-    std::vector<const Armor*> wornArmor(
-        const WornArmorSource& source, const Npc& character, int playerLevel, std::uint32_t seed, WornArmorTrace* trace)
+    std::vector<const Armor*> wornArmor(const WornArmorSource& source, const Npc& character, int playerLevel,
+        std::uint32_t seed, WornArmorTrace* trace, int levelMod, std::optional<std::uint32_t> listSeed)
     {
-        return characterArmor(source, character, playerLevel, seed, trace).mArmor;
+        return characterArmor(source, character, playerLevel, seed, trace, levelMod, listSeed).mArmor;
     }
 
-    CharacterArmor characterArmor(
-        const WornArmorSource& source, const Npc& character, int playerLevel, std::uint32_t seed, WornArmorTrace* trace)
+    CharacterArmor characterArmor(const WornArmorSource& source, const Npc& character, int playerLevel,
+        std::uint32_t seed, WornArmorTrace* trace, int levelMod, std::optional<std::uint32_t> listSeed)
     {
         if (trace != nullptr)
             ++trace->mCharacters;
 
-        const std::vector<const Npc*> chain = templateChain(source, character, playerLevel, seed, trace);
+        // The template is the one that the placement chose, whatever seed the lists of the inventory are rolled with
+        const std::vector<const Npc*> chain = templateChain(source, character, playerLevel, seed, trace, levelMod);
         const Npc* inventoryOwner = templateOwner(chain, Npc::Template_UseInventory);
         if (inventoryOwner == nullptr)
         {
@@ -252,7 +253,7 @@ namespace ESM4
         const Npc* statsOwner = templateOwner(chain, Npc::Template_UseStats);
         const int level = actorLevel(statsOwner != nullptr ? *statsOwner : character, playerLevel);
 
-        return inventoryArmor(source, inventoryOwner->mInventory, level, seed, trace);
+        return inventoryArmor(source, inventoryOwner->mInventory, level, listSeed.value_or(seed), trace);
     }
 
     CharacterArmor inventoryArmor(const WornArmorSource& source, const std::vector<InventoryItem>& inventory, int level,

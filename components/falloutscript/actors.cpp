@@ -60,6 +60,12 @@ namespace FalloutScript
         for (const auto& [item, count] : entry.mItems)
             if (count > 0)
                 noteChange(id, item, -count);
+        // Before the records could be asked what the holder has, the count that scripts gave it was its count
+        // (removeCountLocked takes from the same): the inventory is cleared of it as of the rest
+        if (!entry.mItemsKnown)
+            for (const auto& [item, edit] : entry.mItemEdits)
+                if (const std::int64_t pending = edit.apply(0); pending > 0)
+                    noteChange(id, item, -static_cast<int>(pending));
         entry.mItems.clear();
         entry.mWorn.clear();
         entry.mItemEdits.clear();

@@ -405,6 +405,26 @@ namespace
         EXPECT_FALSE(changes[0].mWorn);
     }
 
+    TEST(FalloutScriptEquipmentTest, a_character_with_a_new_inventory_is_dressed_from_its_record_again)
+    {
+        Wardrobe setup;
+        setup.mRecords.mItems[guard] = { { vest, 1 } };
+        setup.mRecords.mStartingArmor[guard] = { vest };
+        ASSERT_THAT(setup.mEquipment.armor(guard), ElementsAre(vest));
+
+        // A looted corpse has nothing on
+        setup.mState.removeItem(guard, vest, 1);
+        EXPECT_THAT(setup.mEquipment.armor(guard), IsEmpty());
+
+        // Back with the inventory its record gives, and in its armor
+        setup.mState.resetItems(guard);
+        EXPECT_THAT(setup.mEquipment.armor(guard), IsEmpty());
+        const std::uint32_t before = setup.mEquipment.revision(guard);
+        setup.mEquipment.reset(guard);
+        EXPECT_THAT(setup.mEquipment.armor(guard), ElementsAre(vest));
+        EXPECT_NE(setup.mEquipment.revision(guard), before);
+    }
+
     TEST(FalloutScriptEquipmentTest, a_character_starts_in_the_first_of_the_armor_that_covers_the_same_parts)
     {
         Wardrobe setup;

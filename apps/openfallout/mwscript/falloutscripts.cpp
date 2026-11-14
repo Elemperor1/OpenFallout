@@ -646,6 +646,9 @@ namespace OFScript
 
     FalloutScripts::~FalloutScripts()
     {
+        // The two hooks of the levelled lists capture this object and are process wide, so they go with it
+        ESM4::setLevelledAdditions({});
+        ESM4::setSpawnRollProvider({});
         reportMissingCommands();
     }
 
@@ -2351,7 +2354,7 @@ namespace OFScript
             {
                 const OFClass::StoreWornArmorSource source(mStore);
                 const ESM4::CharacterArmor given
-                    = ESM4::characterArmor(source, *npc, roll.mLevel, itemSeed);
+                    = ESM4::characterArmor(source, *npc, roll.mLevel, seed, nullptr, roll.mLevelMod, itemSeed);
                 for (const ESM4::ListedArmor& piece : given.mFromLists)
                     give(numberOf(piece.mArmor->mId), piece.mCount);
                 for (const ESM4::ListedItem& item : given.mOtherFromLists)
@@ -2473,8 +2476,8 @@ namespace OFScript
         if (traitsOwner == nullptr)
             traitsOwner = npc;
         const bool female = (traitsOwner->mBaseConfig.fo3.flags & ESM4::Npc::FO3_Female) != 0;
-        const ESM4::WornPieces worn
-            = ESM4::wornPieces(ESM4::wornArmor(source, *npc, roll.mLevel, itemSeed), female);
+        const ESM4::WornPieces worn = ESM4::wornPieces(
+            ESM4::wornArmor(source, *npc, roll.mLevel, seed, nullptr, roll.mLevelMod, itemSeed), female);
         for (const ESM4::WornPiece& piece : worn.mPieces)
             armor.push_back(numberOf(piece.mArmor->mId));
         return true;
@@ -6559,7 +6562,7 @@ namespace OFScript
             for (const PendingSave::Request& request : pending.mRequests)
             {
                 mPendingMade[request.mId] = MadeObject{ request.mBase, request.mNear, request.mDirection,
-                    request.mDistance, Place{ request.mCell, request.mPosition, request.mAngle } };
+                    request.mDistance, Place{ request.mCell, request.mPosition, request.mAngle }, request.mCount };
                 mMadeBases[request.mId] = request.mBase;
             }
             pending.mRequests.clear();

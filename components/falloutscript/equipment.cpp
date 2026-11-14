@@ -23,6 +23,13 @@ namespace FalloutScript
         ++mRevision;
     }
 
+    void Equipment::reset(FormId actor)
+    {
+        const std::lock_guard lock(mMutex);
+        if (mWorn.erase(actor) > 0)
+            ++mArmorRevisions[actor];
+    }
+
     void Equipment::noteChange(FormId actor, FormId item, bool worn)
     {
         ItemInfo info;
