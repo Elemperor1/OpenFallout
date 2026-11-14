@@ -660,8 +660,15 @@ namespace OFScript
             if (ptr.getType() == ESM4::Npc::sRecordId || ptr.getType() == ESM4::Creature::sRecordId)
             {
                 const bool dead = mActors.isDead(reference);
-                const bool due = mRespawn.actorDue(reference, now, neverResets);
-                if ((reference >> 24) != 0xff && (!dead || due))
+                // A dead character comes back when it is due and its record has the flag that makes it respawn (the flag
+                // of the record that has the base data: a template can give it)
+                const bool respawns = dead && mRespawn.actorDue(reference, now, neverResets)
+                    && (ptr.getType() == ESM4::Npc::sRecordId
+                            ? respawnsAsRecord(*ptr.get<ESM4::Npc>()->mBase, reference)
+                            : respawnsAsRecord(*ptr.get<ESM4::Creature>()->mBase, reference));
+                // The reset is for a character that is up to be made new: one that is alive, or one that comes back. A dead
+                // one that stays dead keeps what it has.
+                if ((reference >> 24) != 0xff && (!dead || respawns))
                 {
                     // The cell reset: an actor that is up to be made new goes back to its own base and resolves its
                     // template again, for the level of the player now (0x550C60 through 0x47CE10)
@@ -671,12 +678,6 @@ namespace OFScript
                     ptr.getRefData().setCustomData(nullptr);
                     ++rerolled;
                 }
-                if (!dead || !due)
-                    return true;
-                // The flag of the record that has the base data (a template can give it)
-                const bool respawns = ptr.getType() == ESM4::Npc::sRecordId
-                    ? respawnsAsRecord(*ptr.get<ESM4::Npc>()->mBase, reference)
-                    : respawnsAsRecord(*ptr.get<ESM4::Creature>()->mBase, reference);
                 if (!respawns)
                     return true;
                 {
