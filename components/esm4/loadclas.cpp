@@ -58,9 +58,12 @@ void ESM4::Class::load(ESM4::Reader& reader)
                 break;
             case ESM::fourCC("DATA"):
             {
-                // The DATA of Fallout 3 and New Vegas holds the tag skills (4 bytes) and the flags (4 bytes: playable,
-                // guard); the files of the other games are laid out another way and keep their data unread
-                std::uint8_t data[8] = {};
+                // The DATA of Fallout 3 and New Vegas is 28 bytes: four tag skills (4 bytes each, -1 for none), the flags (4
+                // bytes: 1 playable, 2 guard), the services and the trainer. The executable keeps the flags at +0x54 of the
+                // class, which is the 16th byte of DATA (Fallout3.exe 0x54D490 tests bit 1 of it for IsGuard). The files of
+                // the other games are laid out another way and keep their data unread
+                constexpr std::uint32_t flagsOffset = 16;
+                std::uint8_t data[flagsOffset + sizeof(mFo3Flags)] = {};
                 const std::uint32_t size = std::min<std::uint32_t>(subHdr.dataSize, sizeof(data));
                 if (size == 0 || !reader.get(data, size))
                 {
@@ -70,7 +73,7 @@ void ESM4::Class::load(ESM4::Reader& reader)
                 if (subHdr.dataSize > size)
                     reader.skipSubRecordData(subHdr.dataSize - size);
                 if (size >= sizeof(data))
-                    std::memcpy(&mFo3Flags, data + 4, sizeof(mFo3Flags));
+                    std::memcpy(&mFo3Flags, data + flagsOffset, sizeof(mFo3Flags));
                 break;
             }
             case ESM::fourCC("ATTR"):

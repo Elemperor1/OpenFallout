@@ -53,7 +53,7 @@ The procedure numbers of each package type are in `actorstatus.cpp` (`procedureN
 - **Action timing.** The animation action comes from the playing weapon-move group: attack 2, equip 0, unequip 1, recoil 8; a scripted idle shows as 14 (forced by script), a furniture pose as 13 (special idle). Block, reload, stagger, dodge and wait-lower are in the table of numbers but nothing sets them yet.
 - **Walk speed** is the velocity of the walk animation of the character (units a second), 0 when it has none.
 - **DisableAllActors** disables the characters that the engine looks after (those that have published an activity); the player is not one of them.
-- **Cannibal and Sandman flags** stay set until a new game or a load.
+- **Cannibal and Sandman flags** stay set until a new game or a load. The executable's GetCannibal and GetSandman read the player's own action state (a virtual at +0x364 of the player, 0x5A2890), which the feeding animation ends; the port plays no feeding action and so has no end signal for the flag. An end that was invented here (a movement, a time) could end the flag while a script still polls it, so none was added.
 - **Stand-ins** (`docs/openfallout/coverage/stand-ins.csv`): PickIdle, LoopGroup, SkipAnim, SetClass, GetActorAggroRadiusViolated and IsContinuingPackagePCNear are accepted and do nothing (a reason each); MatchRace, AgeRace, SetPCYoung and SetPCToddler stay the stand-ins that were already in `switches.cpp` (rebuilding a race on a live character is not built).
 
 ## What was run

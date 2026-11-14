@@ -1301,6 +1301,8 @@ namespace OFScript
             for (int hour = 0; hour < hours; ++hour)
             {
                 world->advanceTime(1.0);
+                // The needs of the hardcore mode count the hour before the effects of the stages it reaches run in it
+                updateHardcore(false);
                 if (!mActors.isDead(mPlayer))
                     mActorValues.restore(mPlayer, AV::health,
                         FalloutScript::DerivedStats::regeneration(

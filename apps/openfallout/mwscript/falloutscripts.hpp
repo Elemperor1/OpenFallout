@@ -2357,6 +2357,7 @@ namespace OFScript
         std::optional<FalloutScript::CombatState::Relation> recordedRelation(
             FalloutScript::FormId first, FalloutScript::FormId second) override;
         bool playerEnemyOf(FalloutScript::FormId faction, FalloutScript::FormId target) override;
+        void alarmStopped(FalloutScript::FormId actor) override;
         /// What a weapon does with a blow, for the attacker that holds it; the hands for a weapon that is none. The
         /// condition of the weapon is the one of the copy in the hands (`condition`, in tenths of a percent, names another)
         FalloutScript::WeaponDamage describeWeapon(

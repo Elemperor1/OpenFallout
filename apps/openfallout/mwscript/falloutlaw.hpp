@@ -2,6 +2,7 @@
 #define OPENFALLOUT_APPS_OPENFALLOUT_MWSCRIPT_FALLOUTLAW_H
 
 #include <map>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <vector>
@@ -58,6 +59,9 @@ namespace OFScript
         void update(float frametime);
         /// What the character thinks of the player (0 to 100), or -1 when it cannot be worked out
         int dispositionToPlayer(FalloutScript::FormId self);
+        /// Whether a character that an alarm turned on the player still fights it (what the restrictions on waiting and
+        /// travel ask)
+        bool alarmSounding();
 
         // LawRecords and StandingRecords
         FalloutScript::FormId player() override;
@@ -107,6 +111,9 @@ namespace OFScript
         /// The characters that warn the player of a trespass now, and the time since the last look
         std::set<FalloutScript::FormId> mTrespassWatchers;
         float mSinceLook = 0.f;
+        /// The characters that an alarm turned on the player. Asked from any thread.
+        std::mutex mAlarmMutex;
+        std::set<FalloutScript::FormId> mAlarmed;
     };
 }
 

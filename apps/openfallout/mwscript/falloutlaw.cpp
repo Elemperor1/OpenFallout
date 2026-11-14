@@ -52,6 +52,13 @@ namespace OFScript
         return target == mPlayer && mPlayer != 0 && mObjectState.enemyOfFaction(faction);
     }
 
+    void FalloutScripts::alarmStopped(FalloutScript::FormId actor)
+    {
+        // The crimes the character is the victim of or a witness to are forgotten, and the enemy flags they set with them
+        if (mLaw != nullptr)
+            mLaw->law().stopAlarm(actor);
+    }
+
     bool noteTaking(const OFWorld::Ptr& actor, const OFWorld::Ptr& item, const OFWorld::Ptr& container, int count)
     {
         if (!OFBase::Environment::get().hasFalloutScripts())
@@ -75,6 +82,8 @@ namespace OFScript
         mLaw.clear();
         mStanding.clear();
         mTrespassWatchers.clear();
+        const std::lock_guard lock(mAlarmMutex);
+        mAlarmed.clear();
         mSinceLook = 0.f;
     }
 
@@ -187,10 +196,42 @@ namespace OFScript
         }
     }
 
-    bool LawGlue::alarmed(FormId)
+    bool LawGlue::alarmed(FormId actor)
     {
-        // The package of the alarm is not a package that characters run here
-        return false;
+        // The package of the alarm is not one that characters run here; a character that an alarm turned on the player and
+        // that still fights it stands for it
+        {
+            const std::lock_guard lock(mAlarmMutex);
+            if (mAlarmed.count(actor) == 0)
+                return false;
+        }
+        return mHost.mCombat.inCombat(actor) && mHost.mCombat.target(actor) == mHost.mPlayer;
+    }
+
+    bool LawGlue::alarmSounding()
+    {
+        std::vector<FormId> asked;
+        {
+            const std::lock_guard lock(mAlarmMutex);
+            asked.assign(mAlarmed.begin(), mAlarmed.end());
+        }
+        std::vector<FormId> over;
+        bool sounding = false;
+        for (const FormId actor : asked)
+        {
+            if (mHost.mCombat.inCombat(actor) && mHost.mCombat.target(actor) == mHost.mPlayer)
+                sounding = true;
+            else
+                over.push_back(actor);
+        }
+        if (!over.empty())
+        {
+            // The ones whose fight is over are not the alarm any more
+            const std::lock_guard lock(mAlarmMutex);
+            for (const FormId actor : over)
+                mAlarmed.erase(actor);
+        }
+        return sounding;
     }
 
     bool LawGlue::detected(FormId actor)
@@ -204,7 +245,10 @@ namespace OFScript
 
     bool LawGlue::trespassingNow(FormId actor)
     {
-        return mLaw.trespassing(actor);
+        // IsTrespassing asks of the character that trespasses (0x5A1900 asks the actor itself): here only the player can,
+        // and it does while someone minds it in a place that is not its own. The trespass that the law keeps is that of
+        // the watchers (the characters that warn), which are not the trespassers.
+        return actor != 0 && actor == mHost.mPlayer && mLaw.anyTrespass();
     }
 
     std::vector<FalloutScript::Witness> LawGlue::gather(FormId victim)
@@ -276,6 +320,12 @@ namespace OFScript
                 if (!mHost.mCombat.inCombat(reaction.mActor)
                     && FalloutScript::startFight(mHost.mCombat, mHost.mActors, reaction.mActor, mHost.mPlayer))
                     mHost.evaluatePackage(reaction.mActor);
+                // One that fights the player because of an alarm is what the alarm sounding stands for
+                if (mHost.mCombat.inCombat(reaction.mActor) && mHost.mCombat.target(reaction.mActor) == mHost.mPlayer)
+                {
+                    const std::lock_guard lock(mAlarmMutex);
+                    mAlarmed.insert(reaction.mActor);
+                }
                 break;
             case Kind::Say:
             case Kind::Warn:
@@ -492,10 +542,11 @@ namespace OFScript
         OFBase::World* world = OFBase::Environment::get().getWorld();
         if (actor.isEmpty() || actor != world->getPlayerPtr() || item.isEmpty())
             return;
-        // What is taken from a character's pockets or body is not a theft of the owner of the place
-        if (!container.isEmpty() && container.getClass().isActor())
-            return;
         const FormId reference = mHost.scriptReferenceOf(container.isEmpty() ? item : container);
+        // What is taken from a character's pockets or body is not a theft of the owner of the place (the class of a
+        // character of Fallout is not an actor of the engine, so the records say whether it is one)
+        if (!container.isEmpty() && (container.getClass().isActor() || mHost.isActor(reference)))
+            return;
         const bool gold = item.getClass().isGold(item);
         const std::int64_t value = gold ? count : static_cast<std::int64_t>(count) * item.getClass().getValue(item);
         theftOf(reference, value);
@@ -534,7 +585,11 @@ namespace OFScript
     void LawGlue::tamperedWith(FormId reference, bool karmaOnly)
     {
         mHost.runOnMainThread([this, reference, karmaOnly] {
-            const FormId owner = mHost.mObjectState.owner(reference);
+            // The reference's own owner, else the owner of the cell it is in, as for a thing that is taken
+            FormId owner = mHost.mObjectState.owner(reference);
+            if (owner == 0)
+                if (const FormId cell = mHost.cellOf(reference); cell != 0)
+                    owner = mHost.mObjectState.cellOwner(cell);
             if (FalloutScript::Law::mayTake(owner, mHost.playerBase(), factionsOf(mHost.mPlayer)))
                 return;
             theft(owner, 0, karmaOnly);

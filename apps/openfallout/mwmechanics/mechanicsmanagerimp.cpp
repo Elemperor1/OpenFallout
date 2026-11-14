@@ -1119,8 +1119,9 @@ namespace OFMechanics
     {
         if (ptr != getPlayer())
             return;
-        // The games of Fallout judge what is taken by their own rules (the crime of the Fallout scripts)
-        if (OFScript::noteTaking(ptr, item, container, count))
+        // The games of Fallout judge what is taken by their own rules (the crime of the Fallout scripts); a take that
+        // raises no alarm (a pocket that was picked) is not one of theirs
+        if (alarm && OFScript::noteTaking(ptr, item, container, count))
             return;
 
         OFWorld::Ptr victim;

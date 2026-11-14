@@ -737,6 +737,14 @@ namespace OFMechanics
             if ((ptr.getRefData().getPosition().asVec3() - position).length2() <= squared)
                 objects.push_back(ptr);
         }
+        for (const auto& entry : mUnminded)
+        {
+            const OFWorld::Ptr& ptr = entry.second;
+            if (ptr.isEmpty() || !ptr.isInCell())
+                continue;
+            if ((ptr.getRefData().getPosition().asVec3() - position).length2() <= squared)
+                objects.push_back(ptr);
+        }
     }
 
     FalloutActors::FalloutActors() = default;
@@ -772,7 +780,11 @@ namespace OFMechanics
                 }
         const auto command = mCommands.find(refNum);
         if (command == mCommands.end() && packagesOf(ptr).empty() && scriptPackagesOf(ptr).empty() && !needsMind(ptr))
+        {
+            // No mind, but it is there: whoever looks for those that see a thing finds it
+            mUnminded[ptr.mRef] = ptr;
             return;
+        }
         Mind& mind = makeMind(ptr);
         if (command != mCommands.end())
             obey(mind, command->second);
@@ -783,6 +795,7 @@ namespace OFMechanics
         const ESM::RefNum refNum = ptr.getCellRef().getRefNum();
         const std::uint64_t seed = (static_cast<std::uint64_t>(static_cast<std::uint32_t>(refNum.mContentFile)) << 32)
             ^ refNum.mIndex ^ 0x9E3779B97F4A7C15ull;
+        mUnminded.erase(ptr.mRef);
         Mind& mind = *mMinds.emplace(ptr.mRef, std::make_unique<Mind>(ptr, packagesOf(ptr), seed)).first->second;
         mind.mScripted = scriptPackagesOf(ptr);
         restoreState(mind);
@@ -902,6 +915,7 @@ namespace OFMechanics
 
     void FalloutActors::remove(const OFWorld::Ptr& ptr)
     {
+        mUnminded.erase(ptr.mRef);
         const auto found = mMinds.find(ptr.mRef);
         if (found == mMinds.end())
             return;
@@ -915,6 +929,8 @@ namespace OFMechanics
 
     void FalloutActors::updatePtr(const OFWorld::Ptr& old, const OFWorld::Ptr& ptr)
     {
+        if (mUnminded.erase(old.mRef) > 0)
+            mUnminded[ptr.mRef] = ptr;
         const auto found = mMinds.find(old.mRef);
         if (found == mMinds.end())
             return;
@@ -945,6 +961,7 @@ namespace OFMechanics
     {
         // The cells are unloaded before this, so there are no minds left to give their agents back
         mMinds.clear();
+        mUnminded.clear();
         mCommands.clear();
     }
 
@@ -2470,8 +2487,16 @@ namespace OFMechanics
         // The scripts of the packages run now that every actor has had its turn: what they do (give an actor a package,
         // move one) is for the next frame
         if (frame.mScripts != nullptr)
+        {
+            // What a script of a package asks of the actor (GetCurrentAIProcedure) is the state the frame ended with: the
+            // package, the stage and the end of it that the frame brought, not what was told before it
+            for (const PendingEvent& event : events)
+                if (!event.mActor.isEmpty())
+                    if (const auto found = mMinds.find(event.mActor.mRef); found != mMinds.end())
+                        publishMind(frame.mScripts, *found->second, frame.mScripts->isDead(event.mActor));
             for (const PendingEvent& event : events)
                 if (!event.mActor.isEmpty())
                     frame.mScripts->packageEvent(event.mActor, *event.mPackage, event.mEvent);
+        }
     }
 }

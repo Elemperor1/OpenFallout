@@ -246,16 +246,22 @@ return { limit = 600, delay = 4, run = function(r)
         r.wait(1)
         if setup then setup() end
         r.wait(0.8)
-        local places = { copy(player.position) }
+        -- (each place has the time it was read at: a wait is a deadline and not an exact interval, so the speed is the
+        -- distance over the time that passed between the two places)
+        local clock = r.core.getSimulationTime or r.core.getRealTime
+        local places = { { position = copy(player.position), time = clock() } }
         r.move{ forward = 1, run = false, seconds = 2.5 }
         for i = 1, 10 do
             r.wait(0.25)
-            places[#places + 1] = copy(player.position)
+            places[#places + 1] = { position = copy(player.position), time = clock() }
             if i == 4 then sample('D player ' .. label, player) end
         end
         local speed = 0
-        for i = 4, #places do speed = math.max(speed, distance(places[i - 3], places[i]) / 0.75) end
-        r.log(string.format('D %s: %.0f units/s (%.0f units in 2.5 s)', label, speed, distance(places[1], places[#places])))
+        for i = 4, #places do
+            local elapsed = places[i].time - places[i - 3].time
+            if elapsed > 0 then speed = math.max(speed, distance(places[i - 3].position, places[i].position) / elapsed) end
+        end
+        r.log(string.format('D %s: %.0f units/s (%.0f units in 2.5 s)', label, speed, distance(places[1].position, places[#places].position)))
         return speed
     end
     local walkSpeed = walk('walking', nil)

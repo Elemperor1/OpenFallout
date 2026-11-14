@@ -499,6 +499,20 @@ namespace
         EXPECT_EQ(f.mLaw.trespass(0, 1.0, false), Step::Wait);
     }
 
+    TEST(FalloutScriptCrimeTest, the_trespasser_is_trespassing_while_any_watcher_minds_it)
+    {
+        Fixture f;
+        EXPECT_FALSE(f.mLaw.anyTrespass());
+        f.mLaw.trespass(doc, 0.0, false);
+        // the watcher has the package; whoever asks about the trespasser is told by any of them
+        EXPECT_TRUE(f.mLaw.anyTrespass());
+        f.mLaw.trespass(trudy, 0.0, false);
+        f.mLaw.endTrespass(doc);
+        EXPECT_TRUE(f.mLaw.anyTrespass());
+        f.mLaw.endTrespass(trudy);
+        EXPECT_FALSE(f.mLaw.anyTrespass());
+    }
+
     TEST(FalloutScriptCrimeTest, a_cell_that_is_off_limits_gives_no_warning)
     {
         Fixture f;
@@ -553,6 +567,24 @@ namespace
         EXPECT_FALSE(f.mObjects.enemyOfFaction(rangers));
         EXPECT_EQ(f.mLaw.crimeCount(), 0u);
         EXPECT_THAT(f.mLaw.stopAlarm(doc), IsEmpty());
+    }
+
+    TEST(FalloutScriptCrimeTest, a_faction_held_only_by_a_crime_that_is_forgotten_for_newer_ones_is_released)
+    {
+        Fixture f;
+        Law::Blow blow;
+        blow.mVictim = doc;
+        blow.mVictimFactions = { town };
+        f.mLaw.attack(blow, { watcher(trudy, { town }) });
+        ASSERT_TRUE(f.mObjects.enemyOfFaction(town));
+        // the crimes that are kept are a few hundred; the town is held by the first only
+        blow.mVictim = sheriff;
+        blow.mVictimFactions = { rangers };
+        for (int i = 0; i < 600; ++i)
+            f.mLaw.attack(blow, { watcher(sheriff, { rangers }) });
+        EXPECT_FALSE(f.mLaw.hasCrime(doc, player, -1));
+        EXPECT_FALSE(f.mObjects.enemyOfFaction(town));
+        EXPECT_TRUE(f.mObjects.enemyOfFaction(rangers));
     }
 
     TEST(FalloutScriptCrimeTest, the_flags_of_a_faction_are_set_and_cleared_one_by_one)

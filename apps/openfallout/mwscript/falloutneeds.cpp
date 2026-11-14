@@ -9,6 +9,7 @@
 #include <components/esm4/loadspel.hpp>
 #include <components/esm4/loadwrld.hpp>
 #include <components/falloutscript/actorvalues.hpp>
+#include <components/falloutscript/crime.hpp>
 #include <components/falloutscript/hardcore.hpp>
 #include <components/falloutscript/restrictions.hpp>
 
@@ -18,6 +19,8 @@
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/datetimemanager.hpp"
 #include "../mwworld/esmstore.hpp"
+
+#include "falloutlaw.hpp"
 
 // The needs of the hardcore mode, and the one question that decides if the player may wait, sleep or travel: the host
 // side of components/falloutscript/hardcore.* and restrictions.* (the rules are there, with the addresses of the
@@ -81,7 +84,10 @@ namespace OFScript
 
     bool FalloutScripts::essentialByMode(FalloutScript::FormId actor)
     {
-        // A companion cannot die unless the hardcore mode is on (FalloutNV.exe 0x87F3D0)
+        // A companion cannot die unless the hardcore mode is on (FalloutNV.exe 0x87F3D0). Fallout 3 has no such mode: its
+        // companions are essential by their records and by what scripts say, which the other rules answer.
+        if (!isNewVegas())
+            return false;
         return actor != 0 && actor != mPlayer
             && FalloutScript::companionIsEssential(mObjectState.teammate(actor), hardcoreMode());
     }
@@ -142,15 +148,16 @@ namespace OFScript
 
     bool FalloutScripts::playerTrespassing()
     {
-        // The flag of the player that the ownership rules set (0x8D1E70) is not kept by this engine: the work of the
-        // crime rules, which call this when they have it
-        return false;
+        // The flag of the player that the ownership rules set (0x8D1E70) is kept as what the crime rules hold: someone
+        // minds the player in a place that is not its own (the trespass package of a watcher)
+        return mLaw != nullptr && mLaw->law().anyTrespass();
     }
 
     bool FalloutScripts::playerAlarmSounding()
     {
-        // The alarm of the crime rules (0x953C80: a process of kind 0x15 that is after the player)
-        return false;
+        // The alarm of the crime rules (0x953C80: a process of kind 0x15 that is after the player): here a character that
+        // an alarm turned on the player is still fighting it
+        return mLaw != nullptr && mLaw->alarmSounding();
     }
 
     Restrictions::Facts FalloutScripts::restrictionFacts(Restrictions::Action action, FalloutScript::FormId bed)
@@ -189,7 +196,10 @@ namespace OFScript
             {
                 // What a script made of the bed counts, so the owner is not the one the record names
                 const FalloutScript::FormId owner = mObjectState.owner(bed);
-                facts.mOwnedBed = owner != 0 && owner != playerBase();
+                // (a bed of a faction the player is in, or of the player, is the player's to use)
+                facts.mOwnedBed = owner != 0 && owner != playerBase()
+                    && (mLaw == nullptr
+                        || !FalloutScript::Law::mayTake(owner, playerBase(), mLaw->factionsOf(mPlayer)));
             }
         }
         else
