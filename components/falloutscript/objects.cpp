@@ -15,6 +15,26 @@ namespace FalloutScript
             return std::any_of(script.blocks().begin(), script.blocks().end(),
                 [&](const Block& block) { return block.mType == blockType && (!filter || filter(block)); });
         }
+
+        /// Sets a number for the length of a scope and puts back what was there on every way out of it (a script that
+        /// runs inside another's update must not leave the outer one with the seconds of its own)
+        class ValueScope
+        {
+        public:
+            ValueScope(double& value, double inside)
+                : mValue(value)
+                , mOutside(value)
+            {
+                mValue = inside;
+            }
+            ~ValueScope() { mValue = mOutside; }
+            ValueScope(const ValueScope&) = delete;
+            ValueScope& operator=(const ValueScope&) = delete;
+
+        private:
+            double& mValue;
+            double mOutside;
+        };
     }
 
     ObjectScripts::ObjectScripts(Interpreter& interpreter, ScriptFinder finder)
@@ -171,6 +191,10 @@ namespace FalloutScript
         const bool has = hasBlockOfType(instance->script(), blockType);
         if (has)
         {
+            // Only the update of an effect that is running has seconds to tell (the host sets them for it); the start and
+            // the end, and a script that has no effect to ask, tell 0 (0x5C43A0)
+            const bool updates = blockType == BlockType::ScriptEffectUpdate && effect != 0;
+            const ValueScope seconds(mEffectSeconds, updates ? mEffectSeconds : 0.0);
             const ActionScope scope(mActionReference, 0);
             mInterpreter.run(*instance, blockType);
         }

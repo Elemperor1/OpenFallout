@@ -7,6 +7,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <map>
 #include <set>
 
@@ -474,6 +475,18 @@ namespace
             [](int limb) { return limb == head; }, numbers({ 99, 99, 0 }));
         ASSERT_EQ(again.size(), 2u);
         EXPECT_EQ(again[0].mLimb, leftArm);
+    }
+
+    TEST(FalloutScriptDismemberTest, the_hours_of_a_death_are_whole_game_hours_that_pass_within_a_day)
+    {
+        EXPECT_EQ(Rule::wholeHours(3, 0), 72.0);
+        EXPECT_EQ(Rule::wholeHours(3, 13.9), 85.0);
+        // An hour of the day passes the count; the same day's next hour is one more
+        EXPECT_EQ(Rule::wholeHours(3, 14.2) - Rule::wholeHours(3, 13.9), 1.0);
+        // The days are whole days of the world
+        EXPECT_EQ(Rule::wholeHours(3.7, 1.5), 73.0);
+        EXPECT_EQ(Rule::wholeHours(std::nan(""), 5), 0.0);
+        EXPECT_EQ(Rule::wholeHours(2, INFINITY), 0.0);
     }
 
     TEST(FalloutScriptDismemberTest, the_cause_of_a_death_is_what_dealt_the_blow)

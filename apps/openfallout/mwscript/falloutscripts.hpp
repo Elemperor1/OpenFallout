@@ -2399,6 +2399,9 @@ namespace OFScript
         void reinsertObject(const OFWorld::Ptr& ptr);
         /// After a game is loaded: the models of the stages that things were in
         void showDamagedObjects();
+        /// The model of the stage that a damaged thing was in when the game was saved, for the thing itself when it is in the
+        /// scene already
+        void showSavedDamage(FalloutScript::FormId reference, const OFWorld::Ptr& placed);
         void resetDamage();
         FalloutScript::DismemberSettings dismemberSettings();
         /// The blow that killed the character: what killed it, and the limbs that the rule of the executable tears off
@@ -2427,7 +2430,8 @@ namespace OFScript
         void noteChallengeMarker(FalloutScript::FormId marker);
         void noteChallengeCrafted(FalloutScript::FormId recipe);
         void noteChallengeHit(FalloutScript::FormId victim, const FalloutScript::CombatState::Hit& hit);
-        void noteChallengeKill(FalloutScript::FormId victim, FalloutScript::FormId killer);
+        void noteChallengeKill(
+            FalloutScript::FormId victim, FalloutScript::FormId killer, FalloutScript::FormId weapon);
         bool baseFormOf(FalloutScript::FormId reference, FalloutScript::FormId& base) override;
         FalloutScript::FormId worldspaceOf(FalloutScript::FormId reference) override;
         FalloutScript::FormId linkedRef(FalloutScript::FormId reference, FalloutScript::FormId keyword) override;

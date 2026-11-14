@@ -93,9 +93,11 @@ namespace OFLua
                 return id->toUint32();
             };
             std::vector<double> numbers;
+            // The arguments are the entries 1 to the length, in that order (the traversal of a table has no order)
             if (arguments)
-                for (const auto& [key, value] : *arguments)
+                for (std::size_t index = 1; index <= arguments->size(); ++index)
                 {
+                    const sol::object value = arguments->get<sol::object>(index);
                     if (value.is<std::string_view>())
                         numbers.push_back(number(value.as<std::string_view>()));
                     else
