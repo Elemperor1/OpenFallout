@@ -6465,6 +6465,12 @@ namespace OFScript
     FalloutScript::FormId FalloutScripts::placeAtMe(
         FalloutScript::FormId reference, FalloutScript::FormId base, int count, double distance, int direction)
     {
+        return placeObjects(reference, base, count, distance, direction, nullptr);
+    }
+
+    FalloutScript::FormId FalloutScripts::placeObjects(FalloutScript::FormId reference, FalloutScript::FormId base,
+        int count, double distance, int direction, const DroppedStack* stack)
+    {
         Place near;
         if (!whereIs(reference, near))
         {
@@ -6480,8 +6486,11 @@ namespace OFScript
                 const FalloutScript::FormId id = 0xff000000u | ++mMadeCount;
                 // Asked for at once, so that the rest of the script finds the object it was told the number of (also
                 // when a script that Lua started runs on the thread of Lua); the world makes it at the next frame
+                // (the stack of a drop is part of the request from the start: the frame can make the object as soon as the
+                // lock is let go)
                 mPendingMade[id] = MadeObject{ base, reference, direction >= 0 && direction <= 3 ? direction : 0,
-                    static_cast<float>(distance), near, 1 };
+                    static_cast<float>(distance), near, stack != nullptr ? stack->mCount : 1, stack != nullptr,
+                    stack != nullptr ? stack->mCondition : 1000, stack != nullptr ? stack->mMods : 0 };
                 mMadeBases[id] = base;
                 if (first == 0)
                     first = id;
@@ -6502,6 +6511,7 @@ namespace OFScript
         {
             log("PlaceAtMe: " + FalloutScript::hex(request.mNear) + " is not in a loaded cell, so nothing is made next "
                 "to it");
+            giveBackDropped(id, request);
             return;
         }
         try
@@ -6523,7 +6533,18 @@ namespace OFScript
         catch (const std::exception& error)
         {
             log("PlaceAtMe: an object of " + FalloutScript::hex(request.mBase) + " can not be made: " + error.what());
+            giveBackDropped(id, request);
         }
+    }
+
+    void FalloutScripts::giveBackDropped(FalloutScript::FormId id, const MadeObject& request)
+    {
+        if (!request.mDropped)
+            return;
+        // The stack left the holder when the script dropped it; with no object to hold it, it is not lost
+        mActors.addItem(request.mNear, request.mBase, request.mCount, request.mCondition, request.mMods);
+        mReferenceState.setCondition(id, 1000, 0);
+        log("Drop: the stack of " + FalloutScript::hex(request.mBase) + " went back to " + FalloutScript::hex(request.mNear));
     }
 
     namespace
@@ -6586,7 +6607,8 @@ namespace OFScript
             for (const PendingSave::Request& request : pending.mRequests)
             {
                 mPendingMade[request.mId] = MadeObject{ request.mBase, request.mNear, request.mDirection,
-                    request.mDistance, Place{ request.mCell, request.mPosition, request.mAngle }, request.mCount };
+                    request.mDistance, Place{ request.mCell, request.mPosition, request.mAngle }, request.mCount, false, 1000,
+                    0 };
                 mMadeBases[request.mId] = request.mBase;
             }
             pending.mRequests.clear();

@@ -214,15 +214,14 @@ namespace OFScript
         {
             if (holder == 0 || item == 0 || count <= 0)
                 return 0;
-            const FalloutScript::FormId made = mHost.placeAtMe(holder, item, 1, 0.0, 0);
+            // The stack is made as one object at the start of the next frame, and the request says so from the start
+            // (also how worn the copies were and the mods in them, to give the stack back if no object can be made)
+            const FalloutScripts::DroppedStack stack{ count, condition, mods };
+            const FalloutScript::FormId made = mHost.placeObjects(holder, item, 1, 0.0, 0, &stack);
             if (made == 0)
                 return 0;
             // The object keeps how worn the copies were and the mods in them, to be picked up with them
             mHost.mReferenceState.setCondition(made, condition, mods);
-            // The stack is made as one object at the start of the next frame
-            const std::lock_guard lock(mHost.mMadeMutex);
-            if (const auto asked = mHost.mPendingMade.find(made); asked != mHost.mPendingMade.end())
-                asked->second.mCount = count;
             return made;
         }
 
