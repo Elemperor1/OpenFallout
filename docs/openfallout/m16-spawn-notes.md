@@ -189,3 +189,7 @@ with 0 scenario errors and the engine never frontmost (Fallout 3: 131 s from a n
 - `RemoveMe` and `DropMe` return "stop the script" in the executable; the interpreter has no way to stop the calling script.
 - The names of `SetActorFullName` and `SetCellFullName` are kept, not shown.
 - A pending `PlaceAtMe` of a stack (a dropped item with a count) that was not yet made when the game was saved is made again with count 1.
+- `Drop` and `DropMe` take the stacks out of the holder at once and the world makes the object at the start of the next frame. The count,
+  the condition and the mods of a stack are part of the request from the moment it is published, and when no object can be made (the
+  holder is not in a loaded cell by then, or the world refuses it) the stack goes back to the holder with its condition and mods. A
+  request that was saved before it was made has no holder to give back to after a load (it is made again as above).
