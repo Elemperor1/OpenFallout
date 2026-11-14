@@ -55,8 +55,6 @@ namespace OFScript
             return id != nullptr ? numberFor(*id) : 0;
         }
 
-        /// The base flag of a character or creature that makes it come back (the flag of Fallout 3 and New Vegas)
-        constexpr std::uint32_t respawnFlag = 0x00000008;
         /// The flag of a container that makes it fill again
         constexpr std::uint8_t containerRespawnFlag = 0x02;
     }
@@ -309,7 +307,7 @@ namespace OFScript
         mSpawnAdapter = std::make_shared<SpawnAdapter>(*this);
         FalloutScript::addLevelledListCommands(mInterpreter, mLevelledLists, *mSpawnAdapter);
         const FalloutScript::SpawnParts parts{ mActors, mFormLists, *this, *mSpawnAdapter, mRespawn, mItemValues,
-            mNameOverrides };
+            mNameOverrides, mEquipment };
         FalloutScript::addSpawnCommands(mInterpreter, parts);
 
         // What scripts added to a list is part of the list for every roll of it, wherever it is rolled
@@ -365,9 +363,9 @@ namespace OFScript
         if (actor == 0 || !baseOf(actor, base) || base.isZeroOrUnset())
             return false;
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
-            return npc->mIsFONV && (npc->mBaseConfig.fo3.flags & respawnFlag) != 0;
+            return respawnsAsRecord(*npc, actor);
         if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
-            return creature->mIsFONV && (creature->mBaseConfig.fo3.flags & respawnFlag) != 0;
+            return respawnsAsRecord(*creature, actor);
         return false;
     }
 
@@ -476,12 +474,11 @@ namespace OFScript
             {
                 if (!mActors.isDead(reference) || !mRespawn.actorDue(reference, now, neverResets))
                     return true;
-                std::uint32_t flags = 0;
-                if (ptr.getType() == ESM4::Npc::sRecordId)
-                    flags = ptr.get<ESM4::Npc>()->mBase->mBaseConfig.fo3.flags;
-                else
-                    flags = ptr.get<ESM4::Creature>()->mBase->mBaseConfig.fo3.flags;
-                if ((flags & respawnFlag) == 0)
+                // The flag of the record that has the base data (a template can give it)
+                const bool respawns = ptr.getType() == ESM4::Npc::sRecordId
+                    ? respawnsAsRecord(*ptr.get<ESM4::Npc>()->mBase, reference)
+                    : respawnsAsRecord(*ptr.get<ESM4::Creature>()->mBase, reference);
+                if (!respawns)
                     return true;
                 {
                     // Alive again and with its health back in one step, as ResurrectActor does it

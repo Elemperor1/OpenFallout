@@ -15,10 +15,15 @@ return { limit = 360, delay = 4, run = function(r)
             return nil
         end
         local value
-        r.waitFor(function()
+        -- A command that gets no answer is a failure of the round (a note about it would not fail it)
+        local answered = r.waitFor(function()
             value = W.result(id)
             return value ~= nil
         end, 10, name)
+        if not answered then
+            r.error('ASK ' .. name .. ' received no answer')
+            return nil
+        end
         r.log(string.format('ASK %s %s -> %s', name, reference or '-', tostring(value)))
         return value
     end

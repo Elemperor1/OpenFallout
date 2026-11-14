@@ -5,6 +5,7 @@
 
 #include "actors.hpp"
 #include "arguments.hpp"
+#include "equipment.hpp"
 #include "formlists.hpp"
 #include "objectcommands.hpp"
 #include "respawn.hpp"
@@ -167,6 +168,7 @@ namespace FalloutScript
         RespawnState& respawn = parts.mRespawn;
         ItemValues& itemValues = parts.mItemValues;
         NameOverrides& names = parts.mNames;
+        Equipment& equipment = parts.mEquipment;
 
         // PlaceLeveledActorAtMe base, levelMod, zone: a character or creature at the place of the reference, whose
         // levelled lists are rolled for the level of the zone and the modifier (0x5D9810). The modifier is 4, which
@@ -180,7 +182,9 @@ namespace FalloutScript
         });
 
         // PlaceAtMeHealthPercent base, health, count, distance, direction: as PlaceAtMe, with the health that the
-        // objects have (0x5D90A0). Nothing in the world has a condition yet, so the health is only checked.
+        // objects have (0x5D90A0). The health (argument 1) is not applied: the placement interface carries none, and
+        // what it would set differs by kind (a character's health, the damage state of a breakable object, the condition
+        // of an item), so the objects are made as PlaceAtMe makes them.
         interpreter.setHandler("PlaceAtMeHealthPercent", [&objects](CallContext& call) {
             const FormId base = formArgument(call, 0);
             if (call.mReference == 0 || base == 0)
@@ -259,12 +263,14 @@ namespace FalloutScript
         });
 
         // The inventory of the reference is made new from its record: what it held is forgotten, and the levelled lists
-        // in it are rolled again (0x5DAC60 asks the reference to rebuild)
-        interpreter.setHandler("ResetInventory", [&actors, &respawn](CallContext& call) {
+        // in it are rolled again (0x5DAC60 asks the reference to rebuild). What the character wears is forgotten with
+        // it, so that it is dressed from its record again, as a character that comes back by respawn is.
+        interpreter.setHandler("ResetInventory", [&actors, &respawn, &equipment](CallContext& call) {
             if (call.mReference == 0)
                 return 0.0;
             respawn.resetInventory(call.mReference);
             actors.resetItems(call.mReference);
+            equipment.reset(call.mReference);
             return 0.0;
         });
 

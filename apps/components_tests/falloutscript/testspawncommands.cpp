@@ -1,6 +1,7 @@
 #include "scriptbuilder.hpp"
 
 #include <components/falloutscript/actors.hpp>
+#include <components/falloutscript/equipment.hpp>
 #include <components/falloutscript/formlists.hpp>
 #include <components/falloutscript/objectcommands.hpp>
 #include <components/falloutscript/objects.hpp>
@@ -34,6 +35,7 @@ namespace
     constexpr FormId pistol = 0x01000400;
     constexpr FormId rifle = 0x01000401;
     constexpr FormId junk = 0x01000402;
+    constexpr FormId vest = 0x01000403;
     constexpr FormId junkList = 0x01000700;
     constexpr FormId message = 0x01000800;
     constexpr FormId scriptOfGuards = 0x01002000;
@@ -60,11 +62,28 @@ namespace
 
     constexpr std::uint32_t integerVariable = 1;
 
-    class FakeActorRecords : public FalloutScript::ActorRecords
+    class FakeActorRecords : public FalloutScript::ActorRecords, public FalloutScript::ItemRecords
     {
     public:
         std::map<FormId, std::vector<std::pair<FormId, int>>> mItems;
+        std::map<FormId, std::vector<FormId>> mStartingArmor;
         int mQuestions = 0;
+
+        bool itemInfo(FormId item, FalloutScript::ItemInfo& info) override
+        {
+            // Every item of the tests that is worn is a vest
+            if (item != vest)
+                return false;
+            info.mKind = FalloutScript::ItemKind::Armor;
+            info.mSlots = FalloutScript::BipedSlot::upperBody;
+            return true;
+        }
+
+        bool startingArmor(FormId actor, std::vector<FormId>& armor) override
+        {
+            armor = mStartingArmor[actor];
+            return true;
+        }
 
         bool initialItems(FormId holder, std::vector<std::pair<FormId, int>>& items) override
         {
@@ -206,11 +225,12 @@ namespace
         FalloutScript::RespawnState mRespawn;
         FalloutScript::ItemValues mItemValues;
         FalloutScript::NameOverrides mNames;
+        FalloutScript::Equipment mEquipment{ mActorRecords, mActors };
 
         Runner()
         {
             FalloutScript::addSpawnCommands(mInterpreter,
-                { mActors, mFormLists, mObjectWorld, mWorld, mRespawn, mItemValues, mNames });
+                { mActors, mFormLists, mObjectWorld, mWorld, mRespawn, mItemValues, mNames, mEquipment });
         }
 
         void run(const ScriptBuilder& builder, FormId owner = guard)
@@ -502,6 +522,24 @@ namespace
         EXPECT_EQ(setup.mActors.itemCount(guard, pistol), 2);
         EXPECT_EQ(setup.mActors.itemCount(guard, junk), 0);
         EXPECT_EQ(setup.mRespawn.inventoryGeneration(guard), 1);
+    }
+
+    TEST(FalloutScriptSpawnCommandsTest, aCharacterWithANewInventoryIsDressedFromItsRecordAgain)
+    {
+        Runner setup;
+        setup.mActorRecords.mItems[guard] = { { vest, 1 } };
+        setup.mActorRecords.mStartingArmor[guard] = { vest };
+        ASSERT_THAT(setup.mEquipment.armor(guard), ElementsAre(vest));
+        // A looted character has nothing on
+        setup.mActors.removeItem(guard, vest, 1);
+        ASSERT_THAT(setup.mEquipment.armor(guard), IsEmpty());
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate) + command(OpResetInventory, arguments(0)) + end());
+
+        setup.run(builder);
+
+        EXPECT_EQ(setup.mActors.itemCount(guard, vest), 1);
+        EXPECT_THAT(setup.mEquipment.armor(guard), ElementsAre(vest));
     }
 
     TEST(FalloutScriptSpawnCommandsTest, zonesAndInteriorsAreToldToResetOrNot)
