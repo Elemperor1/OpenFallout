@@ -2078,6 +2078,9 @@ namespace OFScript
         void showImpact(FalloutScript::FormId victim, FalloutScript::FormId attacker, FalloutScript::FormId weapon, int limb);
         void struckRumble();
         void hitRumble();
+        /// Tells the input manager, once a frame, the weapon in the player's hands, whether it is out and whether a menu
+        /// is open: the fire trigger of the pad feels the weapon (`OFInput::TriggerFeel`)
+        void updateTriggerFeel();
         /// The sound of the ground for a landing or a jump, from where the actor stands
         void playGroundStep(const OFWorld::Ptr& ptr, FalloutScript::Footsteps::Slot slot);
         /// A number that changes when what `playerBody` gives changes (the sex, race or look, armor put on or taken

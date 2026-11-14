@@ -10,6 +10,7 @@
 
 #include <components/lua/asyncpackage.hpp>
 
+#include "input.hpp"
 #include "padding.hpp"
 #include "properties.hpp"
 
@@ -79,7 +80,7 @@ namespace LuaUi
         virtual MyGUI::IntSize calculateSize() const;
         virtual MyGUI::IntPoint calculatePosition(const MyGUI::IntSize& size) const;
         MyGUI::IntCoord calculateCoord() const;
-        void mouseWheel(MyGUI::Widget*, float, float, float, float);
+        void mouseWheel(const MouseWheel& wheel);
 
         virtual bool isTextInput() { return false; }
         bool collectWarnings(Warnings& warnings, int depth, bool generateWarningStrings) const;

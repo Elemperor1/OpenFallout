@@ -13,7 +13,7 @@ trigger:
         type: Push
         spec:
           connectorRef: account.connector_Github_7cd1
-          repoName: Elemperor1/OpenFallout
+          repoName: OpenBethesda/OpenFallout
           autoAbortPreviousExecutions: false
           payloadConditions:
           - key: targetBranch

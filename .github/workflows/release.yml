@@ -37,3 +37,11 @@ jobs:
       image: ${{ matrix.args.image }}
       runner: ${{ matrix.args.runner }}
       build-type: Release
+      signing-environment: ${{ matrix.args.image == 'macos-26' && 'macos-release' || '' }}
+    secrets:
+      MACOS_DEVELOPER_ID_P12_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 }}
+      MACOS_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_P12_PASSWORD }}
+      MACOS_TEAM_ID: ${{ secrets.MACOS_TEAM_ID }}
+      MACOS_NOTARY_API_KEY: ${{ secrets.MACOS_NOTARY_API_KEY }}
+      MACOS_NOTARY_API_KEY_ID: ${{ secrets.MACOS_NOTARY_API_KEY_ID }}
+      MACOS_NOTARY_API_ISSUER_ID: ${{ secrets.MACOS_NOTARY_API_ISSUER_ID }}

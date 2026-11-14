@@ -941,6 +941,7 @@ namespace OFScript
 
     void FalloutScripts::update(float frametime, bool paused)
     {
+        updateTriggerFeel();
         runPending();
         updateMessageBoxes();
         updateVoices(frametime);
@@ -3308,7 +3309,11 @@ namespace OFScript
         }
         result.mFired = true;
         if (attacker == mPlayer)
+        {
             ++mPlayerShots;
+            if (OFBase::InputManager* input = OFBase::Environment::get().getInputManager())
+                input->weaponFired();
+        }
         {
             const std::lock_guard lock(mFireMutex);
             mFireCooldowns[attacker] = static_cast<float>(stats.mInterval);

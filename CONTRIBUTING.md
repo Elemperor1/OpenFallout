@@ -1,7 +1,7 @@
 How to contribute to OpenFallout
 ================================
 
-OpenFallout is at an early stage. Start with the [roadmap](docs/openfallout/gap-audit-and-roadmap.md), then pick or open an issue at https://github.com/Elemperor1/OpenFallout/issues and send a pull request against `master`.
+OpenFallout is at an early stage. Start with the [roadmap](docs/openfallout/gap-audit-and-roadmap.md), then pick or open an issue at https://github.com/OpenBethesda/OpenFallout/issues and send a pull request against `master`.
 
 * Keep each pull request to one change, and say in its description what you ran to check it. The build and test baseline is in [docs/openfallout/build-baseline.md](docs/openfallout/build-baseline.md).
 * Format C++ with the repository's `.clang-format`.

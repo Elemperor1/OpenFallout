@@ -162,8 +162,15 @@ namespace OFInput
 
         if (mGuiCursorEnabled)
         {
+            LuaUi::MouseWheel wheel;
+            wheel.mLeft = mGuiCursorX;
+            wheel.mTop = mGuiCursorY;
+            wheel.mDeltaX = arg.preciseX;
+            wheel.mDeltaY = arg.preciseY;
+            wheel.mNotchesX = mGuiWheelNotchesX.add(arg.preciseX, arg.direction);
+            wheel.mNotchesY = mGuiWheelNotchesY.add(arg.preciseY, arg.direction);
             if (MyGUI::Widget* widget = MyGUI::InputManager::getInstance().getMouseFocusWidget())
-                LuaUi::dispatchMouseWheel(widget, mGuiCursorX, mGuiCursorY, arg.preciseX, arg.preciseY);
+                LuaUi::dispatchMouseWheel(widget, wheel);
         }
     }
 

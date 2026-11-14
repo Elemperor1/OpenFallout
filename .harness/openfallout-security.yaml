@@ -8,7 +8,7 @@ pipeline:
     ci:
       codebase:
         connectorRef: account.connector_Github_7cd1
-        repoName: Elemperor1/OpenFallout
+        repoName: OpenBethesda/OpenFallout
         persistCredentials: false
         build: <+input>
   stages:
@@ -71,7 +71,7 @@ pipeline:
                     source:
                       type: repository
                       spec:
-                        url: https://github.com/Elemperor1/OpenFallout
+                        url: https://github.com/OpenBethesda/OpenFallout
                         path: .
                         variant_type: commit
                         variant: <+codebase.commitSha>

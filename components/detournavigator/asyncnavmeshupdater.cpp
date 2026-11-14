@@ -948,7 +948,7 @@ namespace DetourNavigator
                     {
                         Log(Debug::Warning)
                             << "Found duplicate navmeshdb tile_id, please report the "
-                               "issue to https://github.com/Elemperor1/OpenFallout/issues, attach openfallout.log: "
+                               "issue to https://github.com/OpenBethesda/OpenFallout/issues, attach openfallout.log: "
                             << mNextTileId;
                         try
                         {

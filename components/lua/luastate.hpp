@@ -22,6 +22,10 @@ namespace LuaUtil
 
     std::string getLuaVersion();
 
+    // The value of OPENFALLOUT_LUAJIT_PROBE: "1" asks for the one-time LuaJIT compiler probe and its log line (the
+    // packaged-app check sets it); anything else, or no value, means no probe.
+    bool isLuaJitProbeRequested(const char* value);
+
     class ScriptsContainer;
     struct ScriptId
     {

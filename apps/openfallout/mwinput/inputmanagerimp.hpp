@@ -1,6 +1,7 @@
 #ifndef MWINPUT_MWINPUTMANAGERIMP_H
 #define MWINPUT_MWINPUTMANAGERIMP_H
 
+#include <atomic>
 #include <memory>
 
 #include <osg/ref_ptr>
@@ -13,6 +14,7 @@
 #include "../mwbase/inputmanager.hpp"
 
 #include "actions.hpp"
+#include "triggerfeel.hpp"
 
 namespace OFWorld
 {
@@ -76,6 +78,8 @@ namespace OFInput
         bool padPick() const override;
         void rumble(float strength, float seconds) override;
         void rumble(float left, float right, float seconds) override;
+        void setTriggerState(const TriggerFeel::PlayerState& player) override;
+        void weaponFired() override;
 
         void toggleControlSwitch(std::string_view sw, bool value) override;
         bool getControlSwitch(std::string_view sw) override;
@@ -117,6 +121,14 @@ namespace OFInput
 
     private:
         bool mControlsDisabled;
+
+        // What the game said last about the player, for the triggers
+        TriggerFeel::PlayerState mTriggerPlayer;
+        // A shot of the player waits for the next frame: the attack may run off the main thread, and the pad is told
+        // on it
+        std::atomic<bool> mTriggerShotPending{ false };
+
+        void updateTriggers(bool disableControls);
 
         void saveBindings() override;
 
