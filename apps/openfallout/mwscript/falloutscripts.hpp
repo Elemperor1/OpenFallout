@@ -2658,9 +2658,26 @@ namespace OFScript
             float mDistance = 0;
             Place mWhere; // where that reference was, which is where scripts see the new object until it is made
             int mCount = 1; // how many of an item it stands for (a dropped stack)
+            /// A stack that Drop or DropMe took out of the holder mNear: how worn it is and its mods, to give it back to the
+            /// holder when no object is made
+            bool mDropped = false;
+            int mCondition = 1000;
+            int mMods = 0;
         };
+        /// The stack that a Drop or DropMe puts into the world
+        struct DroppedStack
+        {
+            int mCount = 1;
+            int mCondition = 1000;
+            int mMods = 0;
+        };
+        /// PlaceAtMe, with the stack that a drop stands for published in the same request (null for an ordinary object)
+        FalloutScript::FormId placeObjects(FalloutScript::FormId reference, FalloutScript::FormId base, int count,
+            double distance, int direction, const DroppedStack* stack);
         /// Makes an object that PlaceAtMe asked for, at the start of the next frame
         void makeObject(FalloutScript::FormId id, const MadeObject& request);
+        /// No object was made for a request: a dropped stack goes back to the holder it left
+        void giveBackDropped(FalloutScript::FormId id, const MadeObject& request);
         /// Sets the spawn commands, the levelled list additions and the respawn rules up (falloutspawn.cpp)
         void setupSpawn();
         /// Forgets what the spawn rules kept, for a game that is started or loaded
