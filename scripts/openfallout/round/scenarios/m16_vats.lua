@@ -154,10 +154,10 @@ return { limit = 900, delay = 4, run = function(r)
     near(g2, 1500, 'the player 1500 units from g2')
     local spot = { x = player.position.x, y = player.position.y + 70, z = player.position.z }
     local hq0 = health(g2)
+    -- (the mine lies 70 units from its owner, who can set it off: it is disabled in the same step that lays it, with no frame
+    -- between the two, so that it is switched off before anything can set it off. A wait between them is a few frames, and the
+    -- least delay a mine has between being set off and going off, 0.2 s, is not a limit that a wait can stay under.)
     r.core.combat.fireWeapon(pid, mineForm)
-    -- (the mine lies 70 units from its owner, who can set it off: it is disabled at once, within the least delay a mine has
-    -- between being set off and going off, 0.2 s, so that it is still armed when it is switched off)
-    r.wait(0.05)
     cmd('DisableAllMines', pid)
     r.wait(0.5)
     r.putAt(g2, { pos = { spot.x, spot.y, spot.z }, yaw = math.pi, label = 'g2 on the disabled mine' })

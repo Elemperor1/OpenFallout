@@ -250,13 +250,14 @@ namespace FalloutScript::Explosives
             out.u32(p.mState);
             out.u32(p.mCause);
             out.boolean(p.mNoDamage);
+            out.form(p.mWeapon);
         }
     }
 
     void readExplosives(Laid& laid, SaveReader& in, std::uint32_t version)
     {
-        // (version 1 has no flag for a blast that does no damage)
-        if (version != 1 && version != explosivesSectionVersion)
+        // (version 1 has no flag for a blast that does no damage, versions 1 and 2 no weapon)
+        if (version < 1 || version > explosivesSectionVersion)
             throw SaveError("explosives: unknown version");
         const std::uint32_t next = in.u32();
         // each entry takes at least 64 bytes
@@ -284,12 +285,15 @@ namespace FalloutScript::Explosives
             p.mState = in.u32();
             p.mCause = in.u32();
             p.mNoDamage = version >= 2 && in.boolean();
+            // (a weapon of a plugin that is no longer loaded is none)
+            const std::optional<FormId> weapon = version >= 3 ? in.form() : std::nullopt;
             // A projectile whose record is no longer loaded is dropped; the cell it lay in is only a guide
             if (!projectile)
                 continue;
             p.mOwner = owner.value_or(0);
             p.mProjectile = *projectile;
             p.mCell = cell.value_or(0);
+            p.mWeapon = weapon.value_or(0);
             placed.push_back(p);
         }
         laid.restore(std::move(placed), next);

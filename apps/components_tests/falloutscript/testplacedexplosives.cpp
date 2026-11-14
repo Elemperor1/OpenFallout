@@ -308,6 +308,60 @@ namespace
         EXPECT_FALSE(back.all()[1].mNoDamage);
     }
 
+    TEST(FalloutScriptExplosivesTest, theWeaponThatLaidItIsKeptInASave)
+    {
+        EX::Laid laidOnes;
+        EX::Placed armed = laid(mine(), 0x14);
+        armed.mWeapon = 0x2468;
+        laidOnes.plant(armed);
+        laidOnes.plant(laid(mine(), 0x14));
+        FalloutScript::SaveWriter out;
+        EX::writeExplosives(laidOnes, out);
+        const std::string bytes = out.take();
+        FalloutScript::SaveReader in(bytes);
+        EX::Laid back;
+        EX::readExplosives(back, in, EX::explosivesSectionVersion);
+        ASSERT_EQ(back.count(), 2u);
+        EXPECT_EQ(back.all()[0].mWeapon, 0x2468u);
+        EXPECT_EQ(back.all()[1].mWeapon, 0u);
+    }
+
+    TEST(FalloutScriptExplosivesTest, aSaveOfTheVersionBeforeTheWeaponLoadsWithNone)
+    {
+        // Version 2: the flag of the blast that does no damage ends the entry
+        FalloutScript::SaveWriter out;
+        out.u32(5);
+        out.count(1);
+        out.u32(4);
+        out.form(0x14);
+        out.form(0x1357);
+        out.boolean(false);
+        out.boolean(false);
+        out.boolean(true);
+        out.boolean(true);
+        out.f64(100);
+        out.f64(0);
+        out.f32(1.f);
+        out.f32(2.f);
+        out.f32(3.f);
+        out.form(0x1234);
+        out.boolean(true);
+        out.f64(0);
+        out.f64(EX::waiting);
+        out.u32(0);
+        out.u32(0);
+        out.boolean(true);
+        const std::string bytes = out.take();
+        FalloutScript::SaveReader in(bytes);
+        EX::Laid back;
+        EX::readExplosives(back, in, 2);
+        ASSERT_EQ(back.count(), 1u);
+        EXPECT_TRUE(in.atEnd());
+        EXPECT_TRUE(back.all()[0].mNoDamage);
+        EXPECT_EQ(back.all()[0].mProjectile, 0x1357u);
+        EXPECT_EQ(back.all()[0].mWeapon, 0u);
+    }
+
     TEST(FalloutScriptExplosivesTest, disablingAllMinesSwitchesOffTheMinesThatCanBe)
     {
         EX::Laid laidOnes;

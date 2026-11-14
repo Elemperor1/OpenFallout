@@ -116,6 +116,9 @@ namespace FalloutScript
             std::uint32_t mCause = 0;
             /// Laid by an attack that hits and does no damage (UseWeapon with the flag): its blast does none either
             bool mNoDamage = false;
+            /// The weapon (WEAP form) of the attack that laid it, 0 for none: the hits and deaths that its blast causes
+            /// name it, so that what is filtered by weapon (challenges, OnHitWith) sees them
+            std::uint32_t mWeapon = 0;
         };
 
         /// What the world tells the rules about the characters near a mine (the host answers; the pure rules take the
@@ -192,8 +195,9 @@ namespace FalloutScript
             std::uint32_t mNext = 1;
         };
 
-        /// (version 2 adds the flag of a blast that does no damage; version 1 loads with it off)
-        constexpr std::uint32_t explosivesSectionVersion = 2;
+        /// (version 2 adds the flag of a blast that does no damage; version 1 loads with it off. Version 3 adds the weapon of
+        /// the attack that laid it; before it none is known.)
+        constexpr std::uint32_t explosivesSectionVersion = 3;
         void writeExplosives(const Laid& laid, SaveWriter& out);
         void readExplosives(Laid& laid, SaveReader& in, std::uint32_t version);
     }

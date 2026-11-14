@@ -150,8 +150,13 @@ How the port lays and updates them (a choice, no model of the projectile exists 
   is told it was hit by the one who laid the mine and dies by the same path as a blow (`setDead`, the essential case falls).
   Objects in the radius with a clear ray get the same number through `Destruction::damage`, so a car or an electric box goes
   through its stages.
-* State is saved in the section `explosives` (every laid projectile with its record, owner, place, age, timer, run-time flags
-  and the character that set it off) and reset on load or new game.
+* A blast is a hit on every character it reaches, as a blow is: the victim hears of it (`OnHit`, the challenges) even when the attack
+  was to do no damage, a blast of the player's goes through the law's blow handling (the assault crime, with the exception of a
+  friend or ally that tolerates the hit), and a survivor and the owner are put in a fight. The weapon of the attack that laid the
+  explosive is kept with it and named by the hit and by the death that the blast causes, so what is filtered by weapon sees them.
+* State is saved in the section `explosives` (every laid projectile with its record, owner, place, age, timer, run-time flags,
+  the character that set it off, whether its blast does no damage, and from version 3 the weapon that laid it; versions 1 and 2
+  still load, with no weapon) and reset on load or new game.
 
 ## The reticle, grabbing, threat, cover, essential death
 
@@ -192,7 +197,9 @@ the engine and one in the scenario, which are told below.
   seconds after it was laid when the character under it came into its radius, "set off by" that character's reference; its
   health went from 42.5 to -57.5 and it died. The same death counts as a crime of the player (reputation and the law reacted),
   as any kill by the player does.
-* DisableAllMines: a second mine, laid away from anyone and disabled, then a character put on it: no damage (45 to 45).
+* DisableAllMines: a second mine, laid away from anyone and disabled, then a character put on it: no damage (45 to 45). (The scenario
+  now lays the mine and disables it in one step, with no frame between them, so that the mine cannot be set off first. It still
+  cannot see that the mine was armed when it was switched off: the host has no query for the laid mines.)
 * Plastic explosive (PROJ flags 0x462, the detonate flag, no alt trigger): lay it, four seconds with a character beside it,
   nothing happens (health 45); `DetonatePlacedExplosives` at the player: 250 damage, radius 512, the character died, 64
   destructible objects in the radius took the damage through the destruction rule.

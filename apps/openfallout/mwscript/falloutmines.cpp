@@ -17,6 +17,8 @@
 #include <components/falloutscript/combatcommands.hpp>
 #include <components/falloutscript/placedexplosives.hpp>
 
+#include "falloutlaw.hpp"
+
 #include "../mwbase/environment.hpp"
 #include "../mwbase/world.hpp"
 #include "../mwworld/cellstore.hpp"
@@ -124,6 +126,7 @@ namespace OFScript
         placed.mCell = cellOf(attacker);
         placed.mExterior = holder.getCell()->isExterior();
         placed.mNoDamage = noDamage;
+        placed.mWeapon = weapon;
         std::uint32_t id = 0;
         {
             const std::lock_guard lock(mExplosivesMutex);
@@ -180,7 +183,9 @@ namespace OFScript
             const osg::Vec3f where = ptr.getRefData().getPosition().asVec3();
             if ((where - centre).length() > radius || !reaches(where))
                 continue;
-            if (damage > 0)
+            // A blast of an attack that was to do no damage is still a hit (the victim hears of it, the law judges it and it
+            // fights back, as for a blow); only its health and its destruction stay as they were
+            if (damage > 0 || laid.mNoDamage)
             {
                 // The god mode of the console keeps the health of the player
                 if (victim == mPlayer && world->getGodModeState())
@@ -191,24 +196,35 @@ namespace OFScript
                     continue;
                 FalloutScript::CombatState::Hit struck;
                 struck.mAttacker = laid.mOwner;
+                struck.mWeapon = laid.mWeapon;
                 struck.mDamage = damage;
                 // A blast of the player's that an ally or friend lets pass is not an attack on it (as for a blow)
                 const bool tolerated = toleratesBlow(laid.mOwner, victim);
+                const bool wasFighting = mCombat.inCombat(victim);
                 mCombat.noteHit(victim, struck, tolerated);
-                const double healthBefore = mActorValues.current(victim, AV::health);
-                mActorValues.damage(victim, AV::health, damage);
-                // What the player's charge took off a character is the player's damage, whoever lands the last of it: the
-                // experience and the statistics of a kill follow it (as for a blow)
-                if (laid.mOwner == mPlayer && mPlayer != 0 && victim != mPlayer)
+                // A blast of the player's that hurts a character is judged by the law as a blow is, whether the victim lets it
+                // pass or not (one that ignores friendly hits has none); the kill is the death listener's
+                if (laid.mOwner != 0 && laid.mOwner == mPlayer && victim != mPlayer && mLaw
+                    && !(tolerated && mCombat.ignoresFriendlyHits(victim)))
+                    mLaw->blow(victim, laid.mWeapon, wasFighting);
+                if (damage > 0)
                 {
-                    const double dealt = std::max(0.0, healthBefore - std::max(mActorValues.current(victim, AV::health), 0.0));
-                    const std::lock_guard damageLock(mPlayerDamageMutex);
-                    mPlayerDamage[victim] += dealt;
+                    const double healthBefore = mActorValues.current(victim, AV::health);
+                    mActorValues.damage(victim, AV::health, damage);
+                    // What the player's charge took off a character is the player's damage, whoever lands the last of it:
+                    // the experience and the statistics of a kill follow it (as for a blow)
+                    if (laid.mOwner == mPlayer && mPlayer != 0 && victim != mPlayer)
+                    {
+                        const double dealt
+                            = std::max(0.0, healthBefore - std::max(mActorValues.current(victim, AV::health), 0.0));
+                        const std::lock_guard damageLock(mPlayerDamageMutex);
+                        mPlayerDamage[victim] += dealt;
+                    }
+                    mDestruction.damage(victim, damage, mActorValues.current(victim, AV::health));
                 }
-                mDestruction.damage(victim, damage, mActorValues.current(victim, AV::health));
-                if (mActorValues.current(victim, AV::health) <= 0 && !fallsInsteadOfDying(victim))
+                if (damage > 0 && mActorValues.current(victim, AV::health) <= 0 && !fallsInsteadOfDying(victim))
                 {
-                    mActors.setDead(victim, true, laid.mOwner, -1);
+                    mActors.setDead(victim, true, laid.mOwner, -1, laid.mWeapon);
                     evaluatePackage(victim);
                 }
                 else if (mActorValues.current(victim, AV::health) > 0 && laid.mOwner != 0 && laid.mOwner != victim
@@ -298,8 +314,9 @@ namespace OFScript
                 {
                     if (actor == mPlayer || actor == 0 || mActors.isDead(actor))
                         continue;
-                    const auto found = mReferences.find(actor);
-                    if (found == mReferences.end() || !near(laid, found->second, radius))
+                    // (found the way the blast finds who it hits, not by the map of the references alone)
+                    const OFWorld::Ptr ptr = findReference(actor);
+                    if (ptr.isEmpty() || !near(laid, ptr, radius))
                         continue;
                     if (EX::triggers(rules, actor, layerOf(laid, actor)))
                         return actor;

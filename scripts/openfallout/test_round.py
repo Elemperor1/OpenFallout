@@ -934,8 +934,13 @@ class StopEngine(unittest.TestCase):
         # (the orphan holds the leader's pipe open: the end of the orphan is the end of that pipe, which the kernel closes when
         # the process exits, reaped or not; a group that is looked at instead exists while a zombie of it does, and in a
         # container where nothing reaps orphans that is for good)
-        leader = subprocess.Popen(["sh", "-c", "sleep 60 & wait"], start_new_session=True, stdout=subprocess.PIPE)
-        time.sleep(0.5)
+        # (the shell says so once it has started the descendant: a fixed delay is too short on a host that is busy, and the
+        # leader would then be killed before it has a descendant to leave behind)
+        leader = subprocess.Popen(["sh", "-c", "sleep 60 & echo ready; wait"], start_new_session=True,
+                                  stdout=subprocess.PIPE, bufsize=0)
+        started, _, _ = select.select([leader.stdout], [], [], 10)
+        self.assertTrue(started, "the shell did not start its descendant")
+        self.assertEqual(leader.stdout.readline(), b"ready\n")
         os.kill(leader.pid, signal.SIGKILL)
         leader.wait(timeout=10)
         os.killpg(leader.pid, 0)  # a member of the group is still there
