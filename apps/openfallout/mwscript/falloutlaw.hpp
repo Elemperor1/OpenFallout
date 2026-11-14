@@ -97,7 +97,8 @@ namespace OFScript
         /// The characters near the player, as the witnesses of something done to `victim` (0 for none): those that can
         /// see the player, with their factions. Main thread.
         std::vector<FalloutScript::Witness> gather(FalloutScript::FormId victim);
-        /// The nearest character that is (or is of the faction that is) the owner of what was taken, loaded and alive
+        /// The character that is (or is of the faction that is) the owner of what was taken, loaded and alive: the nearest
+        /// one that sees the player, else the nearest
         OFWorld::Ptr nearestOwner(FalloutScript::FormId owner);
         /// What one character does about the crime or the alarm: a line, a fight
         void react(const FalloutScript::Reaction& reaction, FalloutScript::FormId victim);
@@ -111,9 +112,6 @@ namespace OFScript
         FalloutScript::Standing mStanding;
         /// The time since the last look at the trespass
         float mSinceLook = 0.f;
-        /// The characters that an alarm turned on the player. Asked from any thread.
-        std::mutex mAlarmMutex;
-        std::set<FalloutScript::FormId> mAlarmed;
     };
 }
 

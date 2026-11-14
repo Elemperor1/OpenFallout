@@ -17,7 +17,11 @@ comes from the executable and the data files set it differently, both are named.
 | Class guard flag read from CLAS | `components/esm4/loadclas.*` (`mFo3Flags`), `ESM4::Class` store in `mwworld/esmstore.hpp` |
 | Tests | `apps/components_tests/falloutscript/testcrime.cpp`, `teststanding.cpp`, `testreputation.cpp`, `testcombatcommands.cpp` |
 
-Both rules are saved: the `law` section (version 1) and the `standing` section (version 1) of the Fallout save.
+Both rules are saved: the `law` section (version 2) and the `standing` section (version 1) of the Fallout save. Version 2 of the
+law adds the characters that an alarm turned on the player (what the alarm sounding stands for), so a game saved in the middle of
+such a fight loads with `GetAlarmed` and the alarm restrictions on waiting and travel as they were; a game saved as version 1 loads
+with none (its alarm is over). A character that no longer fights the player after a load is dropped from the list the first time the
+alarm is asked about, as before.
 
 ## Crime
 
@@ -165,6 +169,9 @@ actor list holds no Fallout character (they live in `FalloutActors`), so witness
 ## Not done
 
 - Review fixes: StopCombatAlarmOnActor also runs `Law::stopAlarm` (the crimes the character is the victim of or a witness to are forgotten, and the enemy flags nothing else holds are cleared, under the law's lock); `IsTrespassing` asks about the trespasser (the player while any watcher holds a trespass package) and not about the watcher that warns; the restrictions on waiting and travel read that trespass state, and the alarm sounds while a character that an alarm turned on the player still fights it (the alarm package of the executable is not run here); a character with no mind (nothing to do, no one to fight) is a witness too (`FalloutActors` keeps the loaded ones without a mind). Not done: the owner's karma for a hacked terminal is the default when no owner stands near (the karma of an NPC base record that is not loaded is not read), and `IsActorDetected` leaves the player out as an observer.
+- A theft (an owned item taken) picks the reacting owner among the loaded, living characters near the player that own what was
+  taken (by form, or by faction): the nearest one that sees the player, else the nearest one. Whether the executable asks the
+  owners in that order (0x8BFA40 was read for its karma and crime effects, not for the choice of the victim) was not established.
 - Crime expiry (0x971FD0) was not read: crimes and player-enemy flags last until a command or `StopCombatAlarmOnActor`
   clears them. A faction's enemy flag therefore stays set for the rest of the game unless a script clears it.
 - Pickpocketing has a rule (`Law::pickpocket`) and a command table entry but no event: the Fallout interface has no

@@ -81,10 +81,9 @@ namespace OFScript
 
     void LawGlue::clear()
     {
+        // (the characters that an alarm turned on the player are part of the law, and go with it)
         mLaw.clear();
         mStanding.clear();
-        const std::lock_guard lock(mAlarmMutex);
-        mAlarmed.clear();
         mSinceLook = 0.f;
     }
 
@@ -201,21 +200,14 @@ namespace OFScript
     {
         // The package of the alarm is not one that characters run here; a character that an alarm turned on the player and
         // that still fights it stands for it
-        {
-            const std::lock_guard lock(mAlarmMutex);
-            if (mAlarmed.count(actor) == 0)
-                return false;
-        }
+        if (!mLaw.isAlarmResponder(actor))
+            return false;
         return mHost.mCombat.inCombat(actor) && mHost.mCombat.target(actor) == mHost.mPlayer;
     }
 
     bool LawGlue::alarmSounding()
     {
-        std::vector<FormId> asked;
-        {
-            const std::lock_guard lock(mAlarmMutex);
-            asked.assign(mAlarmed.begin(), mAlarmed.end());
-        }
+        const std::vector<FormId> asked = mLaw.alarmResponders();
         std::vector<FormId> over;
         bool sounding = false;
         for (const FormId actor : asked)
@@ -225,13 +217,9 @@ namespace OFScript
             else
                 over.push_back(actor);
         }
-        if (!over.empty())
-        {
-            // The ones whose fight is over are not the alarm any more
-            const std::lock_guard lock(mAlarmMutex);
-            for (const FormId actor : over)
-                mAlarmed.erase(actor);
-        }
+        // The ones whose fight is over are not the alarm any more
+        for (const FormId actor : over)
+            mLaw.removeAlarmResponder(actor);
         return sounding;
     }
 
@@ -334,10 +322,7 @@ namespace OFScript
                     mHost.evaluatePackage(reaction.mActor);
                 // One that fights the player because of an alarm is what the alarm sounding stands for
                 if (mHost.mCombat.inCombat(reaction.mActor) && mHost.mCombat.target(reaction.mActor) == mHost.mPlayer)
-                {
-                    const std::lock_guard lock(mAlarmMutex);
-                    mAlarmed.insert(reaction.mActor);
-                }
+                    mLaw.addAlarmResponder(reaction.mActor);
                 break;
             case Kind::Say:
             case Kind::Warn:
@@ -537,6 +522,7 @@ namespace OFScript
         const OFWorld::Ptr player = world->getPlayerPtr();
         OFWorld::Ptr best;
         double bestDistance = 0;
+        bool bestSees = false;
         std::vector<OFWorld::Ptr> actors;
         OFBase::Environment::get().getMechanicsManager()->getFalloutActorsInRange(
             player.getRefData().getPosition().asVec3(), static_cast<float>(maxWitnessDistance), actors);
@@ -559,10 +545,14 @@ namespace OFScript
                 continue;
             const double distance
                 = (ptr.getRefData().getPosition().asVec3() - player.getRefData().getPosition().asVec3()).length();
-            if (best.isEmpty() || distance < bestDistance)
+            // An owner that sees the player is the one that reacts, however far it is; when none does, the nearest is the
+            // one whose loss it is
+            const bool sees = mHost.sightOf(ptr, player) != FalloutScript::Detection::Sighting::Unseen;
+            if (best.isEmpty() || (sees && !bestSees) || (sees == bestSees && distance < bestDistance))
             {
                 best = ptr;
                 bestDistance = distance;
+                bestSees = sees;
             }
         }
         return best;

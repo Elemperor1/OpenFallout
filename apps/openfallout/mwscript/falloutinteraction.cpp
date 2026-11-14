@@ -1306,6 +1306,15 @@ namespace OFScript
         runOnMainThread([this, marker, hours, timeScale] {
             namespace AV = FalloutScript::ActorValue;
             OFBase::World* world = OFBase::Environment::get().getWorld();
+            // IsPlayerMovingIntoNewSpace is on for the whole trip, the hours that effect scripts run in included (the
+            // executable's worker of the fast travel sets it and clears it); it goes off after the scripts of the next
+            // pass, whether the trip ends at the marker or where the player died
+            playerMoveBegins();
+            struct MoveEnd
+            {
+                FalloutScripts& mHost;
+                ~MoveEnd() { mHost.playerMoveEnds(); }
+            } moveEnd{ *this };
             // Each hour of the trip goes by on its own: the time moves, what runs by the seconds of the game ages by the
             // hour, and the player heals for two seconds of its regeneration (0x93CDF0 and 0x88B510)
             const double seconds = 3600.0 / timeScale;
@@ -1325,11 +1334,8 @@ namespace OFScript
                 if (mActors.isDead(mPlayer))
                     return;
             }
-            // A little above the marker, which stands about where a character would. IsPlayerMovingIntoNewSpace is on
-            // for the whole trip (the executable's worker of the fast travel sets it and clears it).
-            playerMoveBegins();
+            // A little above the marker, which stands about where a character would
             moveTo(mPlayer, marker, { 0.0, 0.0, 48.0 });
-            playerMoveEnds();
         });
         return std::string();
     }
