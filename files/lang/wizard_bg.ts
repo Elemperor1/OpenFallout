@@ -285,8 +285,8 @@ to default Morrowind fonts. Check this box if you still prefer original fonts ov
         <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Съветникът успешно промени съществуващата инсталация на Morrowind.&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The OpenFallout Wizard failed to install Morrowind on your computer.&lt;/p&gt;&lt;p&gt;Please report any bugs you might have encountered to our &lt;a href=&quot;https://github.com/Elemperor1/OpenFallout/issues&quot;&gt;bug tracker&lt;/a&gt;.&lt;br/&gt;Make sure to include the installation log.&lt;/p&gt;&lt;br/&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Съветникът не успя да инсталира Morrowind на вашия компютър.&lt;/p&gt;&lt;p&gt;Моля, докладвайте всички грешки, които срещнахте в нашия &lt;a href=&quot;https://github.com/Elemperor1/OpenFallout/issues&quot;&gt;тракер за грешки&lt;/a&gt;.&lt;br/&gt;Уверете се, че сте приложили инсталационния дневник.&lt;/p&gt;&lt;br/&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The OpenFallout Wizard failed to install Morrowind on your computer.&lt;/p&gt;&lt;p&gt;Please report any bugs you might have encountered to our &lt;a href=&quot;https://github.com/OpenBethesda/OpenFallout/issues&quot;&gt;bug tracker&lt;/a&gt;.&lt;br/&gt;Make sure to include the installation log.&lt;/p&gt;&lt;br/&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Съветникът не успя да инсталира Morrowind на вашия компютър.&lt;/p&gt;&lt;p&gt;Моля, докладвайте всички грешки, които срещнахте в нашия &lt;a href=&quot;https://github.com/OpenBethesda/OpenFallout/issues&quot;&gt;тракер за грешки&lt;/a&gt;.&lt;br/&gt;Уверете се, че сте приложили инсталационния дневник.&lt;/p&gt;&lt;br/&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
 </context>
 <context>

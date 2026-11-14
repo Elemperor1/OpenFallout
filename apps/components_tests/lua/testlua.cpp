@@ -323,4 +323,13 @@ return {
         // without safe get we crash here
         EXPECT_ERROR(LuaUtil::safeGet(t, "any key"), "meta index error");
     }
+
+    TEST(LuaJitProbeTest, RunsOnlyWhenTheEnvironmentAsksForIt)
+    {
+        EXPECT_FALSE(LuaUtil::isLuaJitProbeRequested(nullptr));
+        EXPECT_FALSE(LuaUtil::isLuaJitProbeRequested(""));
+        EXPECT_FALSE(LuaUtil::isLuaJitProbeRequested("0"));
+        EXPECT_FALSE(LuaUtil::isLuaJitProbeRequested("yes"));
+        EXPECT_TRUE(LuaUtil::isLuaJitProbeRequested("1"));
+    }
 }

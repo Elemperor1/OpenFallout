@@ -78,9 +78,33 @@ namespace Misc
             Log(Debug::Warning) << "Failed to set idle priority for thread=" << std::this_thread::get_id() << ": "
                                 << std::generic_category().message(result);
     }
+
+    void setCurrentThreadFrameCriticalPriority()
+    {
+        const int result = pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
+        if (result == 0)
+            Log(Debug::Verbose) << "Using frame-critical priority for thread=" << std::this_thread::get_id();
+        else
+            Log(Debug::Warning) << "Failed to set frame-critical priority for thread=" << std::this_thread::get_id()
+                                << ": " << std::generic_category().message(result);
+    }
 }
 
-#else
+#endif
+
+#ifndef __APPLE__
+
+namespace Misc
+{
+    void setCurrentThreadFrameCriticalPriority()
+    {
+        // Only macOS has a scheduler class for this; elsewhere the thread keeps its normal priority.
+    }
+}
+
+#endif
+
+#if !defined(__linux__) && !defined(WIN32) && !defined(__FreeBSD__) && !defined(__APPLE__)
 
 namespace Misc
 {

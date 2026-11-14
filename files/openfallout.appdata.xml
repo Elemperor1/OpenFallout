@@ -37,7 +37,7 @@ Copyright 2020 Bret Curtis <psi29a@gmail.com>
  <releases>
   <release version="@OPENFALLOUT_VERSION@" date="@OPENFALLOUT_VERSION_COMMITDATE@"/>
  </releases>
- <url type="homepage">https://github.com/Elemperor1/OpenFallout</url>
- <url type="bugtracker">https://github.com/Elemperor1/OpenFallout/issues</url>
+ <url type="homepage">https://github.com/OpenBethesda/OpenFallout</url>
+ <url type="bugtracker">https://github.com/OpenBethesda/OpenFallout/issues</url>
  <content_rating type="oars-1.1" />
 </component>

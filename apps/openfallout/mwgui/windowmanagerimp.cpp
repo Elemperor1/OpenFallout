@@ -35,6 +35,8 @@
 
 #include <components/sceneutil/workqueue.hpp>
 
+#include <components/sdlutil/desktopconventions.hpp>
+
 #include <components/translation/translation.hpp>
 
 #include <components/myguiplatform/additivelayer.hpp>
@@ -208,13 +210,15 @@ namespace OFGui
         , mVersionDescription(versionDescription)
         , mWindowVisible(true)
         , mCfgMgr(cfgMgr)
+        , mSdlWindow(window)
+        , mWindowSize{ Settings::video().mResolutionX, Settings::video().mResolutionY }
     {
         int w, h;
         SDL_GetWindowSize(window, &w, &h);
         int dw, dh;
         SDL_GL_GetDrawableSize(window, &dw, &dh);
 
-        mScalingFactor = Settings::gui().mScalingFactor * (dw / w);
+        mScalingFactor = SDLUtil::interfaceScale(Settings::gui().mScalingFactor, w, dw, SDLUtil::thisDesktopPlatform());
         constexpr VFS::Path::NormalizedView resourcePath("mygui");
         mGuiPlatform = std::make_unique<MyGUIPlatform::Platform>(viewer, guiRoot, resourceSystem->getImageManager(),
             resourceSystem->getVFS(), mScalingFactor, resourcePath, logpath / "MyGUI.log");
@@ -515,7 +519,7 @@ namespace OFGui
         mWindows.push_back(std::move(debugWindow));
         trackWindow(mDebugWindow, makeDebugWindowSettingValues());
 
-        auto postProcessorHud = std::make_unique<PostProcessorHud>(mCfgMgr);
+        auto postProcessorHud = std::make_unique<PostProcessorHud>();
         mPostProcessorHud = postProcessorHud.get();
         mWindows.push_back(std::move(postProcessorHud));
         trackWindow(mPostProcessorHud, makePostprocessorWindowSettingValues());
@@ -1318,6 +1322,7 @@ namespace OFGui
     void WindowManager::processChangedSettings(const Settings::CategorySettingVector& changed)
     {
         bool changeRes = false;
+        bool resolutionChosen = false;
         for (const auto& setting : changed)
         {
             if (setting.first == "GUI" && setting.second == "menu transparency")
@@ -1325,7 +1330,11 @@ namespace OFGui
             else if (setting.first == "Video"
                 && (setting.second == "resolution x" || setting.second == "resolution y"
                     || setting.second == "window mode" || setting.second == "window border"))
+            {
                 changeRes = true;
+                if (setting.second == "resolution x" || setting.second == "resolution y")
+                    resolutionChosen = true;
+            }
 
             else if (setting.first == "Video" && setting.second == "vsync mode")
                 mVideoWrapper->setSyncToVBlank(Settings::video().mVsyncMode);
@@ -1335,13 +1344,53 @@ namespace OFGui
 
         if (changeRes)
         {
-            mVideoWrapper->setVideoMode(Settings::video().mResolutionX, Settings::video().mResolutionY,
-                Settings::video().mWindowMode, Settings::video().mWindowBorder);
+            // A resolution picked in the options is the size the window is to have
+            if (resolutionChosen)
+                mWindowSize = { Settings::video().mResolutionX, Settings::video().mResolutionY };
+            setVideoMode();
         }
+    }
+
+    void WindowManager::setVideoMode()
+    {
+        const Settings::WindowMode mode = Settings::video().mWindowMode;
+        const SDLUtil::WindowSize setting{ Settings::video().mResolutionX, Settings::video().mResolutionY };
+        const SDLUtil::WindowSize size
+            = SDLUtil::sizeForWindowMode(setting, mWindowSize, mode, SDLUtil::thisDesktopPlatform());
+        mVideoWrapper->setVideoMode(size.width, size.height, mode, Settings::video().mWindowBorder);
+    }
+
+    void WindowManager::saveUserSettings()
+    {
+        const std::filesystem::path file = mCfgMgr.getUserConfigPath() / "settings.cfg";
+        const SDLUtil::WindowSize setting{ Settings::video().mResolutionX, Settings::video().mResolutionY };
+        const SDLUtil::WindowSize size = SDLUtil::resolutionToSave(
+            setting, mWindowSize, SDL_GetWindowFlags(mSdlWindow), SDLUtil::thisDesktopPlatform());
+        if (size == setting)
+        {
+            Settings::Manager::saveUser(file);
+            return;
+        }
+
+        // The file gets the size of the window on the desktop; the setting goes on following the drawable. Setting
+        // it there and back is no change of the resolution for anyone to act on.
+        const Settings::CategorySettingVector resolution = { { "Video", "resolution x" }, { "Video", "resolution y" } };
+        const bool pending = !Settings::Manager::getPendingChanges(resolution).empty();
+        Settings::video().mResolutionX.set(size.width);
+        Settings::video().mResolutionY.set(size.height);
+        Settings::Manager::saveUser(file);
+        Settings::video().mResolutionX.set(setting.width);
+        Settings::video().mResolutionY.set(setting.height);
+        if (!pending)
+            Settings::Manager::resetPendingChanges(resolution);
     }
 
     void WindowManager::windowResized(int x, int y)
     {
+        // The flags are those of the window now, at or after the resize this event is about: the size of a Space the
+        // window has entered is never taken for its own
+        mWindowSize = SDLUtil::windowSizeAfterResize(
+            mWindowSize, { x, y }, SDL_GetWindowFlags(mSdlWindow), SDLUtil::thisDesktopPlatform());
         Settings::video().mResolutionX.set(x);
         Settings::video().mResolutionY.set(y);
 
@@ -1355,6 +1404,19 @@ namespace OFGui
         }
 
         Settings::Manager::resetPendingChanges(filter);
+
+        // On the Mac the interface is sized in points: on a display of another scaling (the window moved) it keeps its
+        // size. Elsewhere it keeps the scale it started with.
+        int pointsW, pointsH;
+        SDL_GetWindowSize(mSdlWindow, &pointsW, &pointsH);
+        if (const std::optional<float> scalingFactor = SDLUtil::interfaceScaleAfterResize(
+                Settings::gui().mScalingFactor, pointsW, x, mScalingFactor, SDLUtil::thisDesktopPlatform()))
+        {
+            Log(Debug::Info) << "Interface scale " << mScalingFactor << " -> " << *scalingFactor << " (" << x
+                             << " pixels across " << pointsW << " points)";
+            mScalingFactor = *scalingFactor;
+            mGuiPlatform->getRenderManagerPtr()->setScalingFactor(mScalingFactor);
+        }
 
         mGuiPlatform->getRenderManagerPtr()->setViewSize(x, y);
 
@@ -1403,6 +1465,17 @@ namespace OFGui
     void WindowManager::windowClosed()
     {
         OFBase::Environment::get().getStateManager()->requestQuit();
+    }
+
+    void WindowManager::windowModeRequested(Settings::WindowMode mode)
+    {
+        // Control-Command-F out of (or into) a full-screen mode of the game: the setting changes as from the options
+        Log(Debug::Info) << "Window mode " << static_cast<int>(Settings::video().mWindowMode.get()) << " -> "
+                         << static_cast<int>(mode) << " (Control-Command-F), window size " << mWindowSize.width << "x"
+                         << mWindowSize.height;
+        Settings::video().mWindowMode.set(mode);
+        setVideoMode();
+        Settings::Manager::resetPendingChanges({ { "Video", "window mode" } });
     }
 
     void WindowManager::onCursorChange(std::string_view name)
@@ -2525,7 +2598,7 @@ namespace OFGui
 
     void WindowManager::saveSettings()
     {
-        Settings::Manager::saveUser(mCfgMgr.getUserConfigPath() / "settings.cfg");
+        saveUserSettings();
         OFBase::Environment::get().getLuaManager()->savePermanentStorage(mCfgMgr.getUserConfigPath());
     }
 

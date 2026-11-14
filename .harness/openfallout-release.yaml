@@ -8,13 +8,13 @@ pipeline:
     ci:
       codebase:
         connectorRef: account.connector_Github_7cd1
-        repoName: Elemperor1/OpenFallout
+        repoName: OpenBethesda/OpenFallout
         persistCredentials: false
         # Privileged release code is immutable; source_ref selects the application separately.
         build:
           type: commitSha
           spec:
-            commitSha: 18fcab45f0c20568fe69aa9802d07ff39519483c
+            commitSha: 514553cd683684f74ad8f6407314a10a1c1779c8
   variables:
     - name: mode
       type: String

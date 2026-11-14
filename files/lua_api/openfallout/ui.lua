@@ -349,6 +349,7 @@
 -- @type MouseWheelEvent
 -- @field openfallout.util#Vector2 position Absolute position of the mouse cursor
 -- @field openfallout.util#Vector2 delta The wheel delta on the X and Y axis. The values are usually -1, 0 or 1, but may be different for high-precision wheels such as fraction values.
+-- @field openfallout.util#Vector2 notches The whole notches the wheel has turned by with this event on the X and Y axis, counted from the deltas: on macOS a mouse wheel gives one per notch and a trackpad one after its small deltas add up to a notch (0 in between); on other systems every event with a delta counts as at least one notch in its direction. Both follow the system's scroll direction setting.
 
 ---
 -- Register a new texture resource. Can be used to manually atlas UI textures.

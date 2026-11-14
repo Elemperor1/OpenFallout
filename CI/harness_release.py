@@ -12,7 +12,7 @@ from urllib.error import HTTPError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
-REPOSITORY = "Elemperor1/OpenFallout"
+REPOSITORY = "OpenBethesda/OpenFallout"
 MARKER = ".harness/openfallout-release.yaml"
 PLATFORM_JOBS = {
     "Ubuntu",
@@ -127,13 +127,62 @@ def packaging_run(api, plan):
     return max(matching, key=lambda run: (run["run_number"], run.get("run_attempt", 1)))
 
 
+# The line CI/check_mac_package.py --notes writes for a disk image (write_notes): the result, the mode, the smoke result,
+# the OpenGL renderer the smoke run reported, the image's SHA-256, then the macOS version (build) and chip it ran on.
+NOTE_LINE = re.compile(
+    r"^- (?P<name>[^:\s][^:]*): packaged-app check (?P<result>PASS|FAIL) "
+    r"\((?P<mode>local|release) mode; smoke (?P<smoke>PASS|FAIL|SKIP|not run); renderer (?P<renderer>[^;()]+); "
+    r"sha256 (?P<sha256>[0-9a-f]{64}|none)\) "
+    r"on macOS (?P<macos>\d+(?:\.\d+)*) \([^()]*\), (?P<chip>[^,]+), (?P<arch>\w+)\.")
+DIGEST = re.compile(r"sha256:([0-9a-f]{64})")
+
+
+def note_lines(body):
+    """The tested-on lines of the release notes that name a macOS version and a chip."""
+    notes = []
+    for line in (body or "").splitlines():
+        found = NOTE_LINE.match(line.strip())
+        if found and found["chip"].strip() not in ("", "unknown chip"):
+            notes.append(found.groupdict())
+    return notes
+
+
+def gpu_renderer(renderer):
+    """Whether the smoke run reported a renderer of a GPU (not Apple's software renderer, not none)."""
+    renderer = renderer.strip().lower()
+    return renderer != "not reported" and "software" not in renderer
+
+
 def verify_assets(release):
-    assets = [asset["name"] for asset in release["assets"] if asset.get("size", 0) > 0 and asset.get("state") == "uploaded"]
+    uploaded = [asset for asset in release["assets"] if asset.get("size", 0) > 0 and asset.get("state") == "uploaded"]
+    assets = [asset["name"] for asset in uploaded]
     if not any(name.lower().endswith(".exe") for name in assets):
         raise ReleaseError("Release is missing its Windows installer")
     for arch in ("arm64", "x86_64"):
         if not any(name.endswith(".dmg") and arch in name for name in assets):
             raise ReleaseError(f"Release is missing its macOS {arch} disk image")
+    # Each disk image carries the line CI/check_mac_package.py --notes wrote: the macOS version and chip it was checked on.
+    notes = note_lines(release.get("body"))
+    for asset in (asset for asset in uploaded if asset["name"].endswith(".dmg")):
+        name = asset["name"]
+        mine = [note for note in notes if note["name"] == name]
+        if not mine:
+            raise ReleaseError(f"Release notes lack the macOS version and chip that {name} was tested on")
+        if "arm64" not in name:
+            continue
+        # The notarized Apple Silicon image must have passed the check in release mode, and the game must have
+        # started from it on a Mac with a GPU (a hosted runner has none; the run on such a Mac adds its line). Both
+        # count only for the image that was uploaded: its SHA-256 as GitHub reports it.
+        digest = DIGEST.fullmatch(asset.get("digest") or "")
+        if not digest:
+            raise ReleaseError(f"GitHub reports no sha256 digest for {name}, so no check can be bound to it")
+        passed = [note for note in mine if note["result"] == "PASS" and note["sha256"] == digest.group(1)]
+        if not any(note["mode"] == "release" for note in passed):
+            raise ReleaseError(f"Release notes lack a packaged-app check PASS in release mode for {name} "
+                               f"(sha256 {digest.group(1)})")
+        if not any(note["smoke"] == "PASS" and gpu_renderer(note["renderer"]) for note in passed):
+            raise ReleaseError(f"Release notes lack a smoke PASS (the game started on a Mac with a GPU renderer) for "
+                               f"{name} (sha256 {digest.group(1)})")
 
 
 def find_release(api, tag):

@@ -1,5 +1,7 @@
 #include "bindingsmanager.hpp"
 
+#include "controllerdefaults.hpp"
+
 #include <filesystem>
 
 #include <MyGUI_EditBox.h>
@@ -379,22 +381,7 @@ namespace OFInput
 
     void BindingsManager::loadControllerDefaults(bool force)
     {
-        // using hardcoded key defaults is inevitable, if we want the configuration files to stay valid
-        // across different versions of OpenMW (in the case where another input action is added)
-        std::map<int, int> defaultButtonBindings;
-
-        defaultButtonBindings[A_Activate] = SDL_CONTROLLER_BUTTON_A;
-        defaultButtonBindings[A_ToggleWeapon] = SDL_CONTROLLER_BUTTON_X;
-        defaultButtonBindings[A_ToggleSpell] = SDL_CONTROLLER_BUTTON_Y;
-        // defaultButtonBindings[A_QuickButtonsMenu] = SDL_GetButtonFromScancode(SDL_SCANCODE_F1); // Need to implement,
-        // should be ToggleSpell(5) AND Wait(9)
-        defaultButtonBindings[A_Sneak] = SDL_CONTROLLER_BUTTON_LEFTSTICK;
-        defaultButtonBindings[A_Journal] = SDL_CONTROLLER_BUTTON_LEFTSHOULDER;
-        defaultButtonBindings[A_Rest] = SDL_CONTROLLER_BUTTON_RIGHTSHOULDER;
-        defaultButtonBindings[A_TogglePOV] = SDL_CONTROLLER_BUTTON_RIGHTSTICK;
-        defaultButtonBindings[A_Inventory] = SDL_CONTROLLER_BUTTON_B;
-        defaultButtonBindings[A_GameMenu] = SDL_CONTROLLER_BUTTON_START;
-        defaultButtonBindings[A_QuickSave] = SDL_CONTROLLER_BUTTON_GUIDE;
+        std::map<int, int> defaultButtonBindings = defaultControllerButtons(SDLUtil::thisDesktopPlatform());
 
         std::map<int, int> defaultAxisBindings;
         defaultAxisBindings[A_MoveForwardBackward] = SDL_CONTROLLER_AXIS_LEFTY;

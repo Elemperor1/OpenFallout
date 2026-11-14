@@ -28,10 +28,13 @@ namespace SDLUtil
         , mMouseRelative(false)
         , mFirstMouseMove(true)
         , mMouseZ(0)
-        , mPendingWheelY(0.0)
+        , mWheelY(120.0, thisDesktopPlatform()) // MyGUI's units: 120 to a notch
         , mWindowHasFocus(true)
         , mMouseInWindow(true)
         , mHeadless(false)
+        , mScaleX(1.f)
+        , mScaleY(1.f)
+        , mDesktopShortcuts(followsMacDesktopConventions())
     {
         Uint32 flags = SDL_GetWindowFlags(mSDLWindow);
         // A window that is hidden when the wrapper is made is hidden on purpose (a headless run): the game goes on as
@@ -50,14 +53,17 @@ namespace SDLUtil
         SDL_GetWindowSize(mSDLWindow, &w, &h);
         int dw, dh;
         SDL_GL_GetDrawableSize(mSDLWindow, &dw, &dh);
-        mScaleX = static_cast<Uint16>(dw / w);
-        mScaleY = static_cast<Uint16>(dh / h);
+        mScaleX = pixelsPerPoint(w, dw, thisDesktopPlatform());
+        mScaleY = pixelsPerPoint(h, dh, thisDesktopPlatform());
     }
 
     void InputWrapper::capture(bool windowEventsOnly)
     {
         mViewer->getEventQueue()->frame(0.f);
 
+        // Pumping runs the menu bar's key equivalents (macOS) before the same key press is read below: the window's
+        // state from before the pump tells whether Toggle Full Screen was the menu's to do
+        mWindowFlagsBeforeEvents = SDL_GetWindowFlags(mSDLWindow);
         SDL_PumpEvents();
 
         SDL_Event evt;
@@ -120,6 +126,18 @@ namespace SDLUtil
                     mMouseListener->mouseReleased(evt.button, evt.button.button);
                     break;
                 case SDL_KEYDOWN:
+                    if (mDesktopShortcuts.swallowKeyDown(evt.key.keysym.sym, evt.key.keysym.mod, evt.key.repeat != 0))
+                    {
+                        if (evt.key.repeat == 0 && mWindowListener != nullptr
+                            && desktopShortcut(evt.key.keysym.sym, evt.key.keysym.mod)
+                                == DesktopShortcut::ToggleFullScreen)
+                        {
+                            if (const std::optional<Settings::WindowMode> mode
+                                = windowModeForToggleFullScreen(mWindowFlagsBeforeEvents, thisDesktopPlatform()))
+                                mWindowListener->windowModeRequested(*mode);
+                        }
+                        break;
+                    }
                     mKeyboardListener->keyPressed(evt.key);
 
                     if (!isModifierHeld(KMOD_ALT) && evt.key.keysym.sym >= SDLK_F1 && evt.key.keysym.sym <= SDLK_F12)
@@ -130,6 +148,8 @@ namespace SDLUtil
 
                     break;
                 case SDL_KEYUP:
+                    if (mDesktopShortcuts.swallowKeyUp(evt.key.keysym.sym))
+                        break;
                     if (!evt.key.repeat)
                     {
                         mKeyboardListener->keyReleased(evt.key);
@@ -261,25 +281,17 @@ namespace SDLUtil
                 // so we ignore window moved events (improves window movement performance)
                 break;
             case SDL_WINDOWEVENT_SIZE_CHANGED:
-                int w, h;
-                SDL_GL_GetDrawableSize(mSDLWindow, &w, &h);
-                int x, y;
-                SDL_GetWindowPosition(mSDLWindow, &x, &y);
-
-                // Happens when you Alt-Tab out of game
-                if (w == 0 && h == 0)
-                    return;
-
-                mViewer->getCamera()->getGraphicsContext()->resized(x, y, w, h);
-
-                mViewer->getEventQueue()->windowResize(x, y, w, h);
-
-                if (mWindowListener)
-                    mWindowListener->windowResized(w, h);
-
-                _setWindowScale();
-
+            case SDL_WINDOWEVENT_DISPLAY_CHANGED:
+            {
+                // On the Mac a display change (another display, maybe another scaling) resizes the drawable too, and
+                // entering or leaving full screen changes the size while the capture depends on full screen
+                const WindowEventResponse response = respondToWindowEvent(evt.window.event, thisDesktopPlatform());
+                if (response.resizeDrawable)
+                    handleDrawableResize(response.scaleBeforeListener);
+                if (response.updateMouseCapture)
+                    updateMouseSettings();
                 break;
+            }
 
             case SDL_WINDOWEVENT_RESIZED:
                 // This should also fire SIZE_CHANGED, so no need to handle
@@ -306,6 +318,31 @@ namespace SDLUtil
                     mWindowListener->windowVisibilityChange(false);
                 break;
         }
+    }
+
+    void InputWrapper::handleDrawableResize(bool scaleBeforeListener)
+    {
+        int w, h;
+        SDL_GL_GetDrawableSize(mSDLWindow, &w, &h);
+        int x, y;
+        SDL_GetWindowPosition(mSDLWindow, &x, &y);
+
+        // Happens when you Alt-Tab out of game
+        if (w == 0 && h == 0)
+            return;
+
+        mViewer->getCamera()->getGraphicsContext()->resized(x, y, w, h);
+
+        mViewer->getEventQueue()->windowResize(x, y, w, h);
+
+        if (scaleBeforeListener)
+            _setWindowScale();
+
+        if (mWindowListener)
+            mWindowListener->windowResized(w, h);
+
+        if (!scaleBeforeListener)
+            _setWindowScale();
     }
 
     bool InputWrapper::isModifierHeld(int mod)
@@ -350,12 +387,22 @@ namespace SDLUtil
 
     void InputWrapper::updateMouseSettings()
     {
-        mGrabPointer = mWantGrab && mMouseInWindow && mWindowHasFocus;
-        SDL_SetWindowGrab(mSDLWindow, mGrabPointer && mAllowGrab ? SDL_TRUE : SDL_FALSE);
+        MouseCaptureRequest request;
+        request.wantGrab = mWantGrab;
+        request.wantRelative = mWantRelative;
+        request.wantCursorVisible = mWantMouseVisible;
+        request.allowGrab = mAllowGrab;
+        request.hasFocus = mWindowHasFocus;
+        request.mouseInWindow = mMouseInWindow;
+        request.fullScreen = (SDL_GetWindowFlags(mSDLWindow) & SDL_WINDOW_FULLSCREEN) != 0;
+        const MouseCapture capture = decideMouseCapture(request, thisDesktopPlatform());
 
-        SDL_ShowCursor(mWantMouseVisible || !mWindowHasFocus);
+        mGrabPointer = capture.grab;
+        SDL_SetWindowGrab(mSDLWindow, capture.windowGrab ? SDL_TRUE : SDL_FALSE);
 
-        bool relative = mWantRelative && mMouseInWindow && mWindowHasFocus;
+        SDL_ShowCursor(capture.cursorVisible);
+
+        const bool relative = capture.relative;
         if (mMouseRelative == relative)
             return;
 
@@ -425,10 +472,10 @@ namespace SDLUtil
 
         if (evt.type == SDL_MOUSEMOTION)
         {
-            packEvt.x = evt.motion.x * mScaleX;
-            packEvt.y = evt.motion.y * mScaleY;
-            packEvt.xrel = evt.motion.xrel * mScaleX;
-            packEvt.yrel = evt.motion.yrel * mScaleY;
+            packEvt.x = pointsToPixels(evt.motion.x, mScaleX);
+            packEvt.y = pointsToPixels(evt.motion.y, mScaleY);
+            packEvt.xrel = pointsToPixels(evt.motion.xrel, mScaleX);
+            packEvt.yrel = pointsToPixels(evt.motion.yrel, mScaleY);
             packEvt.type = SDL_MOUSEMOTION;
             if (mFirstMouseMove)
             {
@@ -440,19 +487,16 @@ namespace SDLUtil
         }
         else if (evt.type == SDL_MOUSEWHEEL)
         {
-            double preciseY = evt.wheel.preciseY;
-
-            mPendingWheelY += preciseY * 120.0;
-            const int zrel = static_cast<int>(mPendingWheelY);
-            mPendingWheelY -= zrel;
+            // A trackpad's small deltas and a mouse wheel's notches go the same way, in the system's direction
+            const int zrel = mWheelY.add(evt.wheel.preciseY, evt.wheel.direction);
 
             mMouseZ += zrel;
             packEvt.zrel = zrel;
             packEvt.z = mMouseZ;
             packEvt.type = SDL_MOUSEWHEEL;
 
-            packEvt.x = evt.wheel.mouseX * mScaleX;
-            packEvt.y = evt.wheel.mouseY * mScaleY;
+            packEvt.x = pointsToPixels(evt.wheel.mouseX, mScaleX);
+            packEvt.y = pointsToPixels(evt.wheel.mouseY, mScaleY);
         }
         else
         {

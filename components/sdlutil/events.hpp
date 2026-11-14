@@ -5,6 +5,8 @@
 #include <SDL_types.h>
 #include <SDL_version.h>
 
+#include <components/settings/windowmode.hpp>
+
 ////////////
 // Events //
 ////////////
@@ -98,6 +100,9 @@ namespace SDLUtil
         virtual void windowClosed() {}
 
         virtual void windowResized(int x, int y) {}
+
+        /** @remarks The player asked for another window mode (macOS: Control-Command-F that SDL's menu can not do) */
+        virtual void windowModeRequested(Settings::WindowMode mode) {}
     };
 
 }
