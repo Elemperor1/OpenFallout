@@ -955,6 +955,7 @@ void OF::Engine::prepareEngine()
     mFalloutScripts = std::make_unique<OFScript::FalloutScripts>(
         mWorld->getStore(), OFScript::chooseGame(mContentFiles), OFScript::playerReferenceOf(mContentFiles));
     mFalloutScripts->setContentFiles(mContentFiles);
+    mFalloutScripts->setGameIni(mGameIni);
     // the executable of the game is next to its Data directory (the first directory is the port's own resources)
     // (its words are in the code page that is set for the data of the game)
     mFalloutScripts->loadExecutableTexts(

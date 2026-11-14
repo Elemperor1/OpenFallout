@@ -103,6 +103,16 @@ namespace OFScript
 
     // ---- Locks ----
 
+    bool FalloutScripts::lockIsBroken(FalloutScript::FormId reference)
+    {
+        const auto found = mLockBreaks.find(reference);
+        if (found == mLockBreaks.end())
+            return false;
+        // The perk entry point 32 of the player decides whether one failed forcing is enough (0x430AE0)
+        return FalloutScript::Lockpick::lockBroken(
+            found->second, mPerks.apply(FalloutScript::EntryPoint::ignoreBrokenLock, mPlayer, 0.0));
+    }
+
     bool FalloutScripts::lockStops(const OFWorld::Ptr& object, const OFWorld::Ptr& actor)
     {
         OFBase::World& world = *OFBase::Environment::get().getWorld();
@@ -124,7 +134,7 @@ namespace OFScript
         }
 
         // A lock that forcing broke stays broken
-        if (mLockBroken.count(reference) > 0)
+        if (lockIsBroken(reference))
         {
             showNotice(wordOf("sLockBroken", "The lock is broken."), 2.0);
             return true;
@@ -334,7 +344,7 @@ namespace OFScript
             const FalloutScript::FormId reference = referenceOf(target);
             if (reference != 0)
             {
-                result.mBroken = mLockBroken.count(reference) > 0;
+                result.mBroken = lockIsBroken(reference);
                 const ESM4::Reference* record
                     = mStore.get<ESM4::Reference>().search(ESM::FormId::fromUint32(reference));
                 // A door the reference marks as inaccessible says so, and has no verb (FalloutNV.exe 0x57B460, Mac
@@ -498,8 +508,9 @@ namespace OFScript
         if (kind == "forceFailed")
         {
             // Forcing a lock and failing breaks it for good, and the screen closes (no pin is used)
-            mLockBroken.insert(screen.mReference);
-            showNotice(wordOf("sLockBroken", "The lock is broken."), 2.0);
+            ++mLockBreaks[screen.mReference];
+            if (lockIsBroken(screen.mReference))
+                showNotice(wordOf("sLockBroken", "The lock is broken."), 2.0);
             closeLockScreen();
             return "broken";
         }

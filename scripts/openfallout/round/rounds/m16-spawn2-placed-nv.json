@@ -1,0 +1,12 @@
+{
+  "name": "m16-spawn2-placed-nv",
+  "game": "nv",
+  "save": "latest",
+  "scenario": "../scenarios/m16_spawn2_placed.lua",
+  "resolution": [1280, 720],
+  "framerate": 30,
+  "limit": 900,
+  "settings": { "Sound": { "master volume": "0" } },
+  "env": { "OPENFALLOUT_HEADLESS_SOUND": "1" },
+  "variants": [ { "name": "plain" } ]
+}

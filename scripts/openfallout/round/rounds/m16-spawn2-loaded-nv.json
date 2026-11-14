@@ -1,0 +1,12 @@
+{
+  "name": "m16-spawn2-loaded-nv",
+  "game": "nv",
+  "save": "/Users/jacobcyber/Documents/OpenFallout/scratch-m16/spawn2/saves-nv/Quicksave.omwsave",
+  "scenario": "../scenarios/m16_spawn2_loaded.lua",
+  "resolution": [1280, 720],
+  "framerate": 30,
+  "limit": 900,
+  "settings": { "Sound": { "master volume": "0" } },
+  "env": { "OPENFALLOUT_HEADLESS_SOUND": "1" },
+  "variants": [ { "name": "plain" } ]
+}

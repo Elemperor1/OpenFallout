@@ -79,6 +79,13 @@ namespace FalloutScript
     }
     /// How many stages a package of the type has before its end (0 for a type that is not in the table)
     int procedureStageCount(int packageType);
+
+    /// IsFacingUp (FalloutNV.exe 0x5A0710, Fallout3.exe 0x514DD0) and IsLeftUp (0x5A0800, 0x514E80): the spine bone
+    /// ("Bip01 Spine", the node whose name the executable keeps at 0x11C61B4; the first is looked for by the name of
+    /// the process's own bone list, then "Bip01 Spine01") has the entry of its world rotation at +0x84 (row 2, column 1)
+    /// above 0 for IsFacingUp, and the one at +0x88 (row 2, column 2) above 0 for IsLeftUp. 0 when there is no bone.
+    bool spineYAboveGround(float value);
+
     /// The number of the procedure that the stage of a package of the type is: the stage that is at or past the count is
     /// the end of the package (17); -1 for a type that has no table or a stage that has no number. A negative stage is the
     /// first.
@@ -107,6 +114,11 @@ namespace FalloutScript
         FormId mLastIdle = 0;
         /// How fast the animation of its walk carries it, units a second (0 when it has none)
         float mWalkSpeed = 0.f;
+        /// What the bone of the spine ("Bip01 Spine") says about how the character lies: the entries [2][1] and [2][2]
+        /// of its world rotation, the up part of its Y and of its Z axis (IsFacingUp and IsLeftUp ask whether they are
+        /// above 0). A character that has no such bone has 0 for both.
+        float mSpineYUp = 0.f;
+        float mSpineZUp = 0.f;
 
         bool operator==(const ActorActivity&) const = default;
     };

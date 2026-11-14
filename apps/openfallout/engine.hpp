@@ -8,6 +8,7 @@
 #include <components/debug/debuglog.hpp>
 #include <components/esm/refid.hpp>
 #include <components/files/collections.hpp>
+#include <components/files/gameini.hpp>
 #include <components/settings/settings.hpp>
 #include <components/translation/translation.hpp>
 #include <components/vfs/registerarchives.hpp>
@@ -160,6 +161,7 @@ namespace OF
         osg::ref_ptr<SceneUtil::Color::SelectColorFormatOperation> mSelectColorFormatOperation;
         std::string mCellName;
         std::vector<std::string> mContentFiles;
+        Files::GameIni mGameIni;
         std::vector<std::string> mGroundcoverFiles;
 
         std::unique_ptr<Stereo::Manager> mStereoManager;
@@ -212,6 +214,8 @@ namespace OF
 
         /// Set data dirs
         void setDataDirs(const Files::PathContainer& dataDirs);
+        /// The settings of the ini files of the game, which the script rules read some of
+        void setGameIni(Files::GameIni ini) { mGameIni = std::move(ini); }
 
         /// Add BSA archive. The archives go in the order of increasing priority.
         void addArchive(const std::string& archive);

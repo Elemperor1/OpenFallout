@@ -7,9 +7,12 @@
 -- The dehydration, hunger and sleep pages of the hardcore mode (their buttons are there only when the mode is on) show the
 -- level on the meter of the file: the arrow stands at the level over the level of the last stage.
 --
+-- The general page is the game's own too: the counts (every one, in the order of their numbers), the word, picture and title
+-- of the karma, and in New Vegas the reputation page that the button of the page changes to: the reputations that hold some
+-- fame or infamy, by name, and for the one that is picked its picture, its name and its title.
+--
 -- Not there yet: the pictures of the skills, perks and attributes (the games show models and textures chosen by code), the
--- per-limb condition, the effects list (and the name of a need over its meter), the healing buttons, and the lines of the
--- general page.
+-- per-limb condition, the effects list (and the name of a need over its meter), the healing buttons.
 --
 --   local page = require('scripts.omw.falloutpipboystats')
 --   page.show()            -- true when the page is on the screen, false when the menu file is not there
@@ -34,7 +37,7 @@ local TABS = {
     { key = 'special', button = 'stats_tailline_SPECIAL', list = 'stats_special_container' },
     { key = 'skills', button = 'stats_tailline_skills', list = 'stats_skills_container' },
     { key = 'perks', button = 'stats_tailline_perks', list = 'stats_perks_container' },
-    { key = 'general', button = 'stats_tailline_general' },
+    { key = 'general', button = 'stats_tailline_general', list = 'stats_general_container' },
 }
 local TEMPLATE = 'stats_list_template'
 
@@ -50,6 +53,10 @@ local NEED_MODES = { [4] = 'dehydration', [5] = 'hunger', [6] = 'sleep' }
 local HIDDEN = { 'stats_stimpak_button', 'stats_healing_mode', 'stats_radaway_button', 'stats_radx_button', 'stats_drbag_button' }
 local statusMode = 1
 local needsShown = {}
+-- The page of the general tab in New Vegas: 0 the counts and the karma, 1 the reputations (the file starts on 1)
+local genrepMode = 1
+local reputationList, reputations = nil, {}
+local reputationShown = nil
 
 local shown, lists = nil, nil
 local tabIndex = 1
@@ -67,7 +74,7 @@ end
 
 -- The rows of the three lists, from what the character is now
 local function makeRows()
-    local made = { special = {}, skills = {}, perks = {} }
+    local made = { special = {}, skills = {}, perks = {}, general = {} }
     for _, attribute in ipairs(pipboy.attributes()) do
         made.special[#made.special + 1] = {
             text = attribute.name, value = number(attribute.value), description = attribute.description or '',
@@ -77,6 +84,9 @@ local function makeRows()
         made.skills[#made.skills + 1] = {
             text = skill.name, value = number(skill.value), description = skill.description or '',
         }
+    end
+    for _, count in ipairs(pipboy.general().counts) do
+        made.general[#made.general + 1] = { text = count.name, value = number(count.value), description = '' }
     end
     for _, perk in ipairs(pipboy.perks()) do
         made.perks[#made.perks + 1] = {
@@ -171,6 +181,61 @@ local function currentTab()
     return TABS[tabIndex]
 end
 
+-- The general page: the word, the picture and the title of the karma (the file's `stats_karma_alignment`,
+-- `stats_karma_image` and `stats_karma_title`), and the list of the reputations
+local function fillGeneral()
+    local general = pipboy.general()
+    if shown:find('stats_karma_alignment') then shown:set('stats_karma_alignment', 'string', general.karma.word) end
+    if shown:find('stats_karma_image') then shown:set('stats_karma_image', 'filename', general.karma.picture) end
+    if shown:find('stats_karma_title') then shown:set('stats_karma_title', 'string', general.karma.title) end
+    reputations = general.reputations
+    if reputationList then
+        local made = {}
+        for index, reputation in ipairs(reputations) do made[index] = { ['ListItemText.string'] = reputation.name } end
+        reputationList.rows(made)
+    end
+    reputationShown = nil
+end
+
+-- The reputation that is picked (or under the pointer): its picture, its name and its title are shown at the side, and
+-- none is when no row is
+local function updateReputation()
+    if not reputationList or not shown:find('stats_reputation_title') then return end
+    local row = (genrepMode == 1 and tabIndex == 5) and reputationList.selected() or 0
+    if row == reputationShown then return end
+    reputationShown = row
+    local reputation = row > 0 and reputations[row] or nil
+    shown:batch(function()
+        if shown:find('stats_reputation_image') then
+            if reputation and reputation.picture ~= '' then
+                shown:set('stats_reputation_image', 'filename', reputation.picture)
+            end
+            shown:set('stats_reputation_image', 'visible', reputation ~= nil)
+        end
+        shown:set('stats_reputation_title', 'string', reputation and reputation.title or '')
+        shown:set('stats_reputation_title', 'visible', reputation ~= nil)
+        if shown:find('stats_reputation_rep_title') then
+            shown:set('stats_reputation_rep_title', 'string', reputation and reputation.name or '')
+            shown:set('stats_reputation_rep_title', 'visible', reputation ~= nil)
+        end
+    end)
+end
+
+-- The button of the general tab changes between the counts and the reputations (New Vegas); its word is the one of the page
+-- it leads to
+local function setGenrepMode(mode)
+    genrepMode = mode
+    if not shown or not shown:find('stats_genrep_container') then return end
+    shown:batch(function()
+        shown:set('stats_genrep_container', 'user0', mode)
+        if shown:find('stats_genrep_button') then
+            shown:set('stats_genrep_button', 'string', pipboy.text(mode == 1 and 'sStatsGeneral' or 'sReputationButton'))
+        end
+    end)
+    reputationShown = nil
+    updateReputation()
+end
+
 -- The list of the tab that is shown, if it is a list
 local function currentList()
     local tab = currentTab()
@@ -187,9 +252,7 @@ local function fill()
             if list then list.rows(listRows(rows[tab.key])) end
         end
         fillBody()
-        if shown:find('stats_karma_alignment') then
-            shown:set('stats_karma_alignment', 'string', stats.karmaTitle or '')
-        end
+        fillGeneral()
     end)
     describedKey = nil
 end
@@ -226,9 +289,12 @@ local function pickTab(index)
         shown:io('user0', index - 1)
     end)
     local list = currentList()
-    if list and list.count() > 0 and list.selected() <= 0 then list.select(1, true) end
+    -- (the general page has no row that is picked to begin with: its lists show what the character has done)
+    if list and TABS[index].key ~= 'general' and list.count() > 0 and list.selected() <= 0 then list.select(1, true) end
     describedKey = nil
+    reputationShown = nil
     updateDescription()
+    updateReputation()
 end
 
 local function open()
@@ -246,8 +312,14 @@ local function open()
         end
     end
     shown, lists = opened, made
+    -- (New Vegas only: Fallout 3 has no reputation page)
+    reputationList = opened:list('stats_reputation_container', TEMPLATE)
+    reputations, reputationShown, genrepMode = {}, nil, 1
     for index, tab in ipairs(TABS) do
         opened:onClick(tab.button, function() pickTab(index) end)
+    end
+    if opened:find('stats_genrep_button') then
+        opened:onClick('stats_genrep_button', function() setGenrepMode(1 - genrepMode) end)
     end
     local needs = core.hud.status().needs
     local hardcore = needs ~= nil and needs.hardcore == true
@@ -280,6 +352,17 @@ function module.isOpen()
     return shown ~= nil
 end
 
+-- The tab (its key: status, special, skills, perks, general) and, for the general tab of New Vegas, the page (0 the counts
+-- and the karma, 1 the reputations) that the page opens on and, for the reputations, the row that is picked; for a script
+-- that opens the Pip-Boy at a page
+local pending, pendingRow = nil, nil
+function module.preselect(key, genrep, row)
+    for index, tab in ipairs(TABS) do
+        if tab.key == key then tabIndex = index end
+    end
+    pending, pendingRow = genrep, row
+end
+
 -- Show the page (open the menu if it is not open) with what the character is now; false when it cannot be shown
 function module.show()
     if not shown and not open() then
@@ -287,6 +370,19 @@ function module.show()
     end
     fill()
     pickTab(tabIndex)
+    if pending ~= nil then
+        setGenrepMode(pending)
+        pending = nil
+    end
+    -- (a script that opens the page can pick a row of the reputations, as a click on it would)
+    if pendingRow ~= nil then
+        if reputationList and pendingRow >= 1 and pendingRow <= reputationList.count() then
+            reputationList.select(pendingRow, true)
+            reputationShown = nil
+            updateReputation()
+        end
+        pendingRow = nil
+    end
     return true
 end
 
@@ -294,8 +390,9 @@ function module.hide()
     if shown then
         shown:close()
     end
-    shown, lists = nil, nil
+    shown, lists, reputationList = nil, nil, nil
     describedKey = nil
+    reputationShown = nil
 end
 
 -- Each frame the page is shown: the window size, and the description of what the pointer or the pick is on
@@ -303,6 +400,7 @@ function module.update()
     if not shown then return end
     shown:checkSize()
     updateDescription()
+    updateReputation()
     fillNeeds()
 end
 

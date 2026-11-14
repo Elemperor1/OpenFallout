@@ -1,7 +1,7 @@
 -- The places where the intro of Fallout 3 and New Vegas waits for the player to do something that pressing a button does not
 -- do: walk into a trigger volume, activate an object or shoot at one. autoplayworld.lua reads this table. When a quest has
 -- stood at a stage for `settle` real seconds (nothing else changed in it), the gates of that stage are tried, one at a time:
--- 'walk' puts the player at the reference (the middle of its volume), 'activate' makes the player activate it (or each of the
+-- 'walk' puts the player at the reference (the middle of its volume; with `face`, a reference of the same plugin, turned to it), 'activate' makes the player activate it (or each of the
 -- `refs`), 'fire' makes the player shoot at it with the weapon in hand (`shots` times, or, with `untilDead`, until it is
 -- dead; autoplay.lua does the shooting), 'teleport' takes the player to the cell `cell` of the plugin at the place `at` (for
 -- a room the data has no door to), 'setstage' puts the quest at the stage `to` (a stand-in for what the engine cannot bring
@@ -79,7 +79,9 @@ return {
         { quest = 'CG02', stage = 60, file = 'Fallout3.esm', ref = 0x0306CD, how = 'fire', shots = 20, untilDead = true,
             tries = 1 },
         { quest = 'CG02', stage = 70, file = 'Fallout3.esm', ref = 0x0300EF, how = 'activate' },
-        { quest = 'CG02', stage = 80, file = 'Fallout3.esm', ref = 0x060C81, how = 'walk' },
+        -- The picture (stage 80): the trigger only counts the player ready when the player faces the photographer (within 45
+        -- degrees), and the talk with the Dad has turned the player to where the Dad stood, far off
+        { quest = 'CG02', stage = 80, file = 'Fallout3.esm', ref = 0x060C81, face = 0x0300E8, how = 'walk' },
         -- The classroom (CG03): the Dad, the trigger by the door, Amata, Mr. Brotch (who offers the test, which needs the player
         -- to sit at a desk), the triggers by the desks and the door
         { quest = 'CG03', stage = 6, file = 'Fallout3.esm', ref = 0x01CE3A, how = 'activate' },

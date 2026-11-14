@@ -51,6 +51,19 @@ namespace FalloutScript
             return value;
         }
 
+        /// The same in Fallout 3 (0x71B1C5 to 0x71B255), which has the one setting for the killing of the evil and no grades:
+        /// a kill of the very evil pays it whoever they were and whatever faction they were in; the evil pay nothing; the others
+        /// cost the price of their kind, and only when the kill counts as a crime and the victim was of a faction that tracks it
+        double killKarmaFallout3(
+            const LawSettings& settings, int karmaClass, bool creature, bool tracked, bool crimeOnDeath)
+        {
+            if (karmaClass == 4)
+                return settings.mKarmaKillingEvil;
+            if (karmaClass == 2 || !tracked || !crimeOnDeath)
+                return 0.0;
+            return creature ? settings.mKarmaMurderNonEvilCreature : settings.mKarmaMurderNonEvilNpc;
+        }
+
         int roundToInt(double value)
         {
             return static_cast<int>(std::trunc(value));
@@ -127,6 +140,7 @@ namespace FalloutScript
         mSoldStolen = 0;
         mCrimes.clear();
         mNextCrime = 1;
+        mClock = 0;
         mTrespass.clear();
         mLineVictim = 0;
     }
@@ -276,7 +290,7 @@ namespace FalloutScript
         return mCrimes.size();
     }
 
-    std::vector<FormId> Law::stopAlarm(FormId actor)
+    std::vector<FormId> Law::forget(const std::function<bool(const Crime&)>& drop)
     {
         std::vector<FormId> cleared;
         {
@@ -285,7 +299,7 @@ namespace FalloutScript
             std::vector<Crime> kept;
             for (Crime& crime : mCrimes)
             {
-                if (crime.mVictim == actor || contains(crime.mWitnesses, actor))
+                if (drop(crime))
                 {
                     for (const FormId faction : crime.mFactions)
                         addUnique(released, faction);
@@ -307,6 +321,37 @@ namespace FalloutScript
         return cleared;
     }
 
+    std::vector<FormId> Law::stopAlarm(FormId actor)
+    {
+        return forget([actor](const Crime& crime) { return crime.mVictim == actor || contains(crime.mWitnesses, actor); });
+    }
+
+    bool Law::crimeListed(FormId actor)
+    {
+        if (actor == 0)
+            return false;
+        const std::lock_guard lock(mMutex);
+        return std::any_of(mCrimes.begin(), mCrimes.end(),
+            [actor](const Crime& crime) { return crime.mVictim == actor || contains(crime.mWitnesses, actor); });
+    }
+
+    void Law::advance(double seconds)
+    {
+        const std::lock_guard lock(mMutex);
+        if (seconds > 0)
+            mClock += seconds;
+    }
+
+    std::vector<FormId> Law::forgetRecent(double seconds)
+    {
+        double now = 0;
+        {
+            const std::lock_guard lock(mMutex);
+            now = mClock;
+        }
+        return forget([now, seconds](const Crime& crime) { return !(seconds < now - crime.mTime); });
+    }
+
     std::size_t Law::record(CrimeKind kind, FormId victim, std::int64_t value)
     {
         if (mCrimes.size() >= maxCrimes)
@@ -317,6 +362,7 @@ namespace FalloutScript
         crime.mVictim = victim;
         crime.mCriminal = mRecords.player();
         crime.mValue = value;
+        crime.mTime = mClock;
         mCrimes.push_back(std::move(crime));
         return mCrimes.size() - 1;
     }
@@ -365,6 +411,15 @@ namespace FalloutScript
             if (const FormId reputation = mRecords.reputationOf(faction); reputation != 0)
                 outcome.mInfamy.push_back({ reputation, major ? settings.mMajorCrimeInfamy : settings.mMinorCrimeInfamy });
         }
+    }
+
+    Law::BlowKind Law::judgeBlow(bool victimFights, bool victimIsCreature, bool victimHasOwner)
+    {
+        if (victimFights)
+            return BlowKind::Nothing;
+        if (victimIsCreature)
+            return victimHasOwner ? BlowKind::Property : BlowKind::Nothing;
+        return BlowKind::Attack;
     }
 
     Outcome Law::attack(const Blow& blow, const std::vector<Witness>& watchers)
@@ -420,8 +475,15 @@ namespace FalloutScript
         const LawSettings settings = mRecords.lawSettings();
         const std::lock_guard lock(mMutex);
         // The karma of a kill goes by the class of the victim's karma, and only for a victim of a faction that tracks crime
-        if (killing.mKarmaCounts && anyTracking(killing.mVictimFactions))
-            outcome.mKarma = roundToInt(killKarma(settings, killing.mKarmaClass, !killing.mCharacter));
+        if (killing.mKarmaCounts)
+        {
+            const bool tracked = anyTracking(killing.mVictimFactions);
+            if (!settings.mKarmaGrades)
+                outcome.mKarma = roundToInt(killKarmaFallout3(
+                    settings, killing.mKarmaClass, !killing.mCharacter, tracked, killing.mCrimeOnDeath));
+            else if (tracked)
+                outcome.mKarma = roundToInt(killKarma(settings, killing.mKarmaClass, !killing.mCharacter));
+        }
         if (!killing.mCrimeOnDeath)
             return outcome;
         // Whoever the player kills that is a character and not evil makes the player a murderer, seen or not
@@ -915,13 +977,15 @@ namespace FalloutScript
                 law.clearEnemyFlags(world.factionsOf(call.mReference));
             return 0.0;
         });
-        // Whether a faction of the character is an enemy of the player. The command that asks about the crimes of the
-        // character holds the same flags in the executables' extra data; here the factions' flags answer both.
+        // Whether a faction of the character is an enemy of the player. The other command, that asks about the crimes of
+        // the character, reads the character's own list of crimes (0x5A4930) and not the flags of the factions.
         const auto enemyOfPlayer = [&law, &world](CallContext& call) {
             return call.mReference != 0 && law.anyEnemy(world.factionsOf(call.mReference)) ? 1.0 : 0.0;
         };
         interpreter.setHandler("GetActorFactionPlayerEnemy", enemyOfPlayer);
-        interpreter.setHandler("GetActorCrimePlayerEnemy", enemyOfPlayer);
+        interpreter.setHandler("GetActorCrimePlayerEnemy", [&law](CallContext& call) {
+            return call.mReference != 0 && law.crimeListed(call.mReference) ? 1.0 : 0.0;
+        });
         interpreter.setHandler("GetTrespassWarningLevel", [&law](CallContext& call) {
             return call.mReference != 0 ? static_cast<double>(law.trespassLevel(call.mReference)) : -1.0;
         });

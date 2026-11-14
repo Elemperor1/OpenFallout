@@ -225,6 +225,37 @@ namespace
         EXPECT_TRUE(f.mLaw.attack({}, {}).mReactions.empty());
     }
 
+    TEST(FalloutScriptCrimeTest, a_blow_at_a_creature_is_no_attack_crime_unless_it_belongs_to_someone)
+    {
+        // 0x898D6A to 0x898E5B: fighting victims first, then the creature test (the virtual at +0x21C), then the character
+        EXPECT_EQ(Law::judgeBlow(false, false, false), Law::BlowKind::Attack);
+        EXPECT_EQ(Law::judgeBlow(false, false, true), Law::BlowKind::Attack);
+        EXPECT_EQ(Law::judgeBlow(false, true, false), Law::BlowKind::Nothing);
+        EXPECT_EQ(Law::judgeBlow(false, true, true), Law::BlowKind::Property);
+        EXPECT_EQ(Law::judgeBlow(true, false, false), Law::BlowKind::Nothing);
+        EXPECT_EQ(Law::judgeBlow(true, true, true), Law::BlowKind::Nothing);
+    }
+
+    TEST(FalloutScriptCrimeTest, a_blow_of_a_minor_weapon_is_the_business_of_the_victim_alone)
+    {
+        Fixture f;
+        Law::Blow blow;
+        blow.mVictim = trudy;
+        blow.mVictimFactions = { town };
+        blow.mMinor = true;
+        const Outcome outcome = f.mLaw.attack(blow, { watcher(doc, { town }), watcher(trudy, { town }) });
+        // Trudy, who was hit, is told of the crime; Doc, who only watched, is not (he has the no-crime line, 0x8C0742)
+        const auto kindOf = [&](FormId actor) {
+            for (const Reaction& reaction : outcome.mReactions)
+                if (reaction.mActor == actor)
+                    return static_cast<int>(reaction.mKind);
+            return -1;
+        };
+        EXPECT_EQ(kindOf(trudy), static_cast<int>(Reaction::Kind::Say));
+        EXPECT_EQ(kindOf(doc), static_cast<int>(Reaction::Kind::SayNoCrime));
+        EXPECT_EQ(f.mLaw.playerMajorCrimes(), 0);
+    }
+
     TEST(FalloutScriptCrimeTest, the_disposition_cost_of_a_blow_follows_the_setting)
     {
         Fixture f;
@@ -318,13 +349,39 @@ namespace
         EXPECT_EQ(karma(0, false), -100);
         EXPECT_EQ(karma(3, false), -100);
         EXPECT_EQ(karma(1, true), -25);
-        EXPECT_EQ(karma(2, false), 1);
+        // 0x71B1F8: the evil pay nothing, only the very evil pay the one setting for the killing of the evil
+        EXPECT_EQ(karma(2, false), 0);
         EXPECT_EQ(karma(4, false), 1);
         // And no infamy: the game has no reputations
         Law::Killing killing;
         killing.mVictim = doc;
         killing.mVictimFactions = { town };
         EXPECT_TRUE(f.mLaw.murder(killing, { watcher(trudy, { town }) }).mInfamy.empty());
+    }
+
+    TEST(FalloutScriptCrimeTest, in_fallout_3_the_very_evil_pay_whatever_their_faction_and_a_kill_that_is_no_crime_costs_nothing)
+    {
+        Fixture f;
+        f.mRecords.mSettings = LawSettings::forGame(FalloutScript::Game::Fallout3);
+        Law::Killing killing;
+        killing.mVictim = raider;
+        killing.mVictimFactions = { gang };
+        killing.mKarmaClass = 4;
+        // (0x71B238: the very evil pay on every path)
+        EXPECT_EQ(f.mLaw.murder(killing, {}).mKarma, 1);
+        killing.mKarmaClass = 1;
+        EXPECT_EQ(f.mLaw.murder(killing, {}).mKarma, 0);
+        // a victim of a town that tracks crime costs the price, unless the kill is marked as no crime
+        killing.mVictim = doc;
+        killing.mVictimFactions = { town };
+        EXPECT_EQ(f.mLaw.murder(killing, {}).mKarma, -100);
+        killing.mCrimeOnDeath = false;
+        EXPECT_EQ(f.mLaw.murder(killing, {}).mKarma, 0);
+        killing.mKarmaClass = 4;
+        EXPECT_EQ(f.mLaw.murder(killing, {}).mKarma, 1);
+        // a kill that a script asked to count for no karma counts for none
+        killing.mKarmaCounts = false;
+        EXPECT_EQ(f.mLaw.murder(killing, {}).mKarma, 0);
     }
 
     TEST(FalloutScriptCrimeTest, a_kill_of_someone_outside_a_faction_that_tracks_crime_costs_no_karma)
@@ -553,6 +610,37 @@ namespace
         EXPECT_FALSE(f.mObjects.enemyOfFaction(rangers));
         EXPECT_EQ(f.mLaw.crimeCount(), 0u);
         EXPECT_THAT(f.mLaw.stopAlarm(doc), IsEmpty());
+    }
+
+    TEST(FalloutScriptCrimeTest, the_yield_forgets_the_crimes_of_the_last_seconds_and_what_they_held)
+    {
+        Fixture f;
+        Law::Blow blow;
+        blow.mVictim = doc;
+        blow.mVictimFactions = { town };
+        // an old crime, then (20 seconds of play later) a recent one that holds the town and the rangers
+        f.mLaw.attack(blow, { watcher(trudy, { town }) });
+        f.mLaw.advance(20.0);
+        blow.mVictim = sheriff;
+        blow.mVictimFactions = { town, rangers };
+        f.mLaw.attack(blow, { watcher(sheriff, { town, rangers }) });
+        f.mLaw.advance(4.0);
+        ASSERT_TRUE(f.mObjects.enemyOfFaction(rangers));
+        // fCombatYieldTime is 10: the crime of 4 seconds ago goes (0x971FD0), the one of 24 seconds ago stays; the town is
+        // still held by the old crime and the rangers are not
+        EXPECT_THAT(f.mLaw.forgetRecent(10.0), UnorderedElementsAre(rangers));
+        EXPECT_EQ(f.mLaw.crimeCount(), 1u);
+        EXPECT_TRUE(f.mObjects.enemyOfFaction(town));
+        EXPECT_FALSE(f.mObjects.enemyOfFaction(rangers));
+        // a crime as old as the limit still goes (the age is not above it); one a moment older stays
+        f.mLaw.advance(6.0);
+        EXPECT_THAT(f.mLaw.forgetRecent(10.0), IsEmpty());
+        EXPECT_EQ(f.mLaw.crimeCount(), 1u);
+        f.mLaw.clear();
+        f.mLaw.attack(blow, { watcher(sheriff, { town, rangers }) });
+        f.mLaw.advance(10.0);
+        EXPECT_THAT(f.mLaw.forgetRecent(10.0), UnorderedElementsAre(town, rangers));
+        EXPECT_EQ(f.mLaw.crimeCount(), 0u);
     }
 
     TEST(FalloutScriptCrimeTest, the_flags_of_a_faction_are_set_and_cleared_one_by_one)
@@ -865,7 +953,16 @@ namespace
         EXPECT_EQ(run.call(OpGetActorFactionPlayerEnemy, doc), 0.0);
         run.mFixture.mLaw.setFlag(town, FactionFlag::PlayerEnemy, true);
         EXPECT_EQ(run.call(OpGetActorFactionPlayerEnemy, doc), 1.0);
+        // the flag of a faction is no crime of the character (0x5A4930 reads the character's own list of crimes)
+        EXPECT_EQ(run.call(OpGetActorCrimePlayerEnemy, doc), 0.0);
+        Law::Blow hit;
+        hit.mVictim = doc;
+        hit.mVictimFactions = { town };
+        run.mFixture.mLaw.attack(hit, { watcher(trudy, { town }) });
         EXPECT_EQ(run.call(OpGetActorCrimePlayerEnemy, doc), 1.0);
+        EXPECT_EQ(run.call(OpGetActorCrimePlayerEnemy, trudy), 1.0);
+        EXPECT_EQ(run.call(OpGetActorCrimePlayerEnemy, raider), 0.0);
+        EXPECT_EQ(run.call(OpGetActorCrimePlayerEnemy, 0), 0.0);
         EXPECT_EQ(run.call(OpGetActorFactionPlayerEnemy, raider), 0.0);
         EXPECT_EQ(run.call(OpGetActorFactionPlayerEnemy, 0), 0.0);
         run.call(OpClearActorsFactionsPlayerEnemyFlag, doc);

@@ -238,6 +238,20 @@ namespace FalloutScript
         /// StopCombatAlarmOnActor (0x972840): forgets the crimes that the character is the victim of or a witness to,
         /// and clears the player-enemy flags that no crime that is left holds. The factions that were cleared are given.
         std::vector<FormId> stopAlarm(FormId actor);
+        /// GetActorCrimePlayerEnemy (0x5A4930): 1 when the list of crimes that the character holds is not empty and 0 for
+        /// anyone else (a faction's flag has no part in it). The crimes that the character is the victim of or a witness
+        /// to are those (that a witness is put in the list was not read, the victim's entry was: 0x8C05C8 and 0x972134).
+        bool crimeListed(FormId actor);
+
+        /// The clock of the crimes, in seconds of play (the executables keep a clock that the frames add their length
+        /// to, FalloutNV.exe 0x11F1BF0 with the adder at 0x9915E0, and stamp each crime with it in the constructor,
+        /// 0x9EB5E9 to 0x9EB600). It is not saved: a crime that was loaded counts as made at the moment of the load.
+        void advance(double seconds);
+        /// The routine at 0x971FD0, which the combat's yield (0x967DA0) calls with `fCombatYieldTime` (10 seconds in the
+        /// executables, no plugin sets it): forgets the crimes that are no older than that (the age is the clock minus the
+        /// stamp, 0x435E00, and a crime is kept when the limit is below the age, 0x972099) and clears the player-enemy
+        /// flags that no crime that is left holds (0x9722E0, 0x47EB90). The factions that were cleared are given.
+        std::vector<FormId> forgetRecent(double seconds);
 
         // ---- the events ----
 
@@ -254,6 +268,18 @@ namespace FalloutScript
         };
         /// The player hit a character that is not tolerated and alive (the creator 0x8C0460 called at 0x898E26)
         Outcome attack(const Blow& blow, const std::vector<Witness>& watchers);
+
+        /// What the hit routine (0x898D6A to 0x898E5B) makes of a blow of the player that nobody lets pass: a victim that
+        /// fights already (its combat target at +0x428, or 0x8A6650) is wronged by nothing (the pair modifier only); a
+        /// creature (the virtual at +0x21C) makes no attack crime and only counts when it has an owner, whose property
+        /// it is (the steal creator 0x8BFA40); any other victim is a character and the attack crime is made.
+        enum class BlowKind
+        {
+            Nothing,
+            Attack,
+            Property,
+        };
+        static BlowKind judgeBlow(bool victimFights, bool victimIsCreature, bool victimHasOwner);
 
         struct Killing
         {
@@ -373,6 +399,8 @@ namespace FalloutScript
             std::int64_t mValue = 0;
             std::vector<FormId> mWitnesses;
             std::vector<FormId> mFactions;
+            /// The clock when the crime was made
+            double mTime = 0;
         };
 
         struct Trespass
@@ -416,6 +444,9 @@ namespace FalloutScript
         double mSoldStolen = 0;
         std::vector<Crime> mCrimes;
         int mNextCrime = 1;
+        double mClock = 0;
+        /// Forgets the crimes that `drop` picks and gives the factions that no crime holds any more (0x9722E0)
+        std::vector<FormId> forget(const std::function<bool(const Crime&)>& drop);
         std::map<FormId, Trespass> mTrespass;
         FormId mLineVictim = 0;
     };

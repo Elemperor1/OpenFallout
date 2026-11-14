@@ -14,6 +14,7 @@ namespace FalloutScript
         mDeaths.clear();
         mZones.clear();
         mGenerations.clear();
+        mMerchantDays.clear();
     }
 
     void RespawnState::cellDetached(FormId cell, std::uint32_t now)
@@ -118,6 +119,21 @@ namespace FalloutScript
         if (found != mZones.end())
             return found->second;
         return (recordFlags & ZoneFlag::neverResets) != 0;
+    }
+
+    bool RespawnState::merchantRestocks(FormId merchant, std::int64_t day)
+    {
+        if (day < 0)
+            return false;
+        const int weekday = static_cast<int>(day % 7);
+        if (weekday != mSettings.mMerchantDay1 && weekday != mSettings.mMerchantDay2)
+            return false;
+        const std::lock_guard lock(mMutex);
+        const auto found = mMerchantDays.find(merchant);
+        if (found != mMerchantDays.end() && found->second == day)
+            return false;
+        mMerchantDays[merchant] = day;
+        return true;
     }
 
     int RespawnState::inventoryGeneration(FormId holder) const

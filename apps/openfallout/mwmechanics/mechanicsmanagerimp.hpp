@@ -186,6 +186,7 @@ namespace OFMechanics
         void evaluateFalloutPackages(const OFWorld::Ptr& actor) override;
         void knockFallout(const OFWorld::Ptr& actor, const osg::Vec3f& velocity, float seconds) override;
         ESM::FormId falloutPackageOf(const OFWorld::Ptr& actor) const override;
+        void setFalloutPackageDuration(const OFWorld::Ptr& actor, double hundredths) override;
 
         void playerLoaded() override;
 

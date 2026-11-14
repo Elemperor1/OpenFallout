@@ -119,6 +119,65 @@ namespace
         EXPECT_EQ(texts.at("ssecondthing"), "Second text");
     }
 
+    /// An executable with the loop that builds the counts of the general page: the function that builds a setting pushes the
+    /// format, the loop loads the text out of a table and calls it (the start of that function is the one with the frame
+    /// pointer, or, as in Fallout 3, the one that pushes -1 for the exception handler)
+    std::string countedExecutable(bool handlerFrame)
+    {
+        Executable exe;
+        const std::uint32_t format = exe.text(0x10, "sMiscStat%03d");
+        const std::size_t builder = textFile + 0x11;
+        exe.put8(textFile + 0x10, 0xCC);
+        if (handlerFrame)
+        {
+            exe.put8(builder, 0x6A);
+            exe.put8(builder + 1, 0xFF);
+            exe.put8(builder + 2, 0x90);
+        }
+        else
+        {
+            exe.put8(builder, 0x55);
+            exe.put8(builder + 1, 0x8B);
+            exe.put8(builder + 2, 0xEC);
+        }
+        exe.put8(builder + 3, 0x68);
+        exe.put32(builder + 4, format);
+        const std::uint32_t table = imageBase + 0x2000 + 0x100;
+        const std::size_t loop = textFile + 0x80;
+        exe.put8(loop, 0x83);
+        exe.put8(loop + 1, 0x7D);
+        exe.put8(loop + 2, 0xF0);
+        exe.put8(loop + 3, 3);
+        exe.put8(loop + 4, 0x8B);
+        exe.put8(loop + 5, 0x04);
+        exe.put8(loop + 6, 0x95);
+        exe.put32(loop + 7, table);
+        exe.put8(loop + 11, 0xE8);
+        const std::uint32_t next = imageBase + 0x1000 + 0x80 + 16;
+        exe.put32(loop + 12, imageBase + 0x1000 + 0x11 - next);
+        exe.put32(0x800 + 0x100, exe.text(0x40, "First count"));
+        exe.put32(0x800 + 0x104, exe.text(0x60, "Second count"));
+        exe.put32(0x800 + 0x108, exe.text(0x80, "Third count"));
+        return exe.bytes();
+    }
+
+    TEST(FalloutExeSettings, the_counts_of_the_general_page_are_read_from_the_table_the_loop_reads)
+    {
+        const ExeSettings::Texts texts = ExeSettings::scan(countedExecutable(false));
+        ASSERT_EQ(texts.size(), 3u);
+        EXPECT_EQ(texts.at("smiscstat000"), "First count");
+        EXPECT_EQ(texts.at("smiscstat001"), "Second count");
+        EXPECT_EQ(texts.at("smiscstat002"), "Third count");
+    }
+
+    TEST(FalloutExeSettings, the_counts_are_found_when_the_builder_starts_with_the_exception_handler_frame)
+    {
+        // (Fallout 3: the function at 0x48C610 begins with push -1, not with the frame pointer)
+        const ExeSettings::Texts texts = ExeSettings::scan(countedExecutable(true));
+        ASSERT_EQ(texts.size(), 3u);
+        EXPECT_EQ(texts.at("smiscstat002"), "Third count");
+    }
+
     TEST(FalloutExeSettings, a_setting_in_a_table_of_records_is_found)
     {
         Executable exe;

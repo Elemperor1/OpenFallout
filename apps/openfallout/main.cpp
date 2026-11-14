@@ -196,6 +196,7 @@ bool parseOptions(int argc, char** argv, OF::Engine& engine, Files::Configuratio
     for (const auto& path : variables["game-ini"].as<Files::MaybeQuotedPathContainer>())
         iniPaths.push_back(path);
     const Files::GameIni gameIni = Files::GameIni::load(iniPaths);
+    engine.setGameIni(gameIni);
 
     const std::string pluginOrder = variables["plugin-order"].as<std::string>();
     if (!pluginOrder.empty() && pluginOrder != "list" && pluginOrder != "time")

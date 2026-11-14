@@ -662,6 +662,36 @@ function handlers.travel(args)
     return { found = true, went = text == '', refusalChars = #text }
 end
 
+-- The Pip-Boy opened at a page, as a key of the page would (the event is the one the Pip-Boy script answers)
+function handlers.pipboyOpen(args)
+    self:sendEvent('PipboyOpen', { page = args.page, stats = args.stats, genrep = args.genrep, row = args.row })
+    log('pipboyOpen', tostring(args.label or '-'), 'page=' .. tostring(args.page), 'stats=' .. tostring(args.stats),
+        'genrep=' .. tostring(args.genrep), 'row=' .. tostring(args.row))
+    return {}
+end
+
+function handlers.pipboyClose(args)
+    self:sendEvent('PipboyClose', {})
+    log('pipboyClose', tostring(args.label or '-'))
+    return {}
+end
+
+-- What the general page shows: the title and the picture of the karma and the numbers of the counts and reputations
+function handlers.pipboyGeneral(args)
+    local general = core.pipboy.general()
+    local rows = {}
+    for _, count in ipairs(general.counts) do rows[#rows + 1] = tostring(count.value) end
+    log('pipboyGeneral', tostring(args.label or '-'), 'karmaPictureChars=' .. #general.karma.picture,
+        'karmaWordChars=' .. #general.karma.word, 'karmaTitleChars=' .. #general.karma.title,
+        'counts=' .. #general.counts, 'values=' .. table.concat(rows, ','), 'reputations=' .. #general.reputations)
+    for _, reputation in ipairs(general.reputations) do
+        log('pipboyGeneral', 'reputation', tostring(reputation.id), string.format('fame=%.1f infamy=%.1f levels=%d/%d',
+            reputation.fame, reputation.infamy, reputation.fameLevel, reputation.infamyLevel),
+            'nameChars=' .. #reputation.name, 'titleChars=' .. #reputation.title, 'pictureChars=' .. #reputation.picture)
+    end
+    return { counts = #general.counts, reputations = #general.reputations }
+end
+
 -- V.A.T.S.: the same event the pad's bumper sends the screen
 function handlers.vats(args)
     if args.button then

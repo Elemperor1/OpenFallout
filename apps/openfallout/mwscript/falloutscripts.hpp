@@ -25,6 +25,8 @@
 #include <components/esm4/effectlist.hpp>
 #include <components/esm4/loadnpc.hpp>
 #include <components/falloutscript/footsteps.hpp>
+#include <components/falloutscript/hitreactions.hpp>
+#include <components/files/gameini.hpp>
 #include <components/falloutscript/actors.hpp>
 #include <components/falloutscript/actorstatus.hpp>
 #include <components/falloutscript/actortraits.hpp>
@@ -241,6 +243,18 @@ namespace OFScript
         /// The content files of the game in the order they are loaded, which IsDLCInstalled looks at
         void setContentFiles(std::vector<std::string> files);
 
+        /// ExitGame asks for the credits (the executable's hard-coded global PlayCredits, form 0x63): 1, or 2 for the
+        /// Wild Wasteland credits. The title screen that follows shows them and clears the request. A new game or a load does
+        /// not touch it (the game that ended is gone by then).
+        void requestCredits(int kind) { mCreditsRequest = kind; }
+        int creditsRequested() const { return mCreditsRequest; }
+        void endCredits() { mCreditsRequest = 0; }
+
+        /// The settings of the ini files of the game (the games read bDisableAllGore and a few more from them)
+        void setGameIni(Files::GameIni ini);
+        /// The integer that a setting of the ini files holds, nothing when it is not there
+        std::optional<int> gameIniInteger(std::string_view section, std::string_view key) const;
+
         /// Read the default texts of the game's string settings from its executable, which is next to the `Data`
         /// directory of one of these directories (the plugins hold only the settings that were changed from their
         /// defaults, and the labels of the screens, the texts of the terminals and the counters of the level-up screen
@@ -317,6 +331,19 @@ namespace OFScript
         FalloutScript::LevelledLists& levelledLists() { return mLevelledLists; }
         /// Whether the record of the character or creature has the flag that makes it come back when its cell resets
         bool respawnsByRecord(FalloutScript::FormId actor);
+        /// Whether the encounter zone never resets its cells: what a script told it (SetZoneRespawns), else its record
+        bool zoneNeverResets(FalloutScript::FormId zone);
+        /// Asks for a quick save at the start of the next frame (the rounds that show a save and a load; a Lua script
+        /// can not save from where it runs)
+        void requestQuickSave() { mQuickSaveRequested = true; }
+        /// The records that the template chain of an actor goes through for the roll the actor has (the actor's own base
+        /// first), as the numbers scripts know them by; empty for a reference that is no character or creature
+        std::vector<FalloutScript::FormId> templateChainOf(FalloutScript::FormId actor);
+        /// The name a script gave the base record of characters, creatures and containers (SetActorFullName): the full
+        /// name of the form it named. The text stays valid until the game is cleared. Empty when the base has none.
+        std::string_view nameGivenToBase(const ESM::FormId& base);
+        /// The value the trades use for an item: the one a script gave it (SetItemValue), else that of its record
+        int itemValueOf(FalloutScript::FormId item) { return itemValue(item); }
         /// Whether the record of the container has the flag that makes it fill again when its cell resets
         bool respawnsContainerByRecord(FalloutScript::FormId container);
         /// The reference of the player
@@ -451,6 +478,34 @@ namespace OFScript
             bool mNewVegas = false;
         };
         PipboyStats pipboyStats();
+        /// What the general page of the Pip-Boy shows: the word, picture and title of the karma, the counts, and (New
+        /// Vegas) the reputations that hold some fame or infamy, by name
+        struct PipboyGeneral
+        {
+            std::string mKarmaWord;
+            std::string mKarmaPicture;
+            std::string mKarmaTitle;
+            struct Count
+            {
+                std::string mName;
+                int mValue = 0;
+            };
+            std::vector<Count> mCounts;
+            struct Standing
+            {
+                FalloutScript::FormId mId = 0;
+                std::string mName;
+                std::string mPicture;
+                std::string mTitle;
+                double mFame = 0;
+                double mInfamy = 0;
+                int mFameLevel = 0;
+                int mInfamyLevel = 0;
+            };
+            std::vector<Standing> mStandings;
+            bool mNewVegas = false;
+        };
+        PipboyGeneral pipboyGeneral();
         /// The quests the player is following with what is left to do, for the data tab
         struct PipboyObjective
         {
@@ -2603,6 +2658,8 @@ namespace OFScript
         /// A cell was loaded: it resets if it has been left for long enough (its dead characters come back, its
         /// containers are filled again)
         void spawnCellLoaded(OFWorld::CellStore& cell);
+        /// Once a day the merchants that are up get new stock on the days the settings name (falloutspawn.cpp)
+        void updateSpawn();
         /// A cell was unloaded: the game hour it was left at is kept
         void spawnCellUnloaded(OFWorld::CellStore& cell);
         /// A character died: the game hour it died at is kept
@@ -2610,6 +2667,9 @@ namespace OFScript
         /// The object of this number that the world is about to make carries the level that the made object `id` was
         /// placed at, from the first moment (its equipment is chosen when it is put in the cell)
         void spawnRollFor(FalloutScript::FormId id, const ESM::FormId& number);
+        /// The level and level modifier that an actor which its cell places (not a script) is rolled for, made once for
+        /// the reference and kept (falloutspawn.cpp). False for a reference that is no placed actor.
+        bool placedActorRoll(const ESM::FormId& reference, ESM4::SpawnRoll& roll);
         /// The number the world gives the next object it makes up
         ESM::FormId nextGeneratedNumber() const;
         /// What the world made of the made object `id`: the roll it was given for the number that was guessed is the
@@ -2741,6 +2801,13 @@ namespace OFScript
         FalloutScript::RespawnState mRespawn;
         FalloutScript::ItemValues mItemValues;
         FalloutScript::NameOverrides mNameOverrides;
+        /// The day the merchants were last looked at
+        std::int64_t mMerchantCheckedDay = -1;
+        std::atomic<bool> mQuickSaveRequested{ false };
+        /// The texts that the names scripts gave stand for, kept so that a view of one stays valid
+        mutable std::mutex mNameTextMutex;
+        std::deque<std::string> mNameTexts;
+        std::map<FalloutScript::FormId, std::pair<FalloutScript::FormId, std::size_t>> mNameTextOf;
         /// The level and level modifier that the world's own numbers of placed objects roll their lists with, which the
         /// provider of ESM4::setSpawnRollProvider answers from any thread
         mutable std::mutex mWorldRollMutex;
@@ -2765,6 +2832,8 @@ namespace OFScript
         /// stage (dismember); falloutdamage.cpp
         FalloutScript::Destruction mDestruction;
         FalloutScript::Dismemberment mDismemberment;
+        /// The characters that are being thrown by a blow or PushActorAway, for GetKnockedState
+        FalloutScript::HitReactions::KnockTracker mKnocks;
         std::mutex mDamageMutex;
         /// The references that a stage of destruction disabled (ClearDestruction enables them again)
         std::set<FalloutScript::FormId> mDisabledByDestruction;
@@ -2951,6 +3020,8 @@ namespace OFScript
         std::map<FalloutScript::FormId, std::vector<FalloutScript::FurnitureEntry>> mFurnitureEntries;
         std::mt19937 mRandom;
         std::vector<std::string> mContentFiles;
+        Files::GameIni mGameIni;
+        std::atomic<int> mCreditsRequest{ 0 };
         /// Seconds of play since the commands that scripts reached without a handler were last written to the log
         float mMissingTimer = 0;
         /// Writes the commands that scripts reached without a handler, with how often, to the log (nothing when there
@@ -3045,7 +3116,9 @@ namespace OFScript
         int mLockSerial = 0;
         /// The locks that gave their experience, and those that forcing broke (kept for the run, not in saves)
         std::set<FalloutScript::FormId> mLockExperienceGiven;
-        std::set<FalloutScript::FormId> mLockBroken;
+        /// How many times forcing failed on each lock (a lock is broken from one, or from two with Infiltrator)
+        std::map<FalloutScript::FormId, int> mLockBreaks;
+        bool lockIsBroken(FalloutScript::FormId reference);
         struct TerminalState
         {
             FalloutScript::FormId mReference = 0;

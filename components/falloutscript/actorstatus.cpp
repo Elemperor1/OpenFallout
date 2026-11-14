@@ -111,6 +111,11 @@ namespace FalloutScript
         return (flags & Movement::run) != 0;
     }
 
+    bool spineYAboveGround(float value)
+    {
+        return value > 0.f;
+    }
+
     int procedureStageCount(int packageType)
     {
         return packageType >= 0 && packageType < packageTypes ? stageLists[packageType].mCount : 0;
@@ -394,6 +399,14 @@ namespace FalloutScript
                     || procedureNumber(activity->mPackageType, activity->mStage) == waitingProcedure
                 ? 1.0
                 : 0.0;
+        });
+        interpreter.setHandler("IsFacingUp", [activityOf](CallContext& call) {
+            const auto activity = activityOf(call);
+            return activity && spineYAboveGround(activity->mSpineYUp) ? 1.0 : 0.0;
+        });
+        interpreter.setHandler("IsLeftUp", [activityOf](CallContext& call) {
+            const auto activity = activityOf(call);
+            return activity && spineYAboveGround(activity->mSpineZUp) ? 1.0 : 0.0;
         });
         interpreter.setHandler("GetWalkSpeed", [activityOf](CallContext& call) {
             const auto activity = activityOf(call);

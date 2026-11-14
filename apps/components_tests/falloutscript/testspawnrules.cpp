@@ -110,18 +110,139 @@ namespace
         SpawnLevels levels;
         levels.placementLevel(10, true);
         levels.set(0xFF000001, 14, 2);
+        levels.lockZoneLevel(0x0100AB12, 9);
         SaveWriter out;
         levels.write(out);
 
         SpawnLevels loaded;
         SaveReader in(out.bytes());
-        loaded.read(in, 1);
+        loaded.read(in, 2);
         EXPECT_TRUE(in.atEnd());
         int level = 0, mod = 0;
         ASSERT_TRUE(loaded.find(0xFF000001, level, mod));
         EXPECT_EQ(level, 14);
         EXPECT_EQ(mod, 2);
         EXPECT_EQ(loaded.counter(), levels.counter());
+        EXPECT_EQ(loaded.lockedZoneLevel(0x0100AB12), 9);
+    }
+
+    TEST(FalloutScriptSpawnRulesTest, aSaveOfTheFirstVersionHasNoZoneLevels)
+    {
+        // The stream of the section before the zones kept their levels: the counter and the placements only
+        SaveWriter out;
+        out.i32(3);
+        out.count(1);
+        out.form(0xFF000001);
+        out.i32(14);
+        out.i32(2);
+        SpawnLevels loaded;
+        loaded.lockZoneLevel(0x0100AB12, 9);
+        SaveReader in(out.bytes());
+        loaded.read(in, 1);
+        EXPECT_TRUE(in.atEnd());
+        EXPECT_EQ(loaded.counter(), 3);
+        EXPECT_EQ(loaded.lockedZoneLevel(0x0100AB12), 0);
+    }
+
+    // The zone works its level out once and keeps it (Fallout3.exe 0x4BFBA0, New Vegas 0x526270): a zone that has a level
+    // does not follow the player any more
+    TEST(FalloutScriptSpawnRulesTest, aZoneKeepsTheFirstLevelItWasGiven)
+    {
+        SpawnLevels levels;
+        EXPECT_EQ(levels.lockedZoneLevel(0x0100AB12), 0);
+        levels.lockZoneLevel(0x0100AB12, 7);
+        levels.lockZoneLevel(0x0100AB12, 12);
+        EXPECT_EQ(levels.lockedZoneLevel(0x0100AB12), 7);
+        EXPECT_EQ(levels.lockedZoneLevel(0x0100AB13), 0);
+        // 0 is how the executable says "none": neither a zone 0 nor a level below 1 is kept
+        levels.lockZoneLevel(0, 5);
+        levels.lockZoneLevel(0x0100AB13, 0);
+        EXPECT_EQ(levels.lockedZoneLevel(0), 0);
+        EXPECT_EQ(levels.lockedZoneLevel(0x0100AB13), 0);
+        levels.clear();
+        EXPECT_EQ(levels.lockedZoneLevel(0x0100AB12), 0);
+    }
+
+    TEST(FalloutScriptSpawnRulesTest, theZoneOfAPlacementIsItsOwnThenTheCellsThenTheWorldspaces)
+    {
+        EXPECT_EQ(placementZone(0x100, 0x200, 0x300), 0x100u);
+        EXPECT_EQ(placementZone(0, 0x200, 0x300), 0x200u);
+        EXPECT_EQ(placementZone(0, 0, 0x300), 0x300u);
+        EXPECT_EQ(placementZone(0, 0, 0), 0u);
+    }
+
+    TEST(FalloutScriptSpawnRulesTest, anActorWithALeveledTemplateIsRolledOnceForTheLevelOfItsZoneInTurn)
+    {
+        SpawnLevels levels;
+        int level = 0, mod = 0;
+        // The counter goes 1, then back to -1, 0, 1: one higher, one lower, as it is
+        ASSERT_TRUE(levels.placedLevel(0x01000001, 10, -1, true, level, mod));
+        EXPECT_EQ(level, 11);
+        EXPECT_EQ(mod, noLevelMod);
+        ASSERT_TRUE(levels.placedLevel(0x01000002, 10, -1, true, level, mod));
+        EXPECT_EQ(level, 9);
+        ASSERT_TRUE(levels.placedLevel(0x01000003, 10, -1, true, level, mod));
+        EXPECT_EQ(level, 10);
+        // The same reference gets the level it has, whatever the zone or the player says now, and the counter stays
+        const int counter = levels.counter();
+        EXPECT_FALSE(levels.placedLevel(0x01000001, 40, 3, true, level, mod));
+        EXPECT_EQ(level, 11);
+        EXPECT_EQ(mod, noLevelMod);
+        EXPECT_EQ(levels.counter(), counter);
+    }
+
+    TEST(FalloutScriptSpawnRulesTest, theModifierOfTheReferenceMultipliesTheLevelOfTheTemplateRoll)
+    {
+        SpawnLevels levels;
+        int level = 0, mod = 0;
+        // 20 plus the first step of the counter is 21; the multipliers are 0.5, 0.75, 1.25 and 2 (21 * 1.25 = 26.25)
+        ASSERT_TRUE(levels.placedLevel(0x01000001, 20, 2, true, level, mod));
+        EXPECT_EQ(level, 26);
+        EXPECT_EQ(mod, 2);
+        // The next is 19 in the turn of the counter, times the boss multiplier: 38
+        ASSERT_TRUE(levels.placedLevel(0x01000002, 20, 3, true, level, mod));
+        EXPECT_EQ(level, 38);
+        EXPECT_EQ(mod, 3);
+        // A modifier outside 0 to 3 is none: the level stays as the counter made it (20)
+        ASSERT_TRUE(levels.placedLevel(0x01000003, 20, 7, true, level, mod));
+        EXPECT_EQ(level, 20);
+        EXPECT_EQ(mod, noLevelMod);
+        // Never below 1
+        ASSERT_TRUE(levels.placedLevel(0x01000004, 1, 0, true, level, mod));
+        EXPECT_EQ(level, 1);
+    }
+
+    TEST(FalloutScriptSpawnRulesTest, anActorWithoutALeveledTemplateKeepsThePlayersLevelAndMovesNoCounter)
+    {
+        SpawnLevels levels;
+        int level = 0, mod = 0;
+        ASSERT_TRUE(levels.placedLevel(0x01000001, 14, 3, false, level, mod));
+        EXPECT_EQ(level, 14);
+        EXPECT_EQ(mod, noLevelMod);
+        EXPECT_EQ(levels.counter(), 0);
+        ASSERT_TRUE(levels.placedLevel(0x01000002, 0, -1, false, level, mod));
+        EXPECT_EQ(level, 1);
+    }
+
+    TEST(FalloutScriptSpawnRulesTest, aPlacedLevelIsForgottenForTheNextRollAndSurvivesASave)
+    {
+        SpawnLevels levels;
+        int level = 0, mod = 0;
+        ASSERT_TRUE(levels.placedLevel(0x01000001, 30, 1, true, level, mod));
+        const int chosen = level;
+        SaveWriter out;
+        levels.write(out);
+        SpawnLevels loaded;
+        SaveReader in(out.bytes());
+        loaded.read(in, 1);
+        EXPECT_FALSE(loaded.placedLevel(0x01000001, 99, 3, true, level, mod));
+        EXPECT_EQ(level, chosen);
+        EXPECT_EQ(mod, 1);
+        // The cell resets: the next roll is a new one, for the level of the player then
+        loaded.forget(0x01000001);
+        EXPECT_TRUE(loaded.placedLevel(0x01000001, 50, -1, true, level, mod));
+        EXPECT_GE(level, 49);
+        EXPECT_LE(level, 51);
     }
 
     TEST(FalloutScriptGameHoursTest, wholeHoursOfTheDaysThatPassed)
@@ -192,6 +313,30 @@ namespace
         state.cellDetached(cell, 0);
         EXPECT_FALSE(state.cellResets(cell, 10, false));
         EXPECT_TRUE(state.cellResets(cell, 11, false));
+    }
+
+    TEST(FalloutScriptRespawnTest, aMerchantGetsNewStockOnTheTwoDaysOfTheWeekTheSettingsNameOncePerDay)
+    {
+        RespawnState state;
+        // Days 0 and 3 of the week are the defaults: the days 7, 10 and 14 are such days, the others are not
+        EXPECT_TRUE(state.merchantRestocks(0x01000100, 7));
+        EXPECT_FALSE(state.merchantRestocks(0x01000100, 7));
+        EXPECT_FALSE(state.merchantRestocks(0x01000100, 8));
+        EXPECT_FALSE(state.merchantRestocks(0x01000100, 9));
+        EXPECT_TRUE(state.merchantRestocks(0x01000100, 10));
+        EXPECT_FALSE(state.merchantRestocks(0x01000100, 13));
+        EXPECT_TRUE(state.merchantRestocks(0x01000100, 14));
+        // Every merchant has its own day, and a day before the game began is none
+        EXPECT_TRUE(state.merchantRestocks(0x01000200, 7));
+        EXPECT_FALSE(state.merchantRestocks(0x01000300, -3));
+        // The settings change the days
+        RespawnSettings settings;
+        settings.mMerchantDay1 = 2;
+        settings.mMerchantDay2 = 6;
+        RespawnState other(settings);
+        EXPECT_FALSE(other.merchantRestocks(0x01000100, 7));
+        EXPECT_TRUE(other.merchantRestocks(0x01000100, 9));
+        EXPECT_TRUE(other.merchantRestocks(0x01000100, 13));
     }
 
     TEST(FalloutScriptRespawnTest, aLivingActorIsAlwaysDueAndADeadOneAfter72Hours)

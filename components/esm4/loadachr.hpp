@@ -63,6 +63,9 @@ namespace ESM4
 
         ESM::FormId mMerchantContainer; // XMRC, the container whose things the actor sells when it trades
 
+        ESM::FormId mEncounterZone; // XEZN, the zone of the reference itself (the cell's and the worldspace's follow)
+        std::int32_t mLevelModifier = -1; // XLCM, 0 easy to 3 boss; -1 when the reference has none
+
         std::vector<LinkedReference> mLinkedRefs;
 
         void load(ESM4::Reader& reader);

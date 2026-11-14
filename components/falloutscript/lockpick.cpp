@@ -5,6 +5,11 @@
 
 namespace FalloutScript::Lockpick
 {
+    bool lockBroken(int breaks, double ignoreBrokenLock)
+    {
+        return breaks >= (ignoreBrokenLock == 0.0 ? 1 : 2);
+    }
+
     namespace
     {
         int clampClass(int lockClass)

@@ -12,6 +12,8 @@
 #include "../mwworld/esmstore.hpp"
 
 #include "esm4sources.hpp"
+#include "../mwbase/environment.hpp"
+#include "../mwscript/falloutscripts.hpp"
 
 namespace OFClass
 {
@@ -128,6 +130,10 @@ namespace OFClass
 
     std::string_view ESM4Creature::getName(const OFWorld::ConstPtr& ptr) const
     {
+        // The name that a script gave the base record (SetActorFullName) is the one shown, for every reference of it
+        if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
+            if (const std::string_view given = scripts->nameGivenToBase(ptr.get<ESM4::Creature>()->mBase->mId); !given.empty())
+                return given;
         if (!isFalloutCreature(ptr))
             return ptr.get<ESM4::Creature>()->mBase->mFullName;
         const ESM4::Creature* baseData = getCustomData(ptr).mBaseData;

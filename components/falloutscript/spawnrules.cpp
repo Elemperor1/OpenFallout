@@ -38,11 +38,62 @@ namespace FalloutScript
     {
     }
 
+    FormId placementZone(FormId own, FormId cell, FormId world)
+    {
+        if (own != 0)
+            return own;
+        return cell != 0 ? cell : world;
+    }
+
+    bool SpawnLevels::placedLevel(
+        FormId reference, int baseLevel, int levelMod, bool leveledTemplate, int& level, int& storedMod)
+    {
+        const std::lock_guard lock(mMutex);
+        if (const auto found = mPlacements.find(reference); reference != 0 && found != mPlacements.end())
+        {
+            level = found->second.mLevel;
+            storedMod = found->second.mLevelMod;
+            return false;
+        }
+        level = std::max(baseLevel, 1);
+        storedMod = noLevelMod;
+        if (leveledTemplate)
+        {
+            // The counter of 0x567E10 goes up for every template that is resolved
+            ++mCounter;
+            if (mCounter > mSettings.mAdjustUp)
+                mCounter = -mSettings.mAdjustDown;
+            level = std::max(baseLevel + mCounter, 1);
+            // The multiplier of the modifier is that of 0x4214F0; the result is not below 1 (0x488350)
+            level = scaledSpawnLevel(level, levelMod, mSettings);
+            storedMod = levelMod >= 0 && levelMod <= 3 ? levelMod : noLevelMod;
+        }
+        if (reference != 0)
+            mPlacements[reference] = Placement{ level, storedMod };
+        return true;
+    }
+
     void SpawnLevels::clear()
     {
         const std::lock_guard lock(mMutex);
         mCounter = 0;
         mPlacements.clear();
+        mZoneLevels.clear();
+    }
+
+    int SpawnLevels::lockedZoneLevel(FormId zone) const
+    {
+        const std::lock_guard lock(mMutex);
+        const auto found = mZoneLevels.find(zone);
+        return found == mZoneLevels.end() ? 0 : found->second;
+    }
+
+    void SpawnLevels::lockZoneLevel(FormId zone, int level)
+    {
+        if (zone == 0 || level < 1)
+            return;
+        const std::lock_guard lock(mMutex);
+        mZoneLevels.emplace(zone, level);
     }
 
     int SpawnLevels::placementLevel(int baseLevel, bool rotate)
@@ -107,9 +158,16 @@ namespace FalloutScript
             out.i32(placement.mLevel);
             out.i32(placement.mLevelMod);
         }
+        // The levels the zones fixed (the section has this from its version 2)
+        out.count(mZoneLevels.size());
+        for (const auto& [zone, level] : mZoneLevels)
+        {
+            out.form(zone);
+            out.i32(level);
+        }
     }
 
-    void SpawnLevels::read(SaveReader& in, std::uint32_t)
+    void SpawnLevels::read(SaveReader& in, std::uint32_t version)
     {
         const int counter = in.i32();
         std::map<FormId, Placement> all;
@@ -123,8 +181,21 @@ namespace FalloutScript
             if (reference)
                 all[*reference] = placement;
         }
+        std::map<FormId, int> zones;
+        if (version >= 2)
+        {
+            const std::size_t zoneCount = in.count(8);
+            for (std::size_t i = 0; i < zoneCount; ++i)
+            {
+                const std::optional<FormId> zone = in.form();
+                const int level = in.i32();
+                if (zone && level >= 1)
+                    zones[*zone] = level;
+            }
+        }
         const std::lock_guard lock(mMutex);
         mCounter = counter;
         mPlacements = std::move(all);
+        mZoneLevels = std::move(zones);
     }
 }

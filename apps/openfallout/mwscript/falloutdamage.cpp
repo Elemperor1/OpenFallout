@@ -5,6 +5,7 @@
 #include <cmath>
 #include <random>
 
+#include <components/falloutscript/worldrules.hpp>
 #include <components/debug/debuglog.hpp>
 #include <components/esm4/loadacti.hpp>
 #include <components/esm4/loadcont.hpp>
@@ -210,10 +211,14 @@ namespace OFScript
                 return 1.0;
             return mFormLists.contains(form, killer) || mFormLists.contains(form, base) ? 1.0 : 0.0;
         });
-        // The executables answer with the byte of the character (+0x1B1) and the state of its knock (the process's, whose
-        // states 3 and 4 are a knock); nothing in the port keeps either, so the answer is 0
+        // GetForceHitReaction answers the byte at +0x1B1 of the character, which the damage function 0x899CB0 sets (0x89BEE0)
+        // for the length of the call that plays the reaction of a blow whose data has 1 at +0xC and clears again
+        // (0x89C3BD); a script or a condition only ever sees it clear, which is what the port answers
         mInterpreter.setHandler("GetForceHitReaction", [](FalloutScript::CallContext&) { return 0.0; });
-        mInterpreter.setHandler("GetKnockedState", [](FalloutScript::CallContext&) { return 0.0; });
+        // GetKnockedState answers 1 for the knock states 3 and 4 of the character's process (0x5A08C0): the port's throw
+        mInterpreter.setHandler("GetKnockedState", [this](FalloutScript::CallContext& call) {
+            return FalloutScript::HitReactions::knockedAnswer(mKnocks.stateOf(call.mReference)) ? 1.0 : 0.0;
+        });
         // ResetFallDamageTimer only reads the timer of the character's process (FalloutNV.exe 0x5D10A0 and 0x5D10F0) and
         // changes nothing
         mInterpreter.setHandler("ResetFallDamageTimer", [](FalloutScript::CallContext&) { return 0.0; });
@@ -268,6 +273,7 @@ namespace OFScript
     {
         mDismemberment.newFrame();
         mDestruction.update(frametime);
+        mKnocks.advance(frametime);
     }
 
     void FalloutScripts::noteDeathTime(FalloutScript::FormId actor)
@@ -384,6 +390,7 @@ namespace OFScript
     {
         mDestruction.clear();
         mDismemberment.clear();
+        mKnocks.clear();
         OFClass::ModelOverrides::get().clear();
         const std::lock_guard lock(mDamageMutex);
         mDisabledByDestruction.clear();
@@ -391,8 +398,12 @@ namespace OFScript
 
     FalloutScript::DismemberSettings FalloutScripts::dismemberSettings()
     {
-        return FalloutScript::DismemberSettings::fromGameSettings(
+        FalloutScript::DismemberSettings settings = FalloutScript::DismemberSettings::fromGameSettings(
             [this](std::string_view name) -> std::optional<double> { return gameSetting(name); });
+        // bDisableAllGore (the byte at FalloutNV.exe 0x11DF7F8) ends the cutting off and bursting of parts, as it does the
+        // gore commands (0x899CB0 and its neighbours ask it before they dismember)
+        settings.mGoreOff = FalloutScript::World::goreDisabledBy(gameIniInteger("General", "bDisableAllGore"));
+        return settings;
     }
 
     void FalloutScripts::goreOfKill(
@@ -469,6 +480,7 @@ namespace OFScript
             away.normalize();
             Log(Debug::Info) << "PushActorAway: " << FalloutScript::hex(actor) << " away from " << FalloutScript::hex(origin)
                              << " with force " << thrust;
+            mKnocks.start(actor, reaction.mKnockbackTime);
             OFBase::Environment::get().getMechanicsManager()->knockFallout(
                 target, away * static_cast<float>(thrust), static_cast<float>(reaction.mKnockbackTime));
         });

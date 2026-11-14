@@ -71,6 +71,9 @@ namespace OFMechanics
         /// The package the actor follows now: the id of the record, unset for an actor that follows none (or has no
         /// mind)
         ESM::FormId currentPackage(const OFWorld::Ptr& ptr) const;
+        /// SetPackDuration: the package that the actor follows is done once this many hundredths of a game hour have gone
+        /// (0 for no limit), counted from now; nothing happens for an actor that follows none
+        void setPackageDuration(const OFWorld::Ptr& ptr, double hundredths);
 
         void update(float duration);
         /// The character that the player talks with turns to the player (the minds are not updated while a

@@ -2,8 +2,12 @@
 #define OPENFALLOUT_COMPONENTS_FALLOUTSCRIPT_HITREACTIONS_H
 
 #include <functional>
+#include <map>
+#include <mutex>
 #include <optional>
 #include <string_view>
+
+#include "script.hpp"
 
 namespace FalloutScript::HitReactions
 {
@@ -72,6 +76,36 @@ namespace FalloutScript::HitReactions
     /// The force that throws the character back (units a second for `mKnockbackTime` seconds, along the line of the
     /// blow)
     double knockbackForce(const Settings& settings, double damage, double agility);
+
+    /// The knock state of a character: the byte at +0x13C of the process (MiddleHighProcess, read at FalloutNV.exe
+    /// 0x8D8540, written at 0x8D8560), 0 to 6. GetKnockedState (0x5A08C0) answers 1 for 3 and 4 and 0 for every other
+    /// state. The port has the one knock, the throw that a blow or PushActorAway gives for `mKnockbackTime` seconds,
+    /// and calls it state 3 (**chosen**: the executable's names for the states were not read).
+    namespace KnockState
+    {
+        constexpr int none = 0;
+        constexpr int thrown = 3;
+    }
+
+    /// What GetKnockedState answers for a knock state
+    bool knockedAnswer(int state);
+
+    /// Who is being thrown and for how many seconds more. It can be used from any thread.
+    class KnockTracker
+    {
+    public:
+        /// Starts a knock (one that runs is replaced); a time of 0 or less is no knock
+        void start(FormId actor, double seconds);
+        /// Takes the seconds of a frame off every knock and ends those that have none left
+        void advance(double seconds);
+        /// The state of the actor's knock (KnockState)
+        int stateOf(FormId actor) const;
+        void clear();
+
+    private:
+        mutable std::mutex mMutex;
+        std::map<FormId, double> mLeft;
+    };
 }
 
 #endif

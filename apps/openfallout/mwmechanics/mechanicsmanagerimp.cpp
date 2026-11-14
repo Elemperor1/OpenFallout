@@ -875,6 +875,11 @@ namespace OFMechanics
         return mFalloutActors.currentPackage(actor);
     }
 
+    void MechanicsManager::setFalloutPackageDuration(const OFWorld::Ptr& actor, double hundredths)
+    {
+        mFalloutActors.setPackageDuration(actor, hundredths);
+    }
+
     bool MechanicsManager::isAIActive()
     {
         return mAI;

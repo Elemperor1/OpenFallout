@@ -88,6 +88,12 @@ namespace FalloutScript::Lockpick
         ForceFailed,
     };
 
+    /// Whether a lock that forcing failed on `breaks` times is broken (FalloutNV.exe 0x430AE0, asked by the activation of a
+    /// door or container at 0x5180B0 and 0x516DC0 and by the lock-pick screen at 0x775A00): the count at +0xC of the lock
+    /// data is at or above 1, or at or above 2 when the entry point 32 (Ignore Broken Lock) of the player's perks gives
+    /// anything but 0 (the call starts from 0). The writer of the count was not found; the port counts each failed force.
+    bool lockBroken(int breaks, double ignoreBrokenLock);
+
     /// The game of picking one lock: the sweet spot, the pick on the meter, the cylinder that turns as far as the
     /// pick's place allows, the strain on the pick and its breaking, as LockPickMenu does it (FalloutNV.exe, the update
     /// 0x78EB50 and the functions it calls; round 12AI and 12AJ). The host feeds it the time and what the player does,

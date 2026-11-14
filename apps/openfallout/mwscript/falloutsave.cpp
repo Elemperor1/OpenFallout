@@ -1041,7 +1041,7 @@ namespace OFScript
                 FalloutScript::readFormLists(mFormLists, in, version);
             });
         section(
-            "spawn", 1,
+            "spawn", 2,
             [this](FalloutScript::SaveWriter& out) {
                 mLevelledLists.write(out);
                 mSpawnLevels.write(out);

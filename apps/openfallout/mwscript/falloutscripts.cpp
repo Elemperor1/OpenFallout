@@ -11,6 +11,7 @@
 #include <set>
 #include <sstream>
 
+#include <components/falloutscript/worldrules.hpp>
 #include <components/debug/debuglog.hpp>
 #include <components/esm/refid.hpp>
 #include <components/esm/util.hpp>
@@ -673,6 +674,17 @@ namespace OFScript
         mContentFiles = std::move(files);
     }
 
+    void FalloutScripts::setGameIni(Files::GameIni ini)
+    {
+        mGameIni = std::move(ini);
+    }
+
+    std::optional<int> FalloutScripts::gameIniInteger(std::string_view section, std::string_view key) const
+    {
+        const std::optional<std::string> text = mGameIni.get(section, key);
+        return text ? FalloutScript::World::iniInteger(*text) : std::nullopt;
+    }
+
     FalloutScript::FormId FalloutScripts::newGameQuest() const
     {
         // A list with the master of Fallout 3 starts in Vault 101 as Fallout 3 does (Tale of Two Wastelands has both
@@ -839,7 +851,7 @@ namespace OFScript
             const std::lock_guard lock(mInteractionMutex);
             mLockScreen.reset();
             mLockExperienceGiven.clear();
-            mLockBroken.clear();
+            mLockBreaks.clear();
             mTerminal.reset();
             mTerminalLockouts.clear();
             mHackGate = 0;
@@ -1015,6 +1027,7 @@ namespace OFScript
         mHudTime += frametime;
         raiseCombatEvents(frametime);
         updateDamage(frametime);
+        updateSpawn();
         updateProgress(frametime);
         mQuests.update(frametime);
         mObjects.update();
@@ -2928,8 +2941,13 @@ namespace OFScript
         const bool tolerated = toleratesBlow(attacker, victim);
         const bool wasFighting = mCombat.inCombat(victim);
         mCombat.noteHit(victim, struck, tolerated);
-        // A blow of the player at a character that nobody let pass is judged: a crime, unless the victim fought already
-        if (attacker != 0 && attacker == mPlayer && victim != mPlayer && !tolerated && mLaw)
+        // A blow of the player at a character is judged by the law, whether the victim lets it pass or not: the executable's
+        // hit routine makes the attack crime (0x898E26) inside the block that it enters for a victim that is a friend or ally
+        // of the attacker (0x898CAB), after the tolerance of that blow was weighed at 0x898D56 and without reading its answer
+        // (the answer, [ebp-0x55], only goes to the victim's reaction at 0x898E87). A victim that fought already is only
+        // thought less of (the law's own step). A character that ignores friendly hits (SetIgnoreFriendlyHits) has none.
+        if (attacker != 0 && attacker == mPlayer && victim != mPlayer && mLaw
+            && !(tolerated && mCombat.ignoresFriendlyHits(victim)))
             mLaw->blow(victim, weapon, wasFighting);
 
         mActorValues.damage(victim, AV::health, dealt);
@@ -3005,6 +3023,7 @@ namespace OFScript
                     if (away.length2() < 1.f)
                         return;
                     away.normalize();
+                    mKnocks.start(victim, seconds);
                     OFBase::Environment::get().getMechanicsManager()->knockFallout(
                         target, away * static_cast<float>(force), static_cast<float>(seconds));
                 });

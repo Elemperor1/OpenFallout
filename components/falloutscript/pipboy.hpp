@@ -50,6 +50,35 @@ namespace FalloutScript
         /// has the last.
         std::string karmaTitleSetting(int level, KarmaClass karma);
 
+        /// What the karma shows on the general page (the routine at FalloutNV.exe 0x7DD090 and Fallout3.exe 0x6875C0, the same
+        /// in both): the setting of the word for the kind of karma (sAlignGood, sAlignNeutral, sAlignEvil, sAlignVeryGood,
+        /// sAlignVeryEvil) and the picture, a file of Interface\Icons\PipboyImages\Karma icons. The very good have the
+        /// saintly picture, the evil the bad one and the very evil the evil one.
+        struct KarmaPage
+        {
+            std::string mWordSetting;
+            std::string mPicture;
+        };
+        KarmaPage karmaPage(KarmaClass karma);
+
+        /// The name of the setting that has the title of a reputation whose fame and infamy are at those levels (0 to 3
+        /// each, 0x616710: the table is read at 4 * infamy + fame): sRepTitlePosOneNegNone, ... sRepTitlePosThreeNegThree
+        std::string reputationTitleSetting(int fameLevel, int infamyLevel);
+
+        /// The reputations on the Pip-Boy's page are those with some fame or some infamy (0x7DD9B0 to 0x7DD9DC)
+        bool reputationListed(double fame, double infamy);
+
+        /// How many counts the general page lists, all of them whatever they hold and in the order of their numbers
+        /// (the loops of Fallout: New Vegas, `cmp ..., 0x2B` at 0x7DA885, and Fallout 3, `cmp esi, 0x1A` at 0x48C71C)
+        constexpr int generalPageCounts(bool newVegas)
+        {
+            return newVegas ? 43 : 26;
+        }
+
+        /// The name of the setting that has the name of a count of the general page: sMiscStat000 and up (the games
+        /// build them with the format of 0x4D5BA8 in Fallout: New Vegas and 0x48C64D in Fallout 3)
+        std::string miscStatSetting(int stat);
+
         /// The highest number a title has
         constexpr int lastKarmaTitle = 30;
 

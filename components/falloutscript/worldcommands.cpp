@@ -78,6 +78,7 @@ namespace FalloutScript
     {
         mAllVisible = false;
         mDialogSubtitles = false;
+        mLoadingMenu = false;
         mStarts.clear();
         mActions.clear();
         mSplatter.reset();
@@ -487,6 +488,11 @@ namespace FalloutScript
                 state.setAlwaysSubtitles(call.mReference, intArgument(call, 0) > 0);
             return 0.0;
         });
+        interpreter.setHandler("EnableLoadingMenu", [&state](CallContext& call) {
+            state.setLoadingMenu(intArgument(call, 0) > 0);
+            return 0.0;
+        });
+        interpreter.setHandler("IsLoadingMenuEnabled", [&state](CallContext&) { return state.loadingMenu() ? 1.0 : 0.0; });
         interpreter.setHandler("ShowDialogSubtitles", [&state](CallContext& call) {
             state.setDialogSubtitles(argument(call, 0) != 0);
             return 0.0;

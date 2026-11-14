@@ -84,6 +84,8 @@ namespace OFLua
             row["idleDoneOnce"] = activity->mIdleDoneOnce;
             row["lastIdle"] = idText(activity->mLastIdle);
             row["walkSpeed"] = activity->mWalkSpeed;
+            row["spineYUp"] = activity->mSpineYUp;
+            row["spineZUp"] = activity->mSpineZUp;
             return row;
         };
 

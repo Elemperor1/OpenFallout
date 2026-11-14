@@ -309,6 +309,17 @@ namespace OFLua
             }
             OFBase::Environment::get().getWindowManager()->applyChangedSettings();
         };
+        // The credits that ExitGame asked for (the global PlayCredits of the executable: 1, 2 for the Wild Wasteland ones, 0
+        // for none), which the title screen shows when it opens; the end of the credits clears the request
+        api["creditsRequested"] = []() {
+            const OFBase::Environment& environment = OFBase::Environment::get();
+            return environment.hasFalloutScripts() ? environment.getFalloutScripts()->creditsRequested() : 0;
+        };
+        api["endCredits"] = []() {
+            const OFBase::Environment& environment = OFBase::Environment::get();
+            if (environment.hasFalloutScripts())
+                environment.getFalloutScripts()->endCredits();
+        };
         // Whether a game controller is plugged in (the game's settings leave out the items of the pad when there is
         // none)
         api["controllerConnected"] = []() {

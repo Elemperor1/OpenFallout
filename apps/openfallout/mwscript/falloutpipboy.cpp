@@ -18,6 +18,7 @@
 #include <components/esm4/loadkeym.hpp>
 #include <components/esm4/loadmisc.hpp>
 #include <components/esm4/loadqust.hpp>
+#include <components/esm4/loadrepu.hpp>
 #include <components/esm4/loadweap.hpp>
 #include <components/esm4/script.hpp>
 #include <components/falloutscript/exesettings.hpp>
@@ -299,6 +300,52 @@ namespace OFScript
             rows.push_back(std::move(row));
         }
         return rows;
+    }
+
+    FalloutScripts::PipboyGeneral FalloutScripts::pipboyGeneral()
+    {
+        ensureLevellingRules();
+        PipboyGeneral general;
+        general.mNewVegas = mGame == FalloutScript::Game::NewVegas;
+        // The karma: the word and picture of its kind (FalloutNV.exe 0x7DD090, Fallout3.exe 0x6875C0) and the title of the
+        // level (0x47E0E0)
+        const auto lookup = [this](std::string_view name) { return gameSetting(name); };
+        const FalloutScript::Pipboy::KarmaClass karma = FalloutScript::Pipboy::karmaClass(
+            FalloutScript::Pipboy::karmaRules(lookup), mProgress.karma());
+        const FalloutScript::Pipboy::KarmaPage page = FalloutScript::Pipboy::karmaPage(karma);
+        general.mKarmaWord = gameSettingText(page.mWordSetting);
+        general.mKarmaPicture = page.mPicture;
+        general.mKarmaTitle = gameSettingText(FalloutScript::Pipboy::karmaTitleSetting(mProgress.level(), karma));
+        // The counts: every one, in the order of their numbers (0x7DA885)
+        const int counts = FalloutScript::Pipboy::generalPageCounts(general.mNewVegas);
+        for (int stat = 0; stat < counts; ++stat)
+            general.mCounts.push_back(
+                { gameSettingText(FalloutScript::Pipboy::miscStatSetting(stat)), mProgress.miscStat(stat) });
+        // The reputations: those with some fame or infamy, by name (0x7DD9B0 to 0x7DDA2A)
+        for (const ESM4::Reputation& record : mStore.get<ESM4::Reputation>())
+        {
+            const FalloutScript::FormId id = record.mId.toUint32();
+            const double fame = mReputation.value(id, 1);
+            const double infamy = mReputation.value(id, 0);
+            if (!FalloutScript::Pipboy::reputationListed(fame, infamy))
+                continue;
+            PipboyGeneral::Standing standing;
+            standing.mId = id;
+            standing.mName = record.mFullName;
+            standing.mPicture = record.mIcon;
+            standing.mFame = fame;
+            standing.mInfamy = infamy;
+            standing.mFameLevel = mReputation.level(id, 1);
+            standing.mInfamyLevel = mReputation.level(id, 0);
+            standing.mTitle = gameSettingText(
+                FalloutScript::Pipboy::reputationTitleSetting(standing.mFameLevel, standing.mInfamyLevel));
+            general.mStandings.push_back(std::move(standing));
+        }
+        std::stable_sort(general.mStandings.begin(), general.mStandings.end(),
+            [](const PipboyGeneral::Standing& left, const PipboyGeneral::Standing& right) {
+                return Misc::StringUtils::lowerCase(left.mName) < Misc::StringUtils::lowerCase(right.mName);
+            });
+        return general;
     }
 
     FalloutScripts::PipboyStats FalloutScripts::pipboyStats()

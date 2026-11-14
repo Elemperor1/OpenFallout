@@ -21,6 +21,7 @@
 #include <components/esm4/packageschedule.hpp>
 #include <components/falloutscript/actorstatus.hpp>
 #include <components/falloutscript/aimemory.hpp>
+#include <components/falloutscript/worldrules.hpp>
 #include <components/falloutscript/fightai.hpp>
 #include <components/misc/constants.hpp>
 #include <components/settings/values.hpp>
@@ -41,6 +42,15 @@
 
 namespace OFMechanics
 {
+    namespace
+    {
+        /// The game time as hours since the start (days times 24 plus the hour of the day)
+        double gameHours(const OFWorld::TimeStamp& stamp)
+        {
+            return stamp.getDay() * 24.0 + stamp.getHour();
+        }
+    }
+
     namespace
     {
         // How often the packages of an actor are looked at again, in seconds: the time of the game goes by slowly, and
@@ -211,6 +221,10 @@ namespace OFMechanics
         bool mSpoke = false; // a Dialogue package: it has said what it came to say, and is done when the lines are over
         /// A package that is done and has nothing after it is over for the actor, and its Change script has been told
         bool mChangeTold = false;
+        /// SetPackDuration: how long the package it follows may last, in hundredths of a game hour (0 for no limit), and
+        /// the game hour (days times 24 plus the hour) at which it began
+        double mDurationHundredths = 0;
+        double mStartedHours = 0;
         /// The package was kept in a saved game: its goal is made when the packages are looked at first, without the
         /// character beginning it again
         bool mNeedsGoal = false;
@@ -834,6 +848,16 @@ namespace OFMechanics
                          << " units a second for " << seconds << " s";
     }
 
+    void FalloutActors::setPackageDuration(const OFWorld::Ptr& ptr, double hundredths)
+    {
+        const auto found = mMinds.find(ptr.mRef);
+        if (found == mMinds.end() || found->second->mPackage == nullptr)
+            return;
+        found->second->mDurationHundredths = hundredths;
+        // (the package begins again from now, as the duration counts from when the call is made)
+        found->second->mStartedHours = gameHours(OFBase::Environment::get().getWorld()->getTimeStamp());
+    }
+
     ESM::FormId FalloutActors::currentPackage(const OFWorld::Ptr& ptr) const
     {
         const auto found = mMinds.find(ptr.mRef);
@@ -1428,6 +1452,17 @@ namespace OFMechanics
         /// first that is done (a character does the Travel package of the day again once the night is over).
         void review(const Frame& frame, FalloutActors::Mind& mind)
         {
+            // SetPackDuration: a package that has run for its duration is done (FalloutNV.exe 0x8F4020), as one that has
+            // got to its goal is
+            if (mind.mPackage != nullptr && mind.mDone.count(mind.mPackage) == 0 && !mind.mOrdered
+                && FalloutScript::World::packageTimeIsUp(
+                    mind.mDurationHundredths, gameHours(frame.mWorld.getTimeStamp()), mind.mStartedHours))
+            {
+                mind.mDone.insert(mind.mPackage);
+                mind.mDurationHundredths = 0;
+                keepState(mind);
+                raise(frame, mind.mPtr, *mind.mPackage, OFScript::FalloutScripts::PackageEvent::Done);
+            }
             Choice fresh; // the first that is on and not done
             Choice current; // the one that is followed, when it is done and still on
             Choice done; // the first of the others that are done and on
@@ -1570,6 +1605,9 @@ namespace OFMechanics
             }
 
             mind.mPackage = chosen.mPackage;
+            // (a duration that a script set belongs to the package that was followed)
+            mind.mDurationHundredths = 0;
+            mind.mStartedHours = gameHours(frame.mWorld.getTimeStamp());
             mind.mGoal = chosen.mPackage != nullptr ? chosen.mGoal : FalloutGoal();
             mind.mFollowing = chosen.mPackage != nullptr ? chosen.mFollowing : FalloutActors::Mind::Following();
             mind.mHasFacing = chosen.mPackage != nullptr && chosen.mHasFacing;

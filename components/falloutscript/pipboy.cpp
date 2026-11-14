@@ -54,6 +54,46 @@ namespace FalloutScript::Pipboy
         return 0;
     }
 
+    KarmaPage karmaPage(KarmaClass karma)
+    {
+        // The order of the cases of the routine: good, neutral, bad, saintly, evil
+        switch (karma)
+        {
+            case KarmaClass::Good:
+                return { "sAlignGood", "Interface\\Icons\\PipboyImages\\Karma icons\\karma_good.dds" };
+            case KarmaClass::Evil:
+                return { "sAlignEvil", "Interface\\Icons\\PipboyImages\\Karma icons\\karma_bad.dds" };
+            case KarmaClass::VeryGood:
+                return { "sAlignVeryGood", "Interface\\Icons\\PipboyImages\\Karma icons\\karma_saintly.dds" };
+            case KarmaClass::VeryEvil:
+                return { "sAlignVeryEvil", "Interface\\Icons\\PipboyImages\\Karma icons\\karma_evil.dds" };
+            case KarmaClass::Neutral:
+                break;
+        }
+        return { "sAlignNeutral", "Interface\\Icons\\PipboyImages\\Karma icons\\karma_neutral.dds" };
+    }
+
+    std::string reputationTitleSetting(int fameLevel, int infamyLevel)
+    {
+        static constexpr const char* levels[4] = { "None", "One", "Two", "Three" };
+        const int fame = std::clamp(fameLevel, 0, 3);
+        const int infamy = std::clamp(infamyLevel, 0, 3);
+        return std::string("sRepTitlePos") + levels[fame] + "Neg" + levels[infamy];
+    }
+
+    bool reputationListed(double fame, double infamy)
+    {
+        return fame > 0 || infamy > 0;
+    }
+
+    std::string miscStatSetting(int stat)
+    {
+        std::string number = std::to_string(std::max(stat, 0));
+        if (number.size() < 3)
+            number.insert(0, 3 - number.size(), '0');
+        return "sMiscStat" + number;
+    }
+
     std::string karmaTitleSetting(int level, KarmaClass karma)
     {
         const int number = std::clamp(level, 1, lastKarmaTitle);

@@ -329,6 +329,15 @@ namespace FalloutScript::World
     /// bDisable360Controller of the interface does not turn it off
     bool isWin32(bool padConnected, bool padDisabled);
 
+    /// The integer that a setting of an ini file holds, as the Windows call that the games read their ini files with
+    /// gives it: spaces first, an optional sign, then digits up to the first character that is not one. Nothing when the
+    /// text has no digit (the setting then keeps the default the executable registered it with).
+    std::optional<int> iniInteger(std::string_view text);
+
+    /// IsGoreDisabled (FalloutNV.exe 0x5A5A50, Fallout3.exe 0x5143B0): the setting bDisableAllGore of the General section
+    /// (a byte at 0x11DF7F8, 0x107ADC4) is exactly 1. Where the file has no such setting the answer is 0.
+    bool goreDisabledBy(std::optional<int> setting);
+
     /// The path SetSecuritronExpression builds for the screen of a securitron (0x437F90): the two words the script gives
     /// joined by an underscore, in the folder of the securitron's textures; the shape it goes on is named by
     /// securitronScreenShape()
