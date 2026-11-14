@@ -192,7 +192,9 @@ namespace OFScript
                 FalloutScript::CombatState::Hit struck;
                 struck.mAttacker = laid.mOwner;
                 struck.mDamage = damage;
-                mCombat.noteHit(victim, struck, false);
+                // A blast of the player's that an ally or friend lets pass is not an attack on it (as for a blow)
+                const bool tolerated = toleratesBlow(laid.mOwner, victim);
+                mCombat.noteHit(victim, struck, tolerated);
                 const double healthBefore = mActorValues.current(victim, AV::health);
                 mActorValues.damage(victim, AV::health, damage);
                 // What the player's charge took off a character is the player's damage, whoever lands the last of it: the
@@ -208,6 +210,17 @@ namespace OFScript
                 {
                     mActors.setDead(victim, true, laid.mOwner, -1);
                     evaluatePackage(victim);
+                }
+                else if (mActorValues.current(victim, AV::health) > 0 && laid.mOwner != 0 && laid.mOwner != victim
+                    && !tolerated)
+                {
+                    // A character that survives a blast fights the one that laid it, and that one is in the fight too (as
+                    // for a blow in strike; one with no package gets the one that is to fight)
+                    if (!mCombat.inCombat(victim) && FalloutScript::startFight(mCombat, mActors, victim, laid.mOwner))
+                        evaluatePackage(victim);
+                    if (!mCombat.inCombat(laid.mOwner)
+                        && FalloutScript::startFight(mCombat, mActors, laid.mOwner, victim))
+                        evaluatePackage(laid.mOwner);
                 }
             }
             ++actorsHit;
