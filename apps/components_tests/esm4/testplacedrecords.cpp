@@ -337,6 +337,23 @@ namespace
         EXPECT_EQ(actor.mLinkedRefs[1].reference.toUint32(), 0x832u);
     }
 
+    TEST(ESM4ActorReferenceTest, aPlacedActorKeepsItsOwnEncounterZoneAndLevelModifier)
+    {
+        const ESM4::ActorCharacter actor = load<ESM4::ActorCharacter>("ACHR",
+            valueSubRecord<std::uint32_t>("XEZN", 0x910) + valueSubRecord<std::int32_t>("XLCM", 2));
+        EXPECT_EQ(actor.mEncounterZone.toUint32(), 0x910u);
+        EXPECT_EQ(actor.mLevelModifier, 2);
+
+        const ESM4::ActorCreature creature = load<ESM4::ActorCreature>("ACRE", valueSubRecord<std::int32_t>("XLCM", 3));
+        EXPECT_TRUE(creature.mEncounterZone.isZeroOrUnset());
+        EXPECT_EQ(creature.mLevelModifier, 3);
+
+        // An actor with neither has no zone and no modifier
+        const ESM4::ActorCharacter plain = load<ESM4::ActorCharacter>("ACHR", valueSubRecord<float>("XSCL", 1.f));
+        EXPECT_TRUE(plain.mEncounterZone.isZeroOrUnset());
+        EXPECT_EQ(plain.mLevelModifier, -1);
+    }
+
     TEST(ESM4ActorReferenceTest, aMerchantContainerOfAnotherSizeIsSkipped)
     {
         const ESM4::ActorCharacter actor = load<ESM4::ActorCharacter>(
@@ -349,7 +366,7 @@ namespace
     TEST(ESM4ActorReferenceTest, theSubrecordsOfTheOtherGamesAreSkipped)
     {
         const ESM4::ActorCharacter actor = load<ESM4::ActorCharacter>("ACHR",
-            ignored({ "XAPD", "XAPR", "XEZN", "XHOR", "XLCM", "XLCN", "XLRT", "XPRD", "XPPA", "INAM", "PDTO", "XIS2",
+            ignored({ "XAPD", "XAPR", "XHOR", "XLCN", "XLRT", "XPRD", "XPPA", "INAM", "PDTO", "XIS2",
                 "XPCI", "XLOD", "VMAD", "XLRL", "XRDS", "XIBS", "SCHR", "TNAM", "XATO", "MNAM", "XATP", "XEMI", "XFVC",
                 "XHLT", "XHTW", "XLKT", "XLYR", "XMBR", "XMSP", "XPLK", "XRFG", "XRNK", "XRGD", "XRGB", "XHRS" })
                 + valueSubRecord<float>("XSCL", 9.f));

@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <fstream>
 #include <system_error>
 
@@ -250,6 +251,115 @@ namespace FalloutScript::ExeSettings
                 }
             }
         }
+
+        /// The counts of the general page are settings made in a loop: a function builds the name with the format
+        /// `sMiscStat%03d` and the text is the one of the table that the loop reads (`mov r, [r*4 + table]`, the
+        /// address of the text pushed to the function that builds the setting, the number of entries in the compare
+        /// of the loop). Found by the format: the function that pushes it, its one caller, the table before the call.
+        void scanCounted(const Image& image, Texts& texts, const ToUTF8::StatelessUtf8Encoder* encoder)
+        {
+            constexpr std::string_view format = "sMiscStat%03d";
+            std::uint32_t formatAddress = 0;
+            for (const Section& section : image.mSections)
+            {
+                const std::string_view region = image.mData.substr(section.mOffset, section.mLength);
+                for (std::size_t at = region.find(format); at != std::string_view::npos;
+                     at = region.find(format, at + 1))
+                {
+                    // the whole text, not the tail of a longer one
+                    if (at + format.size() < region.size() && region[at + format.size()] == '\0')
+                        formatAddress = static_cast<std::uint32_t>(section.mAddress + at);
+                }
+            }
+            if (formatAddress == 0)
+                return;
+            const auto codeAt = [&](const Section& section, std::size_t at) {
+                return static_cast<std::uint32_t>(section.mAddress + at);
+            };
+            std::uint32_t builder = 0;
+            for (const Section& section : image.mSections)
+            {
+                const std::string_view region = image.mData.substr(section.mOffset, section.mLength);
+                for (std::size_t i = 0; i + 5 <= region.size() && builder == 0; ++i)
+                {
+                    std::uint32_t pushed = 0;
+                    if (byteAt(region, i) != 0x68 || !readU32(region, i + 1, pushed) || pushed != formatAddress)
+                        continue;
+                    // the start of the function: the padding of the one before it, then a prologue (the frame pointer one, or
+                    // the one that pushes -1 for the frame of the exception handler, which Fallout 3 has here)
+                    for (std::size_t back = i; back >= 3 && i - back < 0x200; --back)
+                    {
+                        const bool frame = byteAt(region, back) == 0x55 && byteAt(region, back + 1) == 0x8B
+                            && byteAt(region, back + 2) == 0xEC;
+                        const bool handler = byteAt(region, back) == 0x6A && byteAt(region, back + 1) == 0xFF;
+                        if ((frame || handler) && byteAt(region, back - 1) == 0xCC)
+                        {
+                            builder = codeAt(section, back);
+                            break;
+                        }
+                    }
+                }
+            }
+            if (builder == 0)
+                return;
+            for (const Section& section : image.mSections)
+            {
+                const std::string_view region = image.mData.substr(section.mOffset, section.mLength);
+                for (std::size_t i = 64; i + 5 <= region.size(); ++i)
+                {
+                    std::uint32_t relative = 0;
+                    if (byteAt(region, i) != 0xE8 || !readU32(region, i + 1, relative)
+                        || codeAt(section, i + 5) + relative != builder)
+                        continue;
+                    // the load of the text out of the table: mov r32, [index*4 + table]
+                    std::uint32_t table = 0;
+                    std::size_t load = 0;
+                    for (std::size_t back = i; back + 64 > i && back >= 7; --back)
+                        if (byteAt(region, back) == 0x8B && (byteAt(region, back + 1) & 0xC7) == 0x04
+                            && (byteAt(region, back + 2) & 0xC7) == 0x85 && readU32(region, back + 3, table))
+                        {
+                            load = back;
+                            break;
+                        }
+                    if (load == 0)
+                        continue;
+                    // the number of entries: the compare of the loop (before the load in one of the games, after the
+                    // call in the other); the largest number compared with in that stretch, as the others are tests
+                    // for zero
+                    std::uint32_t count = 0;
+                    const std::size_t from = load > 80 ? load - 80 : 0;
+                    const std::size_t to = std::min(region.size() - 4, i + 40);
+                    for (std::size_t at = from; at < to; ++at)
+                    {
+                        const std::uint32_t modrm = byteAt(region, at + 1);
+                        if (byteAt(region, at) == 0x83 && (modrm & 0x38) == 0x38
+                            && (modrm == 0x7D || (modrm & 0xC0) == 0xC0))
+                            count = std::max(count, byteAt(region, at + (modrm == 0x7D ? 3 : 2)));
+                    }
+                    for (std::uint32_t number = 0; number < count && number < 256; ++number)
+                    {
+                        // the table is in the data: read the address of the text and the text
+                        std::uint32_t textAddress = 0;
+                        bool found = false;
+                        for (const Section& data : image.mSections)
+                        {
+                            const std::uint64_t entry = table + std::uint64_t{ number } * 4;
+                            if (entry < data.mAddress || entry + 4 > data.mAddress + data.mLength)
+                                continue;
+                            found = readU32(image.mData.substr(data.mOffset, data.mLength),
+                                static_cast<std::size_t>(entry - data.mAddress), textAddress);
+                        }
+                        std::string_view text;
+                        if (!found || !textAt(image, textAddress, maxText, text))
+                            break;
+                        char name[24];
+                        std::snprintf(name, sizeof(name), "sMiscStat%03u", number);
+                        add(texts, name, text, false, encoder);
+                    }
+                    return;
+                }
+            }
+        }
     }
 
     Texts scan(std::string_view image, const ToUTF8::StatelessUtf8Encoder* encoder)
@@ -260,6 +370,7 @@ namespace FalloutScript::ExeSettings
             return texts;
         scanCode(parsed, texts, encoder);
         scanTables(parsed, texts, encoder);
+        scanCounted(parsed, texts, encoder);
         return texts;
     }
 

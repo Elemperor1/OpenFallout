@@ -89,6 +89,7 @@ namespace OFScript
         bool dispositionInput(
             FalloutScript::FormId self, FalloutScript::FormId other, FalloutScript::DispositionInput& input) override;
         int relation(FalloutScript::FormId self, FalloutScript::FormId other) override;
+        double adjustDisposition(FalloutScript::FormId self, FalloutScript::FormId other, double value) override;
         double karmaOf(FalloutScript::FormId actor) override;
         bool isEvil(FalloutScript::FormId actor) override;
 

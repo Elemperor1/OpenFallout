@@ -1,0 +1,22 @@
+{
+  "name": "m16-law2-general-nv",
+  "game": "nv",
+  "save": "latest",
+  "scenario": "../scenarios/m16-law2-general-nv.lua",
+  "resolution": [
+    1280,
+    720
+  ],
+  "framerate": 30,
+  "limit": 400,
+  "settings": {
+    "Sound": {
+      "master volume": "0"
+    }
+  },
+  "variants": [
+    {
+      "name": "plain"
+    }
+  ]
+}

@@ -28,6 +28,13 @@ namespace FalloutScript
         bool mFollowsPlayer = false;
         FormId mFollowTarget = 0;
         float mFollowDistance = 0.f;
+        /// SetPackDuration: how long the package it follows may last, in hundredths of a game hour (0 for no limit), and
+        /// the game hour (days times 24 plus the hour) at which it began
+        double mDurationHundredths = 0;
+        double mStartedHours = 0;
+        /// The package it follows is done because its duration ran out and not because it did what it came to do (a
+        /// character in a piece of furniture does not stay there for it)
+        bool mExpired = false;
 
         /// Whether there is nothing to keep
         bool empty() const;
@@ -56,7 +63,9 @@ namespace FalloutScript
     };
 
     /// The section of a saved game that holds the AI state
-    constexpr std::uint32_t aiSectionVersion = 1;
+    /// (version 2 adds the duration of the package that is followed; a saved game of version 1 has none. Version 3 adds
+    /// whether the package is done because its duration ran out; before it none is.)
+    constexpr std::uint32_t aiSectionVersion = 3;
     void writeAi(const AiMemory& memory, SaveWriter& out);
     /// A character or a package whose plugin is no longer loaded is left out
     void readAi(AiMemory& memory, SaveReader& in, std::uint32_t version);

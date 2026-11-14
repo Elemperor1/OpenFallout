@@ -34,6 +34,9 @@ namespace FalloutScript
         constexpr int bookSkillPoints = 11;
         constexpr int recoveredHealth = 12;
         constexpr int buyPrice = 17;
+        /// The disposition of one character toward another, a number from 0 to 100 that the perks of the one asked about
+        /// (the player's for a teammate) change (FalloutNV.exe 0x88032F, in the routine that gives the disposition)
+        constexpr int disposition = 14;
         /// More than 0 lets a character try a terminal that locked it out once more
         constexpr int ignoreLockedTerminal = 20;
         /// What a character can carry, worked out from the actor value (FalloutNV.exe 0x8A0C20: the value of Carry Weight,
@@ -44,6 +47,9 @@ namespace FalloutScript
         /// The scale of the magnitude of the spell that the water a character drinks gives it (1 for a perk-less character;
         /// FalloutNV.exe 0x5805C0 and Fallout3.exe, for the player)
         constexpr int drinkingRadiation = 26;
+        /// Anything but 0 makes a lock take two failed forcings to break instead of one (FalloutNV.exe 0x430AE0 asks it
+        /// with the player, starting from 0)
+        constexpr int ignoreBrokenLock = 32;
         constexpr int calculateGunSpread = 34;
         constexpr int enemyCriticalChance = 36;
         /// What a perk adds to the Science that hacking a terminal goes by

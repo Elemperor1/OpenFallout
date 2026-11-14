@@ -1,0 +1,25 @@
+{
+  "name": "m16-law2-blows-fo3",
+  "game": "fo3",
+  "start": "Wasteland:0,0",
+  "scenario": "../scenarios/m16-law2-blows-fo3.lua",
+  "resolution": [
+    1280,
+    720
+  ],
+  "framerate": 30,
+  "limit": 600,
+  "settings": {
+    "Sound": {
+      "master volume": "0"
+    }
+  },
+  "env": {
+    "OPENFALLOUT_HEADLESS_SOUND": "1"
+  },
+  "variants": [
+    {
+      "name": "plain"
+    }
+  ]
+}

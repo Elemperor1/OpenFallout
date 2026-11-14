@@ -2795,6 +2795,40 @@
 -- value of a whole stack.
 
 ---
+-- What the general page of the Pip-Boy shows: the karma, the counts, and (New Vegas) the reputations.
+-- @function [parent=#Pipboy] general
+-- @return #PipboyGeneral
+
+---
+-- @type PipboyGeneral
+-- @field #PipboyKarma karma
+-- @field #list<#PipboyCount> counts Every count of the page, in the order of its numbers.
+-- @field #list<#PipboyReputation> reputations New Vegas: the reputations with some fame or infamy, by name.
+-- @field #boolean newVegas
+
+---
+-- @type PipboyKarma
+-- @field #string word The word for the kind of karma (good, neutral, evil, very good, very evil).
+-- @field #string picture The picture of the kind, a file of the game's interface.
+-- @field #string title The title that goes with the karma and the level.
+
+---
+-- @type PipboyCount
+-- @field #string name
+-- @field #number value
+
+---
+-- @type PipboyReputation
+-- @field #string id The form of the reputation.
+-- @field #string name
+-- @field #string picture The picture of its record, empty when it has none.
+-- @field #string title The title of the reputation for the levels of its two sides.
+-- @field #number fame The points of the positive side.
+-- @field #number infamy The points of the negative side.
+-- @field #number fameLevel 0 to 3.
+-- @field #number infamyLevel 0 to 3.
+
+---
 -- The seven attributes of SPECIAL, in order.
 -- @function [parent=#Pipboy] attributes
 -- @return #list<#PipboyValue>

@@ -1,5 +1,6 @@
 #include <components/falloutscript/pipboy.hpp>
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include <map>
@@ -53,6 +54,49 @@ namespace
         // the levels above the last title have the last, and a level below the first has the first
         EXPECT_EQ(karmaTitleSetting(45, KarmaClass::Good), "sKarmicTitleGood30");
         EXPECT_EQ(karmaTitleSetting(0, KarmaClass::Evil), "sKarmicTitleEvil01");
+    }
+
+    TEST(FalloutScriptPipboyTest, theGeneralPageShowsTheWordAndThePictureOfTheKindOfKarma)
+    {
+        EXPECT_EQ(karmaPage(KarmaClass::Neutral).mWordSetting, "sAlignNeutral");
+        EXPECT_EQ(karmaPage(KarmaClass::Good).mWordSetting, "sAlignGood");
+        EXPECT_EQ(karmaPage(KarmaClass::Evil).mWordSetting, "sAlignEvil");
+        EXPECT_EQ(karmaPage(KarmaClass::VeryGood).mWordSetting, "sAlignVeryGood");
+        EXPECT_EQ(karmaPage(KarmaClass::VeryEvil).mWordSetting, "sAlignVeryEvil");
+        // The very good have the saintly picture, the evil the bad one and the very evil the evil one
+        EXPECT_THAT(karmaPage(KarmaClass::VeryGood).mPicture, EndsWith("karma_saintly.dds"));
+        EXPECT_THAT(karmaPage(KarmaClass::Evil).mPicture, EndsWith("karma_bad.dds"));
+        EXPECT_THAT(karmaPage(KarmaClass::VeryEvil).mPicture, EndsWith("karma_evil.dds"));
+        EXPECT_THAT(karmaPage(KarmaClass::Good).mPicture, EndsWith("karma_good.dds"));
+        EXPECT_THAT(karmaPage(KarmaClass::Neutral).mPicture, EndsWith("karma_neutral.dds"));
+    }
+
+    TEST(FalloutScriptPipboyTest, theTitleOfAReputationIsNamedByItsTwoLevels)
+    {
+        EXPECT_EQ(reputationTitleSetting(0, 0), "sRepTitlePosNoneNegNone");
+        EXPECT_EQ(reputationTitleSetting(3, 0), "sRepTitlePosThreeNegNone");
+        EXPECT_EQ(reputationTitleSetting(0, 2), "sRepTitlePosNoneNegTwo");
+        EXPECT_EQ(reputationTitleSetting(1, 3), "sRepTitlePosOneNegThree");
+        EXPECT_EQ(reputationTitleSetting(3, 3), "sRepTitlePosThreeNegThree");
+        // a level out of range is held to the table
+        EXPECT_EQ(reputationTitleSetting(9, -1), "sRepTitlePosThreeNegNone");
+    }
+
+    TEST(FalloutScriptPipboyTest, aReputationIsListedWhenEitherSideHoldsPoints)
+    {
+        EXPECT_FALSE(reputationListed(0, 0));
+        EXPECT_TRUE(reputationListed(0.5, 0));
+        EXPECT_TRUE(reputationListed(0, 12));
+        EXPECT_TRUE(reputationListed(3, 4));
+        EXPECT_FALSE(reputationListed(-1, 0));
+    }
+
+    TEST(FalloutScriptPipboyTest, theCountsOfTheGeneralPageHaveThreeDigitSettingNames)
+    {
+        EXPECT_EQ(miscStatSetting(0), "sMiscStat000");
+        EXPECT_EQ(miscStatSetting(9), "sMiscStat009");
+        EXPECT_EQ(miscStatSetting(42), "sMiscStat042");
+        EXPECT_EQ(miscStatSetting(-3), "sMiscStat000");
     }
 
     TEST(FalloutScriptPipboyTest, namesTheWordForTheValueOfASkill)

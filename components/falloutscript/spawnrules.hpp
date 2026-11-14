@@ -51,6 +51,10 @@ namespace FalloutScript
     /// multiplier with the fraction cut off, and not below 1 (0x488350)
     int scaledSpawnLevel(int level, int levelMod, const SpawnSettings& settings);
 
+    /// The encounter zone that decides the level of a placement (0x567D20): the zone of the reference itself, else that of its
+    /// cell, else that of the worldspace; 0 when none of them has one
+    FormId placementZone(FormId own, FormId cell, FormId world);
+
     /// The levels at which things were put into the world, and the rotation that makes every level a little different:
     /// each placement is made one level higher, one lower or at the level itself, in turn (the counter that 0x567E10
     /// keeps goes up by one for every placement, and starts again below zero by the setting for the largest
@@ -70,6 +74,27 @@ namespace FalloutScript
         int placementLevel(int baseLevel, bool rotate);
         /// Where the counter of the rotation stands
         int counter() const;
+
+        /// The level that the levelled lists of an actor that its cell places are rolled for, chosen when the actor is
+        /// first made and then kept with the reference (the executable keeps the choice with the reference too:
+        /// 0x55D760 resolves the template of an actor once, 0x488350 and 0x567E10 give the level). An actor whose
+        /// template is a levelled list is rolled for the level of its zone or the player (`baseLevel`) made one higher,
+        /// lower or not in turn, times the multiplier of the level modifier of its reference (`levelMod`, 0 to 3, else
+        /// none); any other actor for the level of the player as it is. False when the reference had its level
+        /// already, which is what is given back.
+        bool placedLevel(
+            FormId reference, int baseLevel, int levelMod, bool leveledTemplate, int& level, int& storedMod);
+
+        /// The level that an encounter zone has fixed for itself, 0 when it has none. A zone works its level out the first
+        /// time a cell that uses it comes into the game (Fallout3.exe 0x4BFBA0, called at 0x43A141 and 0x436041; New Vegas
+        /// 0x526270, called at 0x453F07 and 0x4582DC) and stores it with a mark that the zone changed; from then on the
+        /// level of the player is not asked again (the level of a placement reads the stored word first: Fallout3.exe
+        /// 0x4EC070, New Vegas 0x567EC0). Nothing in either executable puts it back to 0, a game that is loaded gets it
+        /// back from its save
+        int lockedZoneLevel(FormId zone) const;
+        /// Keeps the level of a zone when it has none yet (a level below 1 is no level: the executable takes the word 0
+        /// for "none")
+        void lockZoneLevel(FormId zone, int level);
 
         /// What a reference was put into the world at (and the modifier of its placement); false for a reference
         /// that was not
@@ -92,6 +117,7 @@ namespace FalloutScript
         mutable std::mutex mMutex;
         int mCounter = 0;
         std::map<FormId, Placement> mPlacements;
+        std::map<FormId, int> mZoneLevels;
     };
 }
 

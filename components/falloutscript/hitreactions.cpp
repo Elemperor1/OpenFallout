@@ -1,9 +1,46 @@
 #include "hitreactions.hpp"
 
 #include <algorithm>
+#include <iterator>
 
 namespace FalloutScript::HitReactions
 {
+    bool knockedAnswer(int state)
+    {
+        return state == 3 || state == 4;
+    }
+
+    void KnockTracker::start(FormId actor, double seconds)
+    {
+        const std::lock_guard lock(mMutex);
+        if (seconds > 0.0)
+            mLeft[actor] = seconds;
+        else
+            mLeft.erase(actor);
+    }
+
+    void KnockTracker::advance(double seconds)
+    {
+        const std::lock_guard lock(mMutex);
+        for (auto it = mLeft.begin(); it != mLeft.end();)
+        {
+            it->second -= seconds;
+            it = it->second > 0.0 ? std::next(it) : mLeft.erase(it);
+        }
+    }
+
+    int KnockTracker::stateOf(FormId actor) const
+    {
+        const std::lock_guard lock(mMutex);
+        return mLeft.count(actor) != 0 ? KnockState::thrown : KnockState::none;
+    }
+
+    void KnockTracker::clear()
+    {
+        const std::lock_guard lock(mMutex);
+        mLeft.clear();
+    }
+
     Settings Settings::fromGameSettings(const Lookup& lookup)
     {
         Settings settings;

@@ -10,9 +10,11 @@
 #include <components/esm4/loadfact.hpp>
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadrace.hpp>
+#include <components/esm4/loadweap.hpp>
 #include <components/falloutscript/actors.hpp>
 #include <components/falloutscript/actorvalues.hpp>
 #include <components/falloutscript/combatcommands.hpp>
+#include <components/falloutscript/perks.hpp>
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/mechanicsmanager.hpp"
@@ -235,11 +237,15 @@ namespace OFScript
 
     bool LawGlue::detected(FormId actor)
     {
-        // Anyone else that sees the character in full, except one that fights it already (its combat target is the
-        // character, as the executable has it at 0x973550)
+        // 0x973460: of the actors that are loaded, those that are characters (the virtual at +0x218 is false for a creature)
+        // and see the subject in full (the level of detection 3, 0x8A81E0), except one that fights the subject already (its
+        // combat target is the subject, 0x973550). The actor is not itself in the list that is asked.
         for (const FalloutScript::Witness& witness : watchers(0))
         {
-            if (witness.mActor == actor || mHost.mCombat.target(witness.mActor) == actor)
+            FalloutScript::ActorTraits traits;
+            if (witness.mActor == actor || (mHost.traitsOf(witness.mActor, traits) && traits.mCreature))
+                continue;
+            if (mHost.mCombat.target(witness.mActor) == actor)
                 continue;
             if (detectionLevel(witness.mActor, actor) >= 3)
                 return true;
@@ -367,7 +373,8 @@ namespace OFScript
                 FalloutScript::DispositionInput input;
                 int now = 0;
                 if (dispositionInput(victim, mHost.mPlayer, input))
-                    now = mStanding.disposition(victim, mHost.mPlayer, input);
+                    now = mStanding.disposition(victim, mHost.mPlayer, input,
+                        [this, victim](double value) { return adjustDisposition(victim, mHost.mPlayer, value); });
                 mStanding.modifyDisposition(victim, mHost.mPlayer, outcome.mVictimDisposition, now);
             }
             if (outcome.mCrime != 0 || !outcome.mEnemies.empty())
@@ -414,7 +421,22 @@ namespace OFScript
         FalloutScript::DispositionInput input;
         if (!dispositionInput(self, mHost.mPlayer, input))
             return -1;
-        return mStanding.disposition(self, mHost.mPlayer, input);
+        // With the perks that change it, as GetDisposition does, so that the answers of both agree
+        return mStanding.disposition(
+            self, mHost.mPlayer, input, [this, self](double value) { return adjustDisposition(self, mHost.mPlayer, value); });
+    }
+
+    double LawGlue::adjustDisposition(FormId self, FormId other, double value)
+    {
+        // The entry point 14 of the perks (FalloutNV.exe 0x88032F, called with the disposition as a float; the result is cut
+        // and held to 0 to 100 by the caller): the perks of the character that is asked about, or those of the player for one
+        // that is a teammate (0x5E5911 to 0x5E5934), with the other character as the one that the conditions of the entry
+        // see as the target
+        if (self == 0 || other == 0)
+            return value;
+        const FormId owner = self != mHost.mPlayer && mHost.isTeammate(self) ? mHost.mPlayer : self;
+        return mHost.mPerks.apply(FalloutScript::EntryPoint::disposition, owner, value,
+            FalloutScript::PerkEngine::Context{ other, 0 });
     }
 
     int LawGlue::relation(FormId self, FormId other)
@@ -446,15 +468,43 @@ namespace OFScript
 
     // ---- the events ----
 
-    void LawGlue::blow(FormId victim, FormId, bool fighting)
+    void LawGlue::blow(FormId victim, FormId weapon, bool fighting)
     {
-        mHost.runOnMainThread([this, victim, fighting] {
+        mHost.runOnMainThread([this, victim, weapon, fighting] {
             if (mHost.mActors.isDead(victim))
                 return;
+            // The hit routine (FalloutNV.exe 0x898DD5 to 0x898E26) asks whether the victim is a creature (the
+            // virtual at +0x21C, true only for creatures): a creature is no one that the law protects, so a blow at
+            // one makes no attack crime and no witness hears of it; only a creature that has an owner counts, as
+            // the owner's property is hit (the steal crime creator 0x8BFA40, which only warns)
+            FalloutScript::ActorTraits traits;
+            const bool creature = mHost.traitsOf(victim, traits) && traits.mCreature;
+            const FormId owner = creature ? mHost.mObjectState.owner(victim) : 0;
+            switch (FalloutScript::Law::judgeBlow(fighting, creature, owner != 0))
+            {
+                case FalloutScript::Law::BlowKind::Nothing:
+                    // (a victim that fights already only thinks less of the player: that is the law's own step)
+                    if (!fighting)
+                        return;
+                    break;
+                case FalloutScript::Law::BlowKind::Property:
+                    // What belongs to the player, or to someone the player may take from, is no one's loss
+                    if (!FalloutScript::Law::mayTake(owner, mHost.playerBase(), factionsOf(mHost.mPlayer)))
+                        theft(owner, 0, false);
+                    return;
+                case FalloutScript::Law::BlowKind::Attack:
+                    break;
+            }
             FalloutScript::Law::Blow blow;
             blow.mVictim = victim;
             blow.mVictimFactions = factionsOf(victim);
             blow.mFighting = fighting;
+            // A weapon whose record has the minor crime flag (0x898FD0 reads flags2 & 0x10 and the hit routine passes
+            // it to the creator at 0x8C0460): only the one that was hit minds, and the crime is a minor one
+            if (weapon != 0)
+                if (const ESM4::Weapon* record = mHost.mStore.get<ESM4::Weapon>().search(ESM::FormId::fromUint32(weapon)))
+                    blow.mMinor = record->mHasGameData
+                        && (record->mGame.mFlags2 & ESM4::Weapon::GameData::MinorCrime) != 0;
             const FalloutScript::Outcome outcome = mLaw.attack(blow, gather(victim));
             carryOut(outcome, victim);
         });
@@ -622,6 +672,7 @@ namespace OFScript
 
     void LawGlue::update(float frametime)
     {
+        mLaw.advance(frametime);
         mSinceLook += frametime;
         if (mSinceLook < trespassLookInterval || mHost.mPlayer == 0)
             return;

@@ -72,7 +72,16 @@ local function useGate(index, gate, real)
             player:sendEvent('AutoplayFire', { target = object, form = core.getFormId(gate.file, gate.ref),
                 shots = gate.shots or 3, untilDead = gate.untilDead == true })
         else
-            player:teleport(object.cell, object.position)
+            -- A walk keeps the way the player faces, which a conversation has turned toward whoever spoke (the speaker can be
+            -- far off); a gate with `face` turns the player to that reference (of the same plugin) first, as a player who
+            -- walks to a place looks at what the place is for
+            local options
+            if gate.face then
+                local target = world.getObjectByFormId(core.getFormId(gate.file, gate.face))
+                local away = target.position - object.position
+                options = { rotation = util.transform.rotateZ((math.atan2 or math.atan)(away.x, away.y)) }
+            end
+            player:teleport(object.cell, object.position, options)
         end
     end)
     local target

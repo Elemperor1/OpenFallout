@@ -20,7 +20,9 @@
 #include <components/esm4/loadlvlc.hpp>
 #include <components/esm4/loadlvli.hpp>
 #include <components/esm4/loadlvln.hpp>
+#include <components/esm4/loadmesg.hpp>
 #include <components/esm4/loadmisc.hpp>
+#include <components/esm4/loadnote.hpp>
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadrefr.hpp>
 #include <components/esm4/loadweap.hpp>
@@ -29,11 +31,14 @@
 #include <components/falloutscript/worldrules.hpp>
 
 #include "../mwbase/environment.hpp"
+#include "../mwbase/statemanager.hpp"
 #include "../mwbase/world.hpp"
 #include "../mwclass/esm4base.hpp"
+#include "../mwclass/esm4sources.hpp"
 #include "../mwworld/cellstore.hpp"
 #include "../mwworld/class.hpp"
 #include "../mwworld/esmstore.hpp"
+#include "../mwworld/refdata.hpp"
 #include "../mwworld/worldmodel.hpp"
 
 namespace OFScript
@@ -166,9 +171,16 @@ namespace OFScript
                 = zoneForm.isZeroOrUnset() ? nullptr : store.get<ESM4::EncounterZone>().search(zoneForm);
             const SpawnSettings& settings = mHost.mSpawnLevels.settings();
             const int playerLevel = mHost.mProgress.level();
-            const int baseLevel = record != nullptr
-                ? zoneLevel(playerLevel, record->mData.mMinimumLevel, record->mData.mFlags, settings.mLevelScaling)
-                : playerLevel;
+            // A zone that has fixed its level keeps it (the cell that came into the game first fixed it: see
+            // spawnCellLoaded); one that has not is worked out for the player as he is (Fallout3.exe 0x4EC070, 0x4BFB20)
+            int baseLevel = playerLevel;
+            if (record != nullptr)
+            {
+                baseLevel = mHost.mSpawnLevels.lockedZoneLevel(numberFor(zoneForm));
+                if (baseLevel == 0)
+                    baseLevel = zoneLevel(
+                        playerLevel, record->mData.mMinimumLevel, record->mData.mFlags, settings.mLevelScaling);
+            }
             const int level = mHost.mSpawnLevels.placementLevel(baseLevel, true);
             const int scaled = scaledSpawnLevel(level, levelMod, settings);
             const int storedMod = storedLevelMod(levelMod);
@@ -340,9 +352,106 @@ namespace OFScript
                     roll.mLevel = level;
                     roll.mLevelMod = FalloutScript::storedLevelMod(levelMod);
                 }
+                return roll;
             }
+            // An actor of a cell is rolled for the level that was chosen when it was first made
+            placedActorRoll(reference, roll);
             return roll;
         });
+    }
+
+    bool FalloutScripts::placedActorRoll(const ESM::FormId& reference, ESM4::SpawnRoll& roll)
+    {
+        using namespace FalloutScript;
+        const FormId key = numberFor(reference);
+        if (key == 0)
+            return false;
+        const ESM4::ActorCharacter* placed = mStore.get<ESM4::ActorCharacter>().search(reference);
+        if (placed == nullptr)
+            placed = mStore.get<ESM4::ActorCreature>().search(reference);
+        if (placed == nullptr)
+            return false;
+
+        // Whether the template of its base is a levelled list of characters or creatures, which the executable resolves
+        // when the actor is made (0x55D760 through 0x47CDD0 and 0x47CE10)
+        bool leveledTemplate = false;
+        if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(placed->mBaseObj))
+            leveledTemplate = npc->mIsFONV && !npc->mBaseTemplate.isZeroOrUnset()
+                && mStore.get<ESM4::LevelledNpc>().search(npc->mBaseTemplate) != nullptr;
+        else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(placed->mBaseObj))
+            leveledTemplate = creature->mIsFONV && !creature->mBaseTemplate.isZeroOrUnset()
+                && mStore.get<ESM4::LevelledCreature>().search(creature->mBaseTemplate) != nullptr;
+        else
+            return false;
+
+        // The zone of the reference, else of its cell, else of the worldspace (0x567D20)
+        ESM::FormId cellZone;
+        ESM::FormId worldZone;
+        if (const ESM::FormId* cellId = placed->mParent.getIf<ESM::FormId>())
+        {
+            if (const ESM4::Cell* cell = mStore.get<ESM4::Cell>().search(*cellId))
+            {
+                cellZone = cell->mEncounterZone;
+                const ESM::FormId* worldId = cell->mParent.getIf<ESM::FormId>();
+                if (const ESM4::World* world = worldId != nullptr ? mStore.get<ESM4::World>().search(*worldId) : nullptr)
+                    worldZone = world->mEncounterZone;
+            }
+        }
+        const FormId zone
+            = placementZone(numberFor(placed->mEncounterZone), numberFor(cellZone), numberFor(worldZone));
+        const ESM4::EncounterZone* zoneRecord
+            = zone == 0 ? nullptr : mStore.get<ESM4::EncounterZone>().search(ESM::FormId::fromUint32(zone));
+        const SpawnSettings& settings = mSpawnLevels.settings();
+        const int playerLevel = mProgress.level();
+        // A zone that has fixed its level keeps it (the cell that came into the game first fixed it, see spawnCellLoaded);
+        // one that has not is worked out for the player as he is
+        int baseLevel = playerLevel;
+        if (zoneRecord != nullptr)
+        {
+            baseLevel = mSpawnLevels.lockedZoneLevel(zone);
+            if (baseLevel == 0)
+                baseLevel = zoneLevel(
+                    playerLevel, zoneRecord->mData.mMinimumLevel, zoneRecord->mData.mFlags, settings.mLevelScaling);
+        }
+
+        int level = 0;
+        int levelMod = 0;
+        // (only an actor whose template is a levelled list is rolled for the level of its zone: any other is for the level of
+        // the player as it is)
+        const bool made = mSpawnLevels.placedLevel(
+            key, leveledTemplate ? baseLevel : playerLevel, placed->mLevelModifier, leveledTemplate, level, levelMod);
+        if (made && leveledTemplate)
+            Log(Debug::Verbose) << "Placed actor " << hex(key) << " rolled for level " << level << " (zone level "
+                                << baseLevel << ", modifier " << placed->mLevelModifier << ", player " << playerLevel
+                                << ")";
+        roll.mLevel = level;
+        roll.mLevelMod = storedLevelMod(levelMod);
+        return true;
+    }
+
+    std::vector<FalloutScript::FormId> FalloutScripts::templateChainOf(FalloutScript::FormId actor)
+    {
+        std::vector<FalloutScript::FormId> chain;
+        ESM::FormId base;
+        if (actor == 0 || !baseOf(actor, base) || base.isZeroOrUnset())
+            return chain;
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
+        const ESM4::SpawnRoll roll
+            = ESM4::spawnRollOf(ESM::FormId::fromUint32(actor), OFClass::ESM4Impl::sDefaultLevel);
+        if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
+        {
+            const OFClass::StoreWornArmorSource source(mStore);
+            for (const ESM4::Npc* record : ESM4::templateChain(source, *npc, roll.mLevel, seed, nullptr, roll.mLevelMod))
+                chain.push_back(numberFor(record->mId));
+        }
+        else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
+        {
+            const OFClass::StoreCreatureSource source(mStore);
+            for (const ESM4::Creature* record
+                : ESM4::creatureTemplateChain(source, *creature, roll.mLevel, seed, roll.mLevelMod))
+                chain.push_back(numberFor(record->mId));
+        }
+        return chain;
     }
 
     void FalloutScripts::clearSpawn()
@@ -352,6 +461,9 @@ namespace OFScript
         mRespawn.clear();
         mItemValues.clear();
         mNameOverrides.clear();
+        // A game that was loaded looks at the merchants again, whatever day the one before it had last looked on
+        mMerchantCheckedDay = -1;
+        mMerchantScanDue = false;
         const std::lock_guard lock(mWorldRollMutex);
         mWorldRolls.clear();
     }
@@ -366,6 +478,74 @@ namespace OFScript
         if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
             return respawnsAsRecord(*creature, actor);
         return false;
+    }
+
+    void FalloutScripts::updateSpawn()
+    {
+        if (mQuickSaveRequested.exchange(false))
+            OFBase::Environment::get().getStateManager()->quickSave();
+        const auto today = static_cast<std::int64_t>(std::floor(gameDaysPassed()));
+        // A new day, or a cell that was loaded since: the merchants that came in after the first look of the day are
+        // looked at too (each is restocked once a day, whenever it comes)
+        if (!mMerchantScanDue.exchange(false) && today == mMerchantCheckedDay)
+            return;
+        mMerchantCheckedDay = today;
+        // On the days the settings name, the merchants that are up (loaded characters and creatures with a container
+        // of merchandise) get new stock: the inventory of the container is rolled again (0x886360 asks the container
+        // for the same thing ResetInventory does)
+        int restocked = 0;
+        for (const auto& [reference, ptr] : mReferences)
+        {
+            if (ptr.isEmpty() || reference == mPlayer || leftLoadedCells(reference))
+                continue;
+            if (ptr.getType() != ESM4::Npc::sRecordId && ptr.getType() != ESM4::Creature::sRecordId)
+                continue;
+            const FalloutScript::FormId container = merchantContainer(reference);
+            if (container == 0 || !mRespawn.merchantRestocks(reference, today))
+                continue;
+            mRespawn.resetInventory(container);
+            mActors.resetItems(container);
+            ++restocked;
+        }
+        if (restocked > 0)
+            Log(Debug::Info) << "Respawn: day " << today << " restocks " << restocked << " merchants";
+    }
+
+    std::string_view FalloutScripts::nameGivenToBase(const ESM::FormId& base)
+    {
+        FalloutScript::FormId message = 0;
+        const FalloutScript::FormId key = numberFor(base);
+        if (key == 0 || !mNameOverrides.find(key, message))
+            return {};
+        const std::lock_guard lock(mNameTextMutex);
+        if (const auto found = mNameTextOf.find(key); found != mNameTextOf.end() && found->second.first == message)
+            return mNameTexts[found->second.second];
+        // The full name of the form that was given: a message has its title, the other kinds their own full name
+        const ESM::FormId form = ESM::FormId::fromUint32(message);
+        std::string text;
+        if (const ESM4::Message* record = mStore.get<ESM4::Message>().search(form))
+            text = record->mFullName;
+        else if (const ESM4::MiscItem* misc = mStore.get<ESM4::MiscItem>().search(form))
+            text = misc->mFullName;
+        else if (const ESM4::Note* note = mStore.get<ESM4::Note>().search(form))
+            text = note->mFullName;
+        else if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(form))
+            text = npc->mFullName;
+        else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(form))
+            text = creature->mFullName;
+        if (text.empty())
+            return {};
+        mNameTexts.push_back(std::move(text));
+        mNameTextOf[key] = { message, mNameTexts.size() - 1 };
+        return mNameTexts.back();
+    }
+
+    bool FalloutScripts::zoneNeverResets(FalloutScript::FormId zone)
+    {
+        if (zone == 0)
+            return false;
+        const ESM4::EncounterZone* record = mStore.get<ESM4::EncounterZone>().search(ESM::FormId::fromUint32(zone));
+        return mRespawn.zoneNeverResets(zone, record != nullptr ? record->mData.mFlags : 0);
     }
 
     bool FalloutScripts::respawnsContainerByRecord(FalloutScript::FormId container)
@@ -433,6 +613,7 @@ namespace OFScript
 
     void FalloutScripts::spawnCellLoaded(OFWorld::CellStore& cell)
     {
+        mMerchantScanDue = true;
         const FalloutScript::FormId key = cellKey(cell);
         if (key == 0)
             return;
@@ -456,7 +637,13 @@ namespace OFScript
         if (!zone.isZeroOrUnset())
         {
             const ESM4::EncounterZone* zoneRecord = mStore.get<ESM4::EncounterZone>().search(zone);
-            neverResets = mRespawn.zoneNeverResets(numberFor(zone), zoneRecord != nullptr ? zoneRecord->mData.mFlags : 0);
+            // The zone of a cell that comes into the game fixes its level, once (Fallout3.exe 0x4BFBA0 called at 0x43A141,
+            // New Vegas 0x526270 called at 0x453F07): for the player of that moment
+            if (zoneRecord != nullptr)
+                mSpawnLevels.lockZoneLevel(numberFor(zone),
+                    FalloutScript::zoneLevel(mProgress.level(), zoneRecord->mData.mMinimumLevel,
+                        zoneRecord->mData.mFlags, mSpawnLevels.settings().mLevelScaling));
+            neverResets = zoneNeverResets(numberFor(zone));
         }
         if (!mRespawn.attachCell(key, now, neverResets))
             return;
@@ -465,18 +652,32 @@ namespace OFScript
         // new inventory, and the containers that fill again are filled
         int revived = 0;
         int refilled = 0;
+        int rerolled = 0;
         cell.forEach([&](const OFWorld::Ptr& ptr) {
             const FalloutScript::FormId reference = referenceOf(ptr);
             if (reference == 0)
                 return true;
             if (ptr.getType() == ESM4::Npc::sRecordId || ptr.getType() == ESM4::Creature::sRecordId)
             {
-                if (!mActors.isDead(reference) || !mRespawn.actorDue(reference, now, neverResets))
-                    return true;
-                // The flag of the record that has the base data (a template can give it)
-                const bool respawns = ptr.getType() == ESM4::Npc::sRecordId
-                    ? respawnsAsRecord(*ptr.get<ESM4::Npc>()->mBase, reference)
-                    : respawnsAsRecord(*ptr.get<ESM4::Creature>()->mBase, reference);
+                const bool dead = mActors.isDead(reference);
+                // A dead character comes back when it is due and its record has the flag that makes it respawn (the flag
+                // of the record that has the base data: a template can give it)
+                const bool respawns = dead && mRespawn.actorDue(reference, now, neverResets)
+                    && (ptr.getType() == ESM4::Npc::sRecordId
+                            ? respawnsAsRecord(*ptr.get<ESM4::Npc>()->mBase, reference)
+                            : respawnsAsRecord(*ptr.get<ESM4::Creature>()->mBase, reference));
+                // The reset is for a character that is up to be made new: one that is alive, or one that comes back. A dead
+                // one that stays dead keeps what it has.
+                if ((reference >> 24) != 0xff && (!dead || respawns))
+                {
+                    // The cell reset: an actor that is up to be made new goes back to its own base and resolves its
+                    // template again, for the level of the player now (0x550C60 through 0x47CE10)
+                    mSpawnLevels.forget(reference);
+                    // (what was read from the old template is read again from the new one)
+                    mFightTraits.erase(reference);
+                    ptr.getRefData().setCustomData(nullptr);
+                    ++rerolled;
+                }
                 if (!respawns)
                     return true;
                 {
@@ -503,9 +704,9 @@ namespace OFScript
             return true;
         });
         // A cell that has nothing to bring back is not worth a line
-        if (revived > 0 || refilled > 0)
+        if (revived > 0 || refilled > 0 || rerolled > 0)
             log("Respawn: the cell " + FalloutScript::hex(key) + " reset at game hour " + std::to_string(now) + ": "
                 + std::to_string(revived) + " characters came back, " + std::to_string(refilled)
-                + " containers were filled again");
+                + " containers were filled again, " + std::to_string(rerolled) + " actors resolve their template again");
     }
 }

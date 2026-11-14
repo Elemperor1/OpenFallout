@@ -837,4 +837,17 @@ namespace
         EXPECT_EQ(runner.mState.shudderOffset()[0], 0.0);
         EXPECT_FALSE(runner.mState.expression(door));
     }
+
+    TEST(FalloutScriptWorldCommandsTest, the_loading_menu_is_enabled_by_a_number_above_zero_and_disabled_by_any_other)
+    {
+        Runner runner;
+        EXPECT_EQ(runner.call("IsLoadingMenuEnabled"), 0.0);
+        runner.call("EnableLoadingMenu", { number(1) });
+        EXPECT_EQ(runner.call("IsLoadingMenuEnabled"), 1.0);
+        runner.call("EnableLoadingMenu", { number(0) });
+        EXPECT_EQ(runner.call("IsLoadingMenuEnabled"), 0.0);
+        runner.call("EnableLoadingMenu", { number(3) });
+        runner.call("EnableLoadingMenu", { number(-1) });
+        EXPECT_EQ(runner.call("IsLoadingMenuEnabled"), 0.0);
+    }
 }

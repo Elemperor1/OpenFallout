@@ -667,6 +667,23 @@ namespace
         EXPECT_EQ(found, message);
     }
 
+    TEST(FalloutScriptSpawnCommandsTest, theNameOfACharacterIsGivenToItsBaseRecordSoEveryReferenceOfItShowsIt)
+    {
+        Runner setup;
+        constexpr FormId guardBase = 0x01000700;
+        setup.mObjectWorld.mBases[guard] = guardBase;
+        ScriptBuilder builder;
+        const std::uint16_t text = builder.form(message);
+        builder.code(scriptName() + begin(BlockType::OnActivate) + command(OpSetActorFullName, arguments(1).add(refArg(text))) + end());
+
+        setup.run(builder);
+
+        FormId found = 0;
+        ASSERT_TRUE(setup.mNames.find(guardBase, found));
+        EXPECT_EQ(found, message);
+        EXPECT_FALSE(setup.mNames.find(guard, found));
+    }
+
     TEST(FalloutScriptSpawnCommandsTest, anObjectIsMadeWithTheCountDistanceAndDirection)
     {
         Runner setup;

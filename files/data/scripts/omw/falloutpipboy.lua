@@ -1062,6 +1062,25 @@ return {
         PadButton = function(data)
             onPad(data.button)
         end,
+        -- A script opens the Pip-Boy at a page (`page`: stat, inv or data) and, on the stats page, at a tab (`stats`: status,
+        -- special, skills, perks, general) and for the general tab of New Vegas at the counts (`genrep` 0) or the
+        -- reputations (1). Nothing happens when a screen is open already.
+        PipboyOpen = function(data)
+            if visible or I.UI.getMode() ~= nil or pipboy.playerDead() then
+                return
+            end
+            tab = data.page or 'stat'
+            if tab == 'stat' then
+                statsPage.preselect(data.stats or 'status', data.genrep, data.row)
+            end
+            openWindow()
+        end,
+        -- A script closes the Pip-Boy
+        PipboyClose = function()
+            if visible then
+                closeWindow()
+            end
+        end,
         -- A key of the keyboard (its code in `code`), sent by a script, for the keys no button of the pad stands for
         PipboyKey = function(data)
             -- (the letter shortcuts of a menu file go by the letter, which a script's code stands for)

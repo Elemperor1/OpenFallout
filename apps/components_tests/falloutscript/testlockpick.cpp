@@ -324,4 +324,15 @@ namespace
         EXPECT_EQ(game.view().mLockSequence, "Backward");
         EXPECT_NEAR(game.view().mLockTime, Game::lockBackward * game.view().mAngle / 90, 1e-9);
     }
+
+    TEST(FalloutScriptLockpick, aLockBreaksAtOneFailedForcingOrAtTwoForACharacterThatIgnoresBrokenLocks)
+    {
+        EXPECT_FALSE(lockBroken(0, 0.0));
+        EXPECT_TRUE(lockBroken(1, 0.0));
+        EXPECT_TRUE(lockBroken(5, 0.0));
+        EXPECT_FALSE(lockBroken(0, 1.0));
+        EXPECT_FALSE(lockBroken(1, 1.0));
+        EXPECT_TRUE(lockBroken(2, 1.0));
+        EXPECT_FALSE(lockBroken(1, 2.0));
+    }
 }

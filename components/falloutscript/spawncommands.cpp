@@ -332,10 +332,14 @@ namespace FalloutScript
 
         // The name of a character or creature (SetActorFullName message) or of a cell (SetCellFullName cell, message)
         // is the text of a message of the files (0x5D1920, 0x5D1890)
-        interpreter.setHandler("SetActorFullName", [&names](CallContext& call) {
+        interpreter.setHandler("SetActorFullName", [&names, &objects](CallContext& call) {
             const FormId message = formArgument(call, 0);
-            if (call.mReference != 0 && message != 0)
-                names.set(call.mReference, message);
+            if (call.mReference == 0 || message == 0)
+                return 0.0;
+            // The executable changes the name of the base record (0x5D1920: the full name of the form that is given is
+            // copied into the base of the actor), so every reference of that record shows it
+            FormId base = 0;
+            names.set(objects.baseFormOf(call.mReference, base) && base != 0 ? base : call.mReference, message);
             return 0.0;
         });
         interpreter.setHandler("SetCellFullName", [&names](CallContext& call) {

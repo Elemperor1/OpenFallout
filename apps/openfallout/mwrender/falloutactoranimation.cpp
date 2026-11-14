@@ -1253,6 +1253,42 @@ namespace OFRender
                 action = FalloutScript::AnimAction::specialIdle;
         }
 
+        // The up part of the spine bone's Y and Z axes in the world (IsFacingUp and IsLeftUp, which read
+        // the entries [2][1] and [2][2] of the bone's world rotation; the loader keeps the rotation transposed, so the
+        // axis image of the matrix in the row convention is the column of the games' matrix)
+        float spineY = 0.f;
+        float spineZ = 0.f;
+        if (mObjectRoot != nullptr)
+        {
+            if (!mSpineSearched)
+            {
+                SceneUtil::FindByNameVisitor find("Bip01 Spine");
+                mObjectRoot->accept(find);
+                mSpineNode = find.mFoundNode;
+                // The bone of a skeleton that has none of that name is the one after it (the executable asks for the
+                // second name when the first is not there)
+                if (mSpineNode == nullptr)
+                {
+                    SceneUtil::FindByNameVisitor second("Bip01 Spine01");
+                    mObjectRoot->accept(second);
+                    mSpineNode = second.mFoundNode;
+                }
+                mSpineSearched = mSpineNode != nullptr;
+            }
+            if (mSpineNode != nullptr)
+            {
+                // (the whole way to the world: a body that lies down by the tilt of its placement turns the bone as well as
+                // one whose animation lies it down; the heading of the character does not change a height)
+                const osg::NodePathList paths = mSpineNode->getParentalNodePaths();
+                if (!paths.empty())
+                {
+                    const osg::Matrix toWorld = osg::computeLocalToWorld(paths.front());
+                    spineY = static_cast<float>(osg::Matrix::transform3x3(osg::Vec3d(0, 1, 0), toWorld).z());
+                    spineZ = static_cast<float>(osg::Matrix::transform3x3(osg::Vec3d(0, 0, 1), toWorld).z());
+                }
+            }
+        }
+
         const bool idleDone = mScriptIdleDone;
         const bool swimming = mSwimming && !down;
         const float walkSpeed = mGaits.mHasWalk ? mGaits.mWalkVelocity : 0.f;
@@ -1264,6 +1300,8 @@ namespace OFRender
                 activity.mIdlePlaying = scripted;
                 activity.mIdleDoneOnce = idleDone;
                 activity.mWalkSpeed = walkSpeed;
+                activity.mSpineYUp = spineY;
+                activity.mSpineZUp = spineZ;
             });
     }
 

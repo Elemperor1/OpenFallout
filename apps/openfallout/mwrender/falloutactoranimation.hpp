@@ -211,6 +211,9 @@ namespace OFRender
 
         /// The weapon in the hands: the model on the hand, the animation type of the record and the move it makes
         osg::ref_ptr<osg::Node> mWeaponNode;
+        /// The bone of the spine (IsFacingUp and IsLeftUp), looked for once the body is there
+        osg::ref_ptr<osg::Node> mSpineNode;
+        bool mSpineSearched = false;
         osg::ref_ptr<osg::Group> mWeaponParent;
         std::string mAimGroup;
         std::map<std::string, std::string> mWeaponGroups;

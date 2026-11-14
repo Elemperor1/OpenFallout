@@ -110,15 +110,19 @@ void ESM4::ActorCharacter::load(ESM4::Reader& reader)
                 else
                     reader.skipSubRecordData();
                 break;
+            case ESM::fourCC("XEZN"): // the encounter zone of the reference itself
+                reader.getFormId(mEncounterZone);
+                break;
+            case ESM::fourCC("XLCM"): // the level modifier of the placement: 0 easy, 1 medium, 2 hard, 3 boss
+                reader.get(mLevelModifier);
+                break;
             case ESM::fourCC("XRGD"): // ragdoll
             case ESM::fourCC("XRGB"): // ragdoll biped
             case ESM::fourCC("XHRS"): // horse formId
             // TES5
             case ESM::fourCC("XAPD"): // activation parent
             case ESM::fourCC("XAPR"): // active parent
-            case ESM::fourCC("XEZN"): // encounter zone
             case ESM::fourCC("XHOR"):
-            case ESM::fourCC("XLCM"): // levelled creature
             case ESM::fourCC("XLCN"): // location
             case ESM::fourCC("XLRT"): // location type
             //

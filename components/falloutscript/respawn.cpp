@@ -14,6 +14,7 @@ namespace FalloutScript
         mDeaths.clear();
         mZones.clear();
         mGenerations.clear();
+        mMerchantDays.clear();
     }
 
     void RespawnState::cellDetached(FormId cell, std::uint32_t now)
@@ -120,6 +121,21 @@ namespace FalloutScript
         return (recordFlags & ZoneFlag::neverResets) != 0;
     }
 
+    bool RespawnState::merchantRestocks(FormId merchant, std::int64_t day)
+    {
+        if (day < 0)
+            return false;
+        const int weekday = static_cast<int>(day % 7);
+        if (weekday != mSettings.mMerchantDay1 && weekday != mSettings.mMerchantDay2)
+            return false;
+        const std::lock_guard lock(mMutex);
+        const auto found = mMerchantDays.find(merchant);
+        if (found != mMerchantDays.end() && found->second == day)
+            return false;
+        mMerchantDays[merchant] = day;
+        return true;
+    }
+
     int RespawnState::inventoryGeneration(FormId holder) const
     {
         const std::lock_guard lock(mMutex);
@@ -162,13 +178,21 @@ namespace FalloutScript
             out.form(holder);
             out.i32(generation);
         }
+        // The day each merchant got new stock (from version 3)
+        out.count(mMerchantDays.size());
+        for (const auto& [merchant, day] : mMerchantDays)
+        {
+            out.form(merchant);
+            out.i64(day);
+        }
     }
 
-    void RespawnState::read(SaveReader& in, std::uint32_t)
+    void RespawnState::read(SaveReader& in, std::uint32_t version)
     {
         std::map<FormId, std::uint32_t> detached, deaths;
         std::map<FormId, bool> zones;
         std::map<FormId, int> generations;
+        std::map<FormId, std::int64_t> merchantDays;
         for (std::size_t i = 0, n = in.count(8); i < n; ++i)
         {
             const std::optional<FormId> cell = in.form();
@@ -197,10 +221,20 @@ namespace FalloutScript
             if (holder)
                 generations[*holder] = generation;
         }
+        // (a game saved before the days were kept restocks a merchant on the next day it is due, as a new game does)
+        if (version >= 3)
+            for (std::size_t i = 0, n = in.count(12); i < n; ++i)
+            {
+                const std::optional<FormId> merchant = in.form();
+                const std::int64_t day = in.i64();
+                if (merchant)
+                    merchantDays[*merchant] = day;
+            }
         const std::lock_guard lock(mMutex);
         mDetached = std::move(detached);
         mDeaths = std::move(deaths);
         mZones = std::move(zones);
         mGenerations = std::move(generations);
+        mMerchantDays = std::move(merchantDays);
     }
 }

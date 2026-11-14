@@ -253,6 +253,44 @@ namespace OFLua
             row["newVegas"] = stats.mNewVegas;
             return row;
         };
+        // The general page: the word, picture and title of the karma, the counts (name and value, in the order of the page)
+        // and, in New Vegas, the reputations that hold some fame or infamy (by name: name, picture, title, the points and
+        // the level, 0 to 3, of each side)
+        api["general"] = [lua]() {
+            const OFScript::FalloutScripts::PipboyGeneral general = scripts().pipboyGeneral();
+            sol::table result(lua, sol::create);
+            sol::table karma(lua, sol::create);
+            karma["word"] = general.mKarmaWord;
+            karma["picture"] = general.mKarmaPicture;
+            karma["title"] = general.mKarmaTitle;
+            result["karma"] = karma;
+            sol::table counts(lua, sol::create);
+            for (const auto& count : general.mCounts)
+            {
+                sol::table row(lua, sol::create);
+                row["name"] = count.mName;
+                row["value"] = count.mValue;
+                counts.add(row);
+            }
+            result["counts"] = counts;
+            sol::table standings(lua, sol::create);
+            for (const auto& standing : general.mStandings)
+            {
+                sol::table row(lua, sol::create);
+                row["id"] = idText(standing.mId);
+                row["name"] = standing.mName;
+                row["picture"] = standing.mPicture;
+                row["title"] = standing.mTitle;
+                row["fame"] = standing.mFame;
+                row["infamy"] = standing.mInfamy;
+                row["fameLevel"] = standing.mFameLevel;
+                row["infamyLevel"] = standing.mInfamyLevel;
+                standings.add(row);
+            }
+            result["reputations"] = standings;
+            result["newVegas"] = general.mNewVegas;
+            return result;
+        };
         // The seven attributes of SPECIAL: number, name, description, value now and base
         api["attributes"] = [lua]() {
             OFScript::FalloutScripts& host = scripts();

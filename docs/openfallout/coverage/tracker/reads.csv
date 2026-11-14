@@ -107,7 +107,7 @@ command,GetInCellParam,"M16 spawn: exec 0x5C7590, eval 0x59EF60 in the New Vegas
 command,GetParentRef,M16 spawn: exec 0x5CE630 in the New Vegas executable
 command,GetContainerInventoryCount,M16 spawn: exec 0x5E0100 in the New Vegas executable (the count is the total of the items; the rule for each kind is not read)
 command,SetItemValue,M16 spawn: exec 0x5D3E30 in the New Vegas executable
-command,SetActorFullName,M16 spawn: exec 0x5D1920 in the New Vegas executable (the name is kept; the world does not show it)
+command,SetActorFullName,M16 spawn2: exec 0x5D1920 in the New Vegas executable copies the full name of the named form into the base record of the actor; the classes of characters and creatures show it
 command,SetCellFullName,M16 spawn: exec 0x5D1890 in the New Vegas executable (the name is kept; the world does not show it)
 command,AddItemToLeveledList,M16 spawn: exec 0x5DE700 in the New Vegas executable
 command,AddNPCToLeveledList,M16 spawn: exec 0x5DE670 in the New Vegas executable
@@ -218,7 +218,7 @@ command,GetPCFactionMurder,M16 law (docs/openfallout/m16-law-notes.md): faction 
 command,SetPCFactionMurder,M16 law (docs/openfallout/m16-law-notes.md): faction flag 0x40 (0x47EBB0, set only by scripts) in the executable
 command,GetAlarmed,M16 law (docs/openfallout/m16-law-notes.md): eval 0x59E650: the current package is the alarm package in the executable
 command,GetDetectionLevel,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A1EE0 over 0x8A81E0 in the executable
-command,IsActorDetected,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5CDA20 over ProcessLists 0x973460 in the executable
+command,IsActorDetected,M16 law2 (docs/openfallout/m16-law2-notes.md): exec 0x5CDA20 over ProcessLists 0x973460 (characters only, detection level 3 via 0x8A81E0, not one fighting the subject) in the executable
 command,GetAmountSoldStolen,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A2050 over 0x5A20B0 in the executable
 command,ModAmountSoldStolen,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5CDEC0 over 0x5CDF20 in the executable
 command,SendAssaultAlarm,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5DA2A0 over the attack crime 0x8C0460 in the executable
@@ -226,7 +226,7 @@ command,SendTrespassAlarm,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5D
 command,ClearFactionPlayerEnemyFlag,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5D9500 over 0x47EB90 in the executable
 command,ClearActorsFactionsPlayerEnemyFlag,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5D9550 over 0x8BCB40 in the executable
 command,GetActorFactionPlayerEnemy,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A49F0 over the hostility test 0x8B87A0 in the executable
-command,GetActorCrimePlayerEnemy,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A4930 in the executable
+command,GetActorCrimePlayerEnemy,M16 law2 (docs/openfallout/m16-law2-notes.md): eval 0x5A4930 (own crime list non-empty and vt+0x100, no faction flag) in the executable
 command,GetTrespassWarningLevel,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A1770 and the trespass package update 0x918120 in the executable
 command,IsTrespassing,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A1900 in the executable
 command,IsInMyOwnedCell,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A19A0 over 0x546CA0 in the executable
@@ -306,3 +306,20 @@ command,IsAlwaysHardcore,docs/openfallout/m16-needs-notes.md: returns the tracki
 command,DisableHardcoreTracking,docs/openfallout/m16-needs-notes.md: clears the tracking byte +0xE38 of the player in the executable
 command,GetPCSleepHours,docs/openfallout/m16-needs-notes.md: exec 0x5CDE00 reads player +0x654 in the executable
 command,ShowSleepWaitMenu,docs/openfallout/m16-needs-notes.md: exec 0x5E0090 (second argument 1 takes the checked path 0x969FA0) in the executable
+command,CreateDetectionEvent,M16 law2 (docs/openfallout/m16-law2-notes.md): exec 0x5DAC80 over HighProcess vt+0xFC 0x903E40 (event record at process+0x3DC) in the executable
+command,PlaceAtMeHealthPercent,"M16 spawn2: exec 0x5D90A0 in the New Vegas executable passes the percent to the placement worker 0x5C4B30 (the health is not applied here)"
+command,IsLeftUp,docs/openfallout/m16-tail2-notes.md: eval 0x5A0800 tests entry [2][2] of the world rotation of the spine bone above 0
+command,IsGuard,docs/openfallout/m16-fo3-notes.md: Fallout3.exe eval 0x511420 tests bit 1 of the class flags (0x54D490: the byte at class +0x54, the 16th byte of the record's DATA) in the executable
+command,PlaceLeveledActorAtMe,docs/openfallout/m16-fo3-notes.md: Fallout3.exe exec 0x52EC90 (level step 0x4EC070, zone level 0x4BFB20) has the same steps as 0x5D9810 in the executable
+command,DispelAllSpells,docs/openfallout/m16-fo3-notes.md: Fallout3.exe exec 0x523550 calls 0x6B7270 which ends the effects of the types 0 2 3 7 8 like 0x8249D0 in the executable
+command,ExitGame,docs/openfallout/m16-fo3-notes.md: Fallout3.exe exec 0x52E540 sets the credits global to 1 and ends the game in the executable
+command,DamageObject,docs/openfallout/m16-fo3-notes.md: Fallout3.exe exec 0x536AA0 calls the reference's vtable slot 0x144 with the damage like 0x5D4B90 in the executable
+command,GetDestructionStage,docs/openfallout/m16-fo3-notes.md: Fallout3.exe eval 0x513870 and stage function 0x44A5E0 give the same percent and ceiling as 0x477430 in the executable
+command,IsSnowing,docs/openfallout/m16-fo3-notes.md: Fallout3.exe eval 0x5149E0 and 0x50EAD0 use the same 1/255 0.999 and 0.001 terms as 0x59EA10 in the executable
+command,IsCloudy,docs/openfallout/m16-fo3-notes.md: Fallout3.exe eval 0x514900 adds the share of the weather shown to the share left of the one it comes from like 0x59E7F0 in the executable
+command,IsPleasant,docs/openfallout/m16-fo3-notes.md: Fallout3.exe eval 0x514880 has the same two shares as 0x59E700 in the executable
+command,SetActorsAI,docs/openfallout/m16-fo3-notes.md: Fallout3.exe exec 0x52CF70 writes the byte at actor +0xB4 (1 on, an argument of 0 gives 0 = off) in the executable
+command,IsActorsAIOff,docs/openfallout/m16-fo3-notes.md: Fallout3.exe exec 0x520BF0 answers 1 when the byte at actor +0xB4 is 0 in the executable
+command,ToggleActorsAI,docs/openfallout/m16-fo3-notes.md: Fallout3.exe exec 0x520B70 flips the byte at actor +0xB4 in the executable
+command,SetForceRun,docs/openfallout/m16-fo3-notes.md: Fallout3.exe exec 0x529C30 writes the byte at actor +0x118 in the executable
+command,SetForceSneak,docs/openfallout/m16-fo3-notes.md: Fallout3.exe exec 0x529D50 writes the byte at actor +0x119 in the executable

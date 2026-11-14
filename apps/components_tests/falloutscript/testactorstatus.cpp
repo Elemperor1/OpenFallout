@@ -41,6 +41,8 @@ namespace
     constexpr std::uint16_t OpIsSwimming = 0x10B9;
     constexpr std::uint16_t OpIsWaiting = 0x106F;
     constexpr std::uint16_t OpGetWalkSpeed = 0x108E;
+    constexpr std::uint16_t OpIsFacingUp = 0x106A;
+    constexpr std::uint16_t OpIsLeftUp = 0x111D;
     constexpr std::uint16_t OpGetAnimAction = 0x10DB;
     constexpr std::uint16_t OpIsIdlePlaying = 0x1070;
     constexpr std::uint16_t OpGetIdleDoneOnce = 0x113E;
@@ -325,6 +327,13 @@ namespace
         status.forgetBody(otherRaider);
         status.forgetMind(otherRaider);
         EXPECT_EQ(status.activeCount(), 0u);
+        // The pose of the spine goes with the body: a body that is gone is not lying down
+        status.update(raider, [](ActorActivity& activity) {
+            activity.mSpineYUp = 0.5f;
+            activity.mSpineZUp = -0.5f;
+        });
+        status.forgetBody(raider);
+        EXPECT_FALSE(status.activity(raider).has_value());
     }
 
     TEST(FalloutScriptActorStatusTest, clearing_the_status_forgets_everything_a_new_game_starts_without)
@@ -475,6 +484,28 @@ namespace
         EXPECT_EQ(run.ask(OpIsSwimming, raider), 1.0);
         EXPECT_EQ(run.ask(OpGetWalkSpeed, raider), 130.0);
         EXPECT_THAT(run.mHost.mLog, IsEmpty());
+    }
+
+    TEST(FalloutScriptActorStatusTest, the_spine_bone_says_whether_a_character_faces_up_and_whether_its_left_is_up)
+    {
+        Runner run;
+        // No bone yet (or no activity at all): both are 0
+        EXPECT_EQ(run.ask(OpIsFacingUp, raider), 0.0);
+        EXPECT_EQ(run.ask(OpIsLeftUp, raider), 0.0);
+        run.mStatus.publish(raider, ActorActivity{});
+        run.mStatus.update(raider, [](ActorActivity& activity) {
+            activity.mSpineYUp = 0.4f;
+            activity.mSpineZUp = -0.9f;
+        });
+        EXPECT_EQ(run.ask(OpIsFacingUp, raider), 1.0);
+        EXPECT_EQ(run.ask(OpIsLeftUp, raider), 0.0);
+        run.mStatus.update(raider, [](ActorActivity& activity) {
+            activity.mSpineYUp = 0.f;
+            activity.mSpineZUp = 0.1f;
+        });
+        // The executable asks for more than 0: an axis that lies flat is not up
+        EXPECT_EQ(run.ask(OpIsFacingUp, raider), 0.0);
+        EXPECT_EQ(run.ask(OpIsLeftUp, raider), 1.0);
     }
 
     TEST(FalloutScriptActorStatusTest, an_actor_the_game_does_not_look_after_stands_still)
@@ -817,7 +848,7 @@ namespace
     {
         Runner run;
         for (const std::uint16_t code : { OpIsMoving, OpIsTurning, OpIsRunning, OpIsSwimming, OpIsWaiting,
-                 OpGetWalkSpeed, OpGetAnimAction, OpIsIdlePlaying, OpGetIdleDoneOnce, OpIsLastIdlePlayed,
+                 OpGetWalkSpeed, OpIsFacingUp, OpIsLeftUp, OpGetAnimAction, OpIsIdlePlaying, OpGetIdleDoneOnce, OpIsLastIdlePlayed,
                  OpGetCurrentAIProcedure, OpGetPackageTarget, OpSetActorsAI, OpToggleActorsAI, OpIsActorsAIOff,
                  OpDisableAllActors, OpGetActorsInHigh, OpSetForceRun, OpGetForceRun, OpSetForceSneak, OpGetForceSneak,
                  OpSetNoAvoidance, OpSetAllReachable, OpGetGroupMemberCount, OpGetGroupTargetCount,

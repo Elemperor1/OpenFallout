@@ -64,6 +64,11 @@ add_openfallout_dir (mwscript
     falloutneeds
     )
 
+# The Lua bindings are a library of their own. The Windows CI keeps the debug information in every object file, and one
+# static library of all the objects is past the 4 GB that MSVC's lib.exe can write (LNK1248). The two libraries use each
+# other, which CMake allows between static libraries.
+set(OPENFALLOUT_FILES_BEFORE_LUA ${OPENFALLOUT_FILES})
+
 add_openfallout_dir (mwlua
     objectcache luamanagerimp object objectlists userdataserializer luaevents engineevents objectvariant loadscripts contentbindings
     context menuscripts globalscripts localscripts playerscripts luabindings objectbindings cellbindings coremwscriptbindings
@@ -77,6 +82,10 @@ add_openfallout_dir (mwlua
     types/potion types/ingredient types/misc types/repair types/armor types/light types/static
     types/clothing types/levelledlist types/terminal magictypebindings
     )
+
+set(OPENFALLOUT_LUA_FILES ${OPENFALLOUT_FILES})
+list(REMOVE_ITEM OPENFALLOUT_LUA_FILES ${OPENFALLOUT_FILES_BEFORE_LUA})
+set(OPENFALLOUT_FILES ${OPENFALLOUT_FILES_BEFORE_LUA})
 
 add_openfallout_dir (mwsound
     soundmanagerimp openaloutput ffmpegdecoder headcache warmqueue sound soundbuffer sounddecoder soundoutput
@@ -130,6 +139,12 @@ add_library(openfallout-lib STATIC
     ${OPENFALLOUT_FILES}
     ${OPENFALLOUT_SOURCES}
 )
+
+add_library(openfallout-lua-lib STATIC
+    ${OPENFALLOUT_LUA_FILES}
+)
+target_link_libraries(openfallout-lua-lib openfallout-lib)
+target_link_libraries(openfallout-lib openfallout-lua-lib)
 
 if (MSVC)
     # these TUs take a lot of memory for codegen
@@ -200,7 +215,8 @@ target_link_libraries(openfallout-lib
 )
 
 if (MSVC AND PRECOMPILE_HEADERS_WITH_MSVC)
-    target_precompile_headers(openfallout-lib PRIVATE
+    foreach (openfallout_target openfallout-lib openfallout-lua-lib)
+    target_precompile_headers(${openfallout_target} PRIVATE
         <boost/program_options/options_description.hpp>
 
         <sol/sol.hpp>
@@ -223,6 +239,7 @@ if (MSVC AND PRECOMPILE_HEADERS_WITH_MSVC)
         <string_view>
         <vector>
     )
+    endforeach()
 endif()
 
 if (ANDROID)
@@ -281,6 +298,7 @@ endif()
 
 if (BUILD_WITH_CODE_COVERAGE)
     target_compile_options(openfallout-lib PRIVATE --coverage)
+    target_compile_options(openfallout-lua-lib PRIVATE --coverage)
     target_link_libraries(openfallout-lib gcov)
     if (NOT ANDROID AND BUILD_OPENFALLOUT)
         target_compile_options(openfallout PRIVATE --coverage)

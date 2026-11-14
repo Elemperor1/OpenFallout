@@ -20,6 +20,10 @@ namespace FalloutScript
         /// iHoursToRespawnCell: the hours that pass before a cell that was left resets, and before a dead character
         /// comes back
         std::uint32_t mHoursToRespawn = 72;
+        /// iMerchantRespawnDay1 and ...Day2: the days of the week (the whole days since the game began, modulo 7) on
+        /// which a merchant gets new stock (0x886360; the two settings are in no file of either game)
+        int mMerchantDay1 = 0;
+        int mMerchantDay2 = 3;
     };
 
     /// The game hours that the clock of the respawn rules counts in: whole hours since the game began (the global
@@ -78,6 +82,10 @@ namespace FalloutScript
         /// Whether the zone never resets: what a script told it, or else its flags
         bool zoneNeverResets(FormId zone, int recordFlags) const;
 
+        /// Whether a merchant that is up gets new stock on that day (the whole days since the game began): the weekday
+        /// is one of the two the settings name (0x886360). It says yes once for each day for each merchant.
+        bool merchantRestocks(FormId merchant, std::int64_t day);
+
         /// How often the inventory of the holder was rebuilt (ResetInventory), which the host chooses the new roll of
         /// the levelled lists in it by
         int inventoryGeneration(FormId holder) const;
@@ -98,6 +106,7 @@ namespace FalloutScript
         std::map<FormId, std::uint32_t> mDeaths;
         std::map<FormId, bool> mZones;
         std::map<FormId, int> mGenerations;
+        std::map<FormId, std::int64_t> mMerchantDays;
     };
 }
 

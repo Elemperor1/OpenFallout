@@ -23,6 +23,7 @@
 #include <components/misc/strings/lower.hpp>
 
 #include "../mwbase/environment.hpp"
+#include "../mwbase/mechanicsmanager.hpp"
 #include "../mwbase/statemanager.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
@@ -372,6 +373,27 @@ namespace OFScript
             });
         }
 
+        void setPackageDuration(FalloutScript::FormId actor, double hundredths) override
+        {
+            mHost.runOnMainThread([this, actor, hundredths] {
+                const OFWorld::Ptr ptr = mHost.findReference(actor);
+                if (!ptr.isEmpty())
+                    OFBase::Environment::get().getMechanicsManager()->setFalloutPackageDuration(ptr, hundredths);
+            });
+        }
+
+        bool padDisabled() override
+        {
+            // bDisable360Controller of the Interface section turns the pad of the box off
+            const std::optional<int> setting = mHost.gameIniInteger("Interface", "bDisable360Controller");
+            return setting.has_value() && *setting != 0;
+        }
+
+        bool goreDisabled() override
+        {
+            return FalloutScript::World::goreDisabledBy(mHost.gameIniInteger("General", "bDisableAllGore"));
+        }
+
         bool padConnected() override
         {
             for (int index = 0; index < SDL_NumJoysticks(); ++index)
@@ -408,6 +430,7 @@ namespace OFScript
             // The credits are asked for by the global PlayCredits, 2 (the other credits) for a player that has the perk
             // that the executable names in New Vegas, and 1 in Fallout 3
             const bool otherCredits = mHost.isNewVegas() && mHost.mProgress.perkRank(mHost.mPlayer, 0xED568) > 0;
+            mHost.requestCredits(otherCredits ? 2 : 1);
             if (const FalloutScript::FormId global = mHost.findGlobal("PlayCredits"); global != 0)
                 mHost.setGlobal(global, otherCredits ? 2.0 : 1.0);
             Log(Debug::Info) << "ExitGame: the game goes back to the main menu with PlayCredits "

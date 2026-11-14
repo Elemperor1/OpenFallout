@@ -4,14 +4,16 @@ namespace FalloutScript
 {
     bool AiState::empty() const
     {
-        return mDone.empty() && mPackage == 0 && !mChangeTold && !mFollows;
+        return mDone.empty() && mPackage == 0 && !mChangeTold && !mFollows && mDurationHundredths <= 0;
     }
 
     bool AiState::operator==(const AiState& other) const
     {
         return mDone == other.mDone && mPackage == other.mPackage && mChangeTold == other.mChangeTold
             && mFollows == other.mFollows && mFollowsPlayer == other.mFollowsPlayer
-            && mFollowTarget == other.mFollowTarget && mFollowDistance == other.mFollowDistance;
+            && mFollowTarget == other.mFollowTarget && mFollowDistance == other.mFollowDistance
+            && mDurationHundredths == other.mDurationHundredths && mStartedHours == other.mStartedHours
+            && mExpired == other.mExpired;
     }
 
     void AiMemory::clear()
@@ -68,10 +70,13 @@ namespace FalloutScript
             out.boolean(state.mFollowsPlayer);
             out.form(state.mFollowTarget);
             out.f32(state.mFollowDistance);
+            out.f64(state.mDurationHundredths);
+            out.f64(state.mStartedHours);
+            out.boolean(state.mExpired);
         }
     }
 
-    void readAi(AiMemory& memory, SaveReader& in, std::uint32_t)
+    void readAi(AiMemory& memory, SaveReader& in, std::uint32_t version)
     {
         const std::size_t count = in.count(8);
         for (std::size_t i = 0; i < count; ++i)
@@ -90,6 +95,15 @@ namespace FalloutScript
             const std::optional<FormId> target = in.form();
             state.mFollowTarget = target.value_or(0);
             state.mFollowDistance = in.f32();
+            // (a game saved before the duration was kept has none)
+            if (version >= 2)
+            {
+                state.mDurationHundredths = in.f64();
+                state.mStartedHours = in.f64();
+            }
+            // (a game saved before the reason for a done package was kept has none that ran out)
+            if (version >= 3)
+                state.mExpired = in.boolean();
             // The one it followed is gone with its plugin: it follows no one
             if (state.mFollows && !state.mFollowsPlayer && !target)
                 state.mFollows = false;

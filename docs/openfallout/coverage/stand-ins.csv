@@ -14,8 +14,7 @@ GetCasinoWinningsLevel,stand-in,answers 0: the casino of New Vegas is not built
 SetCasinoWinningsLevel,stand-in,changes nothing: the casino of New Vegas is not built
 HasBeenEaten,stand-in,answers 0: nothing feeds on a dead character
 ResetFallDamageTimer,exact,the executable only reads the timer of the process and changes nothing
-GetForceHitReaction,stand-in,answers 0: the byte of the character that the executable reads is not kept
-GetKnockedState,stand-in,answers 0: the knock state of the character is not kept
+GetForceHitReaction,exact,the byte it reads (actor +0x1B1) is set only for the length of the damage function's reaction call and cleared after it (FalloutNV.exe 0x89BEE0, 0x89C3BD): a script or a condition always sees it clear
 PlayMagicEffectVisuals,stand-in,accepted and ignored: the visuals of an effect are drawn by the renderer (effect shaders and models), not built
 StopMagicEffectVisuals,stand-in,accepted and ignored: nothing draws the visuals of an effect, so there is none to stop
 PlayMagicShaderVisuals,stand-in,accepted and ignored: an effect shader (EFSH) changes how the renderer draws a reference, which is renderer work
@@ -50,9 +49,7 @@ TrapUpdate,exact,a dummy in the executables (mov al, 1; ret)
 SetCasinoCheatLevel,exact,a dummy in the executables (mov al, 1; ret)
 SetSize,stand-in,changes nothing: characters collide with the box their model gives them, which nothing resizes
 SetRigidBodyMass,stand-in,changes nothing: the objects of the engine have no mass to set
-Reset3DState,stand-in,changes nothing: the pose of an object is not reset from its record
-SetPackDuration,stand-in,changes nothing: packages have no time limit of their own yet
-IsGoreDisabled,stand-in,answers 0: the setting that turns gore off is not read
+Reset3DState,stand-in,changes nothing: the executable rebuilds the reference's 3D and clears two form flags (0x55F970, 0x422AA0, 0x422C20) and the port has no 3D reset (one New Vegas script uses it, to re-arm bear traps)
 GetDLCCount,stand-in,counts the add-on plugins by name: the list that the executable counts (0x5DF930) was not traced to its source
 ShowLockpickMenu,stand-in,changes nothing: the lock screen is for a lock that a reference has
 ShowLockpickMenuDebug,stand-in,changes nothing: the lock screen is for a lock that a reference has
@@ -91,3 +88,4 @@ SkipAnim,stand-in,accepted and does nothing: the animation that plays is not ski
 SetClass,stand-in,accepted and does nothing: the class of a character is the one its record gives
 GetActorAggroRadiusViolated,stand-in,answers 0: the aggression radius is not watched
 IsContinuingPackagePCNear,stand-in,answers 0: the packages that go on while the player is near are not told apart
+EnableLoadingMenu,stand-in,keeps the flag that IsLoadingMenuEnabled answers; the command does not show or hide the loading menu (0x457D70) itself

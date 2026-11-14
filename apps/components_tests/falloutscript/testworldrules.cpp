@@ -601,6 +601,28 @@ namespace
         EXPECT_TRUE(World::isWin32(false, false));
         EXPECT_FALSE(World::isWin32(true, false));
         EXPECT_TRUE(World::isWin32(true, true));
+    }
+
+    TEST(FalloutScriptWorldRulesTest, an_ini_setting_reads_as_the_windows_call_reads_it)
+    {
+        EXPECT_EQ(World::iniInteger("1"), 1);
+        EXPECT_EQ(World::iniInteger("  42 ; comment"), 42);
+        EXPECT_EQ(World::iniInteger("-3"), -3);
+        EXPECT_EQ(World::iniInteger("+7"), 7);
+        EXPECT_EQ(World::iniInteger("12abc"), 12);
+        EXPECT_EQ(World::iniInteger("99999999999"), 0x7fffffff);
+        EXPECT_FALSE(World::iniInteger("").has_value());
+        EXPECT_FALSE(World::iniInteger("   ").has_value());
+        EXPECT_FALSE(World::iniInteger("yes").has_value());
+        EXPECT_FALSE(World::iniInteger("-").has_value());
+    }
+
+    TEST(FalloutScriptWorldRulesTest, gore_is_off_only_for_a_setting_of_exactly_one)
+    {
+        EXPECT_TRUE(World::goreDisabledBy(1));
+        EXPECT_FALSE(World::goreDisabledBy(0));
+        EXPECT_FALSE(World::goreDisabledBy(2));
+        EXPECT_FALSE(World::goreDisabledBy(std::nullopt));
         EXPECT_TRUE(World::isWin32(false, true));
     }
 

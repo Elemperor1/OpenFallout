@@ -27,6 +27,8 @@
 
 #include "esm4base.hpp"
 #include "esm4sources.hpp"
+#include "../mwbase/environment.hpp"
+#include "../mwscript/falloutscripts.hpp"
 
 namespace OFClass
 {
@@ -401,9 +403,18 @@ namespace OFClass
 
     std::string_view ESM4Npc::getName(const OFWorld::ConstPtr& ptr) const
     {
+        // The name that a script gave the base record (SetActorFullName) is the one shown, for every reference of it
+        if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
+            if (const std::string_view given = scripts->nameGivenToBase(ptr.get<ESM4::Npc>()->mBase->mId); !given.empty())
+                return given;
         const ESM4::Npc* const baseData = getCustomData(ptr).mBaseData;
         if (baseData == nullptr)
             return {};
+        // The name of the record that gives the traits (a template) that a script changed comes after the own one
+        if (baseData != ptr.get<ESM4::Npc>()->mBase)
+            if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
+                if (const std::string_view given = scripts->nameGivenToBase(baseData->mId); !given.empty())
+                    return given;
         return baseData->mFullName;
     }
 }

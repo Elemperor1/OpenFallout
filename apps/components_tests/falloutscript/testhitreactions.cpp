@@ -105,4 +105,41 @@ namespace
         const Settings settings;
         EXPECT_DOUBLE_EQ(knockbackForce(settings, 500, 1), 512);
     }
+
+    TEST(FalloutScriptHitReactionsTest, the_knocked_answer_is_one_for_the_states_three_and_four_only)
+    {
+        for (int state = 0; state <= 6; ++state)
+            EXPECT_EQ(knockedAnswer(state), state == 3 || state == 4) << state;
+        EXPECT_FALSE(knockedAnswer(-1));
+        EXPECT_FALSE(knockedAnswer(7));
+    }
+
+    TEST(FalloutScriptHitReactionsTest, a_knock_lasts_its_seconds_and_a_new_one_replaces_it)
+    {
+        KnockTracker knocks;
+        EXPECT_EQ(knocks.stateOf(0x14), KnockState::none);
+        knocks.start(0x14, 1.0);
+        EXPECT_TRUE(knockedAnswer(knocks.stateOf(0x14)));
+        EXPECT_EQ(knocks.stateOf(0x15), KnockState::none);
+        knocks.advance(0.6);
+        EXPECT_TRUE(knockedAnswer(knocks.stateOf(0x14)));
+        knocks.start(0x14, 1.0);
+        knocks.advance(0.6);
+        EXPECT_TRUE(knockedAnswer(knocks.stateOf(0x14)));
+        knocks.advance(0.5);
+        EXPECT_EQ(knocks.stateOf(0x14), KnockState::none);
+    }
+
+    TEST(FalloutScriptHitReactionsTest, a_knock_of_no_time_is_no_knock_and_clear_forgets_them_all)
+    {
+        KnockTracker knocks;
+        knocks.start(0x14, 0.0);
+        EXPECT_EQ(knocks.stateOf(0x14), KnockState::none);
+        knocks.start(0x14, 2.0);
+        knocks.start(0x14, 0.0);
+        EXPECT_EQ(knocks.stateOf(0x14), KnockState::none);
+        knocks.start(0x16, 2.0);
+        knocks.clear();
+        EXPECT_EQ(knocks.stateOf(0x16), KnockState::none);
+    }
 }

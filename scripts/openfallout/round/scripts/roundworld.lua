@@ -372,6 +372,11 @@ end
 function r.pipboyUse(form, label) return ask('pipboyUse', { form = form, label = label }) end
 -- The quests the Pip-Boy lists: how many, and the one that is followed (the Pip-Boy's own list of quests)
 function r.pipboyQuests(label) return ask('pipboyQuests', { label = label }) end
+-- The Pip-Boy opened at a page: r.pipboyOpen{ page = 'stat', stats = 'general', genrep = 0 } (genrep: New Vegas only, 0 the
+-- counts and the karma, 1 the reputations); r.pipboyGeneral(label) logs what the general page holds (numbers and sizes only)
+function r.pipboyOpen(o) return ask('pipboyOpen', o or {}) end
+function r.pipboyClose(label) return ask('pipboyClose', { label = label }) end
+function r.pipboyGeneral(label) return ask('pipboyGeneral', { label = label }) end
 -- The player's weapon, ammunition and what is in the hand; `weapon{label}` logs it, `equip(record)` puts a weapon of the inventory in the hand
 function r.weapon(label) return ask('weapon', { label = label }) end
 -- `equip(record)`: the weapon with that record in the hand; without one, the first ranged weapon that has rounds (`pick`: the nth)

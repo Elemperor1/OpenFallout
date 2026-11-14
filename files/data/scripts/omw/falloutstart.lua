@@ -492,8 +492,18 @@ showManual = function()
 end
 
 -- Credits: the credits of the game over the title screen; the end of them (or Escape, or a click) brings the list back
-showCredits = function()
-    if credits.show({ layer = LAYER, onDone = function() screen = 'list' end }) then screen = 'credits' end
+-- (`wacky` asks for the Wild Wasteland credits, which the game's loader picks when the global PlayCredits is 2)
+showCredits = function(wacky)
+    local done = function()
+        -- The end of the credits clears the request that ExitGame made (the game's handler at 0x75F750 writes 0 to the global)
+        engine.endCredits()
+        screen = 'list'
+    end
+    if credits.show({ layer = LAYER, wacky = wacky, onDone = done }) then
+        screen = 'credits'
+    else
+        engine.endCredits()
+    end
 end
 
 -- The items of a submenu, as toggles and meters in the container of the options; `keepRow` is the row to light
@@ -756,6 +766,10 @@ local function open()
     -- pause menu leaves it out: the file's picture of the pause screen shows only when the logo does not)
     if atTitle then shown:set('main_title', 'alpha', 255) end
     showList()
+    -- ExitGame took the player to this screen with the global PlayCredits set (1, or 2 for the Wild Wasteland credits): the
+    -- game's start menu opens the credits at once when it is made with the global above 0 (FalloutNV.exe 0x7CBAF0, 0x7CF9A0)
+    local requested = atTitle and engine.creditsRequested() or 0
+    if requested > 0 then showCredits(requested == 2) end
     -- The menu is used by the lit row (the D-pad, and A for Enter), not by the pointer: the circle that the stick left on
     -- the screen stays out of it until the stick moves the pointer again (M13: "the pointer left on the pause menu")
     pad.holdPick()

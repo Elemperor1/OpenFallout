@@ -234,6 +234,8 @@ namespace OFBase
         /// The AI package that a character or creature of Fallout follows now: the id of its record, unset for one
         /// that follows none
         virtual ESM::FormId falloutPackageOf(const OFWorld::Ptr& actor) const = 0;
+        /// SetPackDuration: the package that the character follows is over after this many hundredths of a game hour
+        virtual void setFalloutPackageDuration(const OFWorld::Ptr& actor, double hundredths) = 0;
 
         virtual void getObjectsInRange(const osg::Vec3f& position, float radius, std::vector<OFWorld::Ptr>& objects)
             = 0;

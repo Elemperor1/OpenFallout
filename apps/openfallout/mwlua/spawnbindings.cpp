@@ -11,9 +11,11 @@
 #include <components/lua/util.hpp>
 
 #include "../mwbase/environment.hpp"
+#include "../mwbase/statemanager.hpp"
 #include "../mwscript/falloutscripts.hpp"
 
 #include "context.hpp"
+#include "luamanagerimp.hpp"
 
 namespace OFLua
 {
@@ -150,6 +152,22 @@ namespace OFLua
         // Whether the record of the container makes it fill again when its cell resets
         api["containerRespawns"]
             = [](std::string reference) { return scripts().respawnsContainerByRecord(parseId(reference)); };
+        // The records the template chain of a character or creature goes through (its own base first) for the roll it
+        // has: what a levelled template gave, as form id texts
+        api["template"] = [lua](std::string reference) {
+            sol::table rows(lua, sol::create);
+            int index = 1;
+            for (const FalloutScript::FormId id : scripts().templateChainOf(parseId(reference)))
+                rows[index++] = hexText(id);
+            return rows;
+        };
+        // Asks for a save as the quick save key makes it, in the folder of saves the run has (for the rounds that show a
+        // save and a load: the run's saves are its own copy); it is made at the start of the next frame
+        api["quickSave"] = []() { scripts().requestQuickSave(); };
+        // Whether the zone never resets its cells (the flag of its record, or what SetZoneRespawns made of it)
+        api["zoneNeverResets"] = [](std::string zone) { return scripts().zoneNeverResets(parseId(zone)); };
+        // The value that the trades use for an item (what SetItemValue gave it, else the value of its record)
+        api["itemValue"] = [](std::string item) { return scripts().itemValueOf(parseId(item)); };
         // How many entries scripts added to the list
         api["additions"] = [](std::string list) {
             return static_cast<int>(scripts().levelledLists().additions(parseId(list)).size());

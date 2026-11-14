@@ -485,6 +485,30 @@ namespace FalloutScript::World
         return !(padConnected && !padDisabled);
     }
 
+    std::optional<int> iniInteger(std::string_view text)
+    {
+        std::size_t at = 0;
+        while (at < text.size() && (text[at] == ' ' || text[at] == '\t'))
+            ++at;
+        bool negative = false;
+        if (at < text.size() && (text[at] == '-' || text[at] == '+'))
+            negative = text[at++] == '-';
+        if (at >= text.size() || text[at] < '0' || text[at] > '9')
+            return std::nullopt;
+        long long value = 0;
+        for (; at < text.size() && text[at] >= '0' && text[at] <= '9'; ++at)
+            if (value < 0x7fffffffLL)
+                value = value * 10 + (text[at] - '0');
+        if (value > 0x7fffffffLL)
+            value = 0x7fffffffLL;
+        return static_cast<int>(negative ? -value : value);
+    }
+
+    bool goreDisabledBy(std::optional<int> setting)
+    {
+        return setting.has_value() && *setting == 1;
+    }
+
     std::string securitronTexture(std::string_view first, std::string_view second)
     {
         std::string result = "Textures\\creatures\\Securitron\\";

@@ -101,6 +101,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testcellwater.cpp
     esm4/testcensus.cpp
     esm4/testchallenge.cpp
+    esm4/testclass.cpp
     esm4/testclimate.cpp
     esm4/testcombatdata.cpp
     esm4/testcombatstyle.cpp

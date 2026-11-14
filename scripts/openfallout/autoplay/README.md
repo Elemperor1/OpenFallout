@@ -14,7 +14,8 @@ that stands still can be told from one that waits.
 Some stages wait for the player to walk into a trigger volume, to activate an object, to talk to a character or to shoot at
 something, which no button does. `scripts/autoplaygates.lua` lists them (quest, stage, plugin, reference and `how`): when a quest
 has stood at such a stage for twenty seconds, the world script does what the gate says and logs `AUTOPLAY gate`. `walk` puts the
-player in the middle of the reference, `activate` makes the player activate it (or each of the `refs` of the gate, at once;
+player in the middle of the reference (turned to the reference `face` of the gate when it has one: the picture of the birthday
+wants the player to look at the photographer), `activate` makes the player activate it (or each of the `refs` of the gate, at once;
 activating a character starts a talk), `fire` makes the player shoot at it with the weapon in hand (`shots` times, or with
 `untilDead` until it is dead; the player script logs `AUTOPLAY fire` for each shot and `AUTOPLAY fire done` with the reason it
 stopped), `teleport` takes the player to a place `at` in a cell of the plugin (a room that no door of the data leads to). A gate

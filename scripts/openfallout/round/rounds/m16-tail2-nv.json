@@ -1,0 +1,10 @@
+{
+  "name": "m16-tail2-nv",
+  "game": "nv",
+  "save": "latest",
+  "scenario": "../scenarios/m16_tail2.lua",
+  "resolution": [1280, 720],
+  "framerate": 30,
+  "limit": 420,
+  "variants": [ { "name": "plain" } ]
+}
