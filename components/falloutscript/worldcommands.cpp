@@ -25,7 +25,14 @@ namespace FalloutScript
         /// The axis a script names with a letter (X, Y or Z in either case) or a number; -1 for anything else
         int axisOf(const CallContext& call, std::size_t index)
         {
-            switch (intArgument(call, index))
+            int letter = intArgument(call, index);
+            // A call from Lua, or one that the interpreter makes from a condition, gives the letter as text and no number
+            if (index < call.mArguments.size() && call.mArguments[index].mIsText)
+            {
+                const std::string& named = call.mArguments[index].mText;
+                letter = named.size() == 1 ? static_cast<unsigned char>(named[0]) : -1;
+            }
+            switch (letter)
             {
                 case 'X':
                 case 'x':
