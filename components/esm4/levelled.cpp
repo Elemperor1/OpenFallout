@@ -2,8 +2,10 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <limits>
 #include <mutex>
+#include <thread>
 
 namespace ESM4
 {
@@ -125,16 +127,57 @@ namespace ESM4
 
     namespace
     {
+        /// The calls of a hook that are running on some thread. A call takes a copy of the hook and runs it outside the
+        /// lock, so a hook that is cleared (the host that its copy captures goes away right after) waits for the calls that
+        /// hold a copy to return. The wait is bounded: a call that never returns must not keep the process from ending.
+        class RunningCalls
+        {
+        public:
+            /// Counts a call; to be called with the lock held that the hook is copied under, so that a clear that follows
+            /// that lock sees it
+            void enter() { mCount.fetch_add(1, std::memory_order_acq_rel); }
+            void leave() { mCount.fetch_sub(1, std::memory_order_acq_rel); }
+            void drain() const
+            {
+                const auto limit = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+                while (mCount.load(std::memory_order_acquire) != 0 && std::chrono::steady_clock::now() < limit)
+                    std::this_thread::yield();
+            }
+
+            class Call
+            {
+            public:
+                explicit Call(RunningCalls& calls)
+                    : mCalls(calls)
+                {
+                }
+                ~Call() { mCalls.leave(); }
+                Call(const Call&) = delete;
+                Call& operator=(const Call&) = delete;
+
+            private:
+                RunningCalls& mCalls;
+            };
+
+        private:
+            std::atomic<int> mCount{ 0 };
+        };
+
         std::atomic<bool> sHasAdditions{ false };
         std::mutex sAdditionsMutex;
         LevelledAdditions sAdditions;
+        RunningCalls sAdditionsRunning;
     }
 
     void setLevelledAdditions(LevelledAdditions additions)
     {
-        const std::lock_guard lock(sAdditionsMutex);
-        sHasAdditions = static_cast<bool>(additions);
-        sAdditions = std::move(additions);
+        {
+            const std::lock_guard lock(sAdditionsMutex);
+            sHasAdditions = static_cast<bool>(additions);
+            sAdditions = std::move(additions);
+        }
+        // (a call that took a copy of the hook before runs it to the end before this returns)
+        sAdditionsRunning.drain();
     }
 
     const std::vector<LVLO>& levelledEntriesOf(
@@ -146,8 +189,13 @@ namespace ESM4
         {
             const std::lock_guard lock(sAdditionsMutex);
             additions = sAdditions;
+            if (additions)
+                sAdditionsRunning.enter();
         }
-        if (additions && additions(list, entries, storage))
+        if (!additions)
+            return entries;
+        const RunningCalls::Call call(sAdditionsRunning);
+        if (additions(list, entries, storage))
             return storage;
         return entries;
     }
@@ -157,13 +205,18 @@ namespace ESM4
         std::atomic<bool> sHasSpawnRolls{ false };
         std::mutex sSpawnRollMutex;
         SpawnRollProvider sSpawnRolls;
+        RunningCalls sSpawnRollsRunning;
     }
 
     void setSpawnRollProvider(SpawnRollProvider provider)
     {
-        const std::lock_guard lock(sSpawnRollMutex);
-        sHasSpawnRolls = static_cast<bool>(provider);
-        sSpawnRolls = std::move(provider);
+        {
+            const std::lock_guard lock(sSpawnRollMutex);
+            sHasSpawnRolls = static_cast<bool>(provider);
+            sSpawnRolls = std::move(provider);
+        }
+        // (a call that took a copy of the provider before runs it to the end before this returns)
+        sSpawnRollsRunning.drain();
     }
 
     SpawnRoll spawnRollOf(ESM::FormId reference, int fallbackLevel)
@@ -174,9 +227,14 @@ namespace ESM4
             {
                 const std::lock_guard lock(sSpawnRollMutex);
                 provider = sSpawnRolls;
+                if (provider)
+                    sSpawnRollsRunning.enter();
             }
             if (provider)
+            {
+                const RunningCalls::Call call(sSpawnRollsRunning);
                 return provider(reference);
+            }
         }
         return SpawnRoll{ fallbackLevel, 0 };
     }

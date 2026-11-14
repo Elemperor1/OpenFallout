@@ -3,9 +3,13 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <atomic>
+#include <chrono>
 #include <cstdint>
+#include <future>
 #include <map>
 #include <set>
+#include <thread>
 
 namespace
 {
@@ -284,5 +288,35 @@ namespace
         ESM4::setLevelledAdditions({});
         ESM4::LevelledRandom gone(1);
         EXPECT_EQ(ESM4::resolveLevelledRecord<Thing>(find, findList, id(0x20), 9, gone)->mValue, 1);
+    }
+
+    TEST(ESM4LevelledTest, clearingTheSpawnRollProviderWaitsForTheCallThatRunsIt)
+    {
+        std::promise<void> entered;
+        std::promise<void> release;
+        std::shared_future<void> released = release.get_future().share();
+        ESM4::setSpawnRollProvider([&entered, released](ESM::FormId) {
+            entered.set_value();
+            released.wait();
+            return ESM4::SpawnRoll{ 7, 1 };
+        });
+        std::atomic<bool> cleared{ false };
+        ESM4::SpawnRoll roll;
+        std::thread caller([&roll] { roll = ESM4::spawnRollOf(id(0x30), 1); });
+        entered.get_future().wait();
+        std::thread clearer([&cleared] {
+            ESM4::setSpawnRollProvider({});
+            cleared = true;
+        });
+        // the call has not returned, so what the provider captures is still in use and the clear has not finished
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        EXPECT_FALSE(cleared.load());
+        release.set_value();
+        caller.join();
+        clearer.join();
+        EXPECT_TRUE(cleared.load());
+        EXPECT_EQ(roll.mLevel, 7);
+        // with no provider the fallback stands
+        EXPECT_EQ(ESM4::spawnRollOf(id(0x30), 4).mLevel, 4);
     }
 }
