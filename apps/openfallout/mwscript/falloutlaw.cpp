@@ -321,7 +321,9 @@ namespace OFScript
         switch (reaction.mKind)
         {
             case Kind::Attack:
-                if (!mHost.mCombat.inCombat(reaction.mActor)
+                // Every character that answers fights the player: one that fights someone else turns on the player (the
+                // fight is started over with the new target), and one that fights the player already is left as it is
+                if (mHost.mCombat.target(reaction.mActor) != mHost.mPlayer
                     && FalloutScript::startFight(mHost.mCombat, mHost.mActors, reaction.mActor, mHost.mPlayer))
                     mHost.evaluatePackage(reaction.mActor);
                 // One that fights the player because of an alarm is what the alarm sounding stands for
@@ -560,15 +562,20 @@ namespace OFScript
 
     void LawGlue::pickedUp(FormId reference, FormId item, int count)
     {
-        theftOf(reference, static_cast<std::int64_t>(count) * mHost.itemValue(item));
+        // The owner and the character that is robbed are looked up in the world, which only the thread of the frame may ask
+        mHost.runOnMainThread([this, reference, item, count] {
+            theftOf(reference, static_cast<std::int64_t>(count) * mHost.itemValue(item));
+        });
     }
 
     void LawGlue::takenFrom(FormId container, FormId item, int count)
     {
-        // What is taken from a character (a body, its pockets) is not taken from anyone's place
-        if (mHost.isActor(container))
-            return;
-        theftOf(container, static_cast<std::int64_t>(count) * mHost.itemValue(item));
+        mHost.runOnMainThread([this, container, item, count] {
+            // What is taken from a character (a body, its pockets) is not taken from anyone's place
+            if (mHost.isActor(container))
+                return;
+            theftOf(container, static_cast<std::int64_t>(count) * mHost.itemValue(item));
+        });
     }
 
     void LawGlue::theftOf(FormId reference, std::int64_t value)
