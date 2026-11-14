@@ -207,10 +207,12 @@ local function updateReputation()
     local reputation = row > 0 and reputations[row] or nil
     shown:batch(function()
         if shown:find('stats_reputation_image') then
-            if reputation and reputation.picture ~= '' then
+            local hasPicture = reputation ~= nil and reputation.picture ~= ''
+            if hasPicture then
                 shown:set('stats_reputation_image', 'filename', reputation.picture)
             end
-            shown:set('stats_reputation_image', 'visible', reputation ~= nil)
+            -- (a reputation that has no picture shows none, and not the one of the one before it)
+            shown:set('stats_reputation_image', 'visible', hasPicture)
         end
         shown:set('stats_reputation_title', 'string', reputation and reputation.title or '')
         shown:set('stats_reputation_title', 'visible', reputation ~= nil)
@@ -239,6 +241,8 @@ end
 -- The list of the tab that is shown, if it is a list
 local function currentList()
     local tab = currentTab()
+    -- the general page that shows the reputations is moved through the list of them
+    if tab.key == 'general' and genrepMode == 1 and reputationList then return reputationList end
     return tab.list and lists[tab.key] or nil
 end
 

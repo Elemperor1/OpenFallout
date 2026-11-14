@@ -410,6 +410,11 @@ namespace OFClass
         const ESM4::Npc* const baseData = getCustomData(ptr).mBaseData;
         if (baseData == nullptr)
             return {};
+        // The name of the record that gives the traits (a template) that a script changed comes after the own one
+        if (baseData != ptr.get<ESM4::Npc>()->mBase)
+            if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
+                if (const std::string_view given = scripts->nameGivenToBase(baseData->mId); !given.empty())
+                    return given;
         return baseData->mFullName;
     }
 }

@@ -327,6 +327,13 @@ namespace
         status.forgetBody(otherRaider);
         status.forgetMind(otherRaider);
         EXPECT_EQ(status.activeCount(), 0u);
+        // The pose of the spine goes with the body: a body that is gone is not lying down
+        status.update(raider, [](ActorActivity& activity) {
+            activity.mSpineYUp = 0.5f;
+            activity.mSpineZUp = -0.5f;
+        });
+        status.forgetBody(raider);
+        EXPECT_FALSE(status.activity(raider).has_value());
     }
 
     TEST(FalloutScriptActorStatusTest, clearing_the_status_forgets_everything_a_new_game_starts_without)

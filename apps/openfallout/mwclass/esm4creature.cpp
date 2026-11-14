@@ -137,7 +137,14 @@ namespace OFClass
         if (!isFalloutCreature(ptr))
             return ptr.get<ESM4::Creature>()->mBase->mFullName;
         const ESM4::Creature* baseData = getCustomData(ptr).mBaseData;
-        return baseData == nullptr ? std::string_view() : std::string_view(baseData->mFullName);
+        if (baseData == nullptr)
+            return {};
+        // The name of the record that gives the traits (a template) that a script changed comes after the own one
+        if (baseData != ptr.get<ESM4::Creature>()->mBase)
+            if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
+                if (const std::string_view given = scripts->nameGivenToBase(baseData->mId); !given.empty())
+                    return given;
+        return baseData->mFullName;
     }
 
     void ESM4Creature::insertObjectRendering(

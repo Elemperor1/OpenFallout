@@ -225,6 +225,9 @@ namespace OFMechanics
         /// the game hour (days times 24 plus the hour) at which it began
         double mDurationHundredths = 0;
         double mStartedHours = 0;
+        /// The package it follows is done because its duration ran out and not because it did what it came to do: a character
+        /// in a piece of furniture does not stay there for it
+        bool mExpired = false;
         /// The package was kept in a saved game: its goal is made when the packages are looked at first, without the
         /// character beginning it again
         bool mNeedsGoal = false;
@@ -302,6 +305,12 @@ namespace OFMechanics
             if (mind.mPackage != nullptr)
                 state.mPackage = savedNumber(mind.mPackage->mId);
             state.mChangeTold = mind.mChangeTold;
+            // The duration that a script gave the package belongs to the package that is followed
+            if (mind.mPackage != nullptr && mind.mDurationHundredths > 0)
+            {
+                state.mDurationHundredths = mind.mDurationHundredths;
+                state.mStartedHours = mind.mStartedHours;
+            }
             if (mind.mCommanded)
             {
                 state.mFollows = true;
@@ -348,6 +357,9 @@ namespace OFMechanics
                     mind.mPackage = package;
                     mind.mNeedsGoal = true;
                     mind.mChangeTold = saved->mChangeTold;
+                    // The package goes on with the time it had (a cell that was unloaded, a game that was loaded)
+                    mind.mDurationHundredths = saved->mDurationHundredths;
+                    mind.mStartedHours = saved->mStartedHours;
                 }
         }
 
@@ -869,6 +881,7 @@ namespace OFMechanics
         found->second->mDurationHundredths = hundredths;
         // (the package begins again from now, as the duration counts from when the call is made)
         found->second->mStartedHours = gameHours(OFBase::Environment::get().getWorld()->getTimeStamp());
+        keepState(*found->second);
     }
 
     ESM::FormId FalloutActors::currentPackage(const OFWorld::Ptr& ptr) const
@@ -1477,6 +1490,7 @@ namespace OFMechanics
             {
                 mind.mDone.insert(mind.mPackage);
                 mind.mDurationHundredths = 0;
+                mind.mExpired = true;
                 keepState(mind);
                 raise(frame, mind.mPtr, *mind.mPackage, OFScript::FalloutScripts::PackageEvent::Done);
             }
@@ -1544,8 +1558,8 @@ namespace OFMechanics
             // An actor sitting in the furniture that its package led it to stays there while that package is on and
             // no package that comes before it is: the games take it from the chair when a package asks, not because
             // another one has become possible
-            const bool seated
-                = current.mPackage != nullptr && frame.mScripts != nullptr && frame.mScripts->usesFurniture(mind.mPtr);
+            const bool seated = current.mPackage != nullptr && !mind.mExpired && frame.mScripts != nullptr
+                && frame.mScripts->usesFurniture(mind.mPtr);
             const Choice& chosen = seated     ? current
                 : fresh.mPackage != nullptr   ? fresh
                 : current.mPackage != nullptr ? current
@@ -1624,6 +1638,7 @@ namespace OFMechanics
             mind.mPackage = chosen.mPackage;
             // (a duration that a script set belongs to the package that was followed)
             mind.mDurationHundredths = 0;
+            mind.mExpired = false;
             mind.mStartedHours = gameHours(frame.mWorld.getTimeStamp());
             mind.mGoal = chosen.mPackage != nullptr ? chosen.mGoal : FalloutGoal();
             mind.mFollowing = chosen.mPackage != nullptr ? chosen.mFollowing : FalloutActors::Mind::Following();

@@ -483,7 +483,9 @@ namespace OFScript
                         return;
                     break;
                 case FalloutScript::Law::BlowKind::Property:
-                    theft(owner, 0, false);
+                    // What belongs to the player, or to someone the player may take from, is no one's loss
+                    if (!FalloutScript::Law::mayTake(owner, mHost.playerBase(), factionsOf(mHost.mPlayer)))
+                        theft(owner, 0, false);
                     return;
                 case FalloutScript::Law::BlowKind::Attack:
                     break;

@@ -2806,8 +2806,10 @@ namespace OFScript
         FalloutScript::RespawnState mRespawn;
         FalloutScript::ItemValues mItemValues;
         FalloutScript::NameOverrides mNameOverrides;
-        /// The day the merchants were last looked at
+        /// The day the merchants were last looked at, and whether a cell was loaded since (the merchants in it are looked at
+        /// too: the day of each is kept by the respawn state, so none is restocked twice in a day)
         std::int64_t mMerchantCheckedDay = -1;
+        std::atomic<bool> mMerchantScanDue{ false };
         std::atomic<bool> mQuickSaveRequested{ false };
         /// The texts that the names scripts gave stand for, kept so that a view of one stays valid
         mutable std::mutex mNameTextMutex;

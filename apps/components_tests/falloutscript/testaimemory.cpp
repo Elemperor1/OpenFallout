@@ -78,6 +78,55 @@ namespace
         EXPECT_EQ(*loaded.find(clerk), follower);
     }
 
+    TEST(FalloutScriptAiMemoryTest, the_duration_of_a_package_is_kept_with_the_state_and_in_a_saved_game)
+    {
+        AiMemory memory;
+        AiState timed = stateWithPackages();
+        timed.mDurationHundredths = 250.0;
+        timed.mStartedHours = 1234.5;
+        memory.set(guard, timed);
+        // A duration with nothing else is something to keep
+        AiState onlyTimed;
+        onlyTimed.mDurationHundredths = 100.0;
+        EXPECT_FALSE(onlyTimed.empty());
+        memory.set(clerk, onlyTimed);
+        ASSERT_TRUE(memory.find(clerk).has_value());
+
+        SaveWriter out;
+        FalloutScript::writeAi(memory, out);
+        const std::string bytes = out.take();
+        AiMemory loaded;
+        SaveReader in(bytes);
+        FalloutScript::readAi(loaded, in, FalloutScript::aiSectionVersion);
+        EXPECT_TRUE(in.atEnd());
+        EXPECT_EQ(*loaded.find(guard), timed);
+        EXPECT_EQ(loaded.find(clerk)->mDurationHundredths, 100.0);
+    }
+
+    TEST(FalloutScriptAiMemoryTest, a_saved_game_from_before_the_duration_was_kept_loads_without_one)
+    {
+        SaveWriter out;
+        out.count(1);
+        out.form(guard);
+        out.count(1);
+        out.form(greet);
+        out.form(patrol);
+        out.boolean(true);
+        out.boolean(false);
+        out.boolean(false);
+        out.form(0);
+        out.f32(0.f);
+        const std::string bytes = out.take();
+
+        AiMemory loaded;
+        SaveReader in(bytes);
+        FalloutScript::readAi(loaded, in, 1);
+        EXPECT_TRUE(in.atEnd());
+        ASSERT_TRUE(loaded.find(guard).has_value());
+        EXPECT_EQ(loaded.find(guard)->mPackage, patrol);
+        EXPECT_EQ(loaded.find(guard)->mDurationHundredths, 0.0);
+    }
+
     TEST(FalloutScriptAiMemoryTest, what_belongs_to_a_plugin_that_is_gone_is_left_out)
     {
         AiMemory memory;

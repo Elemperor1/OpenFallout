@@ -271,6 +271,9 @@ namespace FalloutScript
         activity.mIdleDoneOnce = kept.mIdleDoneOnce;
         activity.mLastIdle = kept.mLastIdle;
         activity.mWalkSpeed = kept.mWalkSpeed;
+        // The pose of the spine is the animation's too
+        activity.mSpineYUp = kept.mSpineYUp;
+        activity.mSpineZUp = kept.mSpineZUp;
         if (activity == kept)
             mActivity.erase(found);
     }

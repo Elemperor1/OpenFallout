@@ -155,7 +155,9 @@ namespace FalloutScript
         void setDialogSubtitles(bool on) { mDialogSubtitles = on; }
         bool dialogSubtitles() const { return mDialogSubtitles; }
         /// EnableLoadingMenu (FalloutNV.exe 0x5DFBA0) shows the loading menu for a number above 0 and hides it for any other;
-        /// IsLoadingMenuEnabled (0x5DFC10) is whether the menu's object exists (the pointer at 0x11DA0C0 is not null)
+        /// IsLoadingMenuEnabled (0x5DFC10) is whether the menu's object exists (the pointer at 0x11DA0C0 is not null).
+        /// Only the flag is kept here: the command does not show or hide a menu (a stand-in), and IsLoadingMenuEnabled
+        /// answers from the flag.
         void setLoadingMenu(bool on) { mLoadingMenu = on; }
         bool loadingMenu() const { return mLoadingMenu; }
         World::StartingPoses& starts() { return mStarts; }
