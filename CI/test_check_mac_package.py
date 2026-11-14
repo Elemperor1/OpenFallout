@@ -102,9 +102,13 @@ class StandIn:
                            check=True)
 
 
-def run_check(*args):
+def run_check(*args, environment=None):
+    """Runs the check without the signing variables of the surrounding job (a release build sets its own Team ID);
+    `environment` adds variables for one run."""
     out, err = io.StringIO(), io.StringIO()
-    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+    clean = {name: value for name, value in os.environ.items() if not name.startswith("OPENFALLOUT_CODESIGN")}
+    with unittest.mock.patch.dict(os.environ, dict(clean, **(environment or {})), clear=True), \
+            contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
         status = check_mac_package.main([str(arg) for arg in args])
     return status, out.getvalue() + err.getvalue()
 
@@ -493,8 +497,8 @@ class ReleaseModeTests(unittest.TestCase):
         self.addCleanup(patcher.stop)
         self.app = fake_package(self.root)
 
-    def check(self, *args, package=None):
-        return run_check(package or self.app, "--mode", "release", "--smoke", "skip", *args)
+    def check(self, *args, package=None, environment=None):
+        return run_check(package or self.app, "--mode", "release", "--smoke", "skip", *args, environment=environment)
 
     def test_notarized_developer_id_package_passes_signatures_and_gatekeeper(self):
         status, output = self.check("--team-id", TEAM)
@@ -522,6 +526,11 @@ class ReleaseModeTests(unittest.TestCase):
 
     def test_team_id_option_must_match_the_app(self):
         status, output = self.check("--team-id", "WRONGTEAM1")
+        self.assertEqual(status, 1, output)
+        self.assertIn(f"OpenFallout.app: Team ID {TEAM}, not WRONGTEAM1", output)
+
+    def test_team_id_of_the_signing_environment_must_match_the_app(self):
+        status, output = self.check(environment={"OPENFALLOUT_CODESIGN_TEAM_ID": "WRONGTEAM1"})
         self.assertEqual(status, 1, output)
         self.assertIn(f"OpenFallout.app: Team ID {TEAM}, not WRONGTEAM1", output)
 
