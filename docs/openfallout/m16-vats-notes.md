@@ -55,8 +55,9 @@ What the code does (all of it tested in `testvatsvalue.cpp`): the table above, e
 * When the state exists in the port. The executable has the state while the game plays V.A.T.S.; the port has it in two
   places: `vatsParts` sets the selecting mode (2) with the target and the part while it works out the chance of each part, so
   that a perk whose condition asks GetVATSValue (the entry point 8 of the hit chance) sees the part that is aimed at, and puts
-  back what was there; `vatsAttack` sets the playback mode (4) after the blow, with the hit, the kill (0x10) and the cripple
-  (0x80) of the result. `setVatsOpen(false)` clears it. The flags 0x04, 0x20 and 0x40 are never set (nothing in the port says
+  back what was there; `vatsAttack` sets the playback mode (4) before the blow (so the perk conditions that the blow asks
+  about see this attack, not the one before it) and again after it, with the hit, the kill (0x10) and the cripple (0x80) of the
+  result. `setVatsOpen(false)` clears it. The flags 0x04, 0x20 and 0x40 are never set (nothing in the port says
   the blow took a limb off at that point), so values 8, 12, 13 answer 0.
 * The kind of the action by the weapon. The executable's kinds are numbers of its own; the port writes 0 to 8 for a weapon of
   the animation types 0 to 8, 0x10 for a launcher, 0x11 for a grenade and 0x13 for a mine; the kind of an attack the player
