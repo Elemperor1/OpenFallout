@@ -330,6 +330,8 @@ namespace FalloutScript
         bool trespassing(FormId watcher);
         /// Whether any watcher has one: the player is trespassing (the query of the trespasser and not of a watcher)
         bool anyTrespass();
+        /// Every watcher that has a trespass package, including the ones that a save brought back
+        std::vector<FormId> trespassWatchers();
 
         // ---- the karma ----
 

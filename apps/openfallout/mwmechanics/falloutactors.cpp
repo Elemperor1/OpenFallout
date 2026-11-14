@@ -942,6 +942,15 @@ namespace OFMechanics
 
     void FalloutActors::drop(const OFWorld::CellStore* cell)
     {
+        // The actors without a mind of an unloaded cell are forgotten too, or the scans would go through every
+        // character that was ever near
+        for (auto it = mUnminded.begin(); it != mUnminded.end();)
+        {
+            if (it->second.getCell() == cell)
+                it = mUnminded.erase(it);
+            else
+                ++it;
+        }
         for (auto it = mMinds.begin(); it != mMinds.end();)
         {
             if (it->second->mPtr.getCell() == cell)
