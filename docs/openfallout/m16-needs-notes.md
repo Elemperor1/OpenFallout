@@ -54,7 +54,7 @@ message of the first fact that fails. `Restrictions::refusal(action, facts)` ret
 0x93CDF0: the hours are `trunc(path / speed / 3600 * TimeScale)`; the path is the length of the route the game works out, the speed
 is 0x647F00 = the walking speed 0x647D10 times `fMoveRunMult` (4.0); the base speed is the actor value 0x15 times 0.01 times
 `fMoveBaseSpeed` (77), times 0.85 with one crippled leg and 0.75 with two. The player is healed as the hours go by: 0x88B510, 2.0
-seconds of the regeneration rate for each hour. The port sums the hours in the loop of `travelTo` one hour at a time so that the needs and the effects go on during them.
+seconds of the regeneration rate for each hour. The port sums the hours in the loop of `travelTo` one hour at a time so that the needs and the effects go on during them; a trip ends at the first hour after which the player is dead (the needs or an effect took the last of the health), with no more hours and no move, as a rest ends.
 Chosen: the path is the straight line (no navmesh route is available to the rules), and an unknown length gives 0 hours.
 
 ## Hardcore mode (New Vegas only; Fallout 3 has none)
