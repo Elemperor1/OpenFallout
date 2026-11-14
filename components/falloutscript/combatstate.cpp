@@ -29,10 +29,21 @@ namespace FalloutScript
         mLastHits.clear();
         mHitEvents.clear();
         mChanges.clear();
+        mLastTargets.clear();
+    }
+
+    FormId CombatState::lastTarget(FormId actor) const
+    {
+        const std::lock_guard lock(mMutex);
+        const auto found = mLastTargets.find(actor);
+        return found == mLastTargets.end() ? 0 : found->second;
     }
 
     void CombatState::noteChange(FormId actor, FormId target, FormId was)
     {
+        // The target of the last fight outlives it (GetOwnerLastTarget)
+        if (target != 0)
+            mLastTargets[actor] = target;
         if (mChanges.size() < mostChanges)
             mChanges.push_back({ actor, target, was });
     }

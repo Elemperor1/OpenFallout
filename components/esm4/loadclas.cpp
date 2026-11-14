@@ -26,6 +26,9 @@
 */
 #include "loadclas.hpp"
 
+#include <algorithm>
+#include <cstring>
+
 #include <stdexcept>
 
 #include "reader.hpp"
@@ -54,6 +57,22 @@ void ESM4::Class::load(ESM4::Reader& reader)
                 reader.getZString(mIcon);
                 break;
             case ESM::fourCC("DATA"):
+            {
+                // The DATA of Fallout 3 and New Vegas holds the tag skills (4 bytes) and the flags (4 bytes: playable,
+                // guard); the files of the other games are laid out another way and keep their data unread
+                std::uint8_t data[8] = {};
+                const std::uint32_t size = std::min<std::uint32_t>(subHdr.dataSize, sizeof(data));
+                if (size == 0 || !reader.get(data, size))
+                {
+                    reader.skipSubRecordData();
+                    break;
+                }
+                if (subHdr.dataSize > size)
+                    reader.skipSubRecordData(subHdr.dataSize - size);
+                if (size >= sizeof(data))
+                    std::memcpy(&mFo3Flags, data + 4, sizeof(mFo3Flags));
+                break;
+            }
             case ESM::fourCC("ATTR"):
             case ESM::fourCC("PRPS"):
                 reader.skipSubRecordData();

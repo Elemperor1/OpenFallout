@@ -181,6 +181,11 @@ namespace OFLua
         api["hackFinish"] = []() { scripts().hackFinish(); };
         api["closeTerminal"] = []() { scripts().closeTerminal(); };
 
+        // The hardcore mode (New Vegas): whether it is on, and turning it on or off as the Gameplay screen and the SetHardcore
+        // command do (off takes the needs down to nothing)
+        api["hardcore"] = []() { return scripts().hardcoreMode(); };
+        api["setHardcore"] = [](bool on) { scripts().setHardcoreMode(on); };
+
         // The player wants to wait (the Wait key); a bed asks for sleep by itself
         api["requestWait"] = []() { scripts().requestRest(false, 0); };
         // The screen of waiting or sleeping that was asked for: whether it is for sleep and a number that is another

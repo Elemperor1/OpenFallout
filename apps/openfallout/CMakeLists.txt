@@ -58,6 +58,9 @@ add_openfallout_dir (mwscript
     animationextensions transformationextensions consoleextensions userextensions falloutscripts falloutprogress falloutreputation falloutobjectstate falloutdetection falloutinterface falloutpresentation falloutpipboy falloutinteraction falloutmusic falloutambient falloutradio falloutcrafting falloutbarter falloutrepair falloutlook falloutmods falloutcompanion falloutcasino falloutcaravan fallouthotkeys falloutregionline falloutvats falloutsave falloutdamage falloutchallenges falloutperks falloutdebug
     falloutspawn
     falloutworld
+    falloutlaw
+    falloutactorstatus
+    falloutneeds
     )
 
 add_openfallout_dir (mwlua
@@ -65,6 +68,7 @@ add_openfallout_dir (mwlua
     context menuscripts globalscripts localscripts playerscripts luabindings objectbindings cellbindings coremwscriptbindings
     mwscriptbindings questbindings conversationbindings chargenbindings messagebindings menuscenebindings lockpickbindings specialscreenbindings combatbindings casinobindings spawnbindings hudbindings menubindings interactbindings pipboybindings vatsbindings camerabindings vfsbindings uibindings soundbindings inputbindings nearbybindings dialoguebindings
     falloutworldbindings
+    actorstatusbindings
     postprocessingbindings stats recordstore debugbindings corebindings worldbindings worker landbindings magicbindings factionbindings
     classbindings itemdata inputprocessor animationbindings birthsignbindings racebindings markupbindings weatherbindings regionbindings
     types/types types/door types/item types/actor types/container types/lockable types/weapon types/npc types/bodypart

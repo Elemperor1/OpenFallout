@@ -13,8 +13,8 @@
 
 namespace FalloutScript
 {
-    /// The switches that scripts set for parts of the games that are not in this engine (the hardcore mode, the radio,
-    /// the age of the player, the objectives on the screen ...), kept as they were set so that the questions about them
+    /// The switches that scripts set for parts of the games that are not in this engine (the radio, the age of the
+    /// player, the objectives on the screen ...), kept as they were set so that the questions about them
     /// are answered and a saved game holds them. Nothing here changes what is on the screen or in the world. It can be
     /// used from any thread.
     class Switches
@@ -37,11 +37,10 @@ namespace FalloutScript
         std::set<std::string, std::less<>> mTold;
     };
 
-    /// Gives the interpreter the commands that set a switch (SetHardcore, SetPCYoung, SetPCToddler,
+    /// Gives the interpreter the commands that set a switch (SetPCYoung, SetPCToddler,
     /// SetLocationSpecificLoadScreensOnly, SetBroadcastState, AutoDisplayObjectives), the questions that are always
-    /// answered the same (IsXBox, IsPS3, GetVampire, IsHardcore after SetHardcore) and the commands that do nothing
-    /// here, each of which says once in the log what it does not do. The commands that the table does not have are left
-    /// out.
+    /// answered the same (IsXBox, IsPS3, GetVampire) and the commands that do nothing here, each of which says once in
+    /// the log what it does not do. The commands that the table does not have are left out.
     void addSwitchCommands(Interpreter& interpreter, Switches& switches);
 
     /// The commands that do nothing and the reason, for the list of what is not done

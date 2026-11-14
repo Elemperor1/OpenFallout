@@ -24,6 +24,10 @@ namespace
     constexpr std::uint16_t OpAddReputation = 0x1239;
     constexpr std::uint16_t OpGetReputation = 0x123D;
     constexpr std::uint16_t OpGetReputationThreshold = 0x123F;
+    constexpr std::uint16_t OpAddReputationExact = 0x123B;
+    constexpr std::uint16_t OpRemoveReputation = 0x123A;
+    constexpr std::uint16_t OpRemoveReputationExact = 0x123C;
+    constexpr std::uint16_t OpGetReputationPct = 0x123E;
 
     class FakeRecords : public FalloutScript::ReputationRecords
     {
@@ -272,5 +276,67 @@ namespace
 
         other.mReputation.clear();
         EXPECT_EQ(other.call(OpGetReputation, { ncr, 1 }), 0.0);
+    }
+
+    TEST(FalloutScriptReputationTest, an_exact_addition_adds_the_points_up_to_the_cap_and_tells_the_player)
+    {
+        Runner run;
+        run.call(OpAddReputationExact, { ncr, 0, 30.5 });
+        EXPECT_DOUBLE_EQ(run.call(OpGetReputation, { ncr, 0 }), 30.5);
+        run.call(OpAddReputationExact, { ncr, 0, 100 });
+        EXPECT_DOUBLE_EQ(run.call(OpGetReputation, { ncr, 0 }), 80.0);
+        ASSERT_EQ(run.mMessages.size(), 2u);
+        EXPECT_TRUE(run.mMessages[0].mApplied);
+        EXPECT_FALSE(run.mMessages[0].mLoss);
+        EXPECT_EQ(run.mMessages[0].mSide, 0);
+        // A reputation that is none, or a side that is none, changes nothing and says nothing
+        run.call(OpAddReputationExact, { nobody, 0, 10 });
+        run.call(OpAddReputationExact, { ncr, 7, 10 });
+        EXPECT_EQ(run.mMessages.size(), 2u);
+    }
+
+    TEST(FalloutScriptReputationTest, a_removal_lowers_a_side_by_a_step_or_by_points_down_to_nothing)
+    {
+        Runner run;
+        run.call(OpSetReputation, { ncr, 1, 20 });
+        // Average is 4 points
+        run.call(OpRemoveReputation, { ncr, 1, 3 });
+        EXPECT_DOUBLE_EQ(run.call(OpGetReputation, { ncr, 1 }), 16.0);
+        run.call(OpRemoveReputationExact, { ncr, 1, 2.5 });
+        EXPECT_DOUBLE_EQ(run.call(OpGetReputation, { ncr, 1 }), 13.5);
+        run.call(OpRemoveReputationExact, { ncr, 1, 500 });
+        EXPECT_DOUBLE_EQ(run.call(OpGetReputation, { ncr, 1 }), 0.0);
+        ASSERT_EQ(run.mMessages.size(), 3u);
+        EXPECT_TRUE(run.mMessages[0].mLoss);
+        EXPECT_EQ(run.mMessages[0].mSide, 1);
+        EXPECT_TRUE(run.mMessages[2].mLoss);
+        // A step that is none removes nothing
+        run.call(OpRemoveReputation, { ncr, 1, 9 });
+        run.call(OpRemoveReputation, { ncr, 1, 0 });
+        EXPECT_EQ(run.mMessages.size(), 3u);
+    }
+
+    TEST(FalloutScriptReputationTest, a_removal_that_crosses_a_level_says_so)
+    {
+        Runner run;
+        run.call(OpSetReputation, { ncr, 1, 50 });
+        run.call(OpAddReputationExact, { ncr, 1, 0 });
+        run.mMessages.clear();
+        run.call(OpRemoveReputationExact, { ncr, 1, 45 });
+        ASSERT_EQ(run.mMessages.size(), 1u);
+        EXPECT_TRUE(run.mMessages[0].mLevelChanged);
+    }
+
+    TEST(FalloutScriptReputationTest, the_share_of_the_cap_that_a_side_holds_is_asked_by_the_percentage)
+    {
+        Runner run;
+        run.call(OpSetReputation, { ncr, 1, 40 });
+        EXPECT_DOUBLE_EQ(run.call(OpGetReputationPct, { ncr, 1 }), 0.5);
+        EXPECT_DOUBLE_EQ(run.call(OpGetReputationPct, { ncr, 0 }), 0.0);
+        EXPECT_DOUBLE_EQ(run.call(OpGetReputationPct, { nobody, 1 }), 0.0);
+        EXPECT_DOUBLE_EQ(run.call(OpGetReputationPct, { ncr, 5 }), 0.0);
+        run.mRecords.mCaps[legion] = 0.0;
+        run.call(OpSetReputation, { legion, 1, 5 });
+        EXPECT_DOUBLE_EQ(run.call(OpGetReputationPct, { legion, 1 }), 0.0);
     }
 }

@@ -373,6 +373,9 @@ add_component_dir (falloutscript
     challenges
     levelledlists respawn spawncommands spawnrules
     worldcommands worldmath worldrules
+    crime standing
+    actorstatus
+    restrictions
     )
 
 add_component_dir (misc

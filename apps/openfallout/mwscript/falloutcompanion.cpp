@@ -120,8 +120,10 @@ namespace OFScript
             for (const auto& [item, count] : carried)
             {
                 FalloutScript::ItemInfo info;
+                // What a follower carries is weighed as the player's mode were off: its ammunition counts for nothing
+                // (FalloutNV.exe 0x75DC80)
                 if (itemInfo(item, info))
-                    status.mCarried += info.mWeight * count;
+                    status.mCarried += (info.mKind == FalloutScript::ItemKind::Ammo ? 0.0 : info.mWeight) * count;
             }
         }
         if (const FalloutScript::FormId weapon = mEquipment.weapon(companion); weapon != 0)

@@ -92,27 +92,67 @@ namespace FalloutScript
         return true;
     }
 
-    Reputation::Bump Reputation::add(FormId reputation, int side, int step)
+    Reputation::Bump Reputation::change(FormId reputation, int side, double points, bool loss)
     {
         Bump result;
         double cap = 0;
-        if (!isSide(side) || step < 1 || step > 5 || !mRecords.reputation(reputation, cap, result.mName))
+        if (!isSide(side) || !std::isfinite(points) || !mRecords.reputation(reputation, cap, result.mName))
             return result;
-        const double amount = mRecords.setting(bumps[step - 1].first, bumps[step - 1].second);
         const std::array<double, 3> limit = limits();
         const std::lock_guard lock(mMutex);
         const int before = levelLocked(reputation, side, cap, limit);
         Sides& sides = mSides[reputation];
-        double& points = side == 1 ? sides.mPositive : sides.mNegative;
-        // The cap holds the side from above only: a side that scripts put lower stays where it is, and a reputation
-        // without a cap (as the levels read it) has none to hold
-        points = cap > 0 ? std::min(points + amount, cap) : points + amount;
+        double& held = side == 1 ? sides.mPositive : sides.mNegative;
+        if (loss)
+            held = std::max(held - points, 0.0);
+        else
+            // The cap holds the side from above only: a side that scripts put lower stays where it is, and a reputation
+            // without a cap (as the levels read it) has none to hold
+            held = cap > 0 ? std::min(held + points, cap) : held + points;
         result.mApplied = true;
         result.mSide = side;
-        result.mLevelChanged = before != levelOf(points, cap, limit);
+        result.mLoss = loss;
+        result.mLevelChanged = before != levelOf(held, cap, limit);
         result.mPositiveLevel = levelLocked(reputation, 1, cap, limit);
         result.mNegativeLevel = levelLocked(reputation, 0, cap, limit);
         return result;
+    }
+
+    Reputation::Bump Reputation::add(FormId reputation, int side, int step)
+    {
+        if (step < 1 || step > 5)
+            return {};
+        return change(reputation, side, mRecords.setting(bumps[step - 1].first, bumps[step - 1].second), false);
+    }
+
+    Reputation::Bump Reputation::addExact(FormId reputation, int side, double points)
+    {
+        return change(reputation, side, points, false);
+    }
+
+    Reputation::Bump Reputation::removeStep(FormId reputation, int side, int step)
+    {
+        if (step < 1 || step > 5)
+            return {};
+        return change(reputation, side, mRecords.setting(bumps[step - 1].first, bumps[step - 1].second), true);
+    }
+
+    Reputation::Bump Reputation::removeExact(FormId reputation, int side, double points)
+    {
+        return change(reputation, side, points, true);
+    }
+
+    double Reputation::pct(FormId reputation, int side)
+    {
+        double cap = 0;
+        std::string name;
+        if (!isSide(side) || !mRecords.reputation(reputation, cap, name) || cap <= 0)
+            return 0;
+        const std::lock_guard lock(mMutex);
+        const auto found = mSides.find(reputation);
+        if (found == mSides.end())
+            return 0;
+        return (side == 1 ? found->second.mPositive : found->second.mNegative) / cap;
     }
 
     int Reputation::level(FormId reputation, int side)
@@ -233,6 +273,25 @@ namespace FalloutScript
             if (bump.mApplied && message)
                 message(bump);
             return 0.0;
+        });
+        const auto exact = [&reputation, message](std::string_view name, bool loss, bool step) {
+            return std::make_pair(std::string(name), [&reputation, message, loss, step](CallContext& call) {
+                const FormId form = formArgument(call, 0);
+                const int side = intArgument(call, 1);
+                const Reputation::Bump bump = step ? (loss ? reputation.removeStep(form, side, intArgument(call, 2))
+                                                           : reputation.add(form, side, intArgument(call, 2)))
+                                                   : (loss ? reputation.removeExact(form, side, argument(call, 2))
+                                                           : reputation.addExact(form, side, argument(call, 2)));
+                if (bump.mApplied && message)
+                    message(bump);
+                return 0.0;
+            });
+        };
+        for (const auto& [name, handler] : { exact("AddReputationExact", false, false), exact("RemoveReputation", true, true),
+                 exact("RemoveReputationExact", true, false) })
+            interpreter.setHandler(name, handler);
+        interpreter.setHandler("GetReputationPct", [&reputation](CallContext& call) {
+            return reputation.pct(formArgument(call, 0), intArgument(call, 1));
         });
         interpreter.setHandler("SetReputation", [&reputation](CallContext& call) {
             reputation.set(formArgument(call, 0), intArgument(call, 1), argument(call, 2));

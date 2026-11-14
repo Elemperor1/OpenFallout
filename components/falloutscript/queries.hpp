@@ -56,6 +56,15 @@ namespace FalloutScript
         /// SetPCSleepHours: a rest that is going on has that many hours left, however many the menu allowed (a
         /// number below one ends it). Nothing happens when the player is not resting.
         virtual void setPlayerSleepHours(double hours) = 0;
+        /// GetPCSleepHours: the hours that are left of the rest the menu counts (none when the player is not resting)
+        virtual double playerSleepHours() { return 0.0; }
+        /// ShowSleepWaitMenu: the menu of the rest. With the check the player is refused for the reasons of waiting
+        /// (and the menu is the one of waiting), without it the menu opens as it was asked for: sleeping or waiting.
+        virtual void showSleepWaitMenu(bool sleeping, bool checked)
+        {
+            (void)sleeping;
+            (void)checked;
+        }
         /// Whether the encounter zone of the cell the reference stands in is the zone (the zone of the worldspace
         /// when the cell has none). The zone of the reference itself is not asked.
         virtual bool inZone(FormId reference, FormId zone) = 0;

@@ -117,6 +117,23 @@ namespace
         EXPECT_EQ(run.mState.owner(crate), playerBase);
     }
 
+    TEST(FalloutScriptObjectStateTest, clearing_the_ownership_takes_the_owner_of_the_record_away_too)
+    {
+        Runner run;
+        run.mRecords.mOwners[crate] = faction;
+        run.mState.clearOwner(crate);
+        EXPECT_EQ(run.mState.owner(crate), 0u);
+        EXPECT_EQ(run.call(OpIsOwner, crate, { faction }), 0.0);
+        FalloutScript::SaveWriter out;
+        FalloutScript::writeObjectState(run.mState, out);
+        Runner again;
+        again.mRecords.mOwners[crate] = faction;
+        const std::string bytes = out.take();
+        FalloutScript::SaveReader in(bytes);
+        FalloutScript::readObjectState(again.mState, in, FalloutScript::objectStateSectionVersion);
+        EXPECT_EQ(again.mState.owner(crate), 0u);
+    }
+
     TEST(FalloutScriptObjectStateTest, an_owner_is_told_by_the_form_it_is_of)
     {
         Runner run;

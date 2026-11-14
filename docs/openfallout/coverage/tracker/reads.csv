@@ -204,3 +204,105 @@ command,EnableLoadingMenu,M16 world notes (docs/openfallout/m16-world-notes.md):
 command,IsLoadingMenuEnabled,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DFC10 (FalloutNV.exe) tests the pointer at 0x11DA0C0; not built
 command,IsFacingUp,M16 world notes (docs/openfallout/m16-world-notes.md): eval 0x5A0710 (FalloutNV.exe) tests the spine bone of a character; not built
 command,ShowSleepWaitMenu,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5E0090 (FalloutNV.exe)
+command,GetMinorCrimeCount,M16 law (docs/openfallout/m16-law-notes.md): 0x8BFF50 and 0x8B7E20 (player count, else sum of the factions' minor counts) in the executable
+command,GetMajorCrimeCount,M16 law (docs/openfallout/m16-law-notes.md): 0x8C09B0 and 0x8B7F00 (player count, else sum of the factions' major counts) in the executable
+command,GetCrime,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A0F90 over HasCrime 0x972600 in the executable
+command,GetCrimeKnown,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5CC240 over HasCrime 0x972600 in the executable
+command,IsGuard,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A10B0: the class flag 0x02 of the character's base in the executable
+command,IsPCAMurderer,M16 law (docs/openfallout/m16-law-notes.md): eval 0x953F60; set at 0x89E2B0 by the death routine in the executable
+command,GetPCExpelled,M16 law (docs/openfallout/m16-law-notes.md): faction flag 0x08 (setter 0x5CE040) in the executable
+command,SetPCExpelled,M16 law (docs/openfallout/m16-law-notes.md): faction flag 0x08 (setter 0x5CE040) in the executable
+command,GetPCFactionAttack,M16 law (docs/openfallout/m16-law-notes.md): faction flag 0x20 (0x47EBD0, set only by scripts) in the executable
+command,SetPCFactionAttack,M16 law (docs/openfallout/m16-law-notes.md): faction flag 0x20 (0x47EBD0, set only by scripts) in the executable
+command,GetPCFactionMurder,M16 law (docs/openfallout/m16-law-notes.md): faction flag 0x40 (0x47EBB0, set only by scripts) in the executable
+command,SetPCFactionMurder,M16 law (docs/openfallout/m16-law-notes.md): faction flag 0x40 (0x47EBB0, set only by scripts) in the executable
+command,GetAlarmed,M16 law (docs/openfallout/m16-law-notes.md): eval 0x59E650: the current package is the alarm package in the executable
+command,GetDetectionLevel,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A1EE0 over 0x8A81E0 in the executable
+command,IsActorDetected,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5CDA20 over ProcessLists 0x973460 in the executable
+command,GetAmountSoldStolen,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A2050 over 0x5A20B0 in the executable
+command,ModAmountSoldStolen,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5CDEC0 over 0x5CDF20 in the executable
+command,SendAssaultAlarm,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5DA2A0 over the attack crime 0x8C0460 in the executable
+command,SendTrespassAlarm,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5D47E0 over the alarm sweep 0x8C0EC0 in the executable
+command,ClearFactionPlayerEnemyFlag,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5D9500 over 0x47EB90 in the executable
+command,ClearActorsFactionsPlayerEnemyFlag,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5D9550 over 0x8BCB40 in the executable
+command,GetActorFactionPlayerEnemy,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A49F0 over the hostility test 0x8B87A0 in the executable
+command,GetActorCrimePlayerEnemy,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A4930 in the executable
+command,GetTrespassWarningLevel,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A1770 and the trespass package update 0x918120 in the executable
+command,IsTrespassing,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A1900 in the executable
+command,IsInMyOwnedCell,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A19A0 over 0x546CA0 in the executable
+command,IsCellOwner,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A2ED0 over 0x546A40 in the executable
+command,ClearOwnership,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5D6D10 in the executable
+command,IsActorAVictim,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A3460 over the crime-line state set at 0x8BFF30 in the executable
+command,IsActorEvil,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A3390 over 0x5678A0 and 0x47D740 in the executable
+command,GetIsAlignment,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A4DD0 over the karma class 0x47E040 in the executable
+command,HasFriendDisposition,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A3E90 in the executable
+command,FriendDispositionBoost,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5BE870 in the executable
+command,GetPersuasionNumber,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A2A50 (answers 0 in the New Vegas executable) in the executable
+command,GetTotalPersuasionNumber,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A2A50 (answers 0 in the New Vegas executable) in the executable
+command,GetFactionRelation,M16 law (docs/openfallout/m16-law-notes.md): eval 0x5A46D0 over the hostility 0x8B87A0 in the executable
+command,GetFactionReaction,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5C7FD0 over 0x5FD3B0 in the executable
+command,SetFactionReaction,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5C80A0 over 0x5FD3D0 in the executable
+command,ModFactionReaction,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5C82C0 over 0x5FD400 in the executable
+command,GetFactionRankDifference,M16 law (docs/openfallout/m16-law-notes.md): eval 0x59E510 in the executable
+command,ModFactionRank,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5C7F10 over 0x8B86E0 in the executable
+command,RemoveFromAllFactions,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5C8340 in the executable
+command,SameFaction,M16 law (docs/openfallout/m16-law-notes.md): eval 0x59D400 in the executable
+command,SameFactionAsPC,M16 law (docs/openfallout/m16-law-notes.md): eval 0x59D3A0 in the executable
+command,GetPCInFaction,M16 law (docs/openfallout/m16-law-notes.md): eval 0x59F790 in the executable
+command,SameRace,M16 law (docs/openfallout/m16-law-notes.md): eval 0x59D540 in the executable
+command,SameSex,M16 law (docs/openfallout/m16-law-notes.md): eval 0x59D610 in the executable
+command,AddReputationExact,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5DDD90 over 0x615730 in the executable
+command,RemoveReputation,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5DDE10 over 0x615FA0 in the executable
+command,RemoveReputationExact,M16 law (docs/openfallout/m16-law-notes.md): exec 0x5DDE90 over 0x615A00 in the executable
+command,IsMoving,"M16 actors, FalloutNV.exe: eval 0x5A40D0, movement word through the controller at +0x190 (0x8846E0), bits 1/2/4/8"
+command,IsTurning,"M16 actors, FalloutNV.exe: eval 0x5A4160, bits 0x10 and 0x20 of the movement word"
+command,IsRunning,"M16 actors, FalloutNV.exe: eval 0x5A3010, bit 0x200 of the movement word (0x884730)"
+command,IsSwimming,"M16 actors, FalloutNV.exe: eval 0x5A1FA0, byte +0x14D of the actor (0x5A2030)"
+command,IsWaiting,"M16 actors, FalloutNV.exe: eval 0x5A0E80, procedure code 13 or package flag 0x10000 (0x8A6210, 0x8A6290)"
+command,GetWalkSpeed,"M16 actors, FalloutNV.exe: eval 0x59C860, 0x884DC0 (walk speed of the actor's movement data; the formula was not read)"
+command,GetAnimAction,"M16 actors, FalloutNV.exe: eval 0x5A41C0, word at +0x2EC of the high process through slot 0x3E4 (0x8A7570), -1 for none"
+command,IsIdlePlaying,"M16 actors, FalloutNV.exe: eval 0x5A0F10, the idle object of the process (slot 0x1E4 -> +0x1B8) exists and has not ended (0x4985F0)"
+command,GetIdleDoneOnce,"M16 actors, FalloutNV.exe: eval 0x5A3570, flag through process slot 0x60"
+command,IsLastIdlePlayed,"M16 actors, FalloutNV.exe: eval 0x5A4780, process slot 0x38C compared with the argument"
+command,GetPackageTarget,"M16 actors, FalloutNV.exe: exec 0x5CE520 in the executable"
+command,SetActorsAI,"M16 actors, FalloutNV.exe: exec 0x5D6A60, byte +0xBC of the actor"
+command,ToggleActorsAI,"M16 actors, FalloutNV.exe: exec 0x5BBE10, byte +0xBC of the actor"
+command,IsActorsAIOff,"M16 actors, FalloutNV.exe: exec 0x5BBEC0, byte +0xBC of the actor"
+command,DisableAllActors,"M16 actors, FalloutNV.exe: exec 0x5C47E0, disables every actor of the high list but the object and the disabled ones"
+command,SetForceRun,"M16 actors, FalloutNV.exe: exec 0x5CE7B0, byte +0x124 of the actor"
+command,GetForceRun,"M16 actors, FalloutNV.exe: exec 0x5CE730, byte +0x124 of the actor"
+command,SetForceSneak,"M16 actors, FalloutNV.exe: exec 0x5CE910, byte +0x125 of the actor"
+command,GetForceSneak,"M16 actors, FalloutNV.exe: exec 0x5CE870, byte +0x125 of the actor"
+command,SetNoAvoidance,"M16 actors, FalloutNV.exe: exec 0x5BC200, one global byte (0x12682F8)"
+command,SetAllReachable,"M16 actors, FalloutNV.exe: exec 0x5BC150 parses and changes nothing"
+command,GetGroupMemberCount,"M16 actors, FalloutNV.exe: eval 0x5A4240, the member list of the combat group of the process"
+command,GetGroupTargetCount,"M16 actors, FalloutNV.exe: eval 0x5A42B0, the target list of the combat group of the process"
+command,GetPlayerTeammateCount,"M16 actors, FalloutNV.exe: eval 0x5A48A0, counter at +0xD68 of the player"
+command,GetOwnerLastTarget,"M16 actors, FalloutNV.exe: exec 0x5DEAA0, last target handle of the process (0x8A51A0)"
+command,IsActor,"M16 actors, FalloutNV.exe: eval 0x5A39D0, slot 0x100 of the form"
+command,GetFurnitureMarkerID,"M16 actors, FalloutNV.exe: eval 0x59DE90, process slot 0x4C4 (0x921080): 0 when on no marker"
+command,GetFatiguePercentage,"M16 actors, FalloutNV.exe: eval 0x59C760, 0x893530: value 22 current over permanent, 1 when permanent is 0"
+command,StartCannibal,"M16 actors, FalloutNV.exe: exec 0x5CFEF0, slot 0x378 of the named actor"
+command,StartMisterSandMan,"M16 actors, FalloutNV.exe: exec 0x5CFDF0, slot of the named actor"
+command,GetCannibal,"M16 actors, FalloutNV.exe: eval 0x5A2890, the flag of the player (slot 0x364)"
+command,GetSandman,"M16 actors, FalloutNV.exe: eval 0x5A2810, the flag of the player"
+command,AdvancePCLevel,"M16 actors, FalloutNV.exe: exec 0x5CE9F0, adds one to the level number of the player"
+command,ModPCAttribute,"M16 actors, FalloutNV.exe: exec 0x5D11B0, check 0x5D1260 (values 5 to 11), 0x93A7C0"
+command,ModPCSkill,"M16 actors, FalloutNV.exe: exec 0x5D4A40, the empty command"
+command,AdvancePCSkill,"M16 actors, FalloutNV.exe: exec 0x5D4A40, the empty command"
+command,GetIsPlayableRace,"M16 actors, FalloutNV.exe: eval 0x59F540, race flag 1 (0x59F610)"
+command,IsRidingHorse,"M16 actors, FalloutNV.exe: eval 0x5A3670 answers 0"
+command,IsActorUsingATorch,"M16 actors, FalloutNV.exe: eval 0x5A2C30 answers 0"
+command,IsTorchOut,"M16 actors, FalloutNV.exe: eval 0x5A2A50, the empty evaluator"
+command,IsShieldOut,"M16 actors, FalloutNV.exe: eval 0x5A2A50, the empty evaluator"
+command,GetDisease,"M16 actors, FalloutNV.exe: eval 0x59D250 answers 0"
+command,GetIsClassDefault,"M16 actors, FalloutNV.exe: eval 0x5A2A50, the empty evaluator"
+command,IsPlayersLastRiddenHorse,"M16 actors, FalloutNV.exe: eval 0x5A2A50, the empty evaluator"
+command,GetPlayerHasLastRiddenHorse,"M16 actors, FalloutNV.exe: exec 0x5D1870, evaluator 0x5A2A50, the empty ones"
+command,IsHorseStolen,"M16 actors, FalloutNV.exe: exec 0x5D1870, evaluator 0x5A2A50, the empty ones"
+command,SetHardcore,docs/openfallout/m16-needs-notes.md: exec 0x5DE920 (0 and 1 only) calls 0x969E90 in the executable
+command,IsHardcore,docs/openfallout/m16-needs-notes.md: true for exactly 1 in the player's +0x7BC (same handler for the condition function 0x24A) in the executable
+command,IsAlwaysHardcore,docs/openfallout/m16-needs-notes.md: returns the tracking byte +0xE38 of the player in the executable
+command,DisableHardcoreTracking,docs/openfallout/m16-needs-notes.md: clears the tracking byte +0xE38 of the player in the executable
+command,GetPCSleepHours,docs/openfallout/m16-needs-notes.md: exec 0x5CDE00 reads player +0x654 in the executable
+command,ShowSleepWaitMenu,docs/openfallout/m16-needs-notes.md: exec 0x5E0090 (second argument 1 takes the checked path 0x969FA0) in the executable

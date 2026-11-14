@@ -1,4 +1,5 @@
 #include "falloutscripts.hpp"
+#include "falloutlaw.hpp"
 
 #include <algorithm>
 #include <array>
@@ -207,7 +208,7 @@ namespace OFScript
         }
         else if (const ESM4::Ammunition* record = mStore.get<ESM4::Ammunition>().search(base))
         {
-            result.mWeight = record->mData.mWeight;
+            result.mWeight = FalloutScript::carriedAmmoWeight(hardcoreMode(), record->mData.mWeight);
             result.mValue = record->mData.mValue;
             item = true;
             // The second bit of the flags of an ammunition record is the one that keeps it from the player
@@ -508,6 +509,9 @@ namespace OFScript
         const Interaction::Setting setting
             = [this](std::string_view name, double fallback) { return gameSetting(name, fallback); };
         mReferenceState.unlock(screen.mReference);
+        // A lock that belongs to someone is a theft that the owner may see (0x78EB50)
+        if (mLaw)
+            mLaw->tamperedWith(screen.mReference);
         // The experience is given once for a lock; opening it again (it was locked anew) gives none
         if (mLockExperienceGiven.insert(screen.mReference).second)
         {
@@ -820,6 +824,9 @@ namespace OFScript
         if (correct)
         {
             mReferenceState.unlock(state.mReference);
+            // A terminal that belongs to someone costs the karma of a theft (0x501310)
+            if (mLaw)
+                mLaw->tamperedWith(state.mReference, true);
             const int level = state.mHackLevel;
             if (const char* experience = Interaction::hackClassExperience(level))
             {
@@ -949,26 +956,32 @@ namespace OFScript
 
     bool FalloutScripts::hostilesNearPlayer()
     {
+        namespace Restrictions = FalloutScript::Restrictions;
         const OFWorld::Ptr player = OFBase::Environment::get().getWorld()->getPlayerPtr();
         if (player.isEmpty() || !player.isInCell())
             return false;
         // The reach of the check: the executables look as far as fHostileActorInteriorDistance (2000) in an interior and
-        // fHostileActorExteriorDistance (3000) outside, both absent from the master files (the reads of M13)
-        const double reach = player.getCell()->isExterior() ? gameSetting("fHostileActorExteriorDistance", 3000)
-                                                            : gameSetting("fHostileActorInteriorDistance", 2000);
+        // fHostileActorExteriorDistance (3000) outside, both absent from the master files (FalloutNV.exe 0x9764A0)
+        const double reach = Restrictions::hostileReach(!player.getCell()->isExterior(),
+            gameSetting("fHostileActorExteriorDistance", 3000), gameSetting("fHostileActorInteriorDistance", 2000));
         const osg::Vec3f here = player.getRefData().getPosition().asVec3();
+        // The characters that are after the player (the executable also counts those that its factions and aggression
+        // make enemies: the combat state here lists the ones that went for it)
+        std::vector<Restrictions::Candidate> candidates;
         for (const FalloutScript::FormId attacker : mCombat.attackersOf(mPlayer))
         {
-            if (mActors.isDead(attacker))
-                continue;
-            // One that was removed or disabled is no threat, whatever it was doing
             const OFWorld::Ptr enemy = findReference(attacker);
-            if (!enemy.isEmpty() && enemy.isInCell() && sharesSpace(enemy.getCell(), player.getCell())
-                && enemy.getRefData().isEnabled() && enemy.getCellRef().getCount() > 0
-                && (enemy.getRefData().getPosition().asVec3() - here).length() <= reach)
-                return true;
+            if (enemy.isEmpty() || !enemy.isInCell() || !sharesSpace(enemy.getCell(), player.getCell()))
+                continue;
+            Restrictions::Candidate candidate;
+            candidate.mHostile = true;
+            candidate.mDead = mActors.isDead(attacker);
+            // One that was removed or disabled is no threat, whatever it was doing
+            candidate.mDisabled = !enemy.getRefData().isEnabled() || enemy.getCellRef().getCount() <= 0;
+            candidate.mDistance = (enemy.getRefData().getPosition().asVec3() - here).length();
+            candidates.push_back(candidate);
         }
-        return false;
+        return Restrictions::hostileNear(candidates, reach);
     }
 
     bool FalloutScripts::playerTakingHealthDamage()
@@ -1020,44 +1033,16 @@ namespace OFScript
 
     std::string FalloutScripts::restRefusalText(bool sleeping, FalloutScript::FormId bed)
     {
-        OFBase::World& world = *OFBase::Environment::get().getWorld();
-        const OFWorld::Ptr player = world.getPlayerPtr();
+        namespace Restrictions = FalloutScript::Restrictions;
+        const OFWorld::Ptr player = OFBase::Environment::get().getWorld()->getPlayerPtr();
         if (player.isEmpty() || !player.isInCell())
             return "You cannot rest now.";
-        if (!mMapMarkers.restAllowed())
-            return "You cannot rest here.";
-        Interaction::RestConditions conditions;
-        conditions.mSleeping = sleeping;
-        conditions.mHostilesNear = hostilesNearPlayer();
-        conditions.mTakingHealthDamage = playerTakingHealthDamage();
-        conditions.mUnderwater = world.isSwimming(player);
-        conditions.mInAir = playerInAir();
-        if (!sleeping)
-        {
-            // A place can forbid waiting by a flag of its record: the cell of an interior, the worldspace outside
-            if (inOpenWorld(mPlayer))
-            {
-                const ESM4::World* space
-                    = mStore.get<ESM4::World>().search(ESM::FormId::fromUint32(worldspaceOf(mPlayer)));
-                conditions.mPlaceForbidsWaiting = space != nullptr && (space->mFlags & ESM4::Rec_CanNotWait) != 0;
-            }
-            else if (const FalloutScript::FormId cell = parentCell(mPlayer); cell != 0)
-            {
-                const ESM4::Cell* record = mStore.get<ESM4::Cell>().search(ESM::FormId::fromUint32(cell));
-                conditions.mPlaceForbidsWaiting = record != nullptr && (record->mFlags & ESM4::Rec_CanNotWait) != 0;
-            }
-        }
-        if (sleeping && bed != 0)
-        {
-            // What a script made of the bed counts, so the owner is not the one the record names
-            const FalloutScript::FormId owner = mObjectState.owner(bed);
-            conditions.mOwnedBed = owner != 0 && owner != playerBase();
-        }
-        const std::optional<std::string> refusal = Interaction::restRefusal(conditions);
-        if (!refusal)
+        const Restrictions::Action action = sleeping ? Restrictions::Action::Sleep : Restrictions::Action::Wait;
+        const char* refusal = Restrictions::refusal(action, restrictionFacts(action, bed));
+        if (refusal == nullptr)
             return std::string();
-        const std::string text = refusalWord(*refusal);
-        log("Rest refused: " + *refusal + (text.empty() ? " (the files have no text for it)" : ""));
+        const std::string text = refusalWord(refusal);
+        log(std::string("Rest refused: ") + refusal + (text.empty() ? " (the files have no text for it)" : ""));
         return text.empty() ? std::string(sleeping ? "You cannot sleep now." : "You cannot wait now.") : text;
     }
 
@@ -1069,6 +1054,11 @@ namespace OFScript
             tellPlayer(refusal, 2);
             return;
         }
+        openRestMenu(sleeping, bed);
+    }
+
+    void FalloutScripts::openRestMenu(bool sleeping, FalloutScript::FormId bed)
+    {
         const std::lock_guard lock(mInteractionMutex);
         if (mRest.mOpen || mRest.mActive)
             return;
@@ -1275,50 +1265,49 @@ namespace OFScript
         if (target == nullptr || player.isEmpty() || !player.isInCell())
             return "You cannot travel there.";
 
-        Interaction::TravelConditions conditions;
-        conditions.mUndiscovered = mMapMarkers.state(marker) != 2;
-        conditions.mHostilesNear = hostilesNearPlayer();
-        conditions.mTakingHealthDamage = playerTakingHealthDamage();
-        conditions.mScriptBlocked = !mMapMarkers.fastTravelAllowed();
-        const PipboyStats stats = pipboyStats();
-        conditions.mOverencumbered = stats.mWeight > stats.mMaxWeight;
-        conditions.mInAir = playerInAir();
-        // The place the records forbid to travel from: an interior unless its flag "can travel from here" is set (the
-        // flag the plugin code names CELL_NoTravel), a worldspace that has the flag that forbids it. The executable
-        // reads the same bit of the cells outside too, which is not done here.
-        const bool outside = inOpenWorld(mPlayer);
-        const FalloutScript::FormId cell = parentCell(mPlayer);
-        if (outside)
+        namespace Restrictions = FalloutScript::Restrictions;
+        Restrictions::Facts facts = restrictionFacts(Restrictions::Action::FastTravel, 0);
+        facts.mUndiscovered = mMapMarkers.state(marker) != 2;
+        if (const char* refusal = Restrictions::refusal(Restrictions::Action::FastTravel, facts))
         {
-            const ESM4::World* space = mStore.get<ESM4::World>().search(ESM::FormId::fromUint32(worldspaceOf(mPlayer)));
-            conditions.mCellForbids = space != nullptr && (space->mWorldFlags & ESM4::World::WLD_NoFastTravel) != 0;
-        }
-        else if (cell != 0)
-        {
-            const ESM4::Cell* record = mStore.get<ESM4::Cell>().search(ESM::FormId::fromUint32(cell));
-            conditions.mCellForbids = record != nullptr && (record->mCellFlags & ESM4::CELL_NoTravel) == 0;
-        }
-        if (const std::optional<std::string> refusal = Interaction::travelRefusal(conditions))
-        {
-            std::string text = refusalWord(*refusal);
-            log("Travel refused: " + *refusal + (text.empty() ? " (the files have no text for it)" : ""));
+            std::string text = refusalWord(refusal);
+            log(std::string("Travel refused: ") + refusal + (text.empty() ? " (the files have no text for it)" : ""));
             if (text.empty())
                 text = "You cannot travel now.";
             tellPlayer(text);
             return text;
         }
 
-        // The time the trip takes: from where the player stands when that is in the space of the marker, else the
-        // trip is as long as the longest one
-        double distance = 20000;
-        if (outside && worldspaceOf(mPlayer) == target->mWorldspace)
+        // The time the trip takes (FalloutNV.exe 0x93CDF0): the length of the way over the speed of the player, in hours of
+        // the game at the time scale, cut to whole hours. The executable measures the way on the navigation mesh, which is
+        // not loaded for places so far; the straight line is what is used here (a way is never shorter), and a trip from
+        // a place that is not in the space of the marker has no length, as one the executable can not measure has none.
+        double distance = 0;
+        if (inOpenWorld(mPlayer) && worldspaceOf(mPlayer) == target->mWorldspace)
         {
             const osg::Vec3f away = target->mPosition - player.getRefData().getPosition().asVec3();
             distance = std::sqrt(away.x() * away.x() + away.y() * away.y());
         }
-        const double hours = Interaction::travelHours(distance);
-        runOnMainThread([this, marker, hours] {
-            OFBase::Environment::get().getWorld()->advanceTime(hours);
+        const double timeScale = std::max(static_cast<double>(world.getTimeManager()->getGameTimeScale()), 1.0);
+        const int hours = Restrictions::travelHours(distance, travelSpeed(), timeScale);
+        log("Travel: " + std::to_string(hours) + " hours for " + std::to_string(static_cast<long long>(distance))
+            + " units");
+        runOnMainThread([this, marker, hours, timeScale] {
+            namespace AV = FalloutScript::ActorValue;
+            OFBase::World* world = OFBase::Environment::get().getWorld();
+            // Each hour of the trip goes by on its own: the time moves, what runs by the seconds of the game ages by the
+            // hour, and the player heals for two seconds of its regeneration (0x93CDF0 and 0x88B510)
+            const double seconds = 3600.0 / timeScale;
+            for (int hour = 0; hour < hours; ++hour)
+            {
+                world->advanceTime(1.0);
+                if (!mActors.isDead(mPlayer))
+                    mActorValues.restore(mPlayer, AV::health,
+                        FalloutScript::DerivedStats::regeneration(
+                            mActorValues.current(mPlayer, AV::healRate), Restrictions::travelHealingSeconds));
+                mItemUse.update(seconds);
+                mMagic.update(seconds);
+            }
             // A little above the marker, which stands about where a character would. IsPlayerMovingIntoNewSpace is on
             // for the whole trip (the executable's worker of the fast travel sets it and clears it).
             playerMoveBegins();
@@ -1403,6 +1392,10 @@ namespace OFScript
             mHardcore.setRates(gameSetting("fHCDehydrationRate", 10), gameSetting("fHCStarvationRate", 25),
                 gameSetting("fHCSleepDeprivationRate", 50));
         }
+        // The updater of the executable does nothing while the control of fighting is taken away (0x969C30 asks the
+        // control byte of the player for its bit 4), and the time it left out is counted when it is given back
+        if ((mControlsOff.load() & (1u << static_cast<unsigned>(FalloutScript::PlayerControl::Fighting))) != 0)
+            return;
         OFBase::World* world = OFBase::Environment::get().getWorld();
         if (world == nullptr || mActors.isDead(mPlayer))
             return;

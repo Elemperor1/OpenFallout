@@ -43,6 +43,9 @@ namespace FalloutScript
         bool inCombat(FormId actor) const { return target(actor) != 0; }
         /// Whether someone fights the target
         bool isFought(FormId target) const;
+        /// What the actor fought last, whether it fights it still or not (0 when it never fought); the games keep it in
+        /// the process of the actor and tell it with GetOwnerLastTarget. Of the moment: not in a saved game.
+        FormId lastTarget(FormId actor) const;
 
         /// The actors that fight the target, in the order of their forms
         std::vector<FormId> attackersOf(FormId target) const;
@@ -144,6 +147,7 @@ namespace FalloutScript
 
         mutable std::mutex mMutex;
         std::map<FormId, FormId> mTargets;
+        std::map<FormId, FormId> mLastTargets;
         std::set<FormId> mAlert;
         std::set<FormId> mUnconscious;
         std::map<FormId, float> mWakeTimers;

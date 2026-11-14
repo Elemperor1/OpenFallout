@@ -79,6 +79,10 @@ namespace OFMechanics
 
         std::size_t size() const { return mMinds.size(); }
 
+        /// The characters it follows that are within `radius` units of `position` (the same space is for the caller to
+        /// check)
+        void getObjectsInRange(const osg::Vec3f& position, float radius, std::vector<OFWorld::Ptr>& objects) const;
+
         /// What the game keeps of one actor
         struct Mind;
 

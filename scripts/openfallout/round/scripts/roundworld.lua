@@ -232,6 +232,49 @@ function r.speed(scale)
     return outcome('speed', ok, err, string.format('%.2f', scale))
 end
 
+-- ---- M16 additions: waiting, sleeping, travelling, the needs -------------------------------------------------------------------
+-- The game's clock in hours
+function r.clock() local reply = ask('clock', {}) return reply and reply.hours end
+
+-- The player waits (or, after r.activate of a bed, sleeps: `activated = true`) for `hours`; waits for it to end and logs the game
+-- hours that went by. Gives { screen, started, passed } (passed in game hours)
+function r.rest(o)
+    o = o or {}
+    local before = r.clock()
+    local reply = ask('rest', { label = o.label, hours = o.hours or 1, activated = o.activated })
+    if reply == nil then return nil end
+    local passed = 0
+    if reply.started then
+        -- (the questions to the player script yield, so they are asked here and not from a predicate of waitFor)
+        local deadline = now() + (o.timeout or 240)
+        local last
+        repeat
+            r.wait(1)
+            last = ask('restProgress', {})
+        until last == nil or not last.active or now() >= deadline
+        log('waitFor', 'rest ' .. tostring(o.label or '-'), (last ~= nil and not last.active) and 'ok' or 'timeout',
+            last and string.format('done=%.0f/%.0f', last.done, last.total) or '-')
+        passed = (r.clock() or before) - before
+    end
+    log('rested', tostring(o.label or '-'), 'screen=' .. tostring(reply.screen), 'started=' .. tostring(reply.started), string.format('passed=%.2f', passed))
+    reply.passed = passed
+    return reply
+end
+
+-- The hardcore mode: r.hardcore() asks, r.hardcore(true) or (false) sets
+function r.hardcore(on, label) return ask('hardcore', { on = on, label = label }) end
+
+-- The levels of the three needs and the tiles of the display, as numbers
+function r.needs(label) return ask('needs', { label = label }) end
+
+-- Fast travel to the nearest marker of the map that the player may travel to; logs the game hours it took
+function r.travel(label)
+    local before = r.clock()
+    local reply = ask('travel', { label = label })
+    if reply and reply.went then log('travelled', tostring(label or '-'), string.format('passed=%.2f', (r.clock() or before) - before)) end
+    return reply
+end
+
 -- ---- M14 additions: characters, weapons, the fight -------------------------------------------------------------------------
 -- Records are given as "FormId:0x..." (core.getFormId) or { file, id }; objects are the ones these steps return.
 

@@ -201,6 +201,8 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testcombatcommands.cpp
     falloutscript/testcombatstate.cpp
     falloutscript/testcrafting.cpp
+    falloutscript/testcrime.cpp
+    falloutscript/teststanding.cpp
     falloutscript/testdamage.cpp
     falloutscript/testdestruction.cpp
     falloutscript/testdismember.cpp
@@ -222,6 +224,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testradio.cpp
     falloutscript/testmusic.cpp
     falloutscript/testhardcore.cpp
+    falloutscript/testrestrictions.cpp
     falloutscript/testhitreactions.cpp
     falloutscript/testequipment.cpp
     falloutscript/testfightai.cpp
@@ -248,6 +251,7 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testregionline.cpp
     falloutscript/testmapmarkers.cpp
     falloutscript/testaimemory.cpp
+    falloutscript/testactorstatus.cpp
     falloutscript/testobjectstate.cpp
     falloutscript/testpresentation.cpp
     falloutscript/testqueries.cpp

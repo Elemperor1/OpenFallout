@@ -10,6 +10,7 @@
 #include <components/lua/util.hpp>
 
 #include "../mwbase/environment.hpp"
+#include "../mwscript/falloutlaw.hpp"
 #include "../mwscript/falloutscripts.hpp"
 
 #include "context.hpp"
@@ -186,6 +187,34 @@ namespace OFLua
             row["killed"] = result.mStrike.mKilled;
             row["downed"] = result.mStrike.mDowned;
             row["crippled"] = result.mStrike.mCrippled;
+            return row;
+        };
+        // What the world holds against the player (M16): the crimes of the player, whether it is a murderer, and, when a
+        // character is given, how that character stands: its factions, whether any of them is an enemy of the player, the
+        // crimes of those, what it thinks of the player and the steps of its trespass warning
+        api["law"] = [lua](sol::optional<std::string_view> actor) {
+            sol::table row(lua, sol::create);
+            OFScript::LawGlue* glue = scripts().lawGlue();
+            row["available"] = glue != nullptr;
+            if (glue == nullptr)
+                return row;
+            FalloutScript::Law& law = glue->law();
+            row["minor"] = law.playerMinorCrimes();
+            row["major"] = law.playerMajorCrimes();
+            row["murderer"] = law.murderer();
+            row["crimes"] = static_cast<int>(law.crimeCount());
+            row["amountSoldStolen"] = law.amountSoldStolen();
+            if (actor && !actor->empty())
+            {
+                const FormId id = parseId(*actor);
+                const std::vector<FormId> factions = glue->factionsOf(id);
+                row["factions"] = static_cast<int>(factions.size());
+                row["enemy"] = law.anyEnemy(factions);
+                row["factionMinor"] = law.minorCrimes(factions);
+                row["factionMajor"] = law.majorCrimes(factions);
+                row["disposition"] = glue->dispositionToPlayer(id);
+                row["trespassLevel"] = law.trespassLevel(id);
+            }
             return row;
         };
         // The player draws the weapon (or puts it away), for the scripts that ask whether it is out

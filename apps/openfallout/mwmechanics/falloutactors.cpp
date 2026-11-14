@@ -19,6 +19,7 @@
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadpack.hpp>
 #include <components/esm4/packageschedule.hpp>
+#include <components/falloutscript/actorstatus.hpp>
 #include <components/falloutscript/aimemory.hpp>
 #include <components/falloutscript/fightai.hpp>
 #include <components/misc/constants.hpp>
@@ -225,6 +226,14 @@ namespace OFMechanics
         std::deque<osg::Vec3f> mWaypoints;
         float mPathRetry = 0.f;
 
+        // What the scripts were last told of its package (GetCurrentAIProcedure, IsWaiting, GetPackageTarget): told when
+        // it changes, for the reference mReported
+        FalloutScript::FormId mReported = 0;
+        int mToldType = -2;
+        int mToldStage = 0;
+        std::uint32_t mToldFlags = 0;
+        FalloutScript::FormId mToldTarget = 0;
+
         // Whether it gets on
         osg::Vec3f mCheckpoint;
         float mCheckpointTime = 0.f;
@@ -326,6 +335,57 @@ namespace OFMechanics
                     mind.mNeedsGoal = true;
                     mind.mChangeTold = saved->mChangeTold;
                 }
+        }
+
+        /// Tells the scripts which package the actor follows and at which stage of it (the type of the package, its flags
+        /// and the reference it names as its target), when that is not what they were told last. The stage is chosen,
+        /// not read: the first while it goes to the place of the package, the last of the executable's list for that type
+        /// of package while it is there, and past the list (the end of the package) when it is done.
+        void publishMind(OFScript::FalloutScripts* scripts, FalloutActors::Mind& mind, bool dead)
+        {
+            if (scripts == nullptr)
+                return;
+            int type = -1;
+            std::uint32_t flags = 0;
+            FalloutScript::FormId target = 0;
+            int stage = 0;
+            if (!dead)
+            {
+                // The package that a script gave it to shoot with is a package of the type Use Weapon (16)
+                if (mind.mOrdered)
+                    type = 16;
+                else if (mind.mPackage != nullptr)
+                {
+                    type = mind.mPackage->mData.type;
+                    flags = mind.mPackage->mData.flags;
+                    // A reference is the target when its kind is 0; an object kind or an object id names no one
+                    if (mind.mPackage->mTarget.type == 0)
+                        target = savedNumber(ESM::FormId::fromUint32(mind.mPackage->mTarget.target));
+                }
+                if (type >= 0)
+                {
+                    const int stages = FalloutScript::procedureStageCount(type);
+                    if (mind.mPackage != nullptr && !mind.mOrdered && mind.mDone.count(mind.mPackage) != 0)
+                        stage = stages;
+                    else if (stages > 1 && mind.mAtGoal && !mind.mWalking)
+                        stage = stages - 1;
+                }
+            }
+            if (mind.mReported != 0 && type == mind.mToldType && stage == mind.mToldStage && flags == mind.mToldFlags
+                && target == mind.mToldTarget)
+                return;
+            const FalloutScript::FormId reported
+                = scripts->noteActivity(mind.mPtr, [=](FalloutScript::ActorActivity& activity) {
+                      activity.mPackageType = type;
+                      activity.mStage = stage;
+                      activity.mPackageFlags = flags;
+                      activity.mPackageTarget = target;
+                  });
+            mind.mReported = reported;
+            mind.mToldType = type;
+            mind.mToldStage = stage;
+            mind.mToldFlags = flags;
+            mind.mToldTarget = target;
         }
 
         struct PendingEvent
@@ -665,6 +725,20 @@ namespace OFMechanics
         }
     }
 
+    void FalloutActors::getObjectsInRange(
+        const osg::Vec3f& position, float radius, std::vector<OFWorld::Ptr>& objects) const
+    {
+        const float squared = radius * radius;
+        for (const auto& entry : mMinds)
+        {
+            const OFWorld::Ptr& ptr = entry.second->mPtr;
+            if (ptr.isEmpty() || !ptr.isInCell())
+                continue;
+            if ((ptr.getRefData().getPosition().asVec3() - position).length2() <= squared)
+                objects.push_back(ptr);
+        }
+    }
+
     FalloutActors::FalloutActors() = default;
     FalloutActors::~FalloutActors() = default;
 
@@ -832,6 +906,10 @@ namespace OFMechanics
         if (found == mMinds.end())
             return;
         releaseAgent(*found->second);
+        // The scripts are not told any more of what the actor does
+        if (found->second->mReported != 0)
+            if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
+                scripts->forgetMind(found->second->mReported);
         mMinds.erase(found);
     }
 
@@ -853,6 +931,9 @@ namespace OFMechanics
             if (it->second->mPtr.getCell() == cell)
             {
                 releaseAgent(*it->second);
+                if (it->second->mReported != 0)
+                    if (OFScript::FalloutScripts* scripts = OFBase::Environment::get().getFalloutScripts())
+                        scripts->forgetMind(it->second->mReported);
                 it = mMinds.erase(it);
             }
             else
@@ -1280,6 +1361,10 @@ namespace OFMechanics
             }
 
             const osg::Vec3f next = mind.mWaypoints.front();
+            // A script may force it to run (SetForceRun), or to sneak, which is slower than a run (the speed is then
+            // scaled in moveSpeedMultiplier)
+            if (frame.mScripts != nullptr)
+                run = (run || frame.mScripts->actorForcesRun(mind.mPtr)) && !frame.mScripts->actorForcesSneak(mind.mPtr);
             float speed = run && animation->canRun() ? runSpeed(*animation) : walkSpeed(*animation);
             // A crippled leg slows the walk (fMoveOneCrippledLegSpeedMult, fMoveTwoCrippledLegsSpeedMult)
             if (frame.mScripts != nullptr)
@@ -1296,7 +1381,9 @@ namespace OFMechanics
                 && distanceAcross(position, frame.mPlayer) < yieldDistance;
             const bool inTheWay = std::abs(place.z() - frame.mPlayer.z()) < yieldHeight && toPlayer < yieldDistance
                 && toPlayer < distanceAcross(position, frame.mPlayer);
-            if (falloutYields(mind.mYield, nearPlayer, inTheWay, duration, yieldPatience))
+            // SetNoAvoidance: nothing steps aside for the player
+            const bool avoids = frame.mScripts == nullptr || !frame.mScripts->actorsAvoidanceOff();
+            if (avoids && falloutYields(mind.mYield, nearPlayer, inTheWay, duration, yieldPatience))
             {
                 mind.mYielded = true;
                 return Walk::Moving;
@@ -2198,6 +2285,7 @@ namespace OFMechanics
             {
                 stopWalking(mind);
                 mind.mFighting = false;
+                publishMind(frame.mScripts, mind, true);
                 if (!mind.mFell)
                 {
                     mind.mFell = true;
@@ -2221,6 +2309,18 @@ namespace OFMechanics
                 if (frame.mScripts != nullptr && frame.mScripts->isDead(mind.mPtr))
                     continue;
             }
+
+            // Scripts told it to do nothing (SetActorsAI 0): it follows no package, fights no one and turns to no one (the
+            // executable does not process an actor whose flag is off); it stands where it is
+            if (frame.mScripts != nullptr && frame.mScripts->actorAiOff(mind.mPtr))
+            {
+                if (mind.mWalking)
+                    stopWalking(mind);
+                mind.mFighting = false;
+                publishMind(frame.mScripts, mind, false);
+                continue;
+            }
+            publishMind(frame.mScripts, mind, false);
 
             if (facesSpeaker(frame, mind, speaker, duration))
                 continue;

@@ -1,5 +1,7 @@
 #include "queries.hpp"
 
+#include <cmath>
+
 #include "arguments.hpp"
 
 namespace FalloutScript
@@ -45,6 +47,15 @@ namespace FalloutScript
         interpreter.setHandler("SetPCSleepHours", [&world](CallContext& call) {
             world.setPlayerSleepHours(argument(call, 0));
             return 0.0;
+        });
+        // The hours that are left of the rest the menu counts (the executable reads the hours of the player, 0x5CDE20)
+        interpreter.setHandler("GetPCSleepHours", [&world](CallContext&) { return std::trunc(world.playerSleepHours()); });
+        // The menu of the rest: the first argument says sleeping (1) or waiting, and a second argument of 1 asks for the
+        // refusals of waiting first (FalloutNV.exe 0x5E0090: with it the answer is that of the key that waits, 0x969FA0)
+        interpreter.setHandler("ShowSleepWaitMenu", [&world](CallContext& call) {
+            const bool checked = call.mArguments.size() > 1 && intArgument(call, 1) == 1;
+            world.showSleepWaitMenu(intArgument(call, 0) == 1, checked);
+            return 1.0;
         });
         interpreter.setHandler("GetInZone", [&world](CallContext& call) {
             const FormId zone = formArgument(call, 0);

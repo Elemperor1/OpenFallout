@@ -26,6 +26,7 @@
 #include <components/esm4/loadnpc.hpp>
 #include <components/falloutscript/footsteps.hpp>
 #include <components/falloutscript/actors.hpp>
+#include <components/falloutscript/actorstatus.hpp>
 #include <components/falloutscript/actortraits.hpp>
 #include <components/falloutscript/actorvalues.hpp>
 #include <components/falloutscript/aimemory.hpp>
@@ -56,6 +57,7 @@
 #include <components/falloutscript/furniture.hpp>
 #include <components/falloutscript/hacking.hpp>
 #include <components/falloutscript/hardcore.hpp>
+#include <components/falloutscript/restrictions.hpp>
 #include <components/falloutscript/hotkeys.hpp>
 #include <components/falloutscript/hud.hpp>
 #include <components/falloutscript/interpreter.hpp>
@@ -154,6 +156,8 @@ namespace OFScript
 
     /// What the commands about the world ask of the host (falloutworld.cpp)
     class WorldHost;
+    /// The crime and the standing in the running engine (falloutlaw.hpp)
+    class LawGlue;
 
     /// Which commands the compiled scripts of the loaded content use: Fallout 3 when only its master is loaded, New
     /// Vegas otherwise (its table has all the commands of the other and the same names, and Tale of Two Wastelands runs
@@ -184,6 +188,7 @@ namespace OFScript
                                  private FalloutScript::MagicRecords,
                                  private FalloutScript::FormListRecords,
                                  private FalloutScript::PackageWorld,
+                                 private FalloutScript::ActorStatusWorld,
                                  private FalloutScript::PlacementWorld,
                                  private FalloutScript::QueryWorld,
                                  private FalloutScript::MessageWorld,
@@ -200,8 +205,13 @@ namespace OFScript
         template <class T>
         friend struct FalloutScript::SaveAccess;
         friend class WorldHost;
+        friend class LawGlue;
 
     public:
+        /// The crime and the standing of the game: what the player does to others is judged here, and the disposition of
+        /// a character is worked out
+        LawGlue* lawGlue() { return mLaw.get(); }
+
         /// Whether the game that is played is New Vegas (Tale of Two Wastelands is played with its engine)
         bool isNewVegas() const { return mGame == FalloutScript::Game::NewVegas; }
 
@@ -213,8 +223,9 @@ namespace OFScript
         void setGameDifficulty(int difficulty);
         /// Whether the hardcore mode is on: the flag of the SetHardcore command, which the Gameplay menu writes too.
         /// Only New Vegas has the mode.
-        bool hardcoreMode() const { return isNewVegas() && mSwitches.get("SetHardcore") > 0; }
-        void setHardcoreMode(bool on) { mSwitches.set("SetHardcore", on ? 1 : 0); }
+        bool hardcoreMode() const { return isNewVegas() && mHardcoreMode.on(); }
+        /// Turns the mode on or off as SetHardcore does: off takes the three needs down to nothing
+        void setHardcoreMode(bool on);
 
         FalloutScripts(const OFWorld::ESMStore& store, FalloutScript::Game game,
             FalloutScript::FormId player = FalloutScript::playerReference);
@@ -1580,6 +1591,21 @@ namespace OFScript
             unsigned mControlsOff = 0;
         };
         HudStatus hudStatus();
+        /// The row of the needs that follows the health in the display (FalloutNV.exe 0x7739F0): whether the hardcore mode
+        /// is on, the level of dehydration, hunger and sleep deprivation, and the tile of each of the five labels (the
+        /// three needs, the radiation and the limbs) by the thresholds of the settings
+        struct NeedsStatus
+        {
+            bool mHardcore = false;
+            std::array<double, 3> mLevels{};
+            /// The level of the last stage of each need, which the meter of the Pip-Boy ends at (1000 for a need whose
+            /// records give no stage)
+            std::array<double, 3> mMost{ 1000, 1000, 1000 };
+            int mCrippledParts = 0;
+            /// Dehydration, hunger, sleep, radiation, limbs
+            std::array<FalloutScript::NeedsDisplay::Tile, 5> mTiles{};
+        };
+        NeedsStatus needsStatus();
         /// The character or creature that the crosshair is on: its name, health and whether it fights the player. False
         /// for anything that is not one.
         struct HudTarget
@@ -2017,6 +2043,25 @@ namespace OFScript
         /// What the crippled legs of the character leave of its speed (1 when none is: fMoveOneCrippledLegSpeedMult and
         /// fMoveTwoCrippledLegsSpeedMult of the executables' speed rule, 0x647d10). Any thread.
         double moveSpeedMultiplier(const OFWorld::Ptr& ptr);
+        /// What scripts told the actor to do over what its AI would make it do (falloutactorstatus.cpp): SetActorsAI 0
+        /// (it does nothing: no package, no fight), SetForceRun and SetForceSneak (the gait it walks with). Any thread.
+        bool actorAiOff(const OFWorld::Ptr& ptr);
+        bool actorForcesRun(const OFWorld::Ptr& ptr);
+        bool actorForcesSneak(const OFWorld::Ptr& ptr);
+        /// SetNoAvoidance: the actors do not step aside for the player or for each other
+        bool actorsAvoidanceOff() const { return mActorStatus.noAvoidance(); }
+        FalloutScript::ActorStatus& actorStatus() { return mActorStatus; }
+        /// What the actor is doing now, for IsMoving, GetAnimAction, GetCurrentAIProcedure and the others: the animation
+        /// of the actor changes the fields of its movement and its action, its mind those of its package. The first
+        /// time an actor is told of it is looked after, until `forgetActivity`. Main thread.
+        /// Returns the reference the activity is kept for (0 when the actor is not one that scripts know), which
+        /// `forgetActivity` takes back.
+        FalloutScript::FormId noteActivity(
+            const OFWorld::Ptr& ptr, const std::function<void(FalloutScript::ActorActivity&)>& change);
+        void forgetActivity(FalloutScript::FormId reference) { mActorStatus.forget(reference); }
+        /// The animation of the actor is gone, or its mind: what that one told is taken back and the other's stays
+        void forgetBody(FalloutScript::FormId reference) { mActorStatus.forgetBody(reference); }
+        void forgetMind(FalloutScript::FormId reference) { mActorStatus.forgetMind(reference); }
         /// The pad shakes because the player was hurt, as the games' settings fRumblePainStrength and fRumblePainTime say
         /// The pad of the player shakes for something that happened to it (the INI's `fRumble<Kind>Strength` and
         /// `fRumble<Kind>Time`: Pain, Struck, Hit), unless a menu is open (the executable's own rule at 0x89CEBA)
@@ -2086,6 +2131,20 @@ namespace OFScript
         int currentPackageType(FalloutScript::FormId actor) override;
         bool currentPackageOffersServices(FalloutScript::FormId actor) override;
 
+        // FalloutScript::ActorStatusWorld (isActor is the one below; falloutactorstatus.cpp)
+        int teammateCount() override;
+        bool isTeammate(FalloutScript::FormId actor) override;
+        int furnitureMarker(FalloutScript::FormId actor) override;
+        FalloutScript::FormId ownerOf(FalloutScript::FormId reference) override;
+        bool fatigue(FalloutScript::FormId actor, double& current, double& permanent) override;
+        int actorsInHigh() override;
+        void disableAllActors(FalloutScript::FormId except) override;
+        bool isPlayableRace(FalloutScript::FormId race) override;
+        FalloutScript::FormId raceOf(FalloutScript::FormId actor) override;
+        /// The stance that scripts forced on the player is put on its stats, where the movement and the animation of the
+        /// player read it (once a frame)
+        void applyPlayerStance();
+
         bool placement(FalloutScript::FormId reference, FalloutScript::Placement& result) override;
         void moveTo(FalloutScript::FormId reference, FalloutScript::FormId target,
             const std::array<double, 3>& offset) override;
@@ -2133,6 +2192,8 @@ namespace OFScript
         bool playerSleeping() override { return mPlayerSleeping; }
         void wakePlayer(double hours) override;
         void setPlayerSleepHours(double hours) override;
+        double playerSleepHours() override;
+        void showSleepWaitMenu(bool sleeping, bool checked) override;
         /// The engine has no crime system: nobody sees a crime, so every count is the 0 that a clean player has in the
         /// executables (the commands that ask are the greeting lines of the characters)
         int majorCrimeCount(FalloutScript::FormId) override { return 0; }
@@ -2292,8 +2353,10 @@ namespace OFScript
         void raiseItemEvents();
         bool detects(FalloutScript::FormId viewer, FalloutScript::FormId target) override;
         bool essentialByRecord(FalloutScript::FormId actor) override;
+        bool essentialByMode(FalloutScript::FormId actor) override;
         std::optional<FalloutScript::CombatState::Relation> recordedRelation(
             FalloutScript::FormId first, FalloutScript::FormId second) override;
+        bool playerEnemyOf(FalloutScript::FormId faction, FalloutScript::FormId target) override;
         /// What a weapon does with a blow, for the attacker that holds it; the hands for a weapon that is none. The
         /// condition of the weapon is the one of the copy in the hands (`condition`, in tenths of a percent, names another)
         FalloutScript::WeaponDamage describeWeapon(
@@ -2654,6 +2717,7 @@ namespace OFScript
         FalloutScript::ReferenceState mReferenceState;
         FalloutScript::Reputation mReputation;
         FalloutScript::ObjectState mObjectState;
+        std::shared_ptr<LawGlue> mLaw;
         FalloutScript::MapMarkers mMapMarkers;
         FalloutScript::HotKeys mHotKeys;
         FalloutScript::Presentation mPresentation;
@@ -2689,7 +2753,12 @@ namespace OFScript
         FalloutScript::Challenges mChallenges;
         /// The needs of the hardcore mode (New Vegas)
         FalloutScript::HardcoreNeeds mHardcore;
+        /// Whether the mode is on and whether it has been all along (IsHardcore, IsAlwaysHardcore), which a save holds
+        FalloutScript::HardcoreMode mHardcoreMode;
         std::atomic<bool> mHardcoreOn{ false };
+        /// What the row of the needs in the display shows: the tiles by the levels, and the flash that goes between them
+        FalloutScript::NeedsDisplay mNeedsDisplay;
+        std::mutex mNeedsDisplayMutex;
         FalloutScript::Crafting mCrafting;
         FalloutScript::Limbs mLimbs;
         /// What took damage and what it shows (destruction), and the limbs that are gone, what killed and the critical
@@ -2855,6 +2924,10 @@ namespace OFScript
         std::map<FalloutScript::FormId, ScriptedOrder> mScriptedAttacks;
         unsigned mScriptedSerial = 0;
         FalloutScript::AiMemory mAi;
+        /// What the actors do now and what scripts told them to do (falloutactorstatus.cpp)
+        FalloutScript::ActorStatus mActorStatus;
+        bool mPlayerForcesSneak = false;
+        bool mPlayerForcesRun = false;
         /// The kinds of save that scripts asked for and that were not made yet, one bit for each
         std::atomic<unsigned> mSaveRequests{ 0 };
         /// The state of a loaded game that is put back when the cells and the frame it needs come
@@ -3291,6 +3364,21 @@ namespace OFScript
         bool playerTakingHealthDamage();
         /// Whether the hardcore mode is on (SetHardcore)
         bool hardcoreOn() const { return hardcoreMode(); }
+        /// The mode is turned off: the needs go to nothing, each stage that ends is told
+        void zeroNeeds();
+        /// A need changed its stage: the player is told (the lines of the settings with the face that goes with them)
+        void needNotice(const FalloutScript::HardcoreNeeds::Notice& notice);
+        /// The facts the one question of rest and travel asks (FalloutScript::Restrictions), as the host knows them
+        FalloutScript::Restrictions::Facts restrictionFacts(FalloutScript::Restrictions::Action action,
+            FalloutScript::FormId bed);
+        /// Whether radiation is on the player, whether it is where it should not be, and whether an alarm sounds for it
+        bool playerInRadiation();
+        bool playerTrespassing();
+        bool playerAlarmSounding();
+        /// The speed the executable takes the player to travel at, in units of the world for each second
+        double travelSpeed();
+        /// Opens the menu of the rest as it was asked for, with no check of why the player may not
+        void openRestMenu(bool sleeping, FalloutScript::FormId bed);
         /// The stages of a need of the hardcore mode (the records DEHY, HUNG and SLPD)
         std::vector<FalloutScript::HardcoreNeeds::Stage> hardcoreStages(int need);
         /// Lets the needs of the player go on to the time of the game, when the hardcore mode is on (and takes the

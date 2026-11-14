@@ -55,53 +55,6 @@ namespace FalloutScript::Interaction
     /// The name of the game setting that holds the experience for hacking a terminal of that hacking level
     /// (iXPRewardHackComputer*, FalloutNV.exe 0x6705B0)
     const char* hackClassExperience(int level);
-
-    /// What stops a character from waiting or sleeping, as far as the host can tell
-    struct RestConditions
-    {
-        /// Sleeping, or waiting
-        bool mSleeping = false;
-        bool mTrespassing = false;
-        bool mAlarmSounding = false;
-        bool mUnderwater = false;
-        bool mHostilesNear = false;
-        bool mInAir = false;
-        bool mInRadiation = false;
-        bool mTakingHealthDamage = false;
-        bool mInCombat = false;
-        /// A bed that belongs to someone else (when sleeping)
-        bool mOwnedBed = false;
-        /// The place the character stands in forbids waiting (the flag of its cell, or of its worldspace outside). The
-        /// games have the message for waiting only (sNoWaitInCell), so it is no reason not to sleep
-        bool mPlaceForbidsWaiting = false;
-    };
-
-    /// The game setting that holds the refusal, none when the character may rest (the order is that of the checks of
-    /// the executable, 0x969FA0 for waiting and 0x5095B0 for sleeping, as far as it was read)
-    std::optional<std::string> restRefusal(const RestConditions& conditions);
-
-    /// What stops a character from travelling at once to a place
-    struct TravelConditions
-    {
-        bool mHostilesNear = false;
-        bool mAlarmSounding = false;
-        bool mTakingHealthDamage = false;
-        bool mScriptBlocked = false;
-        bool mOverencumbered = false;
-        bool mInAir = false;
-        /// The cell the character stands in forbids it (an interior without the flag that allows it, or a worldspace
-        /// that forbids it)
-        bool mCellForbids = false;
-        /// The place has not been found yet
-        bool mUndiscovered = false;
-    };
-
-    /// The game setting that holds the refusal, none when the character may go (the order of 0x93D660 as it was read)
-    std::optional<std::string> travelRefusal(const TravelConditions& conditions);
-
-    /// The hours a trip of that many units takes: a stand-in, since the formula of the executable was not found. It is
-    /// an hour for each 5,000 units, and never less than half an hour.
-    double travelHours(double distance);
 }
 
 #endif

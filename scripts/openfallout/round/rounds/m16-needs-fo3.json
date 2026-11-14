@@ -1,0 +1,11 @@
+{
+  "name": "m16-needs-fo3",
+  "game": "fo3",
+  "start": "Wasteland:0,0",
+  "scenario": "../scenarios/m16_needs_fo3.lua",
+  "resolution": [1280, 720],
+  "framerate": 30,
+  "limit": 900,
+  "settings": { "Sound": { "master volume": "0" } },
+  "variants": [ { "name": "plain" } ]
+}

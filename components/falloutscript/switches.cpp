@@ -28,7 +28,13 @@ namespace FalloutScript
             { "SetActorRefraction", "the refraction of a character is not drawn" },
             { "PreloadMagicEffect", "there is nothing to load ahead for an effect" },
             { "ShowQuestStages", "the stages of a quest are written to the console of the games, which this engine does not feed" },
-            { "SendAssaultAlarm", "there is no crime that could be reported" },
+            // What a character's idle is picked or looped from is the idle tree and the animation groups of the world
+            { "PickIdle", "the idle that the conditions of the idle tree pick is not played" },
+            { "LoopGroup", "an animation group is not looped a number of times" },
+            { "SkipAnim", "the animation that plays is not skipped to its end" },
+            { "SetClass", "the class of a character is the one its record gives" },
+            { "GetActorAggroRadiusViolated", "the aggression radius of a character is not watched" },
+            { "IsContinuingPackagePCNear", "the package that goes on while the player is near is not told apart" },
             // Tale of Two Wastelands' own commands
             { "TTW_EnableRadioFix", "there is no radio to fix" },
             { "InitExtraMiscStat", "the extra statistics of Tale of Two Wastelands are not kept" },
@@ -48,8 +54,6 @@ namespace FalloutScript
         // The commands that set a switch that is kept; the reason says what the switch does not do. The value is the
         // first argument, 1 for a command that has none.
         constexpr SwitchCommand switchCommands[] = {
-            { "SetHardcore", "stimpaks over time, doctor's bags and ammo weight of the hardcore mode are not done",
-                false },
             { "SetPCYoung", "the body of the player does not change with its age", false },
             { "SetPCToddler", "the body of the player does not change with its age", false },
             { "SetLocationSpecificLoadScreensOnly", "load screens are not chosen by the place", false },
@@ -135,16 +139,6 @@ namespace FalloutScript
         interpreter.setHandler("IsXBox", [](CallContext&) { return 0.0; });
         interpreter.setHandler("IsPS3", [](CallContext&) { return 0.0; });
         interpreter.setHandler("GetVampire", [](CallContext&) { return 0.0; });
-        // The games work the disposition out of the character's records and skills (the formula was not read from the
-        // executables), which this does not: the answer is 0
-        interpreter.setHandler("GetDisposition", [&switches](CallContext& call) {
-            if (switches.firstTime("GetDisposition"))
-                call.mHost.log(
-                    "GetDisposition answers 0: the disposition of a character towards another is not worked out");
-            return 0.0;
-        });
-        interpreter.setHandler(
-            "IsHardcore", [&switches](CallContext&) { return switches.get("SetHardcore") > 0 ? 1.0 : 0.0; });
     }
 
     void writeSwitches(const Switches& switches, SaveWriter& out)

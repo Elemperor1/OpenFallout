@@ -1,0 +1,10 @@
+{
+  "name": "m16-actors-nv",
+  "game": "nv",
+  "save": "latest",
+  "scenario": "../scenarios/m16_actors.lua",
+  "resolution": [1280, 720],
+  "framerate": 30,
+  "limit": 600,
+  "variants": [ { "name": "plain" } ]
+}

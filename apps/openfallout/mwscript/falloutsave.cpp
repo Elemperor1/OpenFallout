@@ -1,4 +1,5 @@
 #include "falloutscripts.hpp"
+#include "falloutlaw.hpp"
 
 #include <algorithm>
 #include <functional>
@@ -924,6 +925,12 @@ namespace OFScript
                 FalloutScript::readCombat(mCombat, in, version);
             });
         section(
+            "actoroverrides", FalloutScript::actorOverridesSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeActorOverrides(mActorStatus, out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readActorOverrides(mActorStatus, in, version);
+            });
+        section(
             "referencestate", FalloutScript::referencesStateSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeReferenceState(mReferenceState, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
@@ -947,6 +954,18 @@ namespace OFScript
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeDismemberment(mDismemberment, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
                 FalloutScript::readDismemberment(mDismemberment, in, version);
+            });
+        section(
+            "law", FalloutScript::lawSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeLaw(mLaw->law(), out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readLaw(mLaw->law(), in, version);
+            });
+        section(
+            "standing", FalloutScript::standingSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { FalloutScript::writeStanding(mLaw->standing(), out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                FalloutScript::readStanding(mLaw->standing(), in, version);
             });
         section(
             "objectstate", FalloutScript::objectStateSectionVersion,
@@ -1060,7 +1079,19 @@ namespace OFScript
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeSwitches(mSwitches, out); },
             [this](FalloutScript::SaveReader& in, std::uint32_t version) {
                 FalloutScript::readSwitches(mSwitches, in, version);
+                // A save of before the mode had a state of its own kept it as a switch: the mode it says is kept
+                // (the section that follows says it again for a save that has one)
+                if (mSwitches.get("SetHardcore") > 0)
+                    mHardcoreMode.set(1, true);
+                mSwitches.set("SetHardcore", 0);
             });
+        // Whether the hardcore mode is on and whether it has been on all along (the levels of the needs are values of the
+        // player, in the section of the actor values; the time they count from starts over with a load, as in the
+        // executable)
+        section(
+            "hardcore", FalloutScript::HardcoreMode::savedSectionVersion,
+            [this](FalloutScript::SaveWriter& out) { mHardcoreMode.write(out); },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) { mHardcoreMode.read(in, version); });
         section(
             "openstates", FalloutScript::openStatesSectionVersion,
             [this](FalloutScript::SaveWriter& out) { FalloutScript::writeOpenStates(mOpenStates, out); },

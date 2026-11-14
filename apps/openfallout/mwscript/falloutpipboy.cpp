@@ -33,6 +33,8 @@
 #include "../mwworld/esmstore.hpp"
 #include "../mwworld/ptr.hpp"
 
+#include "falloutlaw.hpp"
+
 namespace OFScript
 {
     namespace
@@ -169,7 +171,7 @@ namespace OFScript
                 row.mName = ammo->mFullName;
                 row.mIcon = ammo->mIcon;
                 row.mValue = static_cast<int>(ammo->mData.mValue);
-                row.mWeight = ammo->mData.mWeight;
+                row.mWeight = FalloutScript::carriedAmmoWeight(hardcoreMode(), ammo->mData.mWeight);
                 row.mCategory = FalloutScript::Pipboy::ItemCategory::Ammo;
                 // Ammunition is for the weapon in hand, and for nothing else
                 row.mUsable = !player || (held != nullptr && weaponTakesAmmo(*held, id));
@@ -684,6 +686,8 @@ namespace OFScript
                 moved += taken;
             }
         }
+        if (moved > 0 && to == mPlayer && mLaw)
+            mLaw->takenFrom(from, item, moved);
         return moved;
     }
 

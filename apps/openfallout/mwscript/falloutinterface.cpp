@@ -201,12 +201,18 @@ namespace OFScript
 
     double FalloutScripts::moveSpeedMultiplier(const OFWorld::Ptr& ptr)
     {
+        // A character that scripts forced to sneak goes at the share of its walking speed that the games' setting gives
+        // (fMoveSneakMult; the executable's own use of it was not read)
+        double forced = 1.0;
+        if (actorForcesSneak(ptr))
+            if (const std::optional<double> sneak = gameSetting("fMoveSneakMult"); sneak && *sneak > 0.0)
+                forced = *sneak;
         const int crippled = crippledLegs(ptr);
         if (crippled == 0)
-            return 1.0;
+            return forced;
         const FalloutScript::HitReactions::Settings settings = FalloutScript::HitReactions::Settings::fromGameSettings(
             [this](std::string_view name) -> std::optional<double> { return gameSetting(name); });
-        return FalloutScript::HitReactions::legSpeedMultiplier(settings, crippled);
+        return forced * FalloutScript::HitReactions::legSpeedMultiplier(settings, crippled);
     }
 
     void FalloutScripts::fell(const OFWorld::Ptr& ptr, float heightLost)
