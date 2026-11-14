@@ -7,7 +7,8 @@
 --
 -- Not there yet: the local map (the games draw the cell the player is in from a render of it, which has no data here, so
 -- the tab is not shown), the turn of the arrow to where the player faces, the markers of the quests on the map, the text
--- and the audio of the notes and the stations of the radio (their lists are empty), the active quest, and the buttons
+-- and the audio of the notes and the stations of the radio (their lists are empty), the choice of the active quest by
+-- the player (the list shows which one it is), and the buttons
 -- of the pad (the file shows them only on a console, and the pad focus is not done).
 --
 --   local page = require('scripts.omw.falloutpipboydata')
@@ -390,7 +391,8 @@ local function questRows()
     end
     local rows = {}
     for index, quest in ipairs(quests) do
-        rows[index] = { string = quest.name, _ShowEmptyMarker = true }
+        -- The quest the player follows has its square filled, as the objectives that are done have
+        rows[index] = { string = quest.name, _ShowEmptyMarker = true, _selected = quest.active and true or false }
     end
     return rows
 end

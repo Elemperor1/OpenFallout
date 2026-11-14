@@ -34,6 +34,8 @@
 #include <components/esm/formid.hpp>
 #include <components/esm/path.hpp>
 
+#include "destruction.hpp"
+
 namespace ESM4
 {
     class Reader;
@@ -60,6 +62,9 @@ namespace ESM4
         ESM::FormId mWaterType;
 
         std::string mActivationPrompt;
+
+        /// DEST and its stages (what happens to the thing when it takes damage)
+        Destruction mDestruction;
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;

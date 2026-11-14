@@ -33,6 +33,11 @@ namespace FalloutScript
         int mHealthPercent = 100;
         /// The node of the skeleton that the part is (what a blow at the part lands on), empty when the record names none
         std::string mNode;
+        /// The flags of the part's data: 0x01 it can be torn off, 0x08 it can burst, 0x40 the chance to burst is
+        /// absolute (see DismemberLimb)
+        int mFlags = 0;
+        /// The chance in percent that the part bursts, for a part that can
+        int mExplodeChance = 0;
     };
 
     class LimbRecords

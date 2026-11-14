@@ -141,7 +141,7 @@ namespace FalloutScript
         dieIfSpent(actor);
     }
 
-    void ItemUse::applyEffect(FormId actor, const ConsumableEffect& effect, double durationScale)
+    void ItemUse::applyEffect(FormId actor, const ConsumableEffect& effect, double durationScale, FormId source)
     {
         if (effect.mArchetype == 35)
         {
@@ -164,6 +164,8 @@ namespace FalloutScript
         active.mActor = actor;
         active.mActorValue = effect.mActorValue;
         active.mRemaining = duration;
+        active.mSource = source;
+        active.mEffect = effect.mEffect;
         if (effect.mRecover)
         {
             // A boost that holds while the effect lasts (a drop, for a detrimental one)
@@ -192,13 +194,13 @@ namespace FalloutScript
         mActive.push_back(active);
     }
 
-    void ItemUse::setEffectListener(std::function<void(FormId, FormId, FormId, double)> listener)
+    void ItemUse::setEffectListener(std::function<void(FormId, FormId, FormId, double, double)> listener)
     {
         const std::lock_guard lock(mMutex);
         mEffectListener = std::move(listener);
     }
 
-    void ItemUse::cast(FormId actor, const std::vector<ConsumableEffect>& effects)
+    void ItemUse::cast(FormId actor, const std::vector<ConsumableEffect>& effects, FormId source)
     {
         if (actor == 0)
             return;
@@ -216,8 +218,48 @@ namespace FalloutScript
                 if (!check || !check(effect.mConditions, context))
                     continue;
             }
-            applyEffect(actor, effect, 1.0);
+            applyEffect(actor, effect, 1.0, source);
         }
+    }
+
+    int ItemUse::end(FormId actor, FormId source, FormId effect)
+    {
+        struct Expiry
+        {
+            int mActorValue;
+            double mMagnitude;
+        };
+        std::vector<Expiry> expired;
+        int ended = 0;
+        {
+            const std::lock_guard lock(mMutex);
+            for (auto it = mActive.begin(); it != mActive.end();)
+            {
+                if (it->mActor == actor && it->mSource == source && (effect == 0 || it->mEffect == effect))
+                {
+                    if (it->mTemporary)
+                        expired.push_back({ it->mActorValue, it->mMagnitude });
+                    it = mActive.erase(it);
+                    ++ended;
+                }
+                else
+                    ++it;
+            }
+        }
+        // What the effect held is taken back as when it runs out (a character that lived on the health of a boost dies,
+        // or falls, with the loss)
+        for (const Expiry& expiry : expired)
+        {
+            if (expiry.mActorValue == ActorValue::health && expiry.mMagnitude > 0)
+            {
+                const auto transitions = mState.holdTransitions();
+                mValues.modify(actor, expiry.mActorValue, -expiry.mMagnitude);
+                dieIfSpent(actor);
+            }
+            else
+                mValues.modify(actor, expiry.mActorValue, -expiry.mMagnitude);
+        }
+        return ended;
     }
 
     void ItemUse::setPlayer(FormId player)
@@ -233,7 +275,7 @@ namespace FalloutScript
             return result;
 
         std::function<bool(const std::vector<ESM4::TargetCondition>&, const ConditionContext&)> check;
-        std::function<void(FormId, FormId, FormId, double)> listener;
+        std::function<void(FormId, FormId, FormId, double, double)> listener;
         std::function<bool(FormId)> fighting;
         PerkEngine* perks = nullptr;
         double bookPoints = 1;
@@ -281,9 +323,15 @@ namespace FalloutScript
                 resistsRadiation = resistsRadiation
                     || (effect.mArchetype == 0 && effect.mActorValue == radiationResistance && !effect.mDetrimental);
                 const double scale = effect.mHostile ? 1.0 : durationScale;
-                applyEffect(actor, effect, scale);
+                // The radiation that a food gives is changed by an entry point (44), as the executable does where it
+                // applies the effect of an item to the character (FalloutNV.exe 0x816667: the effect works on Radiation Level and
+                // the item has the food flag)
+                ConsumableEffect applied = effect;
+                if (perks != nullptr && consumable.mFood && effect.mArchetype == 0 && effect.mActorValue == radiationValue)
+                    applied.mMagnitude *= perks->apply(EntryPoint::radiationConsumed, actor, 1.0);
+                applyEffect(actor, applied, scale, item);
                 if (listener && effect.mEffect != 0 && effect.mDuration * scale > 0)
-                    listener(actor, effect.mEffect, item, effect.mDuration * scale);
+                    listener(actor, effect.mEffect, item, effect.mDuration * scale, applied.mMagnitude);
             }
 
             const bool addictive = consumable.mWithdrawal != 0 && consumable.mAddictionChance > 0;

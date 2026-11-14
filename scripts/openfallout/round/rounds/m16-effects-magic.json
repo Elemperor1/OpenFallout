@@ -1,0 +1,10 @@
+{
+  "name": "m16-effects-magic",
+  "game": "nv",
+  "save": "latest",
+  "scenario": "../scenarios/m16_effects_magic.lua",
+  "resolution": [960, 540],
+  "framerate": 20,
+  "limit": 420,
+  "variants": [ { "name": "plain" } ]
+}

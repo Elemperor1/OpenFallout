@@ -57,6 +57,9 @@ namespace FalloutScript
         virtual bool isActor(FormId reference) = 0;
         /// The script that a magic effect runs on its character (an effect of the script archetype), 0 for any other
         virtual FormId effectScript(FormId /*effect*/) { return 0; }
+        /// The kind of a magic item that is no spell, as the executables number them (0x824A28): 6 an enchantment, 7 an
+        /// aid item, 8 an ingredient; -1 for a form that is none of them. A spell has the type of its record.
+        virtual int itemKind(FormId /*item*/) { return -1; }
     };
 
     /// The spells that characters have and the magic effects that are running on them, which HasMagicEffect asks
@@ -93,6 +96,9 @@ namespace FalloutScript
         /// Tells one effect that runs from another, though they are of one script on one character (a spell cast twice,
         /// an item used twice): the script of each has variables of its own
         using EffectId = std::uint64_t;
+        /// Told that an effect that a spell or an item put on a character ended before its time (dispelled), so that
+        /// whoever keeps what it did can undo it: the character, the spell or item and the magic effect
+        using Ender = std::function<void(FormId actor, FormId source, FormId effect)>;
         /// Runs the script of an effect for the stage, with the character it works on. For an update the last argument
         /// is the seconds that the update covers (the frame, or the hour of a rest, or the part of the step that the
         /// effect was still running when it ran out), which GetSecondsPassed tells the script; it is 0 for the others.
@@ -107,6 +113,11 @@ namespace FalloutScript
         void setConditions(ConditionCheck check);
         /// Without it the scripts of effects do not run
         void setScriptRunner(ScriptRunner runner);
+        /// Without it a dispelled effect leaves what the caster did as it is
+        void setEnder(Ender ender);
+        /// How often the conditions of the effects that an ability or a disease keeps are asked again while they run
+        /// (fActiveEffectConditionUpdateInterval, 1 second in both games' files)
+        void setConditionInterval(double seconds);
 
         /// Forgets everything, as for a new game
         void clear();
@@ -118,18 +129,43 @@ namespace FalloutScript
         bool hasSpell(FormId actor, FormId spell);
         std::vector<FormId> spells(FormId actor);
 
-        /// The character casts the spell on itself. An ability is no spell to cast and does nothing.
-        void castOnSelf(FormId actor, FormId spell);
+        /// The character casts the spell on itself. An ability is no spell to cast and does nothing. The scale multiplies
+        /// the magnitude of each effect (the executable's drink of water casts the water's spell with the scale that the
+        /// perk entry point 26 gives, 0x5805C0).
+        void castOnSelf(FormId actor, FormId spell, double magnitudeScale = 1.0);
         /// An effect of something else (an item that was used) runs on the character for the seconds
-        void noteEffect(FormId actor, FormId effect, FormId source, double seconds);
+        void noteEffect(FormId actor, FormId effect, FormId source, double seconds, double magnitude = 0);
 
         /// Whether a magic effect is running on the character
         bool hasEffect(FormId actor, FormId effect);
         /// Whether the character is the target of a spell that is running
         bool isSpellTarget(FormId actor, FormId spell);
 
-        /// Lets the effects that have a duration run down by that many seconds
+        /// Lets the effects that have a duration run down by that many seconds, and asks again the conditions of the
+        /// effects that keep them once each interval
         void update(double seconds);
+
+        /// Ends the effects that the spell or item has running on the character (and, when it is not 0, only those of
+        /// that magic effect), whatever the spell is: what an effect changed is changed back, its script finishes, and
+        /// the ender is told. The spell stays on the character's list. Returns how many it ended (Dispel,
+        /// FalloutNV.exe 0x824400).
+        int dispel(FormId actor, FormId source, FormId effect = 0);
+        /// Ends the effects of the character that come from spells, powers, lesser powers, aid items and ingredients:
+        /// not those of diseases, abilities, poisons and addictions, nor those of enchantments (DispelAllSpells,
+        /// 0x8249D0; what the executable asks of an enchantment, the number at +0x34, is not read, so all of them stay).
+        /// Returns how many it ended.
+        int dispelAll(FormId actor);
+        /// The sum of the magnitudes of the effects the spell or item has running on the character (GetSpellUsageNum
+        /// adds the float at +0x1C of each active effect, 0x822EB0, which is set from the number the effect item starts
+        /// with, 0x803DCF: its magnitude)
+        double usage(FormId actor, FormId source);
+        /// Asks again the conditions of all the effects the character's spells keep, at once (EvaluateSpellConditions,
+        /// 0x5D7B50 calls the function that updates them all, 0x8255A0)
+        void evaluateConditions(FormId actor);
+
+        /// The spell or power the player has chosen (SelectPlayerSpell), 0 for none. Nothing reads it.
+        void selectSpell(FormId spell);
+        FormId selectedSpell();
 
     private:
         struct Running
@@ -145,6 +181,14 @@ namespace FalloutScript
             double mDelta = 0;
             /// The script of the magic effect, 0 for one without (not saved: the records tell it)
             FormId mScript = 0;
+            /// The magnitude of the effect, which GetSpellUsageNum adds up (saved from version 3)
+            double mMagnitude = 0;
+            /// The conditions the effect is on the character by, for an ability or a disease (not saved: the records tell
+            /// them), and whether they hold: an effect they do not hold for is on the list and does nothing
+            std::vector<ESM4::TargetCondition> mConditions;
+            bool mEnabled = true;
+            /// The seconds the conditions have been counted for since they were asked last
+            double mSinceAsked = 0;
             /// Which effect it is among those that run (saved from version 2 of the section, which the saved
             /// variables of its script are held by; a game saved before that numbers them again when it is loaded)
             EffectId mId = 0;
@@ -152,6 +196,12 @@ namespace FalloutScript
 
         /// Takes the effects of a spell whose conditions do not hold for the character out of its record
         void dropFailing(FormId actor, SpellInfo& info);
+        /// Whether the conditions of the effect hold for the character (they do when it has none)
+        bool holds(FormId actor, const SpellEffect& effect);
+        /// Ends the entries that are chosen (outside the lock the scripts and the ender run in)
+        int endEntries(FormId actor, const std::function<bool(const Running&)>& chosen);
+        /// Asks the conditions of the entries again; all of them or those whose interval has passed
+        void askAgain(const std::vector<EffectId>& ids);
         /// Whether the effect still runs
         bool still(EffectId id);
 
@@ -161,6 +211,9 @@ namespace FalloutScript
         Caster mCaster;
         ConditionCheck mConditions;
         ScriptRunner mScripts;
+        Ender mEnder;
+        double mConditionInterval = 1.0;
+        FormId mSelected = 0;
         std::map<FormId, std::set<FormId>> mSpells;
         std::vector<Running> mRunning;
         /// The last number given to an effect that runs; the numbers are not used again
@@ -168,13 +221,14 @@ namespace FalloutScript
     };
 
     /// The section of a saved game that holds the spells and the effects that run (version 2 holds the number of each
-    /// effect that runs)
-    constexpr std::uint32_t magicSectionVersion = 2;
+    /// effect that runs, version 3 its magnitude, whether it is on the character and the spell chosen with
+    /// SelectPlayerSpell)
+    constexpr std::uint32_t magicSectionVersion = 3;
     void writeMagic(Magic& magic, SaveWriter& out);
     void readMagic(Magic& magic, SaveReader& in, std::uint32_t version);
 
-    /// Gives the commands AddSpell, RemoveSpell, CastImmediateOnSelf, Cast, HasMagicEffect and IsSpellTarget to the
-    /// interpreter. Cast does nothing, as in the executables. Those that the command table does not have are left out.
+    /// Gives the commands AddSpell, RemoveSpell, CastImmediateOnSelf, Cast, HasMagicEffect, IsSpellTarget, Dispel,
+    /// DispelAllSpells, EvaluateSpellConditions, GetSpellUsageNum and SelectPlayerSpell to the interpreter. Cast does nothing, as in the executables. Those that the command table does not have are left out.
     void addMagicCommands(Interpreter& interpreter, Magic& magic, MagicRecords& records);
 }
 

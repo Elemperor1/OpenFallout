@@ -17,6 +17,10 @@ namespace FalloutScript
 {
     class Interpreter;
 
+    /// The number of the counters of the Pip-Boy the games have (0x2B in FalloutNV.exe 0x4D5E1F): a change of one that
+    /// does not exist counts for nothing
+    constexpr int miscStatCount = 43;
+
     /// What the story gives the player and the characters that nothing else in the game keeps yet: experience and
     /// karma, the perks of each character and the notes of the Pip-Boy, and what levelling up gives (skill points
     /// and perks to choose, as LevellingRules says). It can be used from any thread. The level of the player is told
@@ -85,6 +89,9 @@ namespace FalloutScript
         /// The counters of the Pip-Boy (ModPCMiscStat, GetPCMiscStat)
         void modifyMiscStat(int stat, int amount);
         int miscStat(int stat) const;
+        /// Called with the counter and the amount each time a counter of the games (0 to 42) is changed by an amount
+        /// that is not 0, after the change (the challenges count it, FalloutNV.exe 0x4D5E10)
+        void setMiscStatListener(std::function<void(int stat, int amount)> listener);
 
         /// Changes the karma, which stays within the limits
         void rewardKarma(int amount);
@@ -118,6 +125,7 @@ namespace FalloutScript
         int mExperience = 0;
         int mKarma = 0;
         std::function<void(int)> mKarmaNotice;
+        std::function<void(int, int)> mMiscStatListener;
         /// The level up to which the points have been handed out
         int mAwardedLevel = 1;
         int mSkillPoints = 0;

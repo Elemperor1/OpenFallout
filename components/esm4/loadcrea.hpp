@@ -36,6 +36,7 @@
 #include <components/esm/path.hpp>
 
 #include "actor.hpp"
+#include "destruction.hpp"
 #include "inventory.hpp"
 #include "objectbounds.hpp"
 
@@ -186,6 +187,9 @@ namespace ESM4
         /// Whether the record takes the thing that the flag names (one of TemplateFlags) from its template. Only
         /// the records of Fallout 3 and New Vegas have a template.
         bool takesFromTemplate(std::uint16_t flag) const;
+
+        /// DEST and its stages (what happens to the thing when it takes damage)
+        Destruction mDestruction;
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& writer) const;

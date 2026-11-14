@@ -8,6 +8,7 @@
 #include <components/esm4/loadalch.hpp>
 #include <components/esm4/loadbook.hpp>
 #include <components/esm4/loadcrea.hpp>
+#include <components/esm4/loadingr.hpp>
 #include <components/esm4/loadmgef.hpp>
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadperk.hpp>
@@ -115,6 +116,7 @@ namespace OFScript
             mProgress.setRules(rules);
             mItemUse.setBookRules(gameSetting("fBookPerkBonus").value_or(1.0));
             mItemUse.setChemDurationNeedsAddiction(mGame == FalloutScript::Game::Fallout3);
+            mMagic.setConditionInterval(gameSetting("fActiveEffectConditionUpdateInterval").value_or(1.0));
         });
     }
 
@@ -245,8 +247,8 @@ namespace OFScript
         return true;
     }
 
-    void FalloutScripts::castSpell(
-        FalloutScript::FormId actor, FalloutScript::FormId, const std::vector<FalloutScript::SpellEffect>& kept)
+    void FalloutScripts::castSpell(FalloutScript::FormId actor, FalloutScript::FormId spell,
+        const std::vector<FalloutScript::SpellEffect>& kept)
     {
         // The conditions were asked once, by Magic, when it chose these effects; they are not asked again
         std::vector<FalloutScript::ConsumableEffect> effects;
@@ -263,7 +265,7 @@ namespace OFScript
             made.mRecover = effect.mRecover;
             effects.push_back(std::move(made));
         }
-        mItemUse.cast(actor, effects);
+        mItemUse.cast(actor, effects, spell);
     }
 
     FalloutScript::FormId FalloutScripts::effectScript(FalloutScript::FormId effect)
@@ -272,6 +274,17 @@ namespace OFScript
         if (record == nullptr || record->mData.mArchetype != archetypeScript)
             return 0;
         return record->mData.mAssociatedItem;
+    }
+
+    int FalloutScripts::itemKind(FalloutScript::FormId item)
+    {
+        // The numbers the executables give the kinds of magic item (0x824A28): an aid item is 7, an ingredient 8
+        const ESM::RefId id = refId(item);
+        if (mStore.get<ESM4::Potion>().search(id) != nullptr)
+            return 7;
+        if (mStore.get<ESM4::Ingredient>().search(id) != nullptr)
+            return 8;
+        return -1;
     }
 
     bool FalloutScripts::spell(FalloutScript::FormId spell, FalloutScript::SpellInfo& info)
@@ -440,6 +453,9 @@ namespace OFScript
         const FalloutScript::ItemUse::Result result = mItemUse.use(actor, item);
         if (actor != mPlayer)
             return result;
+        if (result.mOutcome == FalloutScript::ItemUse::Outcome::Consumed
+            || result.mOutcome == FalloutScript::ItemUse::Outcome::Read)
+            noteChallengeUsed(item);
         if (result.mOutcome == FalloutScript::ItemUse::Outcome::Refused)
         {
             // A fight is on: the player is told so, and the book stays (the executable plays no sound then)

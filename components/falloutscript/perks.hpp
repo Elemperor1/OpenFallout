@@ -36,8 +36,13 @@ namespace FalloutScript
         constexpr int buyPrice = 17;
         /// More than 0 lets a character try a terminal that locked it out once more
         constexpr int ignoreLockedTerminal = 20;
+        /// What a character can carry, worked out from the actor value (FalloutNV.exe 0x8A0C20: the value of Carry Weight,
+        /// then this entry point)
+        constexpr int maxCarryWeight = 22;
         constexpr int addictionChance = 23;
         constexpr int chemDuration = 25;
+        /// The scale of the magnitude of the spell that the water a character drinks gives it (1 for a perk-less character;
+        /// FalloutNV.exe 0x5805C0 and Fallout3.exe, for the player)
         constexpr int drinkingRadiation = 26;
         constexpr int calculateGunSpread = 34;
         constexpr int enemyCriticalChance = 36;
@@ -49,8 +54,14 @@ namespace FalloutScript
         constexpr int actionPointCost = 40;
         constexpr int runSpeed = 42;
         constexpr int attackSpeed = 43;
+        /// New Vegas: the factor of the radiation that an aid item with the food flag gives (1 for no perk; FalloutNV.exe
+        /// 0x816667, in the function that applies an effect of an item to the character)
+        constexpr int radiationConsumed = 44;
         /// New Vegas: more than 0 makes the small things that the player carries weigh less
         constexpr int packRat = 55;
+        /// New Vegas: the damage that an item takes, for a weapon fired or a piece of armor hit (FalloutNV.exe 0x891360, which
+        /// the executable calls with only the damage, no other reference)
+        constexpr int itemDamage = 68;
         constexpr int thresholdDefender = 56;
         constexpr int thresholdAttacker = 58;
         /// New Vegas: whether the perks make the player see through invisibility in V.A.T.S.

@@ -1186,6 +1186,7 @@ template class OFWorld::TypedDynamicStore<ESM4::ArmorAddon>;
 template class OFWorld::TypedDynamicStore<ESM4::BodyPartData>;
 template class OFWorld::TypedDynamicStore<ESM4::Book>;
 template class OFWorld::TypedDynamicStore<ESM4::Casino>;
+template class OFWorld::TypedDynamicStore<ESM4::Challenge>;
 template class OFWorld::TypedDynamicStore<ESM4::CaravanCard>;
 template class OFWorld::TypedDynamicStore<ESM4::CaravanDeck>;
 template class OFWorld::TypedDynamicStore<ESM4::CaravanMoney>;

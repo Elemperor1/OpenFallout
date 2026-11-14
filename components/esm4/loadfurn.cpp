@@ -28,6 +28,7 @@
 
 #include <stdexcept>
 
+#include "destruction.hpp"
 #include "reader.hpp"
 //#include "writer.hpp"
 
@@ -65,19 +66,21 @@ void ESM4::Furniture::load(ESM4::Reader& reader)
             case ESM::fourCC("MODB"):
                 reader.get(mBoundRadius);
                 break;
+            case ESM::fourCC("DEST"):
+            case ESM::fourCC("DSTD"):
+            case ESM::fourCC("DMDL"):
+            case ESM::fourCC("DMDT"):
+            case ESM::fourCC("DMDS"):
+            case ESM::fourCC("DSTF"): // Destructible: health, stages and their models
+                readDestructionSubRecord(reader, mDestruction);
+                break;
             case ESM::fourCC("MODT"): // Model data
             case ESM::fourCC("MODC"):
             case ESM::fourCC("MODS"):
             case ESM::fourCC("MODF"): // Model data end
             case ESM::fourCC("DAMC"): // Destructible
-            case ESM::fourCC("DEST"):
             case ESM::fourCC("DMDC"):
-            case ESM::fourCC("DMDL"):
-            case ESM::fourCC("DMDT"):
-            case ESM::fourCC("DMDS"):
             case ESM::fourCC("DSTA"):
-            case ESM::fourCC("DSTD"):
-            case ESM::fourCC("DSTF"): // Destructible end
             case ESM::fourCC("ENAM"):
             case ESM::fourCC("FNAM"):
             case ESM::fourCC("FNMK"):

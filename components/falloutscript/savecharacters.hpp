@@ -57,8 +57,9 @@ namespace FalloutScript
     void writePerks(PerkEngine& perks, ActorValues& values, SaveWriter& out);
     void readPerks(PerkEngine& perks, ActorValues& values, SaveReader& in, std::uint32_t version);
 
-    /// The effects of chems and food that are running, and the addictions
-    constexpr std::uint32_t itemUseSectionVersion = 1;
+    /// The effects of chems and food that are running, and the addictions. Version 2 holds the item or spell and the magic
+    /// effect that each running effect comes from.
+    constexpr std::uint32_t itemUseSectionVersion = 2;
     void writeItemUse(ItemUse& use, SaveWriter& out);
     void readItemUse(ItemUse& use, SaveReader& in, std::uint32_t version);
 

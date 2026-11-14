@@ -38,10 +38,10 @@ namespace FalloutScript
     };
 
     /// Gives the interpreter the commands that set a switch (SetHardcore, SetPCYoung, SetPCToddler,
-    /// SetLocationSpecificLoadScreensOnly, SetBroadcastState, AutoDisplayObjectives, KillQuestUpdates,
-    /// ForceActiveQuest), the questions that are always answered the same (IsXBox, IsPS3, GetVampire, IsHardcore after
-    /// SetHardcore) and the commands that do nothing here, each of which says once in the log what it does not do. The
-    /// commands that the table does not have are left out.
+    /// SetLocationSpecificLoadScreensOnly, SetBroadcastState, AutoDisplayObjectives), the questions that are always
+    /// answered the same (IsXBox, IsPS3, GetVampire, IsHardcore after SetHardcore) and the commands that do nothing
+    /// here, each of which says once in the log what it does not do. The commands that the table does not have are left
+    /// out.
     void addSwitchCommands(Interpreter& interpreter, Switches& switches);
 
     /// The commands that do nothing and the reason, for the list of what is not done

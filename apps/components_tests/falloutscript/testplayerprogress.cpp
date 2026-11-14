@@ -9,6 +9,8 @@
 
 #include <limits>
 #include <map>
+#include <utility>
+#include <vector>
 
 namespace
 {
@@ -329,5 +331,26 @@ namespace
         EXPECT_EQ(setup.variable(player, 3), 0);
         EXPECT_EQ(setup.variable(player, 4), 1);
         EXPECT_THAT(setup.mHost.mLog, IsEmpty());
+    }
+
+    TEST(FalloutScriptPlayerProgressTest, a_counter_of_the_pipboy_tells_its_listener_what_it_gained)
+    {
+        PlayerProgress progress;
+        std::vector<std::pair<int, int>> told;
+        progress.setMiscStatListener([&](int stat, int amount) { told.emplace_back(stat, amount); });
+        progress.modifyMiscStat(27, 1);
+        progress.modifyMiscStat(3, 40);
+        progress.modifyMiscStat(3, 0);
+        // A counter the games do not have counts for nothing, as far as the listener is concerned
+        progress.modifyMiscStat(FalloutScript::miscStatCount, 1);
+        progress.modifyMiscStat(-1, 1);
+        EXPECT_THAT(told, ElementsAre(Pair(27, 1), Pair(3, 40)));
+        // The listener is told after the change, and may ask for the counter
+        progress.setMiscStatListener([&](int stat, int) { told.emplace_back(stat, progress.miscStat(stat)); });
+        progress.modifyMiscStat(3, 2);
+        EXPECT_EQ(told.back(), std::make_pair(3, 42));
+        progress.setMiscStatListener(nullptr);
+        progress.modifyMiscStat(3, 2);
+        EXPECT_EQ(told.size(), 3u);
     }
 }

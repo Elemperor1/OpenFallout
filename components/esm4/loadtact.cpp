@@ -28,6 +28,7 @@
 
 #include <stdexcept>
 
+#include "destruction.hpp"
 #include "reader.hpp"
 //#include "writer.hpp"
 
@@ -62,15 +63,17 @@ void ESM4::TalkingActivator::load(ESM4::Reader& reader)
             case ESM::fourCC("MODL"):
                 reader.getZString(mModel);
                 break;
-            case ESM::fourCC("DAMC"): // Destructible
             case ESM::fourCC("DEST"):
-            case ESM::fourCC("DMDC"):
+            case ESM::fourCC("DSTD"):
             case ESM::fourCC("DMDL"):
             case ESM::fourCC("DMDT"):
             case ESM::fourCC("DMDS"):
+            case ESM::fourCC("DSTF"): // Destructible: health, stages and their models
+                readDestructionSubRecord(reader, mDestruction);
+                break;
+            case ESM::fourCC("DAMC"): // Destructible
+            case ESM::fourCC("DMDC"):
             case ESM::fourCC("DSTA"):
-            case ESM::fourCC("DSTD"):
-            case ESM::fourCC("DSTF"): // Destructible end
             case ESM::fourCC("FNAM"):
             case ESM::fourCC("PNAM"):
             case ESM::fourCC("MODT"): // Model data

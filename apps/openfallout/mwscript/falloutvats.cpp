@@ -87,6 +87,8 @@ namespace OFScript
             found.mToHit = part.mData.toHitChance;
             found.mHealthPercent = part.mData.healthPercent;
             found.mNode = part.mNodeName;
+            found.mFlags = part.mData.flags;
+            found.mExplodeChance = part.mData.explExplosionChance;
             parts.push_back(std::move(found));
         }
         return true;

@@ -307,7 +307,8 @@ namespace
         {
             QuestRunner after;
             SaveReader in(std::string_view(bytes).substr(0, size));
-            EXPECT_THROW(FalloutScript::readQuests(after.mQuests, in, 1), SaveError) << size;
+            EXPECT_THROW(FalloutScript::readQuests(after.mQuests, in, FalloutScript::questsSectionVersion), SaveError)
+                << size;
         }
     }
 

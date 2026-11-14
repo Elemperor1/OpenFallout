@@ -510,6 +510,9 @@ namespace FalloutScript
                 out.f64(active.mMagnitude);
                 out.f64(active.mRemaining);
                 out.boolean(active.mTemporary);
+                // Version 2: where the effect comes from, which dispelling it needs
+                out.form(active.mSource);
+                out.form(active.mEffect);
             }
             out.count(use.mAddictions.size());
             for (const auto& [actor, item] : use.mAddictions)
@@ -519,7 +522,7 @@ namespace FalloutScript
             }
         }
 
-        static void read(ItemUse& use, SaveReader& in, std::uint32_t)
+        static void read(ItemUse& use, SaveReader& in, std::uint32_t version)
         {
             std::vector<ItemUse::Active> active;
             const std::size_t count = in.count(25);
@@ -531,6 +534,12 @@ namespace FalloutScript
                 effect.mMagnitude = in.f64();
                 effect.mRemaining = in.f64();
                 effect.mTemporary = in.boolean();
+                if (version >= 2)
+                {
+                    // What comes from a plugin that is gone is not dispelled by anything, and runs on
+                    effect.mSource = in.form().value_or(0);
+                    effect.mEffect = in.form().value_or(0);
+                }
                 if (actor)
                 {
                     effect.mActor = *actor;

@@ -116,6 +116,8 @@ namespace FalloutScript
         /// What the quests tell the display: a quest that is added, completed or failed, an objective that is displayed
         /// or completed. Called while the script that did it runs.
         void setEventListener(EventListener listener) { mEventListener = std::move(listener); }
+        /// What KillQuestUpdates asks of the display: to throw away the updates of quests it still holds
+        void setUpdatesKiller(std::function<void()> killer) { mUpdatesKiller = std::move(killer); }
 
         /// Reads the quests again: every quest starts from the beginning, and those that are enabled when the game
         /// starts are running.
@@ -172,6 +174,25 @@ namespace FalloutScript
         /// delay later). Nothing happens for a quest that does not run or has no script.
         void runBlock(FormId quest, std::uint16_t blockType, const BlockFilter& filter = {});
 
+        /// The quest the HUD and the Pip-Boy follow, which the player keeps (the setter is at 0x9529D0 in New Vegas):
+        /// 0 for none. The first quest that is shown while there is none becomes the active one, and the one that is
+        /// completed or fails stops being it (what the display does when it tells the player: 0x77A480).
+        FormId activeQuest() const { return mActive; }
+        /// ForceActiveQuest (0x5D9AC0): makes the quest the active one, whether it runs or not. Nothing happens for a
+        /// quest that is not known.
+        void setActiveQuest(FormId quest);
+        /// ResetQuest (0x60D720, the function of the quest that the command calls): the quest is as it was when the
+        /// game started: its stages are not done, its objectives are not shown or done, it is not completed or failed
+        /// and it runs when its record says it starts enabled. It is not the active quest any more when it does not
+        /// run then. The variables and the delay of its script are not touched (the function does not say they are).
+        void resetQuest(FormId quest);
+        /// SetShowQuestItems (0x5C6AD0): the flag of the player that the commands set (1 for a number above 0). The
+        /// state is kept; nothing in the port reads it.
+        bool showQuestItems() const { return mShowQuestItems; }
+        void setShowQuestItems(bool show) { mShowQuestItems = show; }
+        /// KillQuestUpdates (0x5DE350): the display throws away the quest updates it holds
+        void killUpdates();
+
     private:
         QuestState* find(FormId quest);
         const QuestState* find(FormId quest) const;
@@ -192,6 +213,9 @@ namespace FalloutScript
         ConditionCheck mConditions;
         JournalListener mJournalListener;
         EventListener mEventListener;
+        std::function<void()> mUpdatesKiller;
+        FormId mActive = 0;
+        bool mShowQuestItems = false;
         std::map<FormId, QuestState> mQuests;
         /// The scripts that were made ready, by the definition they were made from
         std::map<const ESM4::ScriptDefinition*, std::shared_ptr<const Script>> mPrepared;
@@ -199,8 +223,8 @@ namespace FalloutScript
     };
 
     /// Gives the commands of quests to the interpreter: GetStage, GetStageDone, SetStage, GetQuestRunning,
-    /// StartQuest, StopQuest, GetQuestCompleted, CompleteQuest, SetQuestDelay, CompleteAllObjectives and the commands
-    /// of objectives. Those that the command table does not have are left out.
+    /// StartQuest, StopQuest, GetQuestCompleted, CompleteQuest, SetQuestDelay, CompleteAllObjectives, the commands of
+    /// objectives, ForceActiveQuest, ResetQuest, SetShowQuestItems and KillQuestUpdates. Those that the command table does not have are left out.
     void addQuestCommands(Interpreter& interpreter, QuestManager& quests);
 }
 

@@ -419,7 +419,7 @@ namespace
         PlayerProgress otherProgress;
         ItemUse loaded(uses, otherState, otherValues, otherProgress);
         SaveReader in(out.bytes());
-        FalloutScript::readItemUse(loaded, in, 1);
+        FalloutScript::readItemUse(loaded, in, FalloutScript::itemUseSectionVersion);
         EXPECT_TRUE(in.atEnd());
         const std::vector<ItemUse::Active> active = loaded.active(player);
         ASSERT_THAT(active, SizeIs(1));
@@ -429,6 +429,62 @@ namespace
         SaveWriter again;
         FalloutScript::writeItemUse(loaded, again);
         EXPECT_EQ(again.bytes(), out.bytes());
+    }
+
+    TEST(FalloutScriptSaveCharactersTest, a_running_chem_keeps_where_it_comes_from_and_an_old_save_leaves_it_unknown)
+    {
+        Records records;
+        Uses uses;
+        constexpr FormId source = 0x01000900;
+        constexpr FormId magicEffect = 0x01000901;
+        FalloutScript::ConsumableEffect effect;
+        effect.mEffect = magicEffect;
+        effect.mActorValue = strength;
+        effect.mMagnitude = 5;
+        effect.mDuration = 240;
+        effect.mRecover = true;
+        ActorState state(records);
+        ActorValues values;
+        PlayerProgress progress;
+        ItemUse use(uses, state, values, progress);
+        use.setPlayer(player);
+        use.cast(player, { effect }, source);
+        ASSERT_THAT(use.active(player), SizeIs(1));
+
+        SaveWriter out;
+        FalloutScript::writeItemUse(use, out);
+        ActorState otherState(records);
+        ActorValues otherValues;
+        PlayerProgress otherProgress;
+        ItemUse loaded(uses, otherState, otherValues, otherProgress);
+        SaveReader in(out.bytes());
+        FalloutScript::readItemUse(loaded, in, FalloutScript::itemUseSectionVersion);
+        EXPECT_TRUE(in.atEnd());
+        const std::vector<ItemUse::Active> active = loaded.active(player);
+        ASSERT_THAT(active, SizeIs(1));
+        EXPECT_EQ(active[0].mSource, source);
+        EXPECT_EQ(active[0].mEffect, magicEffect);
+        // What was loaded can be ended by the spell, and takes the change back
+        EXPECT_EQ(loaded.end(player, source), 1);
+        EXPECT_TRUE(loaded.active(player).empty());
+
+        // A game saved before the source was kept: the entries load without one, and run on
+        SaveWriter old;
+        old.count(1);
+        old.form(player);
+        old.i32(strength);
+        old.f64(5);
+        old.f64(100);
+        old.boolean(true);
+        old.count(0);
+        ItemUse earlier(uses, otherState, otherValues, otherProgress);
+        SaveReader oldIn(old.bytes());
+        FalloutScript::readItemUse(earlier, oldIn, 1);
+        EXPECT_TRUE(oldIn.atEnd());
+        const std::vector<ItemUse::Active> kept = earlier.active(player);
+        ASSERT_THAT(kept, SizeIs(1));
+        EXPECT_EQ(kept[0].mSource, 0u);
+        EXPECT_EQ(earlier.end(player, 0), 1);
     }
 
     class Locks final : public FalloutScript::ReferenceRecords

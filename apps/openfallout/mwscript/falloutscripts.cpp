@@ -211,9 +211,12 @@ namespace OFScript
         , mPerks(*this, mProgress, mActorValues)
         , mItemUse(*this, mActors, mActorValues, mProgress)
         , mMagic(*this)
+        , mChallengeRecords(store, mFormLists)
+        , mChallenges(mChallengeRecords)
         , mHardcore([this](int need) { return hardcoreStages(need); }, mActorValues, mMagic)
         , mCrafting(*this, mActors, mActorValues)
         , mLimbs(*this, mActorValues)
+        , mDestruction(*this, mReferenceState)
         , mChargen(game)
         , mDialogue(mInterpreter, mConditions, mQuests, *this)
         , mDialogueRandom(std::random_device()())
@@ -227,7 +230,10 @@ namespace OFScript
         mPendingSave = std::make_unique<PendingSave>();
         // However a character dies (a blow, KillActor, damage to its health), its fights are over at that moment; a
         // character whose health is gone and who is essential falls instead
-        mActors.setDeathListener([this](FalloutScript::FormId actor) { mCombat.withdraw(actor); });
+        mActors.setDeathListener([this](FalloutScript::FormId actor) {
+            mCombat.withdraw(actor);
+            noteDeathTime(actor);
+        });
         mActors.setReviveHandler([this](FalloutScript::FormId actor) { mCombat.setUnconscious(actor, false); });
         mActors.setFallHandler([this](FalloutScript::FormId actor) { return fallsInsteadOfDying(actor); });
         FalloutScript::addQuestCommands(mInterpreter, mQuests);
@@ -522,6 +528,10 @@ namespace OFScript
         mPerks.setHealthLowered([this](FalloutScript::FormId owner) { mItemUse.checkHealth(owner); });
         mItemUse.setConditions(conditionsHold);
         mMagic.setConditions(conditionsHold);
+        // The challenges of New Vegas, and the commands and the conditions that ask about them
+        setUpChallenges();
+        FalloutScript::addChallengeCommands(mInterpreter, mChallenges);
+        FalloutScript::addChallengeConditionFunctions(mConditions, mChallenges);
         // A change of karma is told in the message area, with a picture for the kind of change
         mProgress.setKarmaNotice([this](int amount) {
             const bool major = std::abs(amount) >= gameSetting("iKarmaChangeThreshold", 250);
@@ -535,9 +545,13 @@ namespace OFScript
         mItemUse.setFighting([this](FalloutScript::FormId actor) { return mCombat.inCombat(actor); });
         // What an item starts on a character, HasMagicEffect finds; what a spell cast on oneself does is done as an
         // item does it, and what an ability or a disease changes stays until it is taken away
-        mItemUse.setEffectListener(
-            [this](FalloutScript::FormId actor, FalloutScript::FormId effect, FalloutScript::FormId source,
-                double seconds) { mMagic.noteEffect(actor, effect, source, seconds); });
+        mItemUse.setEffectListener([this](FalloutScript::FormId actor, FalloutScript::FormId effect,
+                                       FalloutScript::FormId source, double seconds, double magnitude) {
+            mMagic.noteEffect(actor, effect, source, seconds, magnitude);
+        });
+        // An effect that is dispelled ends what the item or spell that started it did to the character
+        mMagic.setEnder([this](FalloutScript::FormId actor, FalloutScript::FormId source,
+                            FalloutScript::FormId effect) { mItemUse.end(actor, source, effect); });
         mMagic.setModifier([this](FalloutScript::FormId actor, int actorValue, double amount) {
             mActorValues.modify(actor, actorValue, amount);
         });
@@ -555,12 +569,15 @@ namespace OFScript
             const float frameSeconds = mObjects.secondsPassed();
             if (stage == Stage::Update && seconds > 0)
                 mObjects.setSecondsPassed(static_cast<float>(seconds));
+            // ScriptEffectElapsedSeconds tells the same seconds in an update and 0 in the start and the end
+            mObjects.setEffectSeconds(stage == Stage::Update ? seconds : 0.0);
             mObjects.runEffect(actor, script,
                 stage == Stage::Start        ? FalloutScript::BlockType::ScriptEffectStart
                     : stage == Stage::Update ? FalloutScript::BlockType::ScriptEffectUpdate
                                              : FalloutScript::BlockType::ScriptEffectFinish,
                 effect);
             mObjects.setSecondsPassed(frameSeconds);
+            mObjects.setEffectSeconds(0.0);
         });
         // The conditions of a log entry of a stage are about the player, who nobody else is in the way of
         mQuests.setConditionCheck([this](const std::vector<ESM4::TargetCondition>& conditions) {
@@ -612,6 +629,14 @@ namespace OFScript
             }
             mHudQuestText.push(std::move(text));
         });
+        // KillQuestUpdates: what the display holds of quest updates is thrown away (0x77F500 and 0x77F5E0 empty its two
+        // queues at the next frame)
+        mQuests.setUpdatesKiller([this] {
+            mHudQuestText.takeTexts();
+            mHudQuestText.takeObjectives();
+        });
+        // The rules of damage and destruction register last, so that their commands are the ones that answer
+        setUpDamage();
     }
 
     FalloutScripts::~FalloutScripts()
@@ -746,6 +771,7 @@ namespace OFScript
         mItemHolders.clear();
         mActorValues.clear();
         mLimbs.clear();
+        resetDamage();
         mVatsOpen = false;
         mBreathLeft = -1.0;
         mHeadUnder = false;
@@ -772,6 +798,7 @@ namespace OFScript
         }
         mFormLists.clear();
         mProgress.clear();
+        mChallenges.reset();
         {
             const std::lock_guard lock(mLootMutex);
             mLoot.reset();
@@ -957,6 +984,7 @@ namespace OFScript
         updateRadio(frametime);
         mHudTime += frametime;
         raiseCombatEvents(frametime);
+        updateDamage(frametime);
         updateProgress(frametime);
         mQuests.update(frametime);
         mObjects.update();
@@ -2472,8 +2500,12 @@ namespace OFScript
         const std::vector<FalloutScript::Equipment::WornChange> worn = mEquipment.takeChanges();
         // A script takes items away without a drop (RemoveItem): the OnDrop blocks run when something is dropped
         for (const FalloutScript::ActorState::ItemChange& change : added)
+        {
             if (change.mCount > 0)
                 raise(change.mItem, change.mHolder, BlockType::OnAdd);
+            if (change.mHolder == mPlayer)
+                noteChallengeAcquired(change.mItem, change.mCount);
+        }
         for (const FalloutScript::Equipment::WornChange& change : worn)
             raise(change.mItem, change.mActor, change.mWorn ? BlockType::OnEquip : BlockType::OnUnequip);
     }
@@ -2845,6 +2877,8 @@ namespace OFScript
         mCombat.noteHit(victim, struck, tolerated);
 
         mActorValues.damage(victim, AV::health, dealt);
+        // A character that has destruction data (a turret, a robot) goes through its stages as its health goes down
+        mDestruction.damage(victim, dealt, mActorValues.current(victim, AV::health));
         // The blow leaves its impact on the body (blood, or what the weapon's impact data set has for the body)
         showImpact(victim, attacker, weapon, limb);
         // The armor that the player wears is worn out by what it stopped (the resistance by the share of the blow it took,
@@ -2950,6 +2984,9 @@ namespace OFScript
         {
             // Of two blows that kill at once, the one that marks the death is the killing blow
             result.mKilled = mActors.setDead(victim, true, attacker, limb);
+            // The rule of dismemberment runs for the blow that killed
+            if (result.mKilled)
+                goreOfKill(victim, attacker, weapon, limb, blow.mMelee);
             // The body falls by the mind of the character, which one with no package has not got until it is dead
             // (round 14D: shot dead, two characters stood upright with their weapons out)
             if (result.mKilled)
@@ -3095,7 +3132,7 @@ namespace OFScript
         stats.mWeapon = attacker != 0 ? mEquipment.weapon(attacker) : 0;
         // A character that a script told to shoot (UseWeapon) holds the weapon the script names and uses no ammunition
         // (the orders are kept by the thread of the frame, and the player never has one)
-        const bool mayBeOrdered = attacker != 0 && attacker != mPlayer && std::this_thread::get_id() == mMainThread;
+        const bool mayBeOrdered = attacker != 0 && std::this_thread::get_id() == mMainThread;
         const auto ordered = mayBeOrdered ? mScriptedAttacks.find(attacker) : mScriptedAttacks.end();
         if (ordered != mScriptedAttacks.end())
             stats.mWeapon = ordered->second.mOrder.mWeapon;
@@ -3226,6 +3263,10 @@ namespace OFScript
             result.mStrike = strike(attacker, victim, stats.mWeapon, limb, -1.0, conditionBefore, modsBefore, noDamage);
             return result;
         }
+        // A thing that can be destroyed takes the damage of the weapon as a blow (the stages it goes through are
+        // told by the rule of destruction)
+        if (!noDamage)
+            mDestruction.damage(victim, describeWeapon(stats.mWeapon, attacker, conditionBefore, modsBefore).mDamage);
         // An object has no health, but its script hears of the blow. It is not attacked in the sense of GetAttacked,
         // which is the flag of an actor in a fight that nothing would ever clear on an object.
         FalloutScript::CombatState::Hit struck;
@@ -3878,6 +3919,7 @@ namespace OFScript
         const std::vector<FalloutScript::CombatState::Change> changes = mCombat.takeChanges();
         for (const FalloutScript::CombatState::HitEvent& event : hits)
         {
+            noteChallengeHit(event.mVictim, event.mHit);
             mObjects.trigger(event.mVictim, BlockType::OnHit, event.mHit.mAttacker, namesActor(event.mHit.mAttacker));
             if (event.mHit.mWeapon != 0)
             {
@@ -3894,6 +3936,7 @@ namespace OFScript
             // One that fought nobody and had no package has no mind yet, and its body falls by it
             evaluatePackage(death.mActor);
             awardKillExperience(death.mActor);
+            noteChallengeKill(death.mActor, death.mKiller);
         }
         for (const FalloutScript::CombatState::Change& change : changes)
         {
@@ -4120,6 +4163,9 @@ namespace OFScript
         // ammunition; Fallout 3 has no such effect)
         if (!settings.mFallout3 && !stats.mMelee && stats.mAmmo != 0)
             points = applyAmmoEffects(stats.mAmmo, 4, points);
+        // The perks change what an item takes (the entry point 68 of New Vegas, FalloutNV.exe 0x891360)
+        if (!settings.mFallout3)
+            points = std::max(perkNumber(FalloutScript::EntryPoint::itemDamage, attacker, points, "item damage"), 0.0);
         mEquipment.wear(attacker, stats.mWeapon, points);
     }
 
@@ -4132,11 +4178,13 @@ namespace OFScript
             return;
         // New Vegas wears armor by its threshold too, so armor that only has a threshold wears (FalloutNV.exe 0x9B5A30, Mac
         // round 12BA A); Fallout 3's armor has the resistance only
-        const double points = FalloutScript::Wear::armorPoints(wearSettings(), damage, resistance, threshold, remaining,
+        double points = FalloutScript::Wear::armorPoints(wearSettings(), damage, resistance, threshold, remaining,
                                   damageSettings().mMinimumThroughThreshold)
             * scale;
         if (points <= 0)
             return;
+        if (mGame == FalloutScript::Game::NewVegas)
+            points = std::max(perkNumber(FalloutScript::EntryPoint::itemDamage, victim, points, "item damage"), 0.0);
         const bool head = limb == 1 || limb == 2;
         FalloutScript::FormId chosen = 0;
         const auto pick = [&](std::uint32_t slot) {
@@ -5664,9 +5712,12 @@ namespace OFScript
         const ESM4::Water* water = mStore.get<ESM4::Water>().search(record->mWaterType);
         if (water == nullptr || water->mActorEffect.isZeroOrUnset())
             return;
+        // The magnitude of the water's spell is scaled by an entry point of the player's perks (26), as the
+        // executables do where the player drinks (FalloutNV.exe 0x5805C0, Fallout3.exe 0x4FE566)
+        const double scale = perkNumber(FalloutScript::EntryPoint::drinkingRadiation, mPlayer, 1.0, "drinking radiation");
         Log(Debug::Info) << "Drink: the player drinks from " << record->mEditorId << ", " << water->mEditorId
-                         << " casts " << FalloutScript::hex(numberOf(water->mActorEffect));
-        mMagic.castOnSelf(mPlayer, numberOf(water->mActorEffect));
+                         << " casts " << FalloutScript::hex(numberOf(water->mActorEffect)) << " at scale " << scale;
+        mMagic.castOnSelf(mPlayer, numberOf(water->mActorEffect), scale);
     }
 
     void FalloutScripts::leaveFurniture(const OFWorld::Ptr& actor)

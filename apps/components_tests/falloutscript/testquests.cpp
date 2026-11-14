@@ -1,6 +1,9 @@
 #include "scriptbuilder.hpp"
 
 #include <components/falloutscript/quests.hpp>
+#include <components/falloutscript/savescripts.hpp>
+#include <components/falloutscript/savestate.hpp>
+#include <components/falloutscript/vanillacommands.hpp>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -789,5 +792,224 @@ namespace
         setup.mQuests.setStage(questA, 30);
 
         EXPECT_THAT(told, ElementsAre("failed " + std::to_string(questA)));
+    }
+
+    /// A runner with the commands of the games' table, for the commands that the test table does not have
+    struct GameRunner
+    {
+        FalloutScript::CommandTable mCommands = FalloutScript::vanillaCommands(FalloutScript::Game::NewVegas);
+        TestHost mHost;
+        Interpreter mInterpreter{ mHost, mCommands };
+        TestRecords mRecords;
+        QuestManager mQuests{ mInterpreter, mRecords };
+
+        GameRunner() { FalloutScript::addQuestCommands(mInterpreter, mQuests); }
+
+        double call(std::uint16_t opcode, std::vector<double> numbers = {})
+        {
+            std::vector<FalloutScript::Value> arguments;
+            for (const double number : numbers)
+                arguments.push_back({ number, {}, false });
+            return mInterpreter.call(opcode, 0, false, std::move(arguments));
+        }
+
+        void addShownQuest(FormId id, int objective = 10)
+        {
+            ESM4::Quest& quest = mRecords.addQuest(id);
+            quest.mObjectives.resize(1);
+            quest.mObjectives[0].mIndex = objective;
+            quest.mObjectives[0].mText = "Go";
+        }
+    };
+
+    constexpr std::uint16_t OpForceActiveQuest = 0x11DD;
+    constexpr std::uint16_t OpResetQuest = 0x11DB;
+    constexpr std::uint16_t OpSetShowQuestItems = 0x114E;
+    constexpr std::uint16_t OpKillQuestUpdates = 0x1231;
+
+    TEST(FalloutScriptQuestsTest, the_first_quest_that_is_shown_is_the_active_one_when_there_is_none)
+    {
+        GameRunner run;
+        run.addShownQuest(questA);
+        run.addShownQuest(questB);
+        run.mQuests.reset();
+        EXPECT_EQ(run.mQuests.activeQuest(), 0u);
+
+        run.mQuests.setObjectiveDisplayed(questA, 10, true);
+        EXPECT_EQ(run.mQuests.activeQuest(), questA);
+        // A second quest does not take the place of the first
+        run.mQuests.setObjectiveDisplayed(questB, 10, true);
+        EXPECT_EQ(run.mQuests.activeQuest(), questA);
+    }
+
+    TEST(FalloutScriptQuestsTest, the_active_quest_is_given_up_when_it_is_completed_or_fails_but_not_another)
+    {
+        GameRunner run;
+        run.addShownQuest(questA);
+        run.addShownQuest(questB);
+        run.mQuests.reset();
+        run.mQuests.setObjectiveDisplayed(questA, 10, true);
+        run.mQuests.setObjectiveDisplayed(questB, 10, true);
+
+        run.mQuests.complete(questB);
+        EXPECT_EQ(run.mQuests.activeQuest(), questA);
+        run.mQuests.complete(questA);
+        EXPECT_EQ(run.mQuests.activeQuest(), 0u);
+
+        // The next quest that is shown is the active one
+        run.addShownQuest(questC);
+        run.mQuests.reset();
+        run.mQuests.setObjectiveDisplayed(questC, 10, true);
+        EXPECT_EQ(run.mQuests.activeQuest(), questC);
+        ESM4::Quest& failing = run.mRecords.addQuest(0x00001003);
+        TestRecords::addEntry(failing, 30, "", ESM4::QuestLogEntry::Flag_FailQuest);
+        failing.mObjectives.resize(1);
+        failing.mObjectives[0].mIndex = 10;
+        failing.mObjectives[0].mText = "Go";
+        run.mQuests.reset();
+        run.mQuests.setActiveQuest(0x00001003);
+        run.mQuests.setStage(0x00001003, 30);
+        EXPECT_EQ(run.mQuests.activeQuest(), 0u);
+    }
+
+    TEST(FalloutScriptQuestsTest, forcing_the_active_quest_takes_the_place_of_the_one_there_is)
+    {
+        GameRunner run;
+        run.addShownQuest(questA);
+        run.addShownQuest(questB);
+        run.mQuests.reset();
+        run.mQuests.setObjectiveDisplayed(questA, 10, true);
+
+        EXPECT_EQ(run.call(OpForceActiveQuest, { questB }), 1.0);
+        EXPECT_EQ(run.mQuests.activeQuest(), questB);
+        // A quest that is not known, or none, changes nothing
+        run.call(OpForceActiveQuest, { 0x00009999 });
+        run.call(OpForceActiveQuest, { 0 });
+        EXPECT_EQ(run.mQuests.activeQuest(), questB);
+    }
+
+    TEST(FalloutScriptQuestsTest, resetting_a_quest_takes_back_its_stages_objectives_and_ending)
+    {
+        GameRunner run;
+        ESM4::Quest& quest = run.mRecords.addQuest(questA);
+        TestRecords::addEntry(quest, 10);
+        TestRecords::addEntry(quest, 20);
+        quest.mObjectives.resize(1);
+        quest.mObjectives[0].mIndex = 10;
+        quest.mObjectives[0].mText = "Go";
+        run.mQuests.reset();
+        run.mQuests.setStage(questA, 20);
+        run.mQuests.setObjectiveDisplayed(questA, 10, true);
+        run.mQuests.setObjectiveCompleted(questA, 10, true);
+        run.mQuests.complete(questA);
+        run.mQuests.setDelay(questA, 7.f);
+        ASSERT_TRUE(run.mQuests.completed(questA));
+
+        run.call(OpResetQuest, { questA });
+
+        EXPECT_EQ(run.mQuests.stage(questA), 0);
+        EXPECT_FALSE(run.mQuests.stageDone(questA, 20));
+        EXPECT_FALSE(run.mQuests.objectiveDisplayed(questA, 10));
+        EXPECT_FALSE(run.mQuests.objectiveCompleted(questA, 10));
+        EXPECT_FALSE(run.mQuests.completed(questA));
+        EXPECT_FALSE(run.mQuests.running(questA));
+        // The stage can be reached again, and the delay of the script stays
+        EXPECT_TRUE(run.mQuests.setStage(questA, 20));
+        EXPECT_EQ(run.mQuests.delay(questA), 7.f);
+    }
+
+    TEST(FalloutScriptQuestsTest, a_reset_quest_runs_again_when_it_starts_enabled_and_is_no_longer_active_when_it_does_not)
+    {
+        GameRunner run;
+        run.addShownQuest(questA);
+        run.mRecords.addQuest(questB, ESM4::Quest::Flag_StartGameEnabled);
+        run.mQuests.reset();
+        run.mQuests.setObjectiveDisplayed(questA, 10, true);
+        run.mQuests.start(questA);
+        ASSERT_EQ(run.mQuests.activeQuest(), questA);
+
+        run.call(OpResetQuest, { questA });
+        EXPECT_EQ(run.mQuests.activeQuest(), 0u);
+
+        run.mQuests.stop(questB);
+        EXPECT_FALSE(run.mQuests.running(questB));
+        run.call(OpResetQuest, { questB });
+        EXPECT_TRUE(run.mQuests.running(questB));
+        // A quest that is not known is nothing to reset
+        EXPECT_EQ(run.call(OpResetQuest, { 0x00009999 }), 1.0);
+    }
+
+    TEST(FalloutScriptQuestsTest, the_flag_of_showing_quest_items_is_on_for_a_number_above_0)
+    {
+        GameRunner run;
+        EXPECT_FALSE(run.mQuests.showQuestItems());
+        run.call(OpSetShowQuestItems, { 1 });
+        EXPECT_TRUE(run.mQuests.showQuestItems());
+        run.call(OpSetShowQuestItems, { 0 });
+        EXPECT_FALSE(run.mQuests.showQuestItems());
+        run.call(OpSetShowQuestItems, { -1 });
+        EXPECT_FALSE(run.mQuests.showQuestItems());
+    }
+
+    TEST(FalloutScriptQuestsTest, killing_the_updates_asks_the_display_to_throw_away_what_it_holds)
+    {
+        GameRunner run;
+        // Without a display it does nothing
+        EXPECT_EQ(run.call(OpKillQuestUpdates), 1.0);
+        int killed = 0;
+        run.mQuests.setUpdatesKiller([&killed] { ++killed; });
+        EXPECT_EQ(run.call(OpKillQuestUpdates), 1.0);
+        EXPECT_EQ(killed, 1);
+    }
+
+    TEST(FalloutScriptQuestsTest, the_active_quest_and_the_flag_are_saved_and_a_quest_that_is_gone_is_not_active)
+    {
+        GameRunner before;
+        before.addShownQuest(questA);
+        before.addShownQuest(questB);
+        before.mQuests.reset();
+        before.mQuests.setActiveQuest(questB);
+        before.mQuests.setShowQuestItems(true);
+        FalloutScript::SaveWriter out;
+        FalloutScript::writeQuests(before.mQuests, out);
+        const std::string bytes = out.take();
+
+        GameRunner after;
+        after.addShownQuest(questA);
+        after.addShownQuest(questB);
+        after.mQuests.reset();
+        FalloutScript::SaveReader in(bytes);
+        FalloutScript::readQuests(after.mQuests, in, FalloutScript::questsSectionVersion);
+        EXPECT_TRUE(in.atEnd());
+        EXPECT_EQ(after.mQuests.activeQuest(), questB);
+        EXPECT_TRUE(after.mQuests.showQuestItems());
+
+        GameRunner fewer;
+        fewer.addShownQuest(questA);
+        fewer.mQuests.reset();
+        FalloutScript::SaveReader again(bytes);
+        FalloutScript::readQuests(fewer.mQuests, again, FalloutScript::questsSectionVersion);
+        EXPECT_EQ(fewer.mQuests.activeQuest(), 0u);
+    }
+
+    TEST(FalloutScriptQuestsTest, a_game_saved_before_the_active_quest_was_kept_loads_without_one)
+    {
+        GameRunner before;
+        before.addShownQuest(questA);
+        before.mQuests.reset();
+        FalloutScript::SaveWriter out;
+        FalloutScript::writeQuests(before.mQuests, out);
+        std::string bytes = out.take();
+        // Version 1 ends after the quests: the form and the flag of version 2 are the last 5 bytes
+        bytes.resize(bytes.size() - 5);
+
+        GameRunner after;
+        after.addShownQuest(questA);
+        after.mQuests.reset();
+        FalloutScript::SaveReader in(bytes);
+        FalloutScript::readQuests(after.mQuests, in, 1);
+        EXPECT_TRUE(in.atEnd());
+        EXPECT_EQ(after.mQuests.activeQuest(), 0u);
+        EXPECT_FALSE(after.mQuests.showQuestItems());
     }
 }

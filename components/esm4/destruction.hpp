@@ -11,6 +11,7 @@
 
 namespace ESM4
 {
+    class Reader;
     class RecordReader;
 
 #pragma pack(push, 1)
@@ -60,6 +61,11 @@ namespace ESM4
     /// Reads the current sub-record if it is DEST, DSTD, DMDL, DMDT, DMDS or DSTF and returns true. Returns false and
     /// reads nothing for any other sub-record. A model before the first DSTD throws.
     bool readDestructionSubRecord(RecordReader& in, Destruction& destruction);
+
+    /// The same for the records that are read with the Reader (the sub-record header was read, its data is not): a
+    /// DEST or DSTD of the wrong size, a model before the first DSTD and the texture lists are skipped, and the
+    /// forms of a stage are given the load order of the file. Returns false, reading nothing, for any other sub-record.
+    bool readDestructionSubRecord(Reader& reader, Destruction& destruction);
 }
 
 #endif // OPENFALLOUT_COMPONENTS_ESM4_DESTRUCTION_H

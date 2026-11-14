@@ -225,6 +225,42 @@ function handlers.god(args)
     return { on = debug.isGodMode() }
 end
 
+-- A command of the script language of Fallout, called by its name (the tool debug.scriptCommand): on the next frame, in the main
+-- thread; the value it gives is written to the engine log ("Command: Name on 0x14 (1, 2) = 3"), not given back here
+function handlers.command(args)
+    debug.scriptCommand(args.name, args.reference, args.arguments)
+    log('command', tostring(args.name), tostring(args.reference or '-'))
+    return { name = args.name }
+end
+
+-- The quests the Pip-Boy lists, with the one that is followed: numbers and ids only
+function handlers.pipboyQuests(args)
+    local rows = core.pipboy.quests()
+    local active, count = nil, 0
+    for index, row in ipairs(rows) do
+        count = count + 1
+        if row.active then active = row.id end
+    end
+    log('pipboyQuests', tostring(args.label or '-'), 'count=' .. count, 'active=' .. tostring(active))
+    local ids = {}
+    for index, row in ipairs(rows) do ids[index] = { id = row.id, active = row.active, completed = row.completed } end
+    return { count = count, active = active, rows = ids }
+end
+
+-- Uses an item the player carries as the Pip-Boy does (an aid item is eaten or drunk, a book read): the item with that form; what
+-- happened is logged ("used", "read", "equipped", or nothing)
+function handlers.pipboyUse(args)
+    for _, row in ipairs(core.pipboy.items()) do
+        if row.form == args.form then
+            local result = core.pipboy.use(row.id)
+            log('pipboyUse', tostring(args.label or '-'), 'form=' .. tostring(args.form), 'result=' .. tostring(result))
+            return { result = result }
+        end
+    end
+    log('error', 'pipboyUse', 'the player does not carry ' .. tostring(args.form))
+    return { result = '' }
+end
+
 -- The weapon of the player: the form, what the games' rules allow, the rounds
 function handlers.weapon(args)
     local stats = core.combat.weapon()

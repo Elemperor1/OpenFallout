@@ -1,6 +1,7 @@
 #include "objects.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <vector>
 
 #include "arguments.hpp"
@@ -179,6 +180,16 @@ namespace FalloutScript
             mEffects.erase(key);
             mSavedEffects.erase(key);
         }
+        return has;
+    }
+
+    bool ObjectScripts::runEffectOnce(FormId character, FormId script)
+    {
+        // The effect number that no magic effect has (they count up from 1), so that a running effect of the same script
+        // is not taken for this one
+        constexpr std::uint64_t once = std::numeric_limits<std::uint64_t>::max();
+        const bool has = runEffect(character, script, BlockType::ScriptEffectStart, once);
+        mEffects.erase(std::tuple<FormId, FormId, std::uint64_t>(character, script, once));
         return has;
     }
 

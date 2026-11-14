@@ -69,6 +69,10 @@ namespace FalloutScript
         /// The effect number tells apart effects of one script on one character: each has its own script instance, which
         /// the end of another does not forget.
         bool runEffect(FormId character, FormId script, std::uint16_t blockType, std::uint64_t effect = 0);
+        /// Runs the ScriptEffectStart block of a script once for the character and forgets the script at once, with no
+        /// finish block: what the games do for the script of a challenge that was completed (FalloutNV.exe 0x5F5B8D).
+        /// Returns whether the script has such a block.
+        bool runEffectOnce(FormId character, FormId script);
 
         /// Runs a script that is a list of statements, such as the one a package runs when it begins, ends or changes,
         /// with the reference as its object: the commands in it that name none act on the reference. Returns whether
@@ -87,6 +91,11 @@ namespace FalloutScript
         /// The seconds the last frame took, which GetSecondsPassed tells (set before any script runs in the frame)
         void setSecondsPassed(float seconds) { mSeconds = seconds; }
         float secondsPassed() const { return mSeconds; }
+        /// The seconds that the update of a script effect that runs now covers, which ScriptEffectElapsedSeconds tells
+        /// (0 when the script runs for the start or the end of an effect, or for no effect: 0x5C43A0 gives 0 when
+        /// the script has no effect to ask)
+        void setEffectSeconds(double seconds) { mEffectSeconds = seconds; }
+        double effectSeconds() const { return mEffectSeconds; }
         /// The object that caused the event that runs now, 0 outside of one
         FormId actionReference() const { return mActionReference; }
 
@@ -160,6 +169,7 @@ namespace FalloutScript
         std::set<FormId> mReported;
         std::set<const ESM4::ScriptDefinition*> mReportedDefinitions;
         float mSeconds = 0;
+        double mEffectSeconds = 0;
         FormId mActionReference = 0;
     };
 }

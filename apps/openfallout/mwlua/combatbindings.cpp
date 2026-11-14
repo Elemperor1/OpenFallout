@@ -1,7 +1,9 @@
 #include "combatbindings.hpp"
 
+#include <cmath>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include <components/esm/refid.hpp>
 #include <components/lua/luastate.hpp>
@@ -100,6 +102,55 @@ namespace OFLua
             scripts().combat().setRelation(parseId(second), parseId(first), Relation::Enemy);
         };
         api["isDead"] = [](std::string_view actor) { return scripts().actors().isDead(parseId(actor)); };
+
+        // Damage and destruction (what the commands DamageObject, GetDestructionStage, IsLimbGone, FireWeapon and
+        // PushActorAway do, for the rounds): a blow to a thing that can be destroyed, with the table of what it did
+        api["damageObject"] = [lua](std::string_view reference, double amount) {
+            const FalloutScript::DestructionOutcome outcome = scripts().destruction().damage(parseId(reference), amount);
+            sol::table row(lua, sol::create);
+            row["applied"] = outcome.mApplied;
+            row["health"] = outcome.mHealth;
+            row["maxHealth"] = outcome.mMaxHealth;
+            row["stageBefore"] = outcome.mStageBefore;
+            row["stageAfter"] = outcome.mStageAfter;
+            row["crossed"] = static_cast<int>(outcome.mCrossed.size());
+            row["modelStage"] = outcome.mModelStage;
+            row["damageStage"] = outcome.mDamageStage;
+            row["disabled"] = outcome.mDisable;
+            row["destroyed"] = outcome.mDestroyed;
+            return row;
+        };
+        // The stage as GetDestructionStage tells it (-1 for a thing with none) and the health it has (-1 for a thing that
+        // was never damaged)
+        api["destructionStage"] = [](std::string_view reference) { return scripts().destruction().stage(parseId(reference)); };
+        api["destructionHealth"] = [](std::string_view reference) { return scripts().destruction().health(parseId(reference)); };
+        api["clearDestruction"] = [](std::string_view reference) { return scripts().destruction().restore(parseId(reference)); };
+        // The limbs of a character that are gone (IsLimbGone, and the mask of them), and what killed it
+        api["isLimbGone"] = [](std::string_view actor, int limb) { return scripts().dismemberment().isGone(parseId(actor), limb); };
+        api["limbMask"] = [](std::string_view actor) { return static_cast<int>(scripts().dismemberment().mask(parseId(actor))); };
+        // The character is made whole again as far as the limbs and the kept death go (what a revival leaves alone)
+        api["forgetLimbs"] = [](std::string_view actor) { scripts().dismemberment().restore(parseId(actor)); };
+        api["causeOfDeath"] = [](std::string_view actor) { return scripts().dismemberment().cause(parseId(actor)); };
+        // Any command of the script language, run as a script runs it: the name, the reference it is called on ("" for none) and
+        // the numbers it is given (a form is its number, 0x... as core.getFormId writes it, given in the number form: the
+        // form ids are the numbers of the games' load order)
+        api["command"] = [](std::string_view name, std::string_view reference, sol::variadic_args numbers) {
+            std::vector<double> arguments;
+            for (const sol::stack_proxy value : numbers)
+            {
+                if (value.is<double>())
+                    arguments.push_back(value.get<double>());
+                else if (value.is<std::string_view>())
+                    arguments.push_back(static_cast<double>(parseId(value.get<std::string_view>())));
+            }
+            return scripts().runCommand(name, parseId(reference), arguments);
+        };
+        api["fireWeapon"] = [](std::string_view actor, std::string_view weapon) {
+            scripts().fireWeaponOf(parseId(actor), parseId(weapon));
+        };
+        api["pushActorAway"] = [](std::string_view origin, std::string_view actor, double force) {
+            scripts().pushActorAwayFrom(parseId(origin), parseId(actor), force);
+        };
 
         // Whether the content is that of Fallout, which has combat to run (it is not for Morrowind's)
         api["available"] = []() { return scripts().hasCombat(); };

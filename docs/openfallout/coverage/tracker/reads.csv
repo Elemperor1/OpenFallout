@@ -57,3 +57,38 @@ command,GetReputationPct,Mac report m10/mac-10b-part-a.md: exec 0x5DDC20 in the 
 command,GetReputationThreshold,Mac report m10/mac-10a-part-a.md: exec 0x5DDC90 in the executable
 command,IsPlayerInRegion,Mac report m8/mac-8d-part-c.md: execute 0x5CF490 in the executable
 command,SystemSave,Mac report m10/mac-10e-part-c.md: exec 0x5E0160 in the executable
+command,DamageObject,docs/openfallout/m16-damage-notes.md: exec 0x5D4B90 calls the reference's Damage (0x579220; vfunc 0x144); which is BGSDestructibleObjectForm::Damage 0x475B20
+command,GetDestructionStage,docs/openfallout/m16-damage-notes.md: exec 0x5D9AA0; eval 0x5A4C60; the stage is 0x477430
+command,ClearDestruction,docs/openfallout/m16-damage-notes.md: exec 0x5DA260; the reset is 0x477D10
+command,IsLimbGone,docs/openfallout/m16-damage-notes.md: eval 0x5A3DB0; the test is 0x573090 on the extra data of the dismembered limbs (mask); the loss is 0x8B43A0 and 0x8B4D10
+command,GetCauseofDeath,docs/openfallout/m16-damage-notes.md: eval 0x5A3D30 reads 0x5730D0; the value is worked out at 0x89C0B1 from the form type of the source of the blow
+command,SetCriticalStage,docs/openfallout/m16-damage-notes.md: exec 0x5DC010 stores the enum at actor + 0x10C and calls 0x8A1A70
+command,IsInCriticalStage,docs/openfallout/m16-damage-notes.md: eval 0x5A2910 compares the enum at actor + 0x10C
+command,IsWeaponSkillType,docs/openfallout/m16-damage-notes.md: eval 0x5A0AB0 compares the skill of the weapon (WEAP form type 0x28); the unarmed skill 0x2D when there is none
+command,IsWeaponInList,docs/openfallout/m16-damage-notes.md: eval 0x5A05E0 looks for the weapon; or the default object Fists; in the form list
+command,FireWeapon,docs/openfallout/m16-damage-notes.md: exec 0x5DA570: for the player the action 0x20 (0x87AA40); for a character the shot of the weapon 0x523150
+command,PushActorAway,docs/openfallout/m16-damage-notes.md: exec 0x5D6B60 takes the force from 0x646580 (damage and agility) and throws the character away from the position of the calling reference (process vfunc 0x418)
+command,AttachAshPile,docs/openfallout/m16-damage-notes.md: exec 0x5DB870 places the ash pile at the position of the character (read as far as the placement; the default object is not resolved)
+command,GetTimeDead,docs/openfallout/m16-damage-notes.md: eval 0x5A3A30: whole hours of the game now minus the hour stored in the process at death
+command,IsKillerObject,docs/openfallout/m16-damage-notes.md: eval 0x5A3FA0 compares the killer kept at extra + 0x14 with the form
+command,GetConcussed,docs/openfallout/m16-damage-notes.md: eval 0x5A5020: an active effect of the archetype 33
+command,GetForceHitReaction,docs/openfallout/m16-damage-notes.md: eval 0x5A5B30 reads the byte at actor + 0x1B1
+command,GetKnockedState,docs/openfallout/m16-damage-notes.md: eval 0x5A08C0: the knock state of the process; 3 and 4 answer 1
+command,ResetFallDamageTimer,docs/openfallout/m16-damage-notes.md: exec 0x5D10A0 only reads the float at process + 0x544 (0x5D10F0)
+command,KillAllActors,docs/openfallout/m16-damage-notes.md: exec 0x5BE4F0 kills every character of the high process list with the actor Kill 0x89D900 (the killer is the optional parameter)
+command,GetVATSValue,docs/openfallout/m16-damage-notes.md: eval 0x594E40 (structure only: 18 values in a jump table at 0x5952BC over the state of V.A.T.S. at 0x11F2250)
+command,Dispel,M16 effects (docs/openfallout/m16-effects-notes.md): exec 0x5C20E0 (Fallout 3 0x5234A0) calls 0x824400 in the executable
+command,DispelAllSpells,M16 effects (docs/openfallout/m16-effects-notes.md): exec 0x5C2190 calls 0x8249D0, kinds 0x824A28 in the executable
+command,GetSpellUsageNum,M16 effects (docs/openfallout/m16-effects-notes.md): exec 0x5CEAF0, eval 0x5A24F0, sum at 0x822EB0 in the executable
+command,EvaluateSpellConditions,M16 effects (docs/openfallout/m16-effects-notes.md): exec 0x5D7B50 calls 0x8255A0, live update 0x8043F0 in the executable
+command,ScriptEffectElapsedSeconds,M16 effects (docs/openfallout/m16-effects-notes.md): exec 0x5C43A0 in the executable
+command,SelectPlayerSpell,M16 effects (docs/openfallout/m16-effects-notes.md): exec 0x5CD750 in the executable
+command,IncrementScriptedChallenge,M16 effects (docs/openfallout/m16-effects-notes.md): exec 0x5DFE30, central counter 0x5F5950 in the executable
+command,UnlockChallenge,M16 effects (docs/openfallout/m16-effects-notes.md): exec 0x5DEE30 in the executable
+command,GetChallengeCompleted,M16 effects (docs/openfallout/m16-effects-notes.md): exec 0x5DEEF0, eval 0x5A60F0, completed bit 0x5A6150 in the executable
+command,RemoveRecurringFromChallenge,M16 effects (docs/openfallout/m16-effects-notes.md): exec 0x5DEF90 in the executable
+command,ChallengeLocked,M16 effects (docs/openfallout/m16-effects-notes.md): exec 0x5DEE90, eval 0x5A6070, bit 0x5A60D0 in the executable
+command,ForceActiveQuest,M16 effects (docs/openfallout/m16-effects-notes.md): exec 0x5D9AC0, setter 0x9529D0 in the executable
+command,ResetQuest,M16 effects (docs/openfallout/m16-effects-notes.md): exec 0x5DA180 calls 0x60D720 in the executable
+command,KillQuestUpdates,M16 effects (docs/openfallout/m16-effects-notes.md): exec 0x5DE350 in the executable
+command,SetShowQuestItems,M16 effects (docs/openfallout/m16-effects-notes.md): exec 0x5C6AD0 in the executable
