@@ -9,6 +9,7 @@
 #include <gtest/gtest.h>
 
 #include <map>
+#include <optional>
 
 namespace
 {
@@ -306,6 +307,27 @@ namespace
         capped.mStages = { stage(20, 0, DestructionStage::capDamage), stage(20, 1, DestructionStage::disable) };
         EXPECT_FALSE(Rule::disables(capped, 20, 100));
         EXPECT_FALSE(Rule::disables(DestructionData(), 0, 100));
+    }
+
+    TEST(FalloutScriptDestructionTest, a_second_blow_through_the_cap_reaches_the_stage_under_it_and_stays_known_after_a_load)
+    {
+        // The first lethal blow stops at the cap at 50; the second goes on to the stage at 0 that disables the thing
+        DestructionData data;
+        data.mHealth = 100;
+        data.mStages = { stage(50, 0, DestructionStage::capDamage), stage(0, 1, DestructionStage::disable) };
+        EXPECT_FALSE(Rule::disables(data, 50, 100));
+        EXPECT_FALSE(Rule::disables(data, 51, 100));
+        EXPECT_TRUE(Rule::disables(data, 0, 100));
+        EXPECT_TRUE(Rule::disables(data, 20, 100));
+
+        // The same as a thing is hit twice and then loaded again
+        const DestructionOutcome first = Rule::damage(data, 100, 100, 100, std::nullopt);
+        EXPECT_FALSE(first.mDisable);
+        EXPECT_DOUBLE_EQ(first.mHealth, 50);
+        const DestructionOutcome second = Rule::damage(data, 100, first.mHealth, 100, std::nullopt);
+        EXPECT_TRUE(second.mDisable);
+        EXPECT_DOUBLE_EQ(second.mHealth, 0);
+        EXPECT_TRUE(Rule::disables(data, second.mHealth, 100));
     }
 
     TEST(FalloutScriptDestructionTest, what_a_stage_disabled_is_told_from_the_health_and_a_clear_takes_it_back)

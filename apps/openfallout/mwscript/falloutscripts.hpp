@@ -119,6 +119,7 @@ namespace ESM4
 {
     struct AIPackage;
     struct Armor;
+    struct Creature;
     struct IdleAnimation;
     struct Weapon;
 }
@@ -317,6 +318,10 @@ namespace OFScript
         FalloutScript::LevelledLists& levelledLists() { return mLevelledLists; }
         /// Whether the record of the character or creature has the flag that makes it come back when its cell resets
         bool respawnsByRecord(FalloutScript::FormId actor);
+        /// The same for the record that a reference shows. The flag is part of the base data, which a template can give,
+        /// so it is read from the record that has the base data of the chain of templates.
+        bool respawnsAsRecord(const ESM4::Npc& record, FalloutScript::FormId reference);
+        bool respawnsAsRecord(const ESM4::Creature& record, FalloutScript::FormId reference);
         /// Whether the record of the container has the flag that makes it fill again when its cell resets
         bool respawnsContainerByRecord(FalloutScript::FormId container);
         /// The reference of the player

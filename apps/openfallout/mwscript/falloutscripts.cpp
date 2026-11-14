@@ -2655,6 +2655,30 @@ namespace OFScript
         return false;
     }
 
+    bool FalloutScripts::respawnsAsRecord(const ESM4::Npc& record, FalloutScript::FormId reference)
+    {
+        if (!record.mIsFONV)
+            return false;
+        // The seed and the roll are those of essentialByRecord: a levelled list of characters gives the one that the
+        // cell shows for this reference
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(reference), record.mId);
+        return (templateRecordOf(mStore, record, ESM4::Npc::Template_UseBaseData, seed, rollOf(reference))
+                       .mBaseConfig.fo3.flags
+                   & ESM4::Npc::FO3_Respawn)
+            != 0;
+    }
+
+    bool FalloutScripts::respawnsAsRecord(const ESM4::Creature& record, FalloutScript::FormId reference)
+    {
+        if (!record.mIsFONV)
+            return false;
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(reference), record.mId);
+        return (templateRecordOf(mStore, record, ESM4::Creature::Template_UseBaseData, seed, rollOf(reference))
+                       .mBaseConfig.fo3.flags
+                   & ESM4::Creature::FO3_Respawn)
+            != 0;
+    }
+
     std::optional<FalloutScript::CombatState::Relation> FalloutScripts::recordedRelation(
         FalloutScript::FormId first, FalloutScript::FormId second)
     {
