@@ -227,11 +227,14 @@ namespace OFScript
     {
         // 0x973460: of the actors that are loaded, those that are characters (the virtual at +0x218 is false for a creature)
         // and see the subject in full (the level of detection 3, 0x8A81E0), except one that fights the subject already (its
-        // combat target is the subject, 0x973550). The actor is not itself in the list that is asked.
+        // combat target is the subject, 0x973550). The actor is not itself in the list that is asked. A dead or unconscious
+        // character is in the list (it is loaded) but sees nothing: its level of detection is not asked.
         for (const FalloutScript::Witness& witness : watchers(0))
         {
             FalloutScript::ActorTraits traits;
             if (witness.mActor == actor || (mHost.traitsOf(witness.mActor, traits) && traits.mCreature))
+                continue;
+            if (mHost.mActors.isDead(witness.mActor) || mHost.mCombat.unconscious(witness.mActor))
                 continue;
             if (mHost.mCombat.target(witness.mActor) == actor)
                 continue;

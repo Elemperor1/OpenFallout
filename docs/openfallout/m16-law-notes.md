@@ -179,7 +179,9 @@ actor list holds no Fallout character (they live in `FalloutActors`), so witness
 - CreateDetectionEvent (0x5D...) was not read.
 - Perk entry point 14 for the disposition: the perk system has no entry point list for it yet (`adjustDisposition` is the
   identity).
-- IsActorDetected and GetActorCrimePlayerEnemy are approximations of 0x973460 and 0x5A4930.
+- IsActorDetected and GetActorCrimePlayerEnemy are approximations of 0x973460 and 0x5A4930. IsActorDetected leaves out the
+  characters that are dead or unconscious (they are loaded, so they are in the list, but they see nothing); whether the executable
+  does that in the list or in the level of detection it asks was not read.
 - The Pip-Boy General tab has no reputation lines: the page is the game's own menu file, whose general-tab tiles were not
   read, so the lines were not wired. The data is there (`Reputation`, `core.combat.law`).
 - The Fallout 3 death routine was not read separately: the kill karma uses the New Vegas routine's shape with the three
