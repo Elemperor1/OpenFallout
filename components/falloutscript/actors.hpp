@@ -127,8 +127,9 @@ namespace FalloutScript
         /// Marks the actor dead (killed by `killer`, 0 when no one is known) or alive again. An actor that was alive
         /// is told in takeDeaths(). True when this call changed the state: of two calls at once that kill the same
         /// actor, only one gets true. `limb` is the part of the body the killing blow struck, -1 when none did (a
-        /// script killed the actor) or it is not known.
-        bool setDead(FormId actor, bool dead, FormId killer = 0, int limb = -1);
+        /// script killed the actor) or it is not known. `weapon` is what the killing blow was struck with, which is told
+        /// with the death (the killer may not hold it any more when the death is told).
+        bool setDead(FormId actor, bool dead, FormId killer = 0, int limb = -1, FormId weapon = 0);
         /// Kills the actor as the game's Kill does (KillActor): one that is dead already stays so, one that the host
         /// lets fall instead of dying (an essential one) falls and does not die, and any other dies. True when this
         /// call made the actor dead.
@@ -163,6 +164,8 @@ namespace FalloutScript
         {
             FormId mActor = 0;
             FormId mKiller = 0;
+            /// The weapon of the blow that killed it, 0 for a death that no blow caused (or by the hands)
+            FormId mWeapon = 0;
         };
         /// The actors that died since this was last called (the first 1024 kept): the game raises their OnDeath blocks
         /// when it is ready for scripts to run, not in the middle of one.

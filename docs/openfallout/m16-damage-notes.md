@@ -23,6 +23,12 @@ reference (0x579220). The data:
 | `DMDL`, `DMDT`, `DMDS` | the model of the stage, its texture hashes, its texture set |
 
 - Health is kept in the extra data type 0x56 (ExtraHealth). A thing that has no extra data has its full health, the `DEST` health.
+- For a character the function reads the actor value Health (the getter at vtable 8 of the value owner at +0xA4, with the number 0x10) as
+  the health after the blow, and writes its result (including a health stopped by a cap stage) only into ExtraHealth (0x5D43C0, 0x41B6E0):
+  none of its calls sets an actor value. So a cap stage does not keep a character alive that the blow has taken to 0 health; the port
+  does the same (the death comes from the actor value), and `GetDestructionStage` of such a character follows the capped health.
+- Whether a stage has taken a thing out of the world is told from its health and its stages (`DestructionRule::disables`), so a loaded game
+  knows it without a saved mark (ClearDestruction after a load puts the thing back).
 - The percentage is the low byte of `ceil(health * 100 / max)`: a float32 intermediate, and the maximum is widened without a sign (the
   ceiling is the helper at 0x476B20). A health above the most wraps around. A thing that has some health left is never counted as 0.
 - A stage is crossed by a blow when `percent < before && percent >= after`. The stage's flags then act: 1 stops the health at the stage's
@@ -141,3 +147,16 @@ stage (i32), the hour of death (f64).
 - `bDisableAllGore`, the gore-less creature kinds, and the checks at 0x87F3D0 and vtable 0x1A0 in the apply function are not modelled. The
   list of the parts of an explosion's source (0x9B1720) comes only from the host and is not filled.
 - Causes of death 4 and 5 (hazard and poison) are not produced.
+
+## Review fixes
+
+- The cause of death and the killing weapon are kept for every kill: `goreOfKill` records the cause before the gore guards, and the death queue
+  carries the weapon of the killing blow (actors section version 2; version 1 saves load with no weapon), so a kill challenge asks the weapon
+  of the blow and not the one in the hands when the death is told.
+- `GetTimeDead` and the hour of death count the world's whole days times 24 plus the hour of the day (the executable floors the days
+  passed, a number with a fraction there, times 24: 0x867E30).
+- `ClearDestruction` after a load: a stage that disabled a thing is told from its health and stages (`DestructionRule::disables`), the model of
+  a stage is given to an object made by a script when the load makes it (`adoptObject`), and the clear's work (model, mark) is done in the queued
+  action, in the order of the blows before it. A blow and a clear change the state and the destroyed mark under one lock.
+- `FireWeapon` puts a standing `UseWeapon` order aside for the shot and gives it back after it.
+

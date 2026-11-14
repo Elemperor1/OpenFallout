@@ -185,15 +185,16 @@ namespace OFScript
                     return 1.0;
             return 0.0;
         });
-        // GetTimeDead: the hours since the character died (whole hours of the game, as the executable counts them),
-        // 0 for one that is not dead. 0x5A3A30.
+        // GetTimeDead: the hours since the character died (whole hours of the game, as the executable counts them: the
+        // days passed with their fraction times 24, floored, which here is the days and the hour of the day), 0 for one
+        // that is not dead. 0x5A3A30.
         mInterpreter.setHandler("GetTimeDead", [this](FalloutScript::CallContext& call) {
             if (call.mReference == 0 || !isActor(call.mReference) || !mActors.isDead(call.mReference))
                 return 0.0;
             const double died = mDismemberment.deathHour(call.mReference);
             if (!(died > 0))
                 return 0.0;
-            return std::floor(gameDaysPassed() * 24.0) - died;
+            return FalloutScript::DismemberRule::wholeHours(gameDaysPassed(), gameHour()) - died;
         });
         // IsKillerObject: the character is dead and the form is what killed it (or a list that has it). 0x5A3FA0.
         mInterpreter.setHandler("IsKillerObject", [this](FalloutScript::CallContext& call) {
@@ -272,7 +273,7 @@ namespace OFScript
 
     void FalloutScripts::noteDeathTime(FalloutScript::FormId actor)
     {
-        mDismemberment.setDeathHour(actor, std::floor(gameDaysPassed() * 24.0));
+        mDismemberment.setDeathHour(actor, FalloutScript::DismemberRule::wholeHours(gameDaysPassed(), gameHour()));
     }
 
     void FalloutScripts::destructionChanged(
@@ -350,13 +351,15 @@ namespace OFScript
 
     void FalloutScripts::destructionRestored(FalloutScript::FormId reference)
     {
-        const bool changed = OFClass::ModelOverrides::get().set(worldIdOf(reference), {});
-        bool wasDisabled = false;
-        {
-            const std::lock_guard lock(mDamageMutex);
-            wasDisabled = mDisabledByDestruction.erase(reference) != 0;
-        }
-        runOnMainThread([this, reference, changed, wasDisabled] {
+        // The model goes back and the mark of a disabled thing is taken in the queued action, in the order of the queue: a
+        // blow of another thread that is still waiting there is undone by it, not left on top of it
+        runOnMainThread([this, reference] {
+            const bool changed = OFClass::ModelOverrides::get().set(worldIdOf(reference), {});
+            bool wasDisabled = false;
+            {
+                const std::lock_guard lock(mDamageMutex);
+                wasDisabled = mDisabledByDestruction.erase(reference) != 0;
+            }
             const OFWorld::Ptr ptr = findReference(reference);
             if (ptr.isEmpty() || !ptr.isInCell())
                 return;
@@ -373,11 +376,31 @@ namespace OFScript
         // before their cells are loaded, so the scene takes them
         for (const FalloutScript::FormId reference : mDestruction.damaged())
         {
-            const int stage = mDestruction.modelStage(reference);
-            FalloutScript::DestructionData data;
-            if (stage >= 0 && mDestruction.dataOf(reference, data) && stage < static_cast<int>(data.mStages.size()))
-                OFClass::ModelOverrides::get().set(worldIdOf(reference), data.mStages[stage].mModel);
+            // What a stage took out of the world is told from the health, since the mark of it is not saved: a clear of
+            // the destruction after a load puts the thing back
+            if (mDestruction.disabledByStage(reference))
+            {
+                const std::lock_guard lock(mDamageMutex);
+                mDisabledByDestruction.insert(reference);
+            }
+            // (what scripts made while the game was played is not known to the world yet: adoptObject shows it when it is)
+            constexpr FalloutScript::FormId madeWhilePlaying = 0xFF000000u;
+            if ((reference & madeWhilePlaying) != madeWhilePlaying)
+                showSavedDamage(reference, OFWorld::Ptr());
         }
+    }
+
+    void FalloutScripts::showSavedDamage(FalloutScript::FormId reference, const OFWorld::Ptr& placed)
+    {
+        const int stage = mDestruction.modelStage(reference);
+        FalloutScript::DestructionData data;
+        if (stage < 0 || !mDestruction.dataOf(reference, data) || stage >= static_cast<int>(data.mStages.size()))
+            return;
+        const bool changed = OFClass::ModelOverrides::get().set(worldIdOf(reference), data.mStages[stage].mModel);
+        // A thing that is in the scene already (an object that a load made, in a cell that is loaded) shows the model it
+        // had when it went in: out and in again takes the model of the stage
+        if (changed && !placed.isEmpty() && placed.isInCell() && placed.getRefData().isEnabled() && !isActorRecord(placed))
+            reinsertObject(placed);
     }
 
     void FalloutScripts::resetDamage()
@@ -401,7 +424,13 @@ namespace OFScript
         namespace AV = FalloutScript::ActorValue;
         // The rule runs for the blow that killed (0x899CB0 calls it with what the actor's damage function answered)
         const FalloutScript::DismemberSettings settings = dismemberSettings();
-        if (settings.mGoreOff || victim == 0 || victim == mPlayer)
+        if (victim == 0)
+            return;
+        // What the blow came from is kept for every kill, whether or not it takes a limb off (0x89C0B1 stores the cause
+        // with the death, not with the gore): a shot is a projectile and a swing the weapon itself
+        mDismemberment.recordDeath(victim,
+            FalloutScript::DismemberRule::causeOf(false, !melee && weapon != 0, melee), attacker);
+        if (settings.mGoreOff || victim == mPlayer)
             return;
         const std::vector<FalloutScript::BodyPart> parts = mLimbs.partsOf(victim);
         // The blow's limb must have no condition left, or have none (the executable skips the rule for a limb that still
@@ -414,10 +443,6 @@ namespace OFScript
             return;
         if (!mDismemberment.takeSlot(settings.mPerFrame))
             return;
-
-        // What the blow came from: a shot is a projectile and a swing the weapon itself
-        mDismemberment.recordDeath(victim,
-            FalloutScript::DismemberRule::causeOf(false, !melee && weapon != 0, melee), attacker);
 
         FalloutScript::DismemberHit hit;
         hit.mLimb = limb;
@@ -490,18 +515,20 @@ namespace OFScript
             const FalloutScript::FormId opponent = mCombat.target(actor);
             const OFWorld::Ptr target = opponent != 0 ? findReference(opponent) : OFWorld::Ptr();
             // The shot is the one of an order of UseWeapon that has one attack: it holds the weapon that was named and
-            // takes no round of ammunition
-            const bool hadOrder = mScriptedAttacks.count(actor) != 0;
-            if (!hadOrder)
-            {
-                FalloutScript::UseWeaponOrder order;
-                order.mWeapon = weapon;
-                order.mAttacks = 1;
-                order.mAlwaysHit = true;
-                mScriptedAttacks[actor] = ScriptedOrder{ order, 0, ++mScriptedSerial };
-            }
+            // takes no round of ammunition. An order the character has already (for another weapon, or for no damage)
+            // is put aside for the shot and comes back after it, as it was.
+            std::optional<ScriptedOrder> previous;
+            if (const auto found = mScriptedAttacks.find(actor); found != mScriptedAttacks.end())
+                previous = found->second;
+            FalloutScript::UseWeaponOrder order;
+            order.mWeapon = weapon;
+            order.mAttacks = 1;
+            order.mAlwaysHit = true;
+            mScriptedAttacks[actor] = ScriptedOrder{ order, 0, ++mScriptedSerial };
             const FireResult result = fire(actor, target, -1, 1.0, true, false);
-            if (!hadOrder)
+            if (previous)
+                mScriptedAttacks[actor] = *previous;
+            else
                 mScriptedAttacks.erase(actor);
             Log(Debug::Info) << "FireWeapon: " << FalloutScript::hex(actor) << " fires " << FalloutScript::hex(weapon)
                              << (result.mFired ? "" : ", it did not fire") << (result.mHit ? ", it hit " : ", it hit no one")

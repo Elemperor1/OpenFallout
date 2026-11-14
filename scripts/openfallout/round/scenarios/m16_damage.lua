@@ -86,7 +86,7 @@ return { limit = 900, delay = 4, run = function(r)
     local function kill(who, label, limb, weaponForm)
         for blow = 1, 20 do
             local ok, result = pcall(r.core.combat.strike, pid, r.form(who), weaponForm or '', limb)
-            if not ok then r.log('L ' .. label .. ' strike error ' .. tostring(result)) break end
+            if not ok then r.error('L ' .. label .. ' strike error ' .. tostring(result)) break end
             if result.killed then
                 r.log(string.format('L %s killed by blow %d at limb %d (crippled %s)', label, blow, limb, tostring(result.crippled)))
                 return true
@@ -146,7 +146,7 @@ return { limit = 900, delay = 4, run = function(r)
     phase('E energy kill')
     cmd('ResurrectActor', r.form(g1), 1)
     r.wait(1)
-    kill(g1, 'laser g1', -1, LASER)
+    if not kill(g1, 'laser g1', -1, LASER) then r.error('E the laser kill of g1 did not happen') end
     r.core.combat.forgetLimbs(r.form(g1))
     r.log('E critical stage before: ' .. tostring(cmd('IsInCriticalStage', r.form(g1), 3)))
     cmd('SetCriticalStage', r.form(g1), 3)
