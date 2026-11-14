@@ -75,7 +75,9 @@ script's entries put in. `FalloutScript::LevelledLists` keeps the additions (the
   (flag 1 of its record, or `SetZoneRespawns zone, 0`) keeps its cells as they are.
 - A character that is dead comes back when more than the hours passed since it died and its zone does not forbid it (0x881C90); a living
   one is always up to be made new. Only a character whose record has the flag that makes it respawn (bit 8 of the first dword of its ACBS)
-  comes back (chosen from the record layout; the executable's own test of the flag was not read).
+  comes back (chosen from the record layout; the executable's own test of the flag was not read). The flag is part of the base data, so a
+  record that takes its base data from a template (`Template_UseBaseData`) is judged by the flag of the record at the end of its chain of
+  templates, the same record that the essential flag is read from (`respawnsAsRecord`).
 - What the host does for a character that comes back: alive again with its health (the same two steps as `ResurrectActor`), a new
   inventory (its levelled lists are rolled again with a different seed: `inventoryGeneration`), and a container with the respawn flag of
   its record (bit 2 of the container's data flags, chosen from the record layout) is filled again the same way.
@@ -92,7 +94,8 @@ script's entries put in. `FalloutScript::LevelledLists` keeps the additions (the
   29 ingredients are the numbers of the executable's form types) and not in the form list of the exceptions to the destination, or out
   of the game (0x5B55A0, 0x4CE380). The copies move with their condition.
 - `ResetInventory` (0x5DAC60) asks the holder to rebuild its inventory from its record: what scripts did to it is forgotten and the
-  lists in it are rolled again. `SetZoneRespawns zone, value` sets or clears the flag that says the zone never resets (value 0 sets it,
+  lists in it are rolled again, and what the character wears is forgotten so that it is dressed from its record again (as for a
+  character that comes back by respawn). `SetZoneRespawns zone, value` sets or clears the flag that says the zone never resets (value 0 sets it,
   0x5DAB90). `PurgeCellBuffers` (0x5B6CD0) drops memory the games keep: nothing is kept here, so nothing is done.
 - `GetInCellParam cell, reference` is `GetInCell` for another reference (0x59EF60; exec 0x5C7590); `GetParentRef` gives the reference
   that enables the calling one (the enable parent of its record: 0x5CE630); `GetContainerInventoryCount` is the total of the items
@@ -174,7 +177,10 @@ with 0 scenario errors and the engine never frontmost (Fallout 3: 131 s from a n
 - Flora and ingredient resets (the plants that grow back) are not modelled.
 - `RemoveAllTypedItems`: the handling of equipped and quest items, of ownership and of the message that the executable adds when the
   destination is the player are chosen, not read.
-- `PlaceAtMeHealthPercent` places the objects like `PlaceAtMe`; the health is not applied (nothing in the world has a condition).
+- `PlaceAtMeHealthPercent` places the objects like `PlaceAtMe`; the health fraction (argument 1) is read and dropped. Applying it is not
+  done: the placement interface (`ObjectWorld::placeAtMe`, the pending request of the host and its saved form) carries no health, and
+  what the fraction would set differs by kind (the health of a character, the destruction state of a breakable object, the condition of
+  an item that has no stack to hold it while it lies in the world).
 - `GetIsLockBroken`, `DuplicateNPCStats` and `PlaceAtReticle` have no handler (optional in the package).
 - A character that the cell places from a list rolls at the fixed level 5, as before: the cell resolves its list when it loads, before
   a level could be known.

@@ -262,9 +262,14 @@ namespace OFScript
             return found == mItemHolders.end() ? 0.0 : static_cast<double>(found->second);
         });
         // Whether the character moves with the stance of sneaking: the player's stance is the key it holds, and the
-        // others do not sneak (a package that makes them is not read yet)
+        // others sneak when a script forced them to (SetForceSneak: the gait their walk and their animation follow); a
+        // package that makes them is not read yet
         mInterpreter.setHandler("IsSneaking", [this](FalloutScript::CallContext& call) {
-            if (call.mReference == 0 || call.mReference != mPlayer || std::this_thread::get_id() != mMainThread)
+            if (call.mReference == 0)
+                return 0.0;
+            if (call.mReference != mPlayer)
+                return mActorStatus.overrideOf(call.mReference).mForceSneak ? 1.0 : 0.0;
+            if (std::this_thread::get_id() != mMainThread)
                 return 0.0;
             const OFWorld::Ptr body = OFBase::Environment::get().getWorld()->getPlayerPtr();
             return !body.isEmpty() && OFBase::Environment::get().getMechanicsManager()->isSneaking(body) ? 1.0 : 0.0;
@@ -2666,6 +2671,30 @@ namespace OFScript
                        & ESM4::Creature::FO3_Essential)
                 != 0;
         return false;
+    }
+
+    bool FalloutScripts::respawnsAsRecord(const ESM4::Npc& record, FalloutScript::FormId reference)
+    {
+        if (!record.mIsFONV)
+            return false;
+        // The seed and the roll are those of essentialByRecord: a levelled list of characters gives the one that the
+        // cell shows for this reference
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(reference), record.mId);
+        return (templateRecordOf(mStore, record, ESM4::Npc::Template_UseBaseData, seed, rollOf(reference))
+                       .mBaseConfig.fo3.flags
+                   & ESM4::Npc::FO3_Respawn)
+            != 0;
+    }
+
+    bool FalloutScripts::respawnsAsRecord(const ESM4::Creature& record, FalloutScript::FormId reference)
+    {
+        if (!record.mIsFONV)
+            return false;
+        const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(reference), record.mId);
+        return (templateRecordOf(mStore, record, ESM4::Creature::Template_UseBaseData, seed, rollOf(reference))
+                       .mBaseConfig.fo3.flags
+                   & ESM4::Creature::FO3_Respawn)
+            != 0;
     }
 
     std::optional<FalloutScript::CombatState::Relation> FalloutScripts::recordedRelation(
