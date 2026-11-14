@@ -12,7 +12,8 @@ namespace FalloutScript
         return mDone == other.mDone && mPackage == other.mPackage && mChangeTold == other.mChangeTold
             && mFollows == other.mFollows && mFollowsPlayer == other.mFollowsPlayer
             && mFollowTarget == other.mFollowTarget && mFollowDistance == other.mFollowDistance
-            && mDurationHundredths == other.mDurationHundredths && mStartedHours == other.mStartedHours;
+            && mDurationHundredths == other.mDurationHundredths && mStartedHours == other.mStartedHours
+            && mExpired == other.mExpired;
     }
 
     void AiMemory::clear()
@@ -71,6 +72,7 @@ namespace FalloutScript
             out.f32(state.mFollowDistance);
             out.f64(state.mDurationHundredths);
             out.f64(state.mStartedHours);
+            out.boolean(state.mExpired);
         }
     }
 
@@ -99,6 +101,9 @@ namespace FalloutScript
                 state.mDurationHundredths = in.f64();
                 state.mStartedHours = in.f64();
             }
+            // (a game saved before the reason for a done package was kept has none that ran out)
+            if (version >= 3)
+                state.mExpired = in.boolean();
             // The one it followed is gone with its plugin: it follows no one
             if (state.mFollows && !state.mFollowsPlayer && !target)
                 state.mFollows = false;

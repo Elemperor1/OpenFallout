@@ -371,7 +371,8 @@ namespace OFScript
                 FalloutScript::DispositionInput input;
                 int now = 0;
                 if (dispositionInput(victim, mHost.mPlayer, input))
-                    now = mStanding.disposition(victim, mHost.mPlayer, input);
+                    now = mStanding.disposition(victim, mHost.mPlayer, input,
+                        [this, victim](double value) { return adjustDisposition(victim, mHost.mPlayer, value); });
                 mStanding.modifyDisposition(victim, mHost.mPlayer, outcome.mVictimDisposition, now);
             }
             if (outcome.mCrime != 0 || !outcome.mEnemies.empty())
@@ -418,7 +419,9 @@ namespace OFScript
         FalloutScript::DispositionInput input;
         if (!dispositionInput(self, mHost.mPlayer, input))
             return -1;
-        return mStanding.disposition(self, mHost.mPlayer, input);
+        // With the perks that change it, as GetDisposition does, so that the answers of both agree
+        return mStanding.disposition(
+            self, mHost.mPlayer, input, [this, self](double value) { return adjustDisposition(self, mHost.mPlayer, value); });
     }
 
     double LawGlue::adjustDisposition(FormId self, FormId other, double value)

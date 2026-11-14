@@ -449,7 +449,8 @@ namespace FalloutScript
         std::vector<Crime> mCrimes;
         int mNextCrime = 1;
         double mClock = 0;
-        /// Forgets the crimes that `drop` picks and gives the factions that no crime holds any more (0x9722E0)
+        /// Forgets the crimes that `drop` picks and gives the factions that no crime holds any more (0x9722E0). `drop`
+        /// is called with the lock held.
         std::vector<FormId> forget(const std::function<bool(const Crime&)>& drop);
         std::map<FormId, Trespass> mTrespass;
         FormId mLineVictim = 0;

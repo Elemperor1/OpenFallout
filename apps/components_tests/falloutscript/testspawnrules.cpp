@@ -387,13 +387,17 @@ namespace
         state.died(actor, 80);
         state.setZoneNeverResets(0x01000C00, true);
         state.resetInventory(actor);
+        ASSERT_TRUE(state.merchantRestocks(0x01000100, 7));
         SaveWriter out;
         state.write(out);
 
         RespawnState loaded;
         SaveReader in(out.bytes());
-        loaded.read(in, 1);
+        loaded.read(in, 3);
         EXPECT_TRUE(in.atEnd());
+        // A merchant that was restocked today is not restocked again by a load on the same day
+        EXPECT_FALSE(loaded.merchantRestocks(0x01000100, 7));
+        EXPECT_TRUE(loaded.merchantRestocks(0x01000100, 10));
         EXPECT_TRUE(loaded.cellResets(cell, 173, false));
         EXPECT_FALSE(loaded.cellResets(cell, 172, false));
         EXPECT_TRUE(loaded.cellResets(0x01000A01, 0, true));
@@ -405,6 +409,24 @@ namespace
         EXPECT_FALSE(loaded.wasDetached(cell));
     }
 
+    TEST(FalloutScriptRespawnTest, aSaveFromBeforeTheMerchantDaysWereKeptLoadsWithoutThem)
+    {
+        // The sections of versions 1 and 2 end after the inventory generations
+        SaveWriter out;
+        out.count(0);
+        out.count(0);
+        out.count(0);
+        out.count(1);
+        out.form(actor);
+        out.i32(2);
+        RespawnState loaded;
+        SaveReader in(out.bytes());
+        loaded.read(in, 2);
+        EXPECT_TRUE(in.atEnd());
+        EXPECT_EQ(loaded.inventoryGeneration(actor), 2);
+        EXPECT_TRUE(loaded.merchantRestocks(0x01000100, 7));
+    }
+
     TEST(FalloutScriptRespawnTest, aSaveThatIsCutShortIsAnError)
     {
         RespawnState state;
@@ -414,6 +436,6 @@ namespace
         const std::string cut = out.bytes().substr(0, 6);
         RespawnState loaded;
         SaveReader in(cut);
-        EXPECT_THROW(loaded.read(in, 1), SaveError);
+        EXPECT_THROW(loaded.read(in, 3), SaveError);
     }
 }

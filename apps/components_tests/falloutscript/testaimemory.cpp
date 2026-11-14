@@ -103,6 +103,53 @@ namespace
         EXPECT_EQ(loaded.find(clerk)->mDurationHundredths, 100.0);
     }
 
+    TEST(FalloutScriptAiMemoryTest, a_package_that_ran_out_is_known_as_one_after_a_saved_game)
+    {
+        AiMemory memory;
+        AiState expired = stateWithPackages();
+        expired.mExpired = true;
+        memory.set(guard, expired);
+        memory.set(clerk, stateWithPackages());
+        EXPECT_FALSE(*memory.find(clerk) == expired);
+
+        SaveWriter out;
+        FalloutScript::writeAi(memory, out);
+        const std::string bytes = out.take();
+        AiMemory loaded;
+        SaveReader in(bytes);
+        FalloutScript::readAi(loaded, in, FalloutScript::aiSectionVersion);
+        EXPECT_TRUE(in.atEnd());
+        EXPECT_TRUE(loaded.find(guard)->mExpired);
+        EXPECT_FALSE(loaded.find(clerk)->mExpired);
+    }
+
+    TEST(FalloutScriptAiMemoryTest, a_saved_game_from_before_the_reason_was_kept_has_no_package_that_ran_out)
+    {
+        // Version 2: the duration is there and the reason is not
+        SaveWriter out;
+        out.count(1);
+        out.form(guard);
+        out.count(1);
+        out.form(greet);
+        out.form(patrol);
+        out.boolean(true);
+        out.boolean(false);
+        out.boolean(false);
+        out.form(0);
+        out.f32(0.f);
+        out.f64(250.0);
+        out.f64(1234.5);
+        const std::string bytes = out.take();
+
+        AiMemory loaded;
+        SaveReader in(bytes);
+        FalloutScript::readAi(loaded, in, 2);
+        EXPECT_TRUE(in.atEnd());
+        ASSERT_TRUE(loaded.find(guard).has_value());
+        EXPECT_EQ(loaded.find(guard)->mDurationHundredths, 250.0);
+        EXPECT_FALSE(loaded.find(guard)->mExpired);
+    }
+
     TEST(FalloutScriptAiMemoryTest, a_saved_game_from_before_the_duration_was_kept_loads_without_one)
     {
         SaveWriter out;

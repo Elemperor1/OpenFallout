@@ -45,7 +45,13 @@ has the same commands and was not read function by function), **seen in a runnin
   leveledTemplate, level, storedMod)`: finds the roll a reference has, or makes it once: a template that is a levelled list is rolled
   for `baseLevel` turned by the counter, times the modifier's multiplier; any other actor for the level of the player as it is (no
   counter step, no multiplier). The roll lives in the same table as the placements of `PlaceLeveledActorAtMe` and is therefore in the
-  save (section `spawn`, unchanged format).
+  save (section `spawn`, see below for its version).
+
+The `spawn` section is **version 3**. Version 1 held the levelled additions, the table of placements (the counter and the level and
+modifier of each reference), the respawn clocks, the item values and the names. Version 2 adds the levels that the zones locked, after
+the placements, which the table of the first wave did not have; version 3 adds the day each merchant was last restocked, after the
+inventory generations. A game saved as version 1 or 2 still loads: it has no zone locked yet (the next visit locks one) and no merchant
+restocked today (so a merchant whose day it is gets new stock once).
 - `FalloutScripts::placedActorRoll` (mwscript/falloutspawn.cpp) is what the provider of `ESM4::setSpawnRollProvider` asks for a
   reference of a cell: the zone chain, `zoneLevel`, the player's level. Everything that rolled "level 5" for a placed actor (the
   template chain, the worn armor, the inventory, the creature body parts) goes through that provider and now gets the real roll.
@@ -60,7 +66,8 @@ has the same commands and was not read function by function), **seen in a runnin
   stock: the exe asks the container of its merchandise (extra type 0x3C, the XMRC) for what `ResetInventory` asks (the virtual at
   +0x208, the one 0x5DAC60 calls). `RespawnState::merchantRestocks` says yes once per day per merchant;
   `FalloutScripts::updateSpawn` resets the inventory of the container of every loaded merchant. Chosen: the once-a-day bookkeeping
-  (the exe keeps a flag on the actor, byte +0x175, and compares the day of its process with today) and that the days are not saved.
+  (the exe keeps a flag on the actor, byte +0x175, and compares the day of its process with today); the day each merchant was last
+  restocked is saved (section `spawn` from version 3), so a load on the same day does not restock a merchant again.
 - Round tools: `core.spawn.template(reference)` (the records of the template chain for the roll the reference has), `quickSave()`,
   `itemValue(item)`, `zoneNeverResets(zone)`.
 
@@ -83,7 +90,12 @@ modifier multiplier and the floor of 1, an actor without a levelled template, fo
 merchant days), `FalloutScriptSpawnCommandsTest` (SetActorFullName keys the base record), `ESM4ActorReferenceTest` (XEZN and XLCM kept,
 and none when absent).
 
-The loaded rounds take `"save": "latest"`, the quicksave that the placement round wrote, so they run right after it; the placement rounds must start from a save that has not visited their cells (a zone level that was locked or a placement that was stored by an earlier visit shows as it was kept).
+The loaded rounds name `"save": "latest"`, which the runner resolves to the newest save of the profile's `saves` folder (the engine's own user-data
+folder, or the one given to `round.py profile --saves`). The placement round does not write there: its engine runs with a private
+`--user-data` folder, so its quicksave lands in `userdata/saves/<character>/` of the placement run's own folder under the profile's `out`.
+To load that quicksave, hand it over on the command line (the `--save` of `round.py run` takes a file and replaces the round's value),
+for example `round.py run rounds/m16-spawn2-loaded-nv.json --save <run folder of the placement round>/userdata/saves/<character>/<quicksave>.omwsave`;
+`round.py check` shows which save a run would use. Run without `--save`, the loaded round loads whatever save is newest in the profile's folder, which is the wrong state. The placement rounds must start from a save that has not visited their cells (a zone level that was locked or a placement that was stored by an earlier visit shows as it was kept).
 
 Hidden real-data rounds (`rounds/m16-spawn2-placed-{nv,fo3}.json` with `scenarios/m16_spawn2_placed.lua`; `rounds/m16-spawn2-loaded-{nv,fo3}.json`
 with `scenarios/m16_spawn2_loaded.lua`); all PASS, 0 scenario errors, the engine never frontmost. The scenario enters interior cells that
