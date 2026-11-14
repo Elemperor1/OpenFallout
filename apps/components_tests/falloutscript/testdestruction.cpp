@@ -307,6 +307,23 @@ namespace
         capped.mStages = { stage(20, 0, DestructionStage::capDamage), stage(20, 1, DestructionStage::disable) };
         EXPECT_FALSE(Rule::disables(capped, 20, 100));
         EXPECT_FALSE(Rule::disables(DestructionData(), 0, 100));
+        // A second blow that takes the thing under the cap does not reach the stage that has the cap's own percentage
+        // either (it starts at the cap, which is not below it), so the health tells the same as the blows did
+        const DestructionOutcome first = Rule::damage(capped, 100, 100, 100, std::nullopt);
+        EXPECT_FALSE(first.mDisable);
+        EXPECT_DOUBLE_EQ(first.mHealth, 20);
+        const DestructionOutcome second = Rule::damage(capped, 100, first.mHealth, 1, std::nullopt);
+        EXPECT_FALSE(second.mDisable);
+        EXPECT_DOUBLE_EQ(second.mHealth, 19);
+        EXPECT_FALSE(Rule::disables(capped, second.mHealth, 100));
+        // A stage under the cap that is also listed at its percentage is reached by a blow that goes on through it
+        DestructionData below;
+        below.mHealth = 100;
+        below.mStages = { stage(20, 0, DestructionStage::capDamage), stage(20, 1, DestructionStage::disable),
+            stage(10, 2, DestructionStage::disable) };
+        EXPECT_FALSE(Rule::disables(below, 19, 100));
+        EXPECT_TRUE(Rule::disables(below, 10, 100));
+        EXPECT_TRUE(Rule::damage(below, 100, 20, 15, std::nullopt).mDisable);
     }
 
     TEST(FalloutScriptDestructionTest, a_second_blow_through_the_cap_reaches_the_stage_under_it_and_stays_known_after_a_load)

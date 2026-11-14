@@ -52,17 +52,25 @@ namespace FalloutScript
             int after = percent(health, maxHealth);
             if (after == 0 && health > 0)
                 after = 1;
+            // Once a cap was blown through, the stages at its own percentage or above that come after it in the list were
+            // never crossed: the blow that stopped at the cap broke off there, and the blow that went on starts at the
+            // cap, which is not below it
+            int blownThrough = 256;
             for (const DestructionStage& stage : data.mStages)
             {
                 const int percentOfStage = std::clamp(stage.mHealthPercent, 0, 255);
-                if (percentOfStage >= before || percentOfStage < after)
+                if (percentOfStage >= before || percentOfStage < after || percentOfStage >= blownThrough)
                     continue;
                 if ((stage.mFlags & DestructionStage::disable) != 0)
                     return true;
-                // The health stops at a cap only while it is at the cap; a thing that is under it was blown through the
-                // cap by a later blow, which went on to the stages under it
-                if ((stage.mFlags & DestructionStage::capDamage) != 0 && percentOfStage <= after)
-                    break;
+                if ((stage.mFlags & DestructionStage::capDamage) != 0)
+                {
+                    // The health stops at a cap only while it is at the cap; a thing that is under it was blown through
+                    // the cap by a later blow, which went on to the stages under it
+                    if (percentOfStage <= after)
+                        break;
+                    blownThrough = std::min(blownThrough, percentOfStage);
+                }
             }
             return false;
         }
