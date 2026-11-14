@@ -55,7 +55,7 @@ restocked today (so a merchant whose day it is gets new stock once).
 - `FalloutScripts::placedActorRoll` (mwscript/falloutspawn.cpp) is what the provider of `ESM4::setSpawnRollProvider` asks for a
   reference of a cell: the zone chain, `zoneLevel`, the player's level. Everything that rolled "level 5" for a placed actor (the
   template chain, the worn armor, the inventory, the creature body parts) goes through that provider and now gets the real roll.
-- When a cell resets, the rolls of its living actors (and of dead ones that are due) are forgotten and the cached template data of the
+- When a cell resets, the rolls of its living actors (and of dead ones that are due and whose base has the respawn flag, which come back; a dead one that stays dead keeps what it has) are forgotten and the cached template data of the
   actor is dropped, so the next look rolls again for the player's level of that time (`spawnCellLoaded`).
 - `SetActorFullName` gives the name to the **base record** (0x5D1920 copies the full name of the form that is named into the base of
   the actor: +0xD0 of the actor's base, and marks it changed) and `ESM4Npc::getName` / `ESM4Creature::getName` return it, so every
