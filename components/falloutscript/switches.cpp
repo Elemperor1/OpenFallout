@@ -12,16 +12,12 @@ namespace FalloutScript
         // The commands whose effect is on something this engine does not have. They are accepted so that a script goes
         // on as it does in the games, and the log says once for each what is not done.
         constexpr IgnoredCommand ignored[] = {
-            { "TriggerScreenBlood", "the blood on the screen is not drawn" },
-            { "ClearScreenSplatter", "the blood on the screen is not drawn" },
             { "ResetPipboyManager", "the Pip-Boy keeps nothing that could be reset" },
             { "StartRadioConversation", "there is no radio" },
             { "SetCellImageSpace", "image spaces are not drawn" },
             { "MatchRace", "the race of a character does not change" },
             { "MatchFaceGeometry", "the face of a character does not change" },
             { "AgeRace", "the race of a character does not change" },
-            { "ResetInventory", "an inventory is not rebuilt from the form of the character" },
-            { "PlayBink", "videos are not played" },
             { "SetNoActivationSound", "an activation that does nothing makes no sound" },
             { "ClearNoActivationSound", "an activation that does nothing makes no sound" },
             { "SetActorAlpha", "the transparency of a character is not drawn" },
@@ -33,9 +29,6 @@ namespace FalloutScript
             { "PreloadMagicEffect", "there is nothing to load ahead for an effect" },
             { "ShowQuestStages", "the stages of a quest are written to the console of the games, which this engine does not feed" },
             { "SendAssaultAlarm", "there is no crime that could be reported" },
-            // The leveled lists that scripts add to are those of vendors and loot, which nothing here rolls (the only
-            // lists that are rolled are those of the armor that characters wear)
-            { "AddItemToLeveledList", "the lists that scripts add to (vendors, loot) are not rolled" },
             // Tale of Two Wastelands' own commands
             { "TTW_EnableRadioFix", "there is no radio to fix" },
             { "InitExtraMiscStat", "the extra statistics of Tale of Two Wastelands are not kept" },

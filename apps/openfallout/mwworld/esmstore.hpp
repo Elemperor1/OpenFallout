@@ -105,6 +105,7 @@ namespace ESM4
     struct DialogInfo;
     struct Dialogue;
     struct Door;
+    struct EncounterZone;
     struct Explosion;
     struct ImpactData;
     struct ImpactDataSet;
@@ -201,7 +202,7 @@ namespace OFWorld
             Store<ESM4::Challenge>, Store<ESM4::CaravanCard>, Store<ESM4::CaravanDeck>, Store<ESM4::CaravanMoney>, Store<ESM4::Cell>,
             Store<ESM4::Climate>, Store<ESM4::Clothing>, Store<ESM4::Container>, Store<ESM4::Creature>,
             Store<ESM4::DefaultObj>, Store<ESM4::DialogInfo>, Store<ESM4::Dialogue>, Store<ESM4::Door>,
-            Store<ESM4::Explosion>, Store<ESM4::Eyes>, Store<ESM4::Faction>, Store<ESM4::Furniture>, Store<ESM4::Flora>,
+            Store<ESM4::EncounterZone>, Store<ESM4::Explosion>, Store<ESM4::Eyes>, Store<ESM4::Faction>, Store<ESM4::Furniture>, Store<ESM4::Flora>,
             Store<ESM4::FormIdList>, Store<ESM4::GameSetting>, Store<ESM4::GlobalVariable>, Store<ESM4::Hair>,
             Store<ESM4::HeadPart>, Store<ESM4::IdleAnimation>, Store<ESM4::ImageSpaceModifier>, Store<ESM4::ImpactData>, Store<ESM4::ImpactDataSet>,
             Store<ESM4::Ingredient>,

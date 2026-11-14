@@ -1,0 +1,12 @@
+{
+  "name": "m16-world-misc",
+  "game": "nv",
+  "save": "latest",
+  "scenario": "../scenarios/m16_world_misc.lua",
+  "resolution": [1280, 720],
+  "framerate": 30,
+  "limit": 300,
+  "settings": { "Sound": { "master volume": "0" } },
+  "env": { "OPENFALLOUT_HEADLESS_SOUND": "1" },
+  "variants": [ { "name": "plain" } ]
+}

@@ -50,6 +50,28 @@ namespace FalloutScript
         mChanges.clear();
     }
 
+    void ActorState::resetItems(FormId id)
+    {
+        const std::lock_guard lock(mMutex);
+        const auto found = mHolders.find(id);
+        if (found == mHolders.end())
+            return;
+        Holder& entry = found->second;
+        for (const auto& [item, count] : entry.mItems)
+            if (count > 0)
+                noteChange(id, item, -count);
+        // Before the records could be asked what the holder has, the count that scripts gave it was its count
+        // (removeCountLocked takes from the same): the inventory is cleared of it as of the rest
+        if (!entry.mItemsKnown)
+            for (const auto& [item, edit] : entry.mItemEdits)
+                if (const std::int64_t pending = edit.apply(0); pending > 0)
+                    noteChange(id, item, -static_cast<int>(pending));
+        entry.mItems.clear();
+        entry.mWorn.clear();
+        entry.mItemEdits.clear();
+        entry.mItemsKnown = false;
+    }
+
     void ActorState::knowItems(FormId id, Holder& entry)
     {
         if (entry.mItemsKnown)

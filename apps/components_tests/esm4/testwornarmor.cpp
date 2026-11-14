@@ -430,7 +430,7 @@ namespace
         source.addGlobal(0x3001, 100.f);
         source.addGlobal(0x3002, 0.f);
         source.addGlobal(0x3003, 250.f);
-        source.addGlobal(0x3004, -4.f);
+        source.addGlobal(0x3004, -4.f); // a whole number's low byte is 252
         // The chance stored in the list is the opposite of what the global says, so that it shows which one counts
         source.addList(0x1010, { { 1, 0x1001 } }, 0, 0);
         source.addList(0x1011, { { 1, 0x1001 } }, 0, 100);
@@ -451,7 +451,7 @@ namespace
             EXPECT_TRUE(ESM4::wornArmor(source, alwaysNothing, playerLevel, seed, &trace).empty());
             EXPECT_FALSE(ESM4::wornArmor(source, alwaysSomething, playerLevel, seed, &trace).empty());
             EXPECT_TRUE(ESM4::wornArmor(source, aboveAHundred, playerLevel, seed, &trace).empty());
-            EXPECT_FALSE(ESM4::wornArmor(source, belowZero, playerLevel, seed, &trace).empty());
+            EXPECT_TRUE(ESM4::wornArmor(source, belowZero, playerLevel, seed, &trace).empty());
         }
         EXPECT_EQ(trace.mListsWithGlobalChance, 64u);
     }
@@ -669,6 +669,70 @@ namespace
         EXPECT_THAT(wornAcrossSeeds(source, first, 12), ElementsAre(std::set<std::uint32_t>{ 0x1002 }));
         EXPECT_THAT(wornAcrossSeeds(source, second, 3), ElementsAre(std::set<std::uint32_t>{ 0x1001 }));
         EXPECT_THAT(wornAcrossSeeds(source, second, 12), ElementsAre(std::set<std::uint32_t>{ 0x1002 }));
+    }
+
+    TEST(ESM4WornArmorTest, theLevelModifierOfAPlacementChoosesTheTemplateAmongTheEntriesBelowTheLevel)
+    {
+        TestSource source;
+        source.addArmor(0x1001, upperBody);
+        source.addArmor(0x1002, hat);
+        source.addNpc(0x2011, { 0x1001 });
+        source.addNpc(0x2012, { 0x1002 });
+        ESM4::LevelledNpc list{};
+        list.mId = id(0x2010);
+        list.mLvlObject.push_back({ 1, 0, 0x2011, 1, 0 });
+        list.mLvlObject.push_back({ 9, 0, 0x2012, 1, 0 });
+        source.mLevelledNpcs[id(0x2010)] = list;
+        const ESM4::Npc& npc = source.addNpc(0x2001, {}, ESM4::Npc::Template_UseInventory, 0x2010, 1);
+
+        std::set<std::set<std::uint32_t>> plain;
+        std::set<std::set<std::uint32_t>> modified;
+        for (std::uint32_t seed = 1; seed <= 64; ++seed)
+        {
+            plain.insert(ids(ESM4::wornArmor(source, npc, 12, seed)));
+            modified.insert(ids(ESM4::wornArmor(source, npc, 12, seed, nullptr, 1)));
+        }
+
+        // without a modifier only the entry of the highest level at or below the level is a choice
+        EXPECT_THAT(plain, ElementsAre(std::set<std::uint32_t>{ 0x1002 }));
+        // with one the entries below it are as well
+        EXPECT_THAT(modified, ElementsAre(std::set<std::uint32_t>{ 0x1001 }, std::set<std::uint32_t>{ 0x1002 }));
+    }
+
+    TEST(ESM4WornArmorTest, theSeedOfTheItemsLeavesTheTemplateTheSeedChose)
+    {
+        TestSource source;
+        source.addArmor(0x1001, upperBody);
+        source.addArmor(0x1004, upperBody);
+        source.addArmor(0x1002, hat);
+        source.addArmor(0x1003, hat);
+        // two templates, each with a piece of its own, and a list that gives one of two more
+        source.addList(0x1010, { { 1, 0x1002 }, { 1, 0x1003 } });
+        source.addNpc(0x2011, { 0x1001, 0x1010 });
+        source.addNpc(0x2012, { 0x1004, 0x1010 });
+        ESM4::LevelledNpc list{};
+        list.mId = id(0x2010);
+        list.mLvlObject.push_back({ 1, 0, 0x2011, 1, 0 });
+        list.mLvlObject.push_back({ 1, 0, 0x2012, 1, 0 });
+        source.mLevelledNpcs[id(0x2010)] = list;
+        const ESM4::Npc& npc = source.addNpc(0x2001, {}, ESM4::Npc::Template_UseInventory, 0x2010, 1);
+
+        // the piece of the template does not change with the seed of the items: the template is the one the placement
+        // chose
+        for (std::uint32_t seed = 1; seed <= 16; ++seed)
+        {
+            std::set<std::uint32_t> fixed;
+            std::set<std::uint32_t> listed;
+            for (std::uint32_t listSeed = 100; listSeed < 164; ++listSeed)
+            {
+                for (const ESM4::Armor* piece : ESM4::wornArmor(source, npc, 5, seed, nullptr, 0, listSeed))
+                    (piece->mId.mIndex == 0x1001 || piece->mId.mIndex == 0x1004 ? fixed : listed)
+                        .insert(piece->mId.mIndex);
+            }
+            EXPECT_EQ(fixed.size(), 1u);
+            // while the list is rolled again with each seed of the items
+            EXPECT_EQ(listed.size(), 2u);
+        }
     }
 
     TEST(ESM4WornArmorTest, aLevelledListOfCharactersThatGivesNoneEndsTheChain)

@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 #include <components/esm/formid.hpp>
@@ -60,8 +61,9 @@ namespace ESM4
     // The records that a character gets traits, inventory and the rest from, the character itself first and then its
     // template, the template of that, and so on. A levelled list of characters in the place of a template gives one of
     // its characters, by the level of the player. The seed is what chooses the character.
+    // `levelMod` is the level modifier of the placement (see LevelledRules).
     std::vector<const Npc*> templateChain(const WornArmorSource& source, const Npc& npc, int playerLevel,
-        std::uint32_t seed, WornArmorTrace* trace = nullptr);
+        std::uint32_t seed, WornArmorTrace* trace = nullptr, int levelMod = 0);
 
     // The first record of the chain that does not take the thing the flag names (one of Npc::TemplateFlags) from the
     // next record, so that it is the record that has the thing. Null if every record of the chain takes it.
@@ -96,8 +98,11 @@ namespace ESM4
     // The armour that the character has: the pieces its inventory lists, and those that its levelled lists give for
     // the level of the character. A list is chosen from with the seed, so that the same character is always dressed
     // the same and two characters of one list are not.
+    // The template that a levelled list of characters gives is chosen with `seed` and `levelMod` (the placement of the
+    // character), the items with `listSeed` if it is given (the seed of an inventory that was rebuilt), else `seed`.
     CharacterArmor characterArmor(const WornArmorSource& source, const Npc& character, int playerLevel,
-        std::uint32_t seed, WornArmorTrace* trace = nullptr);
+        std::uint32_t seed, WornArmorTrace* trace = nullptr, int levelMod = 0,
+        std::optional<std::uint32_t> listSeed = std::nullopt);
 
     // The same for an inventory that is not a character's (a creature's): what its levelled lists give for the level
     CharacterArmor inventoryArmor(const WornArmorSource& source, const std::vector<InventoryItem>& inventory, int level,
@@ -105,7 +110,8 @@ namespace ESM4
 
     // The armour that the character wears, in the order of its inventory (characterArmor(...).mArmor)
     std::vector<const Armor*> wornArmor(const WornArmorSource& source, const Npc& character, int playerLevel,
-        std::uint32_t seed, WornArmorTrace* trace = nullptr);
+        std::uint32_t seed, WornArmorTrace* trace = nullptr, int levelMod = 0,
+        std::optional<std::uint32_t> listSeed = std::nullopt);
 
     // A piece of armour that is worn, with the model it shows and the parts of the body it covers
     struct WornPiece

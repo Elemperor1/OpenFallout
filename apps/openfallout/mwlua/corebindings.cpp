@@ -21,6 +21,8 @@
 #include "../mwworld/esmstore.hpp"
 
 #include "casinobindings.hpp"
+#include "spawnbindings.hpp"
+#include "falloutworldbindings.hpp"
 #include "chargenbindings.hpp"
 #include "combatbindings.hpp"
 #include "context.hpp"
@@ -149,6 +151,10 @@ namespace OFLua
                 = context.cachePackage("openfallout_core_hud", [context]() { return initCoreHudBindings(context); });
             api["casino"] = context.cachePackage(
                 "openfallout_core_casino", [context]() { return initCoreCasinoBindings(context); });
+            api["spawn"] = context.cachePackage(
+                "openfallout_core_spawn", [context]() { return initCoreSpawnBindings(context); });
+            api["worldCommands"] = context.cachePackage("openfallout_core_worldcommands",
+                [context]() { return initCoreWorldCommandBindings(context); });
             api["menus"]
                 = context.cachePackage("openfallout_core_menus", [context]() { return initCoreMenuBindings(context); });
             api["interact"] = context.cachePackage(

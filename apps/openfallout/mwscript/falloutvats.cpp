@@ -61,8 +61,10 @@ namespace OFScript
         {
             const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
             const OFClass::StoreCreatureSource source(mStore);
+            const ESM4::SpawnRoll roll
+                = ESM4::spawnRollOf(ESM::FormId::fromUint32(actor), OFClass::ESM4Impl::sDefaultLevel);
             const ESM4::Creature* owner = ESM4::creatureTemplateOwner(
-                ESM4::creatureTemplateChain(source, *creature, OFClass::ESM4Impl::sDefaultLevel, seed),
+                ESM4::creatureTemplateChain(source, *creature, roll.mLevel, seed, roll.mLevelMod),
                 ESM4::Creature::Template_UseModel);
             if (owner == nullptr)
                 owner = creature;

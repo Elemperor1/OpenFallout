@@ -62,6 +62,26 @@ namespace FalloutScript
         return flags != before;
     }
 
+    bool MapMarkers::showOrHide(FormId marker, bool show, bool withTravel, bool keepHidden)
+    {
+        const std::lock_guard lock(mMutex);
+        bool known = false;
+        const std::uint8_t before = flagsLocked(marker, known);
+        if (!known || (keepHidden && (before & keepHiddenFlag) != 0))
+            return false;
+        std::uint8_t flags = before;
+        if (!show)
+            flags &= static_cast<std::uint8_t>(~(visibleFlag | travelFlag));
+        else
+        {
+            flags |= visibleFlag;
+            if (withTravel)
+                flags |= travelFlag;
+        }
+        mFlags[marker] = flags;
+        return flags != before;
+    }
+
     void MapMarkers::enableFastTravel(bool enable, bool second, bool third)
     {
         const std::lock_guard lock(mMutex);

@@ -238,8 +238,12 @@ namespace
         EXPECT_THAT(resolvedAcrossSeeds(source, 0x3001, 1), ElementsAre(0x2001u));
         EXPECT_THAT(resolvedAcrossSeeds(source, 0x3001, 5), ElementsAre(0x2002u));
         EXPECT_THAT(resolvedAcrossSeeds(source, 0x3001, 30), ElementsAre(0x2003u));
+        // a level below 1 counts as 1 (0x487F70 of the New Vegas executable)
+        EXPECT_THAT(resolvedAcrossSeeds(source, 0x3001, 0), ElementsAre(0x2001u));
         // nothing at or below the level
-        EXPECT_THAT(resolvedAcrossSeeds(source, 0x3001, 0), IsEmpty());
+        source.addList(0x3002, { { 4, 0x2002 }, { 9, 0x2003 } });
+        EXPECT_THAT(resolvedAcrossSeeds(source, 0x3002, 3), IsEmpty());
+        EXPECT_THAT(resolvedAcrossSeeds(source, 0x3002, 0), IsEmpty());
     }
 
     TEST(ESM4CreatureModelTest, aListThatCalculatesFromAllLevelsChoosesAmongTheEntriesAtOrBelowTheLevel)

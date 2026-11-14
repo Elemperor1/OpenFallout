@@ -24,3 +24,50 @@ SetActorRefraction,stand-in,accepted and ignored: the refraction of a character 
 PreloadMagicEffect,stand-in,accepted and ignored: nothing is loaded ahead for an effect
 ShowQuestStages,stand-in,accepted and ignored: the stages are written to the console of the games and this engine does not feed it
 AutoDisplayObjectives,stand-in,kept as a switch: the HUD reminder of the objectives is not drawn
+SetActorFullName,stand-in,the name is kept with the game (as a message of the files) but the world shows the name of the record
+SetCellFullName,stand-in,the name is kept with the game (as a message of the files) but the world shows the name of the record
+PlaceAtMeHealthPercent,stand-in,the objects are made as PlaceAtMe makes them: nothing here has a condition that the health could set
+PurgeCellBuffers,exact,the command drops the cells the games keep in memory for a quick return; nothing a script can see changes
+IsLimbGone,stand-in,answers 0: dismemberment is not built and nothing sets the limb bits
+GetWeaponHealthPerc,stand-in,answers 100: nothing wears a weapon out yet
+GetCauseofDeath,stand-in,answers -1: the cause of a death is not kept
+GetDestructionStage,stand-in,answers -1: the stages of destruction are not kept
+HasBeenEaten,stand-in,answers 0 until a corpse is marked as eaten: nothing feeds on a dead character here
+WhichServiceMenu,exact,the executables never give the value anything but -1 (FalloutNV.exe 0x119F344)
+IsNoHumanGoreExe,exact,the executable answers a fixed 0 (FalloutNV.exe 0x5DFDE0)
+SetAudioMultithreading,exact,the executable only turns the threaded audio on when bMultiThreadAudio is set, which the default file leaves 0 (FalloutNV.exe 0xAD7230)
+EnableLinkedPathPoints,exact,a dummy in the executables (mov al, 1; ret: FalloutNV.exe 0x5D4A40)
+DisableLinkedPathPoints,exact,a dummy in the executables (mov al, 1; ret)
+DumpMasterFileSeekData,exact,a dummy in the executables (mov al, 1; ret)
+StartMasterFileSeekData,exact,a dummy in the executables (mov al, 1; ret)
+PrintTrackedCells,exact,a dummy in the executables (mov al, 1; ret)
+EnableCellTracking,exact,a dummy in the executables (mov al, 1; ret)
+ClearTrackedCells,exact,a dummy in the executables (mov al, 1; ret)
+ShowClassMenu,exact,a dummy in the executables (mov al, 1; ret)
+ShowSurgeryMenu,exact,a dummy in the executables (mov al, 1; ret)
+TrapUpdate,exact,a dummy in the executables (mov al, 1; ret)
+SetCasinoCheatLevel,exact,a dummy in the executables (mov al, 1; ret)
+SetSize,stand-in,changes nothing: characters collide with the box their model gives them, which nothing resizes
+SetRigidBodyMass,stand-in,changes nothing: the objects of the engine have no mass to set
+Reset3DState,stand-in,changes nothing: the pose of an object is not reset from its record
+SetPackDuration,stand-in,changes nothing: packages have no time limit of their own yet
+IsGoreDisabled,stand-in,answers 0: the setting that turns gore off is not read
+GetDLCCount,stand-in,counts the add-on plugins by name: the list that the executable counts (0x5DF930) was not traced to its source
+ShowLockpickMenu,stand-in,changes nothing: the lock screen is for a lock that a reference has
+ShowLockpickMenuDebug,stand-in,changes nothing: the lock screen is for a lock that a reference has
+ShowViewerStrings,stand-in,changes nothing: a debug command that prints the strings of a loaded model
+ShowSlotMachineMenu,stand-in,changes nothing: the command has no casino to open the table for
+ShowBlackJackMenu,stand-in,changes nothing: the command has no casino to open the table for
+ShowRouletteMenu,stand-in,changes nothing: the command has no casino to open the table for
+TriggerScreenSplatter,stand-in,kept and aged but not drawn: there is no splatter layer in the interface
+TriggerScreenBlood,stand-in,kept and aged but not drawn: there is no splatter layer in the interface
+SetScreenSplatterFade,stand-in,kept but not drawn
+SetScreenSplatterTexture,stand-in,kept but not drawn
+ClearScreenSplatter,stand-in,clears the kept splatters; none is drawn
+TriggerHUDShudder,stand-in,the offset is worked out each frame but the interface does not move by it
+SetImageSpace,stand-in,kept but not drawn: image spaces are not drawn
+RemapWaterType,stand-in,kept but not applied to the water that is drawn
+TriggerLODApocalypse,stand-in,kept but not applied to the distant objects
+EnableNavMesh,stand-in,kept but the path finder does not read it
+DisableNavMesh,stand-in,kept but the path finder does not read it
+ShowDialogSubtitles,stand-in,kept but the subtitle line does not read it yet

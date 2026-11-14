@@ -158,4 +158,45 @@ namespace
         EXPECT_EQ(again.call(OpGetMapMarkerVisible, hidden), 0.0);
         EXPECT_TRUE(again.mMarkers.fastTravelAllowed());
     }
+
+    TEST(FalloutScriptMapMarkersTest, showing_all_markers_shows_them_and_makes_them_places_to_travel_to)
+    {
+        Runner runner;
+        EXPECT_TRUE(runner.mMarkers.showOrHide(hidden, true, true, false));
+        EXPECT_EQ(runner.call(OpGetMapMarkerVisible, hidden), 2.0);
+        // A marker that is shown already, with the travel flag the call asks for
+        EXPECT_TRUE(runner.mMarkers.showOrHide(seen, true, true, false));
+        EXPECT_FALSE(runner.mMarkers.showOrHide(reachable, true, true, false));
+    }
+
+    TEST(FalloutScriptMapMarkersTest, showing_all_markers_without_travel_leaves_the_travel_flag_alone)
+    {
+        Runner runner;
+        EXPECT_TRUE(runner.mMarkers.showOrHide(hidden, true, false, false));
+        EXPECT_EQ(runner.call(OpGetMapMarkerVisible, hidden), 1.0);
+    }
+
+    TEST(FalloutScriptMapMarkersTest, hiding_all_markers_clears_both_flags)
+    {
+        Runner runner;
+        EXPECT_TRUE(runner.mMarkers.showOrHide(reachable, false, true, false));
+        EXPECT_EQ(runner.call(OpGetMapMarkerVisible, reachable), 0.0);
+        EXPECT_FALSE(runner.mMarkers.showOrHide(hidden, false, true, false));
+    }
+
+    TEST(FalloutScriptMapMarkersTest, a_marker_the_record_keeps_hidden_is_left_alone_when_the_call_says_so)
+    {
+        Runner runner;
+        runner.mRecords.mFlags[hidden] = MapMarkers::keepHiddenFlag;
+        EXPECT_FALSE(runner.mMarkers.showOrHide(hidden, true, true, true));
+        EXPECT_EQ(runner.call(OpGetMapMarkerVisible, hidden), 0.0);
+        EXPECT_TRUE(runner.mMarkers.showOrHide(hidden, true, true, false));
+        EXPECT_EQ(runner.call(OpGetMapMarkerVisible, hidden), 2.0);
+    }
+
+    TEST(FalloutScriptMapMarkersTest, a_reference_that_is_no_marker_is_not_touched_by_a_show_of_all)
+    {
+        Runner runner;
+        EXPECT_FALSE(runner.mMarkers.showOrHide(barrel, true, true, false));
+    }
 }

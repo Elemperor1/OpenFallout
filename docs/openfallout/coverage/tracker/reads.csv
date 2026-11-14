@@ -92,3 +92,115 @@ command,ForceActiveQuest,M16 effects (docs/openfallout/m16-effects-notes.md): ex
 command,ResetQuest,M16 effects (docs/openfallout/m16-effects-notes.md): exec 0x5DA180 calls 0x60D720 in the executable
 command,KillQuestUpdates,M16 effects (docs/openfallout/m16-effects-notes.md): exec 0x5DE350 in the executable
 command,SetShowQuestItems,M16 effects (docs/openfallout/m16-effects-notes.md): exec 0x5C6AD0 in the executable
+command,PlaceLeveledActorAtMe,"M16 spawn: exec 0x5D9810 in the New Vegas executable; zone level 0x526190, placement level 0x567E10, multiplier 0x4214F0, scaled level 0x488350, list roll 0x487D00"
+command,PlaceAtMeHealthPercent,M16 spawn: exec 0x5D90A0 in the New Vegas executable (the health is not applied: nothing has a condition yet)
+command,Exists,M16 spawn: eval 0x5A4210 (exec 0x5D7B80) in the New Vegas executable
+command,RemoveMe,M16 spawn: exec 0x5B53D0 in the New Vegas executable
+command,DropMe,M16 spawn: exec 0x5B5860 in the New Vegas executable
+command,Drop,M16 spawn: exec 0x5B58D0 in the New Vegas executable
+command,RemoveAllTypedItems,M16 spawn: exec 0x5B55A0 in the New Vegas executable (type filter and the list of exceptions; the handling of equipped and quest items is chosen)
+command,ResetInventory,M16 spawn: exec 0x5DAC60 in the New Vegas executable
+command,SetZoneRespawns,M16 spawn: exec 0x5DAB90 in the New Vegas executable; the reset rule 0x54E0AA and the actor rule 0x881C90
+command,ResetInterior,M16 spawn: exec 0x5D24A0 in the New Vegas executable
+command,PurgeCellBuffers,M16 spawn: exec 0x5B6CD0 in the New Vegas executable
+command,GetInCellParam,"M16 spawn: exec 0x5C7590, eval 0x59EF60 in the New Vegas executable"
+command,GetParentRef,M16 spawn: exec 0x5CE630 in the New Vegas executable
+command,GetContainerInventoryCount,M16 spawn: exec 0x5E0100 in the New Vegas executable (the count is the total of the items; the rule for each kind is not read)
+command,SetItemValue,M16 spawn: exec 0x5D3E30 in the New Vegas executable
+command,SetActorFullName,M16 spawn: exec 0x5D1920 in the New Vegas executable (the name is kept; the world does not show it)
+command,SetCellFullName,M16 spawn: exec 0x5D1890 in the New Vegas executable (the name is kept; the world does not show it)
+command,AddItemToLeveledList,M16 spawn: exec 0x5DE700 in the New Vegas executable
+command,AddNPCToLeveledList,M16 spawn: exec 0x5DE670 in the New Vegas executable
+command,AddCreatureToLeveledList,M16 spawn: exec 0x5DE670 in the New Vegas executable
+command,GetLineOfSight,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5C1CE0 and eval 0x59C990 (FalloutNV.exe), exec 0x523370 and eval 0x515850 (Fallout3.exe)
+command,GetInCellParam,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5C7590 and eval 0x59EF60 (FalloutNV.exe), exec 0x5253A0 and eval 0x5100C0 (Fallout3.exe)
+command,IsInDangerousWater,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D2970 and eval 0x5A36B0 (FalloutNV.exe), exec 0x52BA40 and eval 0x512A20 (Fallout3.exe)
+command,GetIsObjectType,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D85A0 and eval 0x5A4410 (FalloutNV.exe), exec 0x52E3C0 and eval 0x5132C0 (Fallout3.exe)
+command,GetIsFormType,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5C4940 (FalloutNV.exe), exec 0x523F30 (Fallout3.exe)
+command,GetParentRef,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5CE630 (FalloutNV.exe), exec 0x529AE0 (Fallout3.exe)
+command,GetStartingPos,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5C08A0 and eval 0x59C230 (FalloutNV.exe), exec 0x522A30 and eval 0x50ED80 (Fallout3.exe)
+command,GetStartingAngle,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5C0960 and eval 0x59C2D0 (FalloutNV.exe), exec 0x522AF0 and eval 0x50EE00 (Fallout3.exe)
+command,GetDefaultOpen,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5CEB90 and eval 0x5A27E0 (FalloutNV.exe), exec 0x529F90 and eval 0x512320 (Fallout3.exe)
+command,SetDefaultOpen,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5CEBF0 (FalloutNV.exe), exec 0x529FE0 (Fallout3.exe)
+command,SetSize,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5BDDB0 (FalloutNV.exe), exec 0x521B80 (Fallout3.exe)
+command,ModScale,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5C1C40 (FalloutNV.exe), exec 0x5232C0 (Fallout3.exe)
+command,SetRigidBodyMass,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D3B90 (FalloutNV.exe), exec 0x539DF0 (Fallout3.exe)
+command,Rotate,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5C03D0 (FalloutNV.exe), exec 0x522720 (Fallout3.exe)
+command,Reset3DState,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D3AE0 (FalloutNV.exe), exec 0x52BB00 (Fallout3.exe)
+command,SetAllVisible,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5BC1A0 (FalloutNV.exe), exec 0x520DF0 (Fallout3.exe)
+command,SetLastExtDoorActivated,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DE2D0 (FalloutNV.exe), exec 0x530560 (Fallout3.exe)
+command,EnableNavMesh,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5BD300 (FalloutNV.exe), exec 0x521460 (Fallout3.exe)
+command,DisableNavMesh,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5BD240 (FalloutNV.exe), exec 0x521370 (Fallout3.exe)
+command,EnableLinkedPathPoints,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D4A40 (FalloutNV.exe), exec 0x52A5E0 (Fallout3.exe)
+command,DisableLinkedPathPoints,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D4A40 (FalloutNV.exe), exec 0x52A5E0 (Fallout3.exe)
+command,GetIsCurrentWeather,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5C7430 and eval 0x59EBB0 (FalloutNV.exe), exec 0x525240 and eval 0x514A90 (Fallout3.exe)
+command,GetCurrentWeatherPercent,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5C7410 and eval 0x59EB60 (FalloutNV.exe), exec 0x525220 and eval 0x514A40 (Fallout3.exe)
+command,GetWindSpeed,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5C73F0 and eval 0x5A1880 (FalloutNV.exe), exec 0x525200 and eval 0x511990 (Fallout3.exe)
+command,IsCloudy,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5C7390 and eval 0x59E7F0 (FalloutNV.exe), exec 0x5251A0 and eval 0x514900 (Fallout3.exe)
+command,IsSnowing,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5C73D0 and eval 0x59EA10 (FalloutNV.exe), exec 0x5251E0 and eval 0x5149E0 (Fallout3.exe)
+command,IsTimePassing,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D1190 and eval 0x5A2C70 (FalloutNV.exe), exec 0x52AE70 and eval 0x512690 (Fallout3.exe)
+command,SetGlobalTimeMultiplier,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D5560 (FalloutNV.exe), exec 0x52CCB0 (Fallout3.exe)
+command,RemapWaterType,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DE840 (FalloutNV.exe), exec 0x530900 (Fallout3.exe)
+command,SetImageSpace,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5B7820 (FalloutNV.exe), exec 0x51F0C0 (Fallout3.exe)
+command,TriggerLODApocalypse,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DAD70 (FalloutNV.exe), exec 0x52F920 (Fallout3.exe)
+command,Tan,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DC290 (FalloutNV.exe), exec 0x530100 (Fallout3.exe)
+command,Sin,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DC0F0 (FalloutNV.exe), exec 0x52FF60 (Fallout3.exe)
+command,Cos,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DC1B0 (FalloutNV.exe), exec 0x530030 (Fallout3.exe)
+command,Sqrt,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DC350 (FalloutNV.exe), exec 0x5301A0 (Fallout3.exe)
+command,Log,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DC3B0 (FalloutNV.exe), exec 0x530200 (Fallout3.exe)
+command,IsWin32,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D1150 and eval 0x5A3870 (FalloutNV.exe), exec 0x52AE30 and eval 0x512B40 (Fallout3.exe)
+command,ExitGame,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D8B60 (FalloutNV.exe), exec 0x52E540 (Fallout3.exe)
+command,GetDLCCount,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DF930 (FalloutNV.exe)
+command,IsNoHumanGoreExe,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DFDE0 (FalloutNV.exe)
+command,IsGoreDisabled,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DC5A0 and eval 0x5A5A50 (FalloutNV.exe), exec 0x530360 and eval 0x5143B0 (Fallout3.exe)
+command,SetAudioMultithreading,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D8320 (FalloutNV.exe), exec 0x52E170 (Fallout3.exe)
+command,PersistentRefCount,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DFE90 (FalloutNV.exe)
+command,GetPlayerControlsDisabled,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5CAF40 and eval 0x5A02F0 (FalloutNV.exe), exec 0x527A30 and eval 0x510C60 (Fallout3.exe)
+command,PrintTrackedCells,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D4A40 (FalloutNV.exe)
+command,EnableCellTracking,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D4A40 (FalloutNV.exe)
+command,ClearTrackedCells,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D4A40 (FalloutNV.exe)
+command,DumpMasterFileSeekData,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D4A40 (FalloutNV.exe), exec 0x52A5E0 (Fallout3.exe)
+command,StartMasterFileSeekData,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D4A40 (FalloutNV.exe), exec 0x52A5E0 (Fallout3.exe)
+command,ForceTerminalBack,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DC4E0 (FalloutNV.exe), exec 0x5302F0 (Fallout3.exe)
+command,AlwaysShowActorSubtitles,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DFF70 (FalloutNV.exe)
+command,ShowTutorialMenu,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DA630 (FalloutNV.exe), exec 0x52F360 (Fallout3.exe)
+command,ShowAllMapMarkers,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5B6D40 (FalloutNV.exe), exec 0x538EB0 (Fallout3.exe)
+command,WhichServiceMenu,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D27A0 and eval 0x5A3650 (FalloutNV.exe), exec 0x52B8C0 and eval 0x5129E0 (Fallout3.exe)
+command,TriggerScreenSplatter,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D87A0 (FalloutNV.exe)
+command,SetScreenSplatterFade,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D8830 (FalloutNV.exe)
+command,SetScreenSplatterTexture,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D88A0 (FalloutNV.exe)
+command,ClearScreenSplatter,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D8920 (FalloutNV.exe)
+command,TriggerScreenBlood,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D8730 (FalloutNV.exe), exec 0x52E480 (Fallout3.exe)
+command,TriggerHUDShudder,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5BB770 (FalloutNV.exe), exec 0x5207E0 (Fallout3.exe)
+command,ShowClassMenu,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D4A40 (FalloutNV.exe), exec 0x52A5E0 (Fallout3.exe)
+command,ShowComputersInterface,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5CFD20 (FalloutNV.exe), exec 0x52A3F0 (Fallout3.exe)
+command,ShowDialogSubtitles,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5B5D40 (FalloutNV.exe), exec 0x51E9D0 (Fallout3.exe)
+command,ShowHackingMiniGame,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5CFCD0 (FalloutNV.exe), exec 0x52A3B0 (Fallout3.exe)
+command,ShowLockpickMenu,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D7430 (FalloutNV.exe), exec 0x52D440 (Fallout3.exe)
+command,ShowLockpickMenuDebug,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D7480 (FalloutNV.exe), exec 0x52D490 (Fallout3.exe)
+command,ShowSurgeryMenu,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D4A40 (FalloutNV.exe), exec 0x52A5E0 (Fallout3.exe)
+command,ShowViewerStrings,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5BADE0 (FalloutNV.exe), exec 0x53B5E0 (Fallout3.exe)
+command,IsPC1stPerson,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D56D0 and eval 0x5A3D00 (FalloutNV.exe), exec 0x52CDD0 and eval 0x512EC0 (Fallout3.exe)
+command,IsPlayerActionActive,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D4C60 and eval 0x5A3B20 (FalloutNV.exe), exec 0x52C650 and eval 0x512D40 (Fallout3.exe)
+command,GetLastPlayerAction,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D4C40 and eval 0x5A3AF0 (FalloutNV.exe), exec 0x52C630 and eval 0x512D10 (Fallout3.exe)
+command,SetSecuritronExpression,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5CF680 (FalloutNV.exe)
+command,SetPackDuration,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D1AB0 (FalloutNV.exe), exec 0x52B400 (Fallout3.exe)
+command,SetMinimalUse,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DC5E0 (FalloutNV.exe), exec 0x5303A0 (Fallout3.exe)
+command,TrapUpdate,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D4A40 (FalloutNV.exe), exec 0x52A5E0 (Fallout3.exe)
+command,IsPleasant,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5C7370 and eval 0x59E700 (FalloutNV.exe), exec 0x525180 and eval 0x514880 (Fallout3.exe)
+command,SetAtStart,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5C0BF0 (FalloutNV.exe), exec 0x522C30 (Fallout3.exe)
+command,ToggleDemigodMode,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5B7000 (FalloutNV.exe)
+command,AddCardToPlayer,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5CF3D0 (FalloutNV.exe)
+command,SetCasinoCheatLevel,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D4A40 (FalloutNV.exe)
+command,RedeemCode,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DD960 (FalloutNV.exe)
+command,IsCodeRedeemed,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DD870 (FalloutNV.exe)
+command,RevokeCode,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DDA00 (FalloutNV.exe)
+command,ShowBlackJackMenu,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5CF0F0 (FalloutNV.exe)
+command,ShowRouletteMenu,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5CF1A0 (FalloutNV.exe)
+command,ShowSlotMachineMenu,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5CF040 (FalloutNV.exe)
+command,PlayBink,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D15D0 (FalloutNV.exe), exec 0x52B0B0 (Fallout3.exe)
+command,IsWaterObject,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5D8640 and eval 0x5A45C0 (FalloutNV.exe); the virtual it calls was not resolved
+command,EnableLoadingMenu,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DFBA0 (FalloutNV.exe) calls the loading menu's 0x457D70; not built
+command,IsLoadingMenuEnabled,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5DFC10 (FalloutNV.exe) tests the pointer at 0x11DA0C0; not built
+command,IsFacingUp,M16 world notes (docs/openfallout/m16-world-notes.md): eval 0x5A0710 (FalloutNV.exe) tests the spine bone of a character; not built
+command,ShowSleepWaitMenu,M16 world notes (docs/openfallout/m16-world-notes.md): exec 0x5E0090 (FalloutNV.exe)

@@ -485,6 +485,8 @@ namespace FalloutScript
         static constexpr std::size_t objectBytes = entryBytes + 4 + 8;
         static constexpr std::size_t moveBytes = 4 + 4 + 1 + 24;
         static constexpr std::size_t requestBytes = 4 + 4 + 4 + 1 + 4 + 1 + 24;
+        /// (version 2 of the section adds the count of a stack that was dropped)
+        static constexpr std::size_t requestCountBytes = 4;
 
         static void writeReferences(OFScript::FalloutScripts& host, SaveWriter& out)
         {
@@ -634,6 +636,7 @@ namespace FalloutScript
                     saved.mCell = request.mWhere.mCell;
                     saved.mPosition = request.mWhere.mPosition;
                     saved.mAngle = request.mWhere.mAngle;
+                    saved.mCount = request.mCount;
                     requests.push_back(saved);
                 }
             }
@@ -646,10 +649,11 @@ namespace FalloutScript
                 out.u8(static_cast<std::uint8_t>(request.mDirection));
                 out.f32(request.mDistance);
                 writePlace(out, { request.mCell, request.mPosition, request.mAngle });
+                out.i32(request.mCount);
             }
         }
 
-        static void readReferences(OFScript::FalloutScripts& host, SaveReader& in, std::uint32_t)
+        static void readReferences(OFScript::FalloutScripts& host, SaveReader& in, std::uint32_t version)
         {
             std::map<FormId, Move> relocations;
             std::map<FormId, bool> disabled;
@@ -715,7 +719,7 @@ namespace FalloutScript
                     made.push_back(entry);
             }
             std::vector<OFScript::PendingSave::Request> requests;
-            const std::size_t asked = in.count(requestBytes);
+            const std::size_t asked = in.count(requestBytes + (version >= 2 ? requestCountBytes : 0));
             for (std::size_t i = 0; i < asked; ++i)
             {
                 const std::optional<FormId> id = in.form();
@@ -726,6 +730,8 @@ namespace FalloutScript
                 request.mDistance = in.f32();
                 Place where;
                 const bool placed = readPlace(in, where);
+                // (a game saved before the count was kept has the one object)
+                request.mCount = version >= 2 ? std::max(in.i32(), 1) : 1;
                 if (!id || !base || !near || !placed || request.mDirection > 3)
                     continue;
                 request.mId = *id;
@@ -1022,6 +1028,22 @@ namespace OFScript
                 FalloutScript::readFormLists(mFormLists, in, version);
             });
         section(
+            "spawn", 1,
+            [this](FalloutScript::SaveWriter& out) {
+                mLevelledLists.write(out);
+                mSpawnLevels.write(out);
+                mRespawn.write(out);
+                mItemValues.write(out);
+                mNameOverrides.write(out);
+            },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                mLevelledLists.read(in, version);
+                mSpawnLevels.read(in, version);
+                mRespawn.read(in, version);
+                mItemValues.read(in, version);
+                mNameOverrides.read(in, version);
+            });
+        section(
             "dialogue", FalloutScript::dialogueSectionVersion,
             [this](FalloutScript::SaveWriter& out) {
                 const std::lock_guard lock(mDialogueMutex);
@@ -1060,7 +1082,7 @@ namespace OFScript
             [this](
                 FalloutScript::SaveReader& in, std::uint32_t version) { Access::readCharacters(*this, in, version); });
         sections.push_back(
-            { "references", 1, [this](FalloutScript::SaveWriter& out) { Access::writeReferences(*this, out); },
+            { "references", 2, [this](FalloutScript::SaveWriter& out) { Access::writeReferences(*this, out); },
                 [this](FalloutScript::SaveReader& in, std::uint32_t version) {
                     Access::readReferences(*this, in, version);
                 } });

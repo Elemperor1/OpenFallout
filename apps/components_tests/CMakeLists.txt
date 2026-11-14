@@ -230,6 +230,9 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testequipment.cpp
     falloutscript/testfightai.cpp
     falloutscript/testformlists.cpp
+    falloutscript/testlevelledlists.cpp
+    falloutscript/testspawncommands.cpp
+    falloutscript/testspawnrules.cpp
     falloutscript/testitemuse.cpp
     falloutscript/testlevelling.cpp
     falloutscript/testlockpick.cpp
@@ -276,6 +279,9 @@ file(GLOB UNITTEST_SRC_FILES
     falloutscript/testvanillacommands.cpp
     falloutscript/testmessagetext.cpp
     falloutscript/testvoicefiles.cpp
+    falloutscript/testworldcommands.cpp
+    falloutscript/testworldmath.cpp
+    falloutscript/testworldrules.cpp
     fx/lexer.cpp
     fx/technique.cpp
 
