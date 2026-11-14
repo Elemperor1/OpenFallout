@@ -159,6 +159,7 @@ writes (keys `World.<Table>.<hex>`); no new section was added to the save.
 `core.worldCommands` (`apps/openfallout/mwlua/falloutworldbindings.cpp`, in Lua `r.core.worldCommands`) runs a command of
 the script language by its name, the way a condition calls it: `run(name, reference, arguments)` queues the call for the
 thread of the frame and gives a number; `result(number)` gives the answer once the frame has run it (nil before). The
+first call that finds the answer takes it away, so a later call gives nil: a caller keeps the first answer that is not nil. The
 second parameter, `reference`, is the reference the command is called on: a form id as text (`"0x..."` or
 `"FormId:0x..."`), `""` or nil for none (the command then runs with no calling reference, as from a quest). It is not
 one of the command's arguments, which are the third parameter, a list. An argument is a number, a form as text (the

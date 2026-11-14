@@ -164,14 +164,18 @@ namespace OFScript
         const auto reaches = [&](const OFWorld::Ptr& target) {
             const osg::Vec3f at = target.getRefData().getPosition().asVec3();
             const osg::Vec3f from = centre + osg::Vec3f(0.f, 0.f, 8.f);
-            const osg::Vec3f to = at + osg::Vec3f(0.f, 0.f, 48.f);
+            // (a thing that is not a character is aimed at in the middle of its box, which is inside it however low it is)
+            osg::Vec3f extents;
+            const bool character = isCharacterOrCreature(target);
+            if (!character)
+                extents = world->getHalfExtents(target);
+            const osg::Vec3f to = at + osg::Vec3f(0.f, 0.f, character ? 48.f : extents.z());
             const float apart = (to - from).length();
             if (apart < 1.f)
                 return true;
             double inside = 0.0;
-            if (!isCharacterOrCreature(target))
+            if (!character)
             {
-                const osg::Vec3f extents = world->getHalfExtents(target);
                 inside = FalloutScript::World::depthInBox({ from.x(), from.y(), from.z() }, { to.x(), to.y(), to.z() },
                     { at.x() - extents.x(), at.y() - extents.y(), at.z() },
                     { at.x() + extents.x(), at.y() + extents.y(), at.z() + 2.0 * extents.z() });

@@ -742,8 +742,16 @@ namespace FalloutScript
                 // (an older save does not say that the request was a drop, so a stack that no object is made for is lost,
                 // as it was)
                 const SavedDrop drop = readSavedDrop(in, version);
-                if (!id || !base || !near || !placed || request.mDirection > 3)
+                if (!id || !base || !near || request.mDirection > 3)
                     continue;
+                // A cell of a plugin that is not loaded now makes the place of the request unknown; a stack that a drop took
+                // out of its holder is still owed to the holder, which is where the request gives it back
+                if (!placed)
+                {
+                    if (!drop.mDropped)
+                        continue;
+                    where.mCell = ESM::RefId();
+                }
                 request.mId = *id;
                 request.mBase = *base;
                 request.mNear = *near;

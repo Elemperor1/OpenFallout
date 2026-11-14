@@ -885,8 +885,12 @@ namespace OFMechanics
         // (the package begins again from now, as the duration counts from when the call is made; one that had run out
         // runs again, and runs out again at the end of the new duration)
         found->second->mStartedHours = gameHours(OFBase::Environment::get().getWorld()->getTimeStamp());
-        if (hundredths > 0)
+        if (hundredths > 0 && found->second->mExpired)
+        {
+            // (it is not done any more: a Dialogue package says its line again, and runs out again with the new duration)
             found->second->mExpired = false;
+            found->second->mDone.erase(found->second->mPackage);
+        }
         keepState(*found->second);
     }
 
@@ -1025,7 +1029,7 @@ namespace OFMechanics
             int claims = 0;
             if (frame.mMinds != nullptr)
                 for (const auto& [key, other] : *frame.mMinds)
-                    if (other.get() != &mind && other->mPackage != nullptr && !other->mAtGoal
+                    if (other.get() != &mind && other->mPackage != nullptr && !other->mAtGoal && !other->mExpired
                         && other->mGoal.mBehaviour == ESM4::PackageBehaviour::Use && other->mGoal.mTarget == furniture)
                         ++claims;
             return claims;

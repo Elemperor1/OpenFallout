@@ -550,7 +550,9 @@ namespace OFScript
                 = (ptr.getRefData().getPosition().asVec3() - player.getRefData().getPosition().asVec3()).length();
             // An owner that sees the player is the one that reacts, however far it is; when none does, the nearest is the
             // one whose loss it is
-            const bool sees = mHost.sightOf(ptr, player) != FalloutScript::Detection::Sighting::Unseen;
+            // (one that is knocked out sees nothing)
+            const bool sees = !mHost.mCombat.unconscious(id)
+                && mHost.sightOf(ptr, player) != FalloutScript::Detection::Sighting::Unseen;
             if (best.isEmpty() || (sees && !bestSees) || (sees == bestSees && distance < bestDistance))
             {
                 best = ptr;
@@ -576,7 +578,8 @@ namespace OFScript
         {
             theft.mVictim = mHost.scriptReferenceOf(victim);
             theft.mVictimFactions = factionsOf(theft.mVictim);
-            theft.mVictimWatching = mHost.sightOf(victim, player) != FalloutScript::Detection::Sighting::Unseen;
+            theft.mVictimWatching = !mHost.mCombat.unconscious(theft.mVictim)
+                && mHost.sightOf(victim, player) != FalloutScript::Detection::Sighting::Unseen;
             if (!faction)
             {
                 const int karmaClass = FalloutScript::Standing::karmaClass(standingSettings(), karmaOf(theft.mVictim));
