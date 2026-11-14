@@ -238,6 +238,11 @@ namespace OFBase
         virtual void getObjectsInRange(const osg::Vec3f& position, float radius, std::vector<OFWorld::Ptr>& objects)
             = 0;
         virtual void getActorsInRange(const osg::Vec3f& position, float radius, std::vector<OFWorld::Ptr>& objects) = 0;
+        /// The characters of Fallout (which the packages of its own drive) within `radius` units of `position`
+        virtual void getFalloutActorsInRange(
+            const osg::Vec3f& /*position*/, float /*radius*/, std::vector<OFWorld::Ptr>& /*objects*/)
+        {
+        }
 
         /// Check if there are actors in selected range
         virtual bool isAnyActorInRange(const osg::Vec3f& position, float radius) = 0;

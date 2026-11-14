@@ -11,6 +11,7 @@
 #include <components/esm3/esmwriter.hpp>
 #include <components/esm4/loadaloc.hpp>
 #include <components/esm4/loadaspc.hpp>
+#include <components/esm4/loadclas.hpp>
 #include <components/esm4/loaddehy.hpp>
 #include <components/esm4/loadeczn.hpp>
 #include <components/esm4/loadhung.hpp>
@@ -1250,6 +1251,7 @@ template class OFWorld::TypedDynamicStore<ESM4::Reputation>;
 template class OFWorld::TypedDynamicStore<ESM4::DehydrationStage>;
 template class OFWorld::TypedDynamicStore<ESM4::HungerStage>;
 template class OFWorld::TypedDynamicStore<ESM4::SleepDeprivationStage>;
+template class OFWorld::TypedDynamicStore<ESM4::Class>;
 template class OFWorld::TypedDynamicStore<ESM4::Script>;
 template class OFWorld::TypedDynamicStore<ESM4::Sound>;
 template class OFWorld::TypedDynamicStore<ESM4::SoundReference>;

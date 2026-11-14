@@ -55,6 +55,8 @@ namespace FalloutScript
         /// The owner of a reference, 0 for none
         FormId owner(FormId reference);
         void setOwner(FormId reference, FormId owner);
+        /// ClearOwnership (0x5D6D10): the reference has no owner at all from now on, whatever its record says
+        void clearOwner(FormId reference);
         /// Whether the form is the owner of the reference. Only the owner it has itself counts: a reference of a place
         /// that someone owns is no one's, and a member of the faction that owns a reference is not its owner.
         bool isOwner(FormId reference, FormId candidate);

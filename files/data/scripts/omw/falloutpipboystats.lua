@@ -4,9 +4,12 @@
 -- the one that is picked, and the condition of the body. What the character is is the engine's (core.pipboy); this
 -- module lists it. It is a module of falloutpipboy.lua, not a script.
 --
+-- The dehydration, hunger and sleep pages of the hardcore mode (their buttons are there only when the mode is on) show the
+-- level on the meter of the file: the arrow stands at the level over the level of the last stage.
+--
 -- Not there yet: the pictures of the skills, perks and attributes (the games show models and textures chosen by code), the
--- per-limb condition, the dehydration, hunger and sleep of the hardcore mode, the effects list, the healing buttons, and
--- the lines of the general page.
+-- per-limb condition, the effects list (and the name of a need over its meter), the healing buttons, and the lines of the
+-- general page.
 --
 --   local page = require('scripts.omw.falloutpipboystats')
 --   page.show()            -- true when the page is on the screen, false when the menu file is not there
@@ -35,13 +38,18 @@ local TABS = {
 }
 local TEMPLATE = 'stats_list_template'
 
--- The modes of the status page: the button of each, in the order of the container's `user0`
-local MODES = { 'stats_CND_button', 'stats_RAD_button', 'stats_EFF_button' }
--- What the games' hardcore mode adds and that is not there: the buttons are not shown
-local HIDDEN = {
-    'stats_H20_button', 'stats_FOD_button', 'stats_SLP_button', 'stats_stimpak_button', 'stats_healing_mode',
-    'stats_radaway_button', 'stats_radx_button', 'stats_drbag_button',
+-- The modes of the status page: the button of each, in the order of the container's `user0` (the last three are the
+-- hardcore mode's: dehydration, hunger, sleep; the executable allows modes 0 to 5 in it and 0 to 2 otherwise, 0x7E0060)
+local MODES = {
+    'stats_CND_button', 'stats_RAD_button', 'stats_EFF_button', 'stats_H20_button', 'stats_FOD_button',
+    'stats_SLP_button',
 }
+-- The need that each mode shows (the key of the engine's status), counted from 1 as MODES is
+local NEED_MODES = { [4] = 'dehydration', [5] = 'hunger', [6] = 'sleep' }
+-- What the games' hardcore mode adds and that is not there: the buttons are not shown
+local HIDDEN = { 'stats_stimpak_button', 'stats_healing_mode', 'stats_radaway_button', 'stats_radx_button', 'stats_drbag_button' }
+local statusMode = 1
+local needsShown = {}
 
 local shown, lists = nil, nil
 local tabIndex = 1
@@ -126,6 +134,24 @@ local function fillBody()
             local label = limb.tile .. '_crippled'
             if shown:find(label) then shown:set(label, 'visible', broken) end
         end
+    end)
+end
+
+-- The level on the meter of the page that is open, when it is one of the needs: the most that the meter reaches and the level
+-- the arrow stands at (the file reads both from the menu's `user2` and `user11`)
+local function fillNeeds()
+    local need = NEED_MODES[statusMode]
+    if not need then return end
+    local status = core.hud.status()
+    local needs = status.needs
+    if not needs then return end
+    local level = math.floor((needs[need] or 0) + 0.5)
+    local most = math.floor((needs[need .. 'Most'] or 1000) + 0.5)
+    if needsShown.level == level and needsShown.most == most then return end
+    needsShown.level, needsShown.most = level, most
+    shown:batch(function()
+        shown:io('user2', most)
+        shown:io('user11', level)
     end)
 end
 
@@ -223,16 +249,27 @@ local function open()
     for index, tab in ipairs(TABS) do
         opened:onClick(tab.button, function() pickTab(index) end)
     end
+    local needs = core.hud.status().needs
+    local hardcore = needs ~= nil and needs.hardcore == true
     for mode, name in ipairs(MODES) do
         opened:onClick(name, function()
             if opened:find('stats_status_container') then
+                statusMode = mode
+                needsShown = {}
                 opened:set('stats_status_container', 'user0', mode - 1)
+                fillNeeds()
             end
         end)
     end
+    statusMode = 1
+    needsShown = {}
     opened:batch(function()
         for _, name in ipairs(HIDDEN) do
             if opened:find(name) then opened:set(name, 'visible', false) end
+        end
+        -- The needs of the hardcore mode have their pages only when it is on
+        for mode, need in pairs(NEED_MODES) do
+            if not hardcore and opened:find(MODES[mode]) then opened:set(MODES[mode], 'visible', false) end
         end
         opened:io('user0', tabIndex - 1)
     end)
@@ -266,6 +303,7 @@ function module.update()
     if not shown then return end
     shown:checkSize()
     updateDescription()
+    fillNeeds()
 end
 
 -- What a key does while the page is there: the arrows and pages pick a row of the list, [ and ] go to the tab before and

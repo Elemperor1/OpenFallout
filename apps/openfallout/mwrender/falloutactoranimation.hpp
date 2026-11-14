@@ -187,6 +187,24 @@ namespace OFRender
         /// faces, whether it sneaks, the weapon it holds): the old one stops and the new one plays over the idle
         void updateMovement();
 
+        /// Tells the scripts what the actor does now (IsMoving, IsRunning, IsTurning, IsSwimming, GetAnimAction,
+        /// IsIdlePlaying, GetIdleDoneOnce, GetWalkSpeed): once a frame, after the animations have run
+        void publishActivity();
+        /// The weapon move that plays and the action of the games' numbers it is (FalloutScript::AnimAction), for
+        /// GetAnimAction; the group is empty when none plays
+        void startAction(int action, const std::string& group);
+        int mActionKind = -1;
+        std::string mActionGroup;
+        /// The group of the animation that a script had the actor play last, and whether it has played to its end
+        /// since it began
+        std::string mScriptIdleGroup;
+        bool mScriptIdleWasPlaying = false;
+        bool mScriptIdleDone = false;
+        /// Whether the body is in the water (the player's body asks the world)
+        bool mSwimming = false;
+        /// The reference that the scripts were told of it by (0 when they were not): it is forgotten with the animation
+        std::uint32_t mReported = 0;
+
         osg::ref_ptr<AdvanceCallback> mAdvanceCallback;
         /// The transform that the body falls with, when it has died
         osg::ref_ptr<osg::MatrixTransform> mFall;

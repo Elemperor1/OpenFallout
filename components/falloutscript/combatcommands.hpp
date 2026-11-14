@@ -20,8 +20,21 @@ namespace FalloutScript
         virtual bool detects(FormId viewer, FormId target) = 0;
         /// Whether the record of the character makes it essential
         virtual bool essentialByRecord(FormId actor) = 0;
+        /// Whether the mode of the game makes the character essential: a companion of the player cannot die unless the
+        /// hardcore mode is on (FalloutNV.exe 0x87F3D0)
+        virtual bool essentialByMode(FormId actor)
+        {
+            (void)actor;
+            return false;
+        }
         /// How the records of the game say two factions stand to each other; none when they say nothing
         virtual std::optional<CombatState::Relation> recordedRelation(FormId first, FormId second) = 0;
+        /// Whether the faction counts the player as its enemy (the flag that a seen crime or SetPCEnemyofFaction sets) and
+        /// the target is the player: the executables let that flag win over every relation (0x8B87A0)
+        virtual bool playerEnemyOf(FormId /*faction*/, FormId /*target*/) { return false; }
+        /// StopCombatAlarmOnActor was run for the character, after the fight was ended: what else the alarm held goes (the
+        /// crimes it is the victim of or a witness to, and the enemy flags they set; Law::stopAlarm)
+        virtual void alarmStopped(FormId /*actor*/) {}
     };
 
     /// How the actor stands to the target by the factions they are in, in what scripts said or else what the records

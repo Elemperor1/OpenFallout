@@ -204,6 +204,30 @@ namespace OFLua
             for (const std::string& limb : status.mCrippled)
                 limbs[index++] = limb;
             row["crippled"] = limbs;
+            // The row of the needs that follows the health: whether the hardcore mode is on, the levels of the three
+            // needs, how many parts of the body are crippled, and for each of the five labels (dehydration, hunger, sleep,
+            // radiation, limbs) the colour of the display (1) or the red one (2) and the alpha it is drawn with
+            const OFScript::FalloutScripts::NeedsStatus needs = scripts().needsStatus();
+            sol::table row2(lua, sol::create);
+            row2["hardcore"] = needs.mHardcore;
+            row2["dehydration"] = needs.mLevels[0];
+            row2["hunger"] = needs.mLevels[1];
+            row2["sleep"] = needs.mLevels[2];
+            row2["crippledParts"] = needs.mCrippledParts;
+            row2["dehydrationMost"] = needs.mMost[0];
+            row2["hungerMost"] = needs.mMost[1];
+            row2["sleepMost"] = needs.mMost[2];
+            static constexpr const char* tileNames[] = { "dehydration", "hunger", "sleep", "rads", "limbs" };
+            sol::table tiles(lua, sol::create);
+            for (std::size_t tile = 0; tile < needs.mTiles.size(); ++tile)
+            {
+                sol::table one(lua, sol::create);
+                one["color"] = needs.mTiles[tile].mColor;
+                one["alpha"] = needs.mTiles[tile].mAlpha;
+                tiles[tileNames[tile]] = one;
+            }
+            row2["tiles"] = tiles;
+            row["needs"] = row2;
             return row;
         };
 

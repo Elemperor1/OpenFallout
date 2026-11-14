@@ -28,6 +28,7 @@
 #include "../mwbase/statemanager.hpp"
 #include "../mwbase/windowmanager.hpp"
 #include "../mwbase/world.hpp"
+#include "../mwscript/falloutlaw.hpp"
 
 #include "../mwsound/constants.hpp"
 
@@ -1118,6 +1119,10 @@ namespace OFMechanics
     {
         if (ptr != getPlayer())
             return;
+        // The games of Fallout judge what is taken by their own rules (the crime of the Fallout scripts); a take that
+        // raises no alarm (a pocket that was picked) is not one of theirs
+        if (alarm && OFScript::noteTaking(ptr, item, container, count))
+            return;
 
         OFWorld::Ptr victim;
 
@@ -1805,6 +1810,12 @@ namespace OFMechanics
         const osg::Vec3f& position, float radius, std::vector<OFWorld::Ptr>& objects)
     {
         mActors.getObjectsInRange(position, radius, objects);
+    }
+
+    void MechanicsManager::getFalloutActorsInRange(
+        const osg::Vec3f& position, float radius, std::vector<OFWorld::Ptr>& objects)
+    {
+        mFalloutActors.getObjectsInRange(position, radius, objects);
     }
 
     bool MechanicsManager::isAnyActorInRange(const osg::Vec3f& position, float radius)

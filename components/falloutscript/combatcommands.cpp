@@ -58,6 +58,10 @@ namespace FalloutScript
         std::vector<std::pair<FormId, int>> theirs;
         if (!actors.factions(actor, mine) || !actors.factions(target, theirs))
             return CombatState::Relation::Neutral;
+        // A faction that counts the player as its enemy makes every one of its members one
+        for (const auto& [first, firstRank] : mine)
+            if (world.playerEnemyOf(first, target))
+                return CombatState::Relation::Enemy;
         bool ally = false;
         bool friendly = false;
         bool enemy = false;
@@ -91,6 +95,8 @@ namespace FalloutScript
         std::vector<std::pair<FormId, int>> theirs;
         if (faction == 0 || !actors.factions(target, theirs))
             return CombatState::Relation::Neutral;
+        if (world.playerEnemyOf(faction, target))
+            return CombatState::Relation::Enemy;
         bool ally = false;
         bool friendly = false;
         bool enemy = false;
@@ -129,6 +135,8 @@ namespace FalloutScript
     {
         if (actor == 0)
             return false;
+        if (world.essentialByMode(actor))
+            return true;
         if (const std::optional<bool> said = combat.essential(actor))
             return *said;
         FormId base = 0;
@@ -148,9 +156,11 @@ namespace FalloutScript
             combat.stop(call.mReference);
             return 0.0;
         });
-        interpreter.setHandler("StopCombatAlarmOnActor", [&combat](CallContext& call) {
-            // The alarm is over for the actor: it stops, and so does everyone who went for it
+        interpreter.setHandler("StopCombatAlarmOnActor", [&combat, &world](CallContext& call) {
+            // The alarm is over for the actor: it stops, and so does everyone who went for it, and what the crimes held
             combat.withdraw(call.mReference);
+            if (call.mReference != 0)
+                world.alarmStopped(call.mReference);
             return 0.0;
         });
         interpreter.setHandler("IsInCombat", [&combat](CallContext& call) {

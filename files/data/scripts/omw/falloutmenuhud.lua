@@ -70,6 +70,12 @@ local LIMBS = {
 }
 local LIMB_ORDER = { 'head', 'torso', 'left_arm', 'right_arm', 'left_leg', 'right_leg' }
 
+-- The row of the needs: how far to the right of the health block it begins, the space between two labels, and the order of
+-- the labels (FalloutNV.exe 0x76BFE0: 150.0 at 0x106C948, 10.0 at 0x1020758)
+local NEEDS_OFFSET = 150
+local NEEDS_GAP = 10
+local NEED_ORDER = { 'dehydration', 'hunger', 'sleep', 'rads', 'limbs' }
+
 local Hud = {}
 Hud.__index = Hud
 
@@ -101,7 +107,9 @@ local function build(self)
         if not id then error('the file of the display has no tile ' .. name, 0) end
         return id
     end
+    -- (a tile that the file of the display does not have is not placed, whichever the tile)
     local function place(tile, x, y)
+        if not tile then return end
         if x then m:set(tile, 'x', x) end
         if y then m:set(tile, 'y', y) end
     end
@@ -127,6 +135,29 @@ local function build(self)
     local hpY = height - 2 * sy - 127
     place(hitPoints, 2 * sx + 10, hpY)
     place(actionPoints, width - 2 * sx - 386 + 30, hpY)
+    -- The row of the needs after the health (the executable's 0x76BFE0): the tile is 150 to the right of the health block and
+    -- at its height, and the five labels follow one another from its left edge, each at the width of the one before it and
+    -- 10 on from it (dehydration, hunger, sleep, radiation, limbs). Their words come from the file (the settings
+    -- sStatsH20Abbrev, sStatsFODAbbrev, sStatsSLPAbbrev, sStatsRADAbbrev, sStatsLMBAbbrev): the code only sets their colour and
+    -- alpha by the level.
+    -- (a file of the display without these tiles, as the one of Fallout 3 may be, has no row of needs: it is left out and
+    -- the rest of the display is made)
+    t.needs = m:find('HardcoreMode')
+    place(t.needs, 2 * sx + 10 + NEEDS_OFFSET, hpY)
+    t.needLabels = {
+        dehydration = m:find('Dehydration'), hunger = m:find('Hunger'), sleep = m:find('Sleep'), rads = m:find('Rads'),
+        limbs = m:find('LMBs'),
+    }
+    local across = 0
+    for _, name in ipairs(NEED_ORDER) do
+        local label = t.needLabels[name]
+        if label then
+            place(label, across, 0)
+            local text = m:getText(label, 'string')
+            local measured = text and text ~= '' and m:measure(7, text, 2048) or nil
+            across = across + (measured and measured.width or 0) + NEEDS_GAP
+        end
+    end
     t.rads = find('RadiationMeter')
     place(t.rads, width - 2 * sx - 367 - 20, 2 * sy)
     t.enemy = find('EnemyHealth')
@@ -295,6 +326,7 @@ end
 
 -- A trait is set only when it is not what it was set to last, so a frame that changes nothing draws nothing again
 function Hud:put(tile, trait, value)
+    if tile == nil then return end
     local key = tile .. '|' .. trait
     if self.cache[key] == value then return end
     self.cache[key] = value
@@ -584,6 +616,25 @@ function Hud:showRadiation(state)
     self:put(t.radsPointer, 'x', 15 + 300 * share(state.rads, state.radsMax))
 end
 
+-- The labels of the needs: the colour of the display (1) or the red one (2) and the alpha each has by its level (FalloutNV.exe
+-- 0x7739F0 and 0x773E90). The engine gives the tile of each; the three needs are clear when the hardcore mode is off, the
+-- radiation and the limbs are not.
+function Hud:showNeeds(needs)
+    local t = self.tiles
+    if not needs or not needs.tiles then
+        for _, label in pairs(t.needLabels) do self:put(label, 'alpha', 0) end
+        return
+    end
+    for _, name in ipairs(NEED_ORDER) do
+        local style = needs.tiles[name]
+        local label = t.needLabels[name]
+        if label then
+            self:put(label, 'systemcolor', style and style.color or 1)
+            self:put(label, 'alpha', style and style.alpha or 0)
+        end
+    end
+end
+
 -- The text under the crosshair: what the player can do with the thing, what it is called, what it weighs and is worth, or
 -- how its lock stands
 function Hud:showInfo(info)
@@ -740,8 +791,11 @@ function Hud:update(state, dt)
         self:put(t.subtitles, 'visible', (full and subtitle ~= nil) and 1 or 0)
         if subtitle ~= nil then self:put(t.subtitleText, 'string', subtitle) end
         self:put(t.messages, 'visible', off and 0 or 1)
-        for _, tile in ipairs({ t.hitPoints, t.actionPoints, t.rads, t.reticle, t.sneak, t.xp, t.limbs, t.enemy, t.info }) do
-            if not full then self:put(tile, 'visible', 0) end
+        -- (the row of the needs may not be in the file, and a hole in the list would end an ipairs loop at it)
+        local tiles = table.pack(t.hitPoints, t.actionPoints, t.needs, t.rads, t.reticle, t.sneak, t.xp, t.limbs, t.enemy,
+            t.info)
+        for i = 1, tiles.n do
+            if not full then self:put(tiles[i], 'visible', 0) end
         end
         if not full then return end
         -- While a script holds the player still the display is the executable's mode 0xC: the radiation, the experience and
@@ -749,6 +803,8 @@ function Hud:update(state, dt)
         local scripted = state.scripted == true
         self:put(t.hitPoints, 'visible', scripted and 0 or 1)
         self:put(t.actionPoints, 'visible', scripted and 0 or 1)
+        -- (the row of the needs is in the modes of the game and not in the one of a script that holds the player)
+        self:put(t.needs, 'visible', scripted and 0 or 1)
         if scripted then
             for _, tile in ipairs({ t.reticle, t.sneak, t.limbs, t.enemy, t.info }) do self:put(tile, 'visible', 0) end
             self:showExperience(state)
@@ -779,6 +835,7 @@ function Hud:update(state, dt)
             self:put(t.sneakText, 'systemcolor', alert and 2 or 1)
         end
         self:showInfo(state.info)
+        self:showNeeds(state.needs)
         self:showExperience(state)
         self:showRadiation(state)
         self:showEnemy(state, dt)

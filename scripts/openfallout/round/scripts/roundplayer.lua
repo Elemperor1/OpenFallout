@@ -579,6 +579,89 @@ function handlers.messages(args)
     return {}
 end
 
+-- ---- M16 needs: waiting, sleeping, travelling and the needs of the hardcore mode ---------------------------------------------------
+-- The game's clock in hours since the start of its count
+function handlers.clock()
+    return { hours = core.getGameTime() / 3600 }
+end
+
+-- The player asks to wait (the Wait key) or has just activated a bed (`activated`); when the screen of waiting opens the player
+-- asks for `hours` of it. Logs the numbers only: whether a screen opened, whether the rest began, the length of the refusal
+-- (its reason is in the engine's log as "Rest refused: ...") and how many messages the HUD was given
+function handlers.rest(args)
+    local interact = core.interact
+    if not args.activated then interact.requestWait() end
+    local screen = interact.rest()
+    local okMessages, list = pcall(core.hud.takeMessages)
+    local messages = okMessages and #list or -1
+    local started, chars = false, 0
+    if screen ~= nil then
+        local text = interact.startRest(args.hours or 1)
+        started = text == ''
+        chars = #text
+        if not started then interact.cancelRest() end
+    end
+    log('rest', tostring(args.label or '-'), 'asked=' .. (args.activated and 'bed' or 'wait'), 'screen=' .. tostring(screen ~= nil),
+        'sleeping=' .. tostring(screen ~= nil and screen.sleeping), 'started=' .. tostring(started), 'refusalChars=' .. chars,
+        'messages=' .. messages, string.format('gameHours=%.2f', core.getGameTime() / 3600))
+    return { screen = screen ~= nil, started = started, refusalChars = chars, messages = messages }
+end
+
+function handlers.restProgress()
+    local p = core.interact.restProgress()
+    return { active = p.active, sleeping = p.sleeping, done = p.done, total = p.total, ended = p.ended, stoppedChars = #(p.stopped or '') }
+end
+
+-- The hardcore mode: asked about (no argument) or turned on or off, and the levels of the needs and the tiles the display draws
+function handlers.hardcore(args)
+    local interact = core.interact
+    if args.on ~= nil then interact.setHardcore(args.on == true) end
+    log('hardcore', tostring(args.label or '-'), 'on=' .. tostring(interact.hardcore()))
+    return { on = interact.hardcore() }
+end
+
+function handlers.needs(args)
+    local ok, state = pcall(core.hud.status)
+    if not ok or state.needs == nil then
+        log('error', 'needs', tostring(state))
+        return {}
+    end
+    local n = state.needs
+    local function tile(name)
+        local t = n.tiles[name]
+        return string.format('%s=%s/%s', name, tostring(t.color), tostring(t.alpha))
+    end
+    log('needs', tostring(args.label or '-'), 'hardcore=' .. tostring(n.hardcore), string.format('dehydration=%.0f', n.dehydration),
+        string.format('hunger=%.0f', n.hunger), string.format('sleep=%.0f', n.sleep), 'crippledParts=' .. tostring(n.crippledParts),
+        string.format('most=%.0f/%.0f/%.0f', n.dehydrationMost, n.hungerMost, n.sleepMost), 'tiles',
+        tile('dehydration'), tile('hunger'), tile('sleep'), tile('rads'), tile('limbs'), 'hp=' .. number(health(self.object)))
+    return { dehydration = n.dehydration, hunger = n.hunger, sleep = n.sleep, hardcore = n.hardcore }
+end
+
+-- Fast travel to the nearest marker the player may travel to (the map's rows say which)
+function handlers.travel(args)
+    local interact = core.interact
+    local ok, rows = pcall(interact.map)
+    if not ok then
+        log('error', 'travel', tostring(rows))
+        return {}
+    end
+    local usable, best = 0, nil
+    for _, row in ipairs(rows) do
+        if row.travel then
+            usable = usable + 1
+            if row.distance >= 0 and (best == nil or best.distance < 0 or row.distance < best.distance) then best = row
+            elseif best == nil then best = row end
+        end
+    end
+    log('travel', tostring(args.label or '-'), 'markers=' .. #rows, 'usable=' .. usable, best and ('nearest=' .. best.id) or 'nearest=none',
+        best and string.format('distance=%.0f', best.distance) or '-')
+    if best == nil then return { found = false } end
+    local text = interact.travel(best.id)
+    log('travel', tostring(args.label or '-'), 'went=' .. tostring(text == ''), 'refusalChars=' .. #text, string.format('gameHours=%.2f', core.getGameTime() / 3600))
+    return { found = true, went = text == '', refusalChars = #text }
+end
+
 -- V.A.T.S.: the same event the pad's bumper sends the screen
 function handlers.vats(args)
     if args.button then

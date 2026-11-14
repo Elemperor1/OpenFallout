@@ -10,6 +10,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <utility>
 
 namespace
 {
@@ -28,6 +29,8 @@ namespace
     constexpr std::uint16_t OpWakeUpPC = 0x10AE;
     constexpr std::uint16_t OpIsPCSleeping = 0x10AF;
     constexpr std::uint16_t OpSetPCSleepHours = 0x10BD;
+    constexpr std::uint16_t OpGetPCSleepHours = 0x10BC;
+    constexpr std::uint16_t OpShowSleepWaitMenu = 0x1279;
     constexpr std::uint16_t OpGetGameSetting = 0x1100;
     constexpr std::uint16_t OpIsInInterior = 0x112C;
     constexpr std::uint16_t OpIsActorTalkingThroughActivator = 0x11AE;
@@ -57,6 +60,8 @@ namespace
         std::set<FormId> mLoaded3;
         std::map<FormId, int> mCrimes;
         bool mMoving = false;
+        double mHoursLeft = 0;
+        std::vector<std::pair<bool, bool>> mMenus;
 
         bool inInterior(FormId reference) override { return mInteriors.count(reference) != 0; }
         bool hasLoaded3D(FormId reference) override { return mLoaded.count(reference) != 0; }
@@ -64,6 +69,8 @@ namespace
         bool playerSleeping() override { return mSleeping; }
         void wakePlayer(double hours) override { mWoken.push_back(hours); }
         void setPlayerSleepHours(double hours) override { mSleepHours.push_back(hours); }
+        double playerSleepHours() override { return mHoursLeft; }
+        void showSleepWaitMenu(bool sleeping, bool checked) override { mMenus.push_back({ sleeping, checked }); }
         bool inZone(FormId reference, FormId zone) override
         {
             const auto found = mZones.find(reference);
@@ -229,6 +236,32 @@ namespace
         run.call(OpSetPCSleepHours, 0, { { 6, {}, false } });
         EXPECT_EQ(run.mWorld.mWoken, (std::vector<double>{ 0.0, 3.0 }));
         EXPECT_EQ(run.mWorld.mSleepHours, (std::vector<double>{ 6.0 }));
+    }
+
+    TEST(FalloutScriptQueriesTest, the_hours_that_are_left_of_the_rest_are_asked_of_the_world_as_whole_hours)
+    {
+        Runner run;
+        EXPECT_EQ(run.call(OpGetPCSleepHours, 0), 0.0);
+        run.mWorld.mHoursLeft = 5.0;
+        EXPECT_EQ(run.call(OpGetPCSleepHours, 0), 5.0);
+        run.mWorld.mHoursLeft = 4.75;
+        EXPECT_EQ(run.call(OpGetPCSleepHours, 0), 4.0);
+    }
+
+    TEST(FalloutScriptQueriesTest, the_menu_of_the_rest_is_shown_as_asked_with_or_without_the_check)
+    {
+        Runner run;
+        run.call(OpShowSleepWaitMenu, 0, { { 1, {}, false } });
+        run.call(OpShowSleepWaitMenu, 0, { { 0, {}, false } });
+        run.call(OpShowSleepWaitMenu, 0, { { 1, {}, false }, { 1, {}, false } });
+        run.call(OpShowSleepWaitMenu, 0, { { 1, {}, false }, { 0, {}, false } });
+        run.call(OpShowSleepWaitMenu, 0, { { 2, {}, false }, { 1, {}, false } });
+        ASSERT_EQ(run.mWorld.mMenus.size(), 5u);
+        EXPECT_EQ(run.mWorld.mMenus[0], (std::pair<bool, bool>{ true, false }));
+        EXPECT_EQ(run.mWorld.mMenus[1], (std::pair<bool, bool>{ false, false }));
+        EXPECT_EQ(run.mWorld.mMenus[2], (std::pair<bool, bool>{ true, true }));
+        EXPECT_EQ(run.mWorld.mMenus[3], (std::pair<bool, bool>{ true, false }));
+        EXPECT_EQ(run.mWorld.mMenus[4], (std::pair<bool, bool>{ false, true }));
     }
 
     TEST(FalloutScriptQueriesTest, a_reference_is_in_the_zone_the_world_gives_it)

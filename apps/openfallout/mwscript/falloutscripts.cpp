@@ -1,4 +1,5 @@
 #include "falloutscripts.hpp"
+#include "falloutlaw.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -233,6 +234,9 @@ namespace OFScript
         mActors.setDeathListener([this](FalloutScript::FormId actor) {
             mCombat.withdraw(actor);
             noteDeathTime(actor);
+            // What the player kills is judged (the murder, its karma and the flag that makes a murderer)
+            if (mLaw && actor != mPlayer && mPlayer != 0 && mActors.killerOf(actor) == mPlayer)
+                mLaw->killed(actor);
         });
         mActors.setReviveHandler([this](FalloutScript::FormId actor) { mCombat.setUnconscious(actor, false); });
         mActors.setFallHandler([this](FalloutScript::FormId actor) { return fallsInsteadOfDying(actor); });
@@ -257,9 +261,14 @@ namespace OFScript
             return found == mItemHolders.end() ? 0.0 : static_cast<double>(found->second);
         });
         // Whether the character moves with the stance of sneaking: the player's stance is the key it holds, and the
-        // others do not sneak (a package that makes them is not read yet)
+        // others sneak when a script forced them to (SetForceSneak: the gait their walk and their animation follow); a
+        // package that makes them is not read yet
         mInterpreter.setHandler("IsSneaking", [this](FalloutScript::CallContext& call) {
-            if (call.mReference == 0 || call.mReference != mPlayer || std::this_thread::get_id() != mMainThread)
+            if (call.mReference == 0)
+                return 0.0;
+            if (call.mReference != mPlayer)
+                return mActorStatus.overrideOf(call.mReference).mForceSneak ? 1.0 : 0.0;
+            if (std::this_thread::get_id() != mMainThread)
                 return 0.0;
             const OFWorld::Ptr body = OFBase::Environment::get().getWorld()->getPlayerPtr();
             return !body.isEmpty() && OFBase::Environment::get().getMechanicsManager()->isSneaking(body) ? 1.0 : 0.0;
@@ -287,10 +296,17 @@ namespace OFScript
         FalloutScript::addPresentationCommands(mInterpreter, mPresentation, *this);
         FalloutScript::addSwitchCommands(mInterpreter, mSwitches);
         installWorldRules();
+        // The crime and the standing of the game: their commands replace the stand-ins that were registered above
+        mLaw = std::make_shared<LawGlue>(*this);
+        mLaw->addCommands();
+        // SetHardcore, IsHardcore, IsAlwaysHardcore and DisableHardcoreTracking: the mode and what a script turning it
+        // off does to the needs
+        FalloutScript::addHardcoreCommands(mInterpreter, mHardcoreMode, [this] { zeroNeeds(); });
         FalloutScript::addMagicCommands(mInterpreter, mMagic, *this);
         FalloutScript::addFormListCommands(mInterpreter, mFormLists);
         setupSpawn();
         FalloutScript::addPlayerProgressCommands(mInterpreter, mProgress);
+        FalloutScript::addActorStatusCommands(mInterpreter, mActorStatus, mCombat, mProgress, mActorValues, *this, game);
         // The perks that change what experience is gained apply to what scripts reward as well
         mInterpreter.setHandler("RewardXP", [this](FalloutScript::CallContext& call) {
             rewardExperience(FalloutScript::intArgument(call, 0));
@@ -561,6 +577,9 @@ namespace OFScript
                              const std::vector<FalloutScript::SpellEffect>& kept) { castSpell(actor, spell, kept); });
         // A stage of a need of the hardcore mode that took all the health (the last one) kills the player
         mHardcore.setStageListener([this](FalloutScript::FormId actor) { mItemUse.checkHealth(actor); });
+        // A need that changes its stage tells the player (the sentences of the executable's settings)
+        mHardcore.setNoticeListener(
+            [this](const FalloutScript::HardcoreNeeds::Notice& notice) { needNotice(notice); });
         // An effect that runs a script (the well rested bonus of a bed) has its blocks run for the character
         mMagic.setScriptRunner([this](FalloutScript::FormId actor, FalloutScript::FormId script,
                                    FalloutScript::Magic::ScriptStage stage, FalloutScript::Magic::EffectId effect,
@@ -753,6 +772,9 @@ namespace OFScript
         mScriptPackages.clear();
         mScriptedAttacks.clear();
         mAi.clear();
+        mActorStatus.clear();
+        mPlayerForcesSneak = false;
+        mPlayerForcesRun = false;
         // A save asked for by the game that is left must not be made in the one that is loaded or started
         mSaveRequests.store(0);
         *mPendingSave = PendingSave();
@@ -786,6 +808,8 @@ namespace OFScript
         mReferenceState.clear();
         mReputation.clear();
         mObjectState.clear();
+        if (mLaw)
+            mLaw->clear();
         mMapMarkers.clear();
         mHotKeys.reset();
         mPresentation.clear();
@@ -800,6 +824,9 @@ namespace OFScript
         // the days between two saves are not time the player lived through
         mHardcore.clear();
         mHardcoreOn.store(false);
+        // A game that begins is not hardcore, and nothing has turned the mode off yet; a game that is loaded gets its
+        // own state from its save
+        mHardcoreMode.reset();
         {
             // A new game and a loaded game are both told to the scripts once; the program was started only once
             const std::lock_guard lock(mSessionMutex);
@@ -965,6 +992,7 @@ namespace OFScript
         updateWorldRules(frametime);
         updateFurniture();
         updateDoors();
+        applyPlayerStance();
         updateTextureSwaps();
         // What the items did since the last frame is told before any block of this frame runs, so that an AddItem or
         // EquipItem of a trigger block is told in the next frame
@@ -994,6 +1022,8 @@ namespace OFScript
         updateMusic(frametime);
         updateAmbient(frametime);
         updateRadio(frametime);
+        if (mLaw)
+            mLaw->update(frametime);
         mHudTime += frametime;
         raiseCombatEvents(frametime);
         updateDamage(frametime);
@@ -1774,7 +1804,9 @@ namespace OFScript
     void FalloutScripts::reputationChanged(const FalloutScript::Reputation::Bump& bump)
     {
         // The line under the name of the reputation tells which side went up
-        const std::string gain = gameSettingText(bump.mSide == 1 ? "sRepPositiveGain" : "sRepNegativeGain");
+        // (a removal has the lines of a loss: sRepPositiveLoss and sRepNegativeLoss)
+        const std::string gain = gameSettingText(bump.mLoss ? (bump.mSide == 1 ? "sRepPositiveLoss" : "sRepNegativeLoss")
+                                                            : (bump.mSide == 1 ? "sRepPositiveGain" : "sRepNegativeGain"));
         std::string text = bump.mName;
         if (!gain.empty())
             text += (text.empty() ? "" : "\n") + gain;
@@ -2420,7 +2452,8 @@ namespace OFScript
         if (const ESM4::Ammunition* ammo = mStore.get<ESM4::Ammunition>().search(id))
         {
             info.mKind = FalloutScript::ItemKind::Ammo;
-            info.mWeight = ammo->mData.mWeight;
+            // Ammunition weighs only in the hardcore mode (FalloutNV.exe 0x48EBC0)
+            info.mWeight = FalloutScript::carriedAmmoWeight(hardcoreMode(), ammo->mData.mWeight);
             return true;
         }
         if (const ESM4::Potion* potion = mStore.get<ESM4::Potion>().search(id))
@@ -2555,6 +2588,8 @@ namespace OFScript
         mActors.addItem(holder, form, std::max(item.getCellRef().getCount(), 1), mReferenceState.condition(reference),
             mReferenceState.mods(reference));
         setDisabled(reference, true);
+        if (holder == mPlayer && mLaw)
+            mLaw->pickedUp(reference, form, std::max(item.getCellRef().getCount(), 1));
         return true;
     }
 
@@ -2927,7 +2962,11 @@ namespace OFScript
         // A blow of the player that an ally or friend of the victim lets pass does not turn the victim on the player,
         // and does not count as an attack on it
         const bool tolerated = toleratesBlow(attacker, victim);
+        const bool wasFighting = mCombat.inCombat(victim);
         mCombat.noteHit(victim, struck, tolerated);
+        // A blow of the player at a character that nobody let pass is judged: a crime, unless the victim fought already
+        if (attacker != 0 && attacker == mPlayer && victim != mPlayer && !tolerated && mLaw)
+            mLaw->blow(victim, weapon, wasFighting);
 
         mActorValues.damage(victim, AV::health, dealt);
         // A character that has destruction data (a turret, a robot) goes through its stages as its health goes down
@@ -5660,13 +5699,20 @@ namespace OFScript
         std::string file = record->mModel.getNormalized().value();
         if (file.compare(0, 7, "meshes/") != 0)
             file.insert(0, "meshes/");
-        runOnMainThread([this, reference, file, called] {
+        const FalloutScript::FormId played = numberOf(record->mId);
+        runOnMainThread([this, reference, file, called, played] {
             const OFWorld::Ptr ptr = findReference(reference);
             if (ptr.isEmpty() || !ptr.isInCell())
                 return;
             auto* animation = dynamic_cast<OFRender::FalloutActorAnimation*>(
                 OFBase::Environment::get().getWorld()->getAnimation(ptr));
-            if (animation != nullptr && !animation->playIdle(file))
+            if (animation != nullptr && animation->playIdle(file))
+                noteActivity(ptr, [played](FalloutScript::ActorActivity& activity) {
+                    // IsLastIdlePlayed tells the idle that played last; GetIdleDoneOnce starts over with it
+                    activity.mLastIdle = played;
+                    activity.mIdleDoneOnce = false;
+                });
+            else if (animation != nullptr)
             {
                 const std::lock_guard lock(mIdleMutex);
                 if (mIdleProblems.insert(called).second)

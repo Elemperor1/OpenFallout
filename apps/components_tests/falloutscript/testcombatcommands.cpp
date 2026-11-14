@@ -73,8 +73,11 @@ namespace
         std::map<FormId, std::vector<std::pair<FormId, int>>> mFactions;
         std::map<FormId, FormId> mBases;
         std::set<FormId> mEssential;
+        std::set<FormId> mCompanions;
         std::set<std::pair<FormId, FormId>> mSees;
         std::map<std::pair<FormId, FormId>, CombatState::Relation> mRecorded;
+        std::set<FormId> mEnemiesOfPlayer;
+        FormId mPlayer = 0;
 
         bool initialItems(FormId, std::vector<std::pair<FormId, int>>&) override { return true; }
         bool initialFactions(FormId actor, std::vector<std::pair<FormId, int>>& factions) override
@@ -93,6 +96,13 @@ namespace
 
         bool detects(FormId viewer, FormId target) override { return mSees.count({ viewer, target }) != 0; }
         bool essentialByRecord(FormId actor) override { return mEssential.count(actor) != 0; }
+        bool playerEnemyOf(FormId faction, FormId target) override
+        {
+            return target == mPlayer && mEnemiesOfPlayer.count(faction) != 0;
+        }
+        bool essentialByMode(FormId actor) override { return mCompanions.count(actor) != 0; }
+        std::vector<FormId> mAlarmsStopped;
+        void alarmStopped(FormId actor) override { mAlarmsStopped.push_back(actor); }
         std::optional<CombatState::Relation> recordedRelation(FormId first, FormId second) override
         {
             const auto found = mRecorded.find({ first, second });
@@ -268,6 +278,8 @@ namespace
         EXPECT_FALSE(setup.mCombat.inCombat(raider));
         EXPECT_FALSE(setup.mCombat.inCombat(ghoul));
         EXPECT_FALSE(setup.mCombat.inCombat(guard));
+        // the game is told, to forget the crimes of the alarm and release what they set
+        EXPECT_THAT(setup.mWorld.mAlarmsStopped, ElementsAre(guard));
     }
 
     TEST(FalloutScriptCombatCommandsTest, a_script_tells_what_the_character_notices)
@@ -523,6 +535,27 @@ namespace
         EXPECT_EQ(setup.variable(2), 0);
     }
 
+    TEST(FalloutScriptCombatCommandsTest, a_companion_is_essential_as_the_mode_of_the_game_says_whatever_a_script_said)
+    {
+        Runner setup;
+        setup.mWorld.mCompanions.insert(guard);
+        ScriptBuilder builder;
+        builder.code(scriptName() + begin(BlockType::OnActivate)
+            + setTo(var('s', 1), callToken(OpIsEssential, arguments(0)))
+            + command(OpSetActorRefEssential, arguments(1).add(intArg(0)))
+            + setTo(var('s', 2), callToken(OpIsEssential, arguments(0))) + end());
+        builder.variable(1, integerVariable, "companion").variable(2, integerVariable, "scriptDenied");
+
+        setup.run(builder);
+
+        EXPECT_EQ(setup.variable(1), 1);
+        // The executable asks the mode first: the flag a script gave does not make a companion mortal
+        EXPECT_EQ(setup.variable(2), 1);
+        // Another character is not touched by it
+        setup.mWorld.mCompanions.clear();
+        EXPECT_FALSE(FalloutScript::isEssential(setup.mCombat, setup.mActors, setup.mWorld, raider));
+    }
+
     TEST(FalloutScriptCombatCommandsTest, a_script_asks_what_the_last_blow_was_like)
     {
         Runner setup;
@@ -662,6 +695,23 @@ namespace
         EXPECT_EQ(standing(Relation::Ally, Relation::Enemy), Relation::Ally);
         EXPECT_EQ(standing(Relation::Friend, Relation::Ally), Relation::Ally);
         EXPECT_EQ(standing(Relation::Neutral, Relation::Neutral), Relation::Neutral);
+    }
+
+    TEST(FalloutScriptCombatCommandsTest, a_faction_that_counts_the_player_as_an_enemy_makes_its_members_enemies_of_it)
+    {
+        using Relation = CombatState::Relation;
+        Runner setup;
+        setup.mWorld.mPlayer = ghoul;
+        setup.mWorld.mRecorded[{ vault, mutants }] = Relation::Ally;
+        // The ally of the player turns on it as soon as its faction does, whatever the factions say
+        EXPECT_EQ(FalloutScript::relationOfActors(setup.mCombat, setup.mActors, setup.mWorld, guard, ghoul), Relation::Ally);
+        EXPECT_EQ(FalloutScript::relationOfFaction(setup.mCombat, setup.mActors, setup.mWorld, vault, ghoul), Relation::Ally);
+        setup.mWorld.mEnemiesOfPlayer.insert(vault);
+        EXPECT_EQ(FalloutScript::relationOfActors(setup.mCombat, setup.mActors, setup.mWorld, guard, ghoul), Relation::Enemy);
+        EXPECT_EQ(FalloutScript::relationOfFaction(setup.mCombat, setup.mActors, setup.mWorld, vault, ghoul), Relation::Enemy);
+        // Toward anyone but the player nothing changes, and a character of another faction is not touched
+        EXPECT_EQ(FalloutScript::relationOfActors(setup.mCombat, setup.mActors, setup.mWorld, guard, raider), Relation::Neutral);
+        EXPECT_EQ(FalloutScript::relationOfActors(setup.mCombat, setup.mActors, setup.mWorld, raider, ghoul), Relation::Neutral);
     }
 
     TEST(FalloutScriptCombatCommandsTest, a_faction_is_kin_to_itself_unless_its_own_row_says_otherwise)

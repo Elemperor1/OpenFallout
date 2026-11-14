@@ -62,10 +62,21 @@ namespace FalloutScript
             /// The levels of the two sides after the change
             int mPositiveLevel = 0;
             int mNegativeLevel = 0;
+            /// The side went down (the removals), and not up
+            bool mLoss = false;
         };
 
         /// Raises a side by the amount of a step, from 1 (very minor) to 5 (very major), up to the cap
         Bump add(FormId reputation, int side, int step);
+
+        /// AddReputationExact (0x615730): raises a side by the points given, up to the cap
+        Bump addExact(FormId reputation, int side, double points);
+        /// RemoveReputation (0x615FA0): lowers a side by the amount of a step (1 to 5), down to nothing
+        Bump removeStep(FormId reputation, int side, int step);
+        /// RemoveReputationExact (0x615A00): lowers a side by the points given, down to nothing
+        Bump removeExact(FormId reputation, int side, double points);
+        /// GetReputationPct (0x616A60): the share of the cap that a side holds; 0 for a reputation without a cap
+        double pct(FormId reputation, int side);
 
         /// The level of a side, 0 to 3
         int level(FormId reputation, int side);
@@ -87,6 +98,8 @@ namespace FalloutScript
         };
 
         std::array<double, 3> limits();
+        /// Changes a side by the points (up, to the cap, or down, to nothing) and tells what came of it
+        Bump change(FormId reputation, int side, double points, bool loss);
         int levelLocked(FormId reputation, int side, double cap, const std::array<double, 3>& limits);
 
         ReputationRecords& mRecords;
@@ -99,8 +112,9 @@ namespace FalloutScript
     void writeReputation(Reputation& reputation, SaveWriter& out);
     void readReputation(Reputation& reputation, SaveReader& in, std::uint32_t version);
 
-    /// Gives the commands AddReputation, SetReputation, GetReputation and GetReputationThreshold to the interpreter.
-    /// The message is called when AddReputation changes a reputation, to tell the player. Those commands that the
+    /// Gives the commands AddReputation, AddReputationExact, RemoveReputation, RemoveReputationExact, SetReputation,
+    /// GetReputation, GetReputationPct and GetReputationThreshold to the interpreter. The message is called when a
+    /// command changes a reputation, to tell the player. Those commands that the
     /// command table does not have are left out.
     void addReputationCommands(
         Interpreter& interpreter, Reputation& reputation, std::function<void(const Reputation::Bump&)> message);

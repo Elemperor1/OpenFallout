@@ -1,0 +1,11 @@
+{
+  "name": "m16-needs-nv",
+  "game": "nv",
+  "save": "latest",
+  "scenario": "../scenarios/m16_needs_nv.lua",
+  "resolution": [1280, 720],
+  "framerate": 30,
+  "limit": 1500,
+  "settings": { "Sound": { "master volume": "0" } },
+  "variants": [ { "name": "plain" } ]
+}

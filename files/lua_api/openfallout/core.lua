@@ -1492,6 +1492,28 @@
 -- @param #string actor
 
 ---
+-- What the world holds against the player, as the law of the game works it out (the crimes the player has made, whether it
+-- is a murderer) and, when a character is given, how that character stands to the player.
+-- @function [parent=#Combat] law
+-- @param #string actor Optional: a character.
+-- @return #CombatLaw
+
+---
+-- @type CombatLaw
+-- @field #boolean available False in a game that has no such rules.
+-- @field #number minor The minor crimes of the player.
+-- @field #number major The major crimes of the player.
+-- @field #boolean murderer Whether the player is a murderer.
+-- @field #number crimes The crimes that are known and not yet over.
+-- @field #number amountSoldStolen The value of stolen goods the player has sold.
+-- @field #number factions With an actor: how many factions the character is in.
+-- @field #boolean enemy With an actor: whether any of its factions is an enemy of the player (the faction flag of a crime).
+-- @field #number factionMinor With an actor: the minor crimes against its factions.
+-- @field #number factionMajor With an actor: the major crimes against its factions.
+-- @field #number disposition With an actor: what it thinks of the player, 0 to 100 (-1 when it cannot be worked out).
+-- @field #number trespassLevel With an actor: the warnings it has given the player for being where it does not belong.
+
+---
 -- @function [parent=#Combat] isDead
 -- @param #string actor
 -- @return #boolean

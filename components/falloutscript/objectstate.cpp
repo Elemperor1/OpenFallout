@@ -112,6 +112,13 @@ namespace FalloutScript
         mOwners[reference] = form;
     }
 
+    void ObjectState::clearOwner(FormId reference)
+    {
+        // The entry that holds no owner is what says that the record's owner is gone too
+        const std::lock_guard lock(mMutex);
+        mOwners[reference] = 0;
+    }
+
     bool ObjectState::isOwner(FormId reference, FormId candidate)
     {
         const FormId has = owner(reference);

@@ -583,6 +583,8 @@ local function current(dt)
         headUnder = status.headUnder == true,
         breathTicks = status.breathTicks,
         crippled = status.crippled,
+        -- The row of the needs of the hardcore mode (levels and the tile of each label)
+        needs = status.needs,
         reticle = status.weaponDrawn,
         -- A script that took the movement away (a scene) shows less of the display, as the executable's mode 0xC does
         scripted = status.controlsOff ~= nil and status.controlsOff.movement == true,

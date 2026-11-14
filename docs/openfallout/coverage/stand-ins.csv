@@ -9,6 +9,7 @@ GetVampire,exact,nothing here makes a vampire and the games keep the command for
 ShowWarning,exact,the retail executables format the text and show it nowhere
 Cast,exact,the command does nothing in the executables (magic.cpp)
 GetDisposition,stand-in,answers 0: the disposition of a character towards another is not worked out
+IsLimbGone,stand-in,answers 0: dismemberment is not built and nothing sets the limb bits
 GetCasinoWinningsLevel,stand-in,answers 0: the casino of New Vegas is not built
 SetCasinoWinningsLevel,stand-in,changes nothing: the casino of New Vegas is not built
 HasBeenEaten,stand-in,answers 0: nothing feeds on a dead character
@@ -71,3 +72,22 @@ TriggerLODApocalypse,stand-in,kept but not applied to the distant objects
 EnableNavMesh,stand-in,kept but the path finder does not read it
 DisableNavMesh,stand-in,kept but the path finder does not read it
 ShowDialogSubtitles,stand-in,kept but the subtitle line does not read it yet
+HasBeenEaten,stand-in,answers 0: nothing feeds on a dead character
+SetAllReachable,exact,the command parses its argument and changes nothing in the executables (FalloutNV.exe 0x5BC150)
+IsRidingHorse,exact,the executable answers 0 for an actor (0x5A3670): the games have no horses
+GetPlayerHasLastRiddenHorse,exact,the evaluator is the empty one of the executables (0x5A2A50)
+IsPlayersLastRiddenHorse,exact,the evaluator is the empty one of the executables (0x5A2A50)
+IsHorseStolen,exact,the evaluator is the empty one of the executables (0x5A2A50)
+IsActorUsingATorch,exact,the executable answers 0 for an actor (0x5A2C30): there are no torches
+IsTorchOut,exact,the evaluator is the empty one of the executables (0x5A2A50)
+IsShieldOut,exact,the evaluator is the empty one of the executables (0x5A2A50)
+GetDisease,exact,the executable answers 0 (0x59D250)
+GetIsClassDefault,exact,the evaluator is the empty one of the executables (0x5A2A50)
+ModPCSkill,exact,the command is the empty one of the executables (0x5D4A40)
+AdvancePCSkill,exact,the command is the empty one of the executables (0x5D4A40)
+PickIdle,stand-in,accepted and does nothing: the idle tree is not walked with the conditions of its idles
+LoopGroup,stand-in,accepted and does nothing: an animation group is not looped a counted number of times
+SkipAnim,stand-in,accepted and does nothing: the animation that plays is not skipped to its end
+SetClass,stand-in,accepted and does nothing: the class of a character is the one its record gives
+GetActorAggroRadiusViolated,stand-in,answers 0: the aggression radius is not watched
+IsContinuingPackagePCNear,stand-in,answers 0: the packages that go on while the player is near are not told apart

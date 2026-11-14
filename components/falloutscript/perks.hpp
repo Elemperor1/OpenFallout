@@ -50,6 +50,9 @@ namespace FalloutScript
         constexpr int hackingModifier = 30;
         /// More than 0 lets the player repair a weapon with another of the same kind (Mac round 12AW S12 F6, entry point 0x30)
         constexpr int repairWithSimilar = 48;
+        /// New Vegas: 1 or more lets the player fast travel while carrying more than it can (entry point 0x33, read by
+        /// the predicate of the world map, FalloutNV.exe 0x93D660)
+        constexpr int travelOverencumbered = 51;
         constexpr int actionPointRegen = 39;
         constexpr int actionPointCost = 40;
         constexpr int runSpeed = 42;

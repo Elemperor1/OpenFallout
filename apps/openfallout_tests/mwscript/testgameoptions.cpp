@@ -49,4 +49,31 @@ namespace
         fallout3.setHardcoreMode(true);
         EXPECT_FALSE(fallout3.hardcoreMode());
     }
+
+    // The row of the needs in the display (FalloutNV.exe 0x7739F0): the three needs are drawn clear while the mode is
+    // off, and the status says whether it is on
+    TEST(FalloutGameOptions, theNeedsRowIsClearWhileHardcoreIsOff)
+    {
+        OFWorld::ESMStore store;
+        store.setUp();
+        OFScript::FalloutScripts vegas(store, FalloutScript::Game::NewVegas, 0x14);
+
+        OFScript::FalloutScripts::NeedsStatus off = vegas.needsStatus();
+        EXPECT_FALSE(off.mHardcore);
+        for (int need = 0; need < 3; ++need)
+        {
+            EXPECT_EQ(off.mTiles[need].mColor, 1);
+            EXPECT_EQ(off.mTiles[need].mAlpha, 0);
+            EXPECT_EQ(off.mLevels[need], 0);
+            // (no stage records in the store: the meter ends at the default)
+            EXPECT_EQ(off.mMost[need], 1000);
+        }
+        EXPECT_EQ(off.mCrippledParts, 0);
+
+        vegas.setHardcoreMode(true);
+        const OFScript::FalloutScripts::NeedsStatus on = vegas.needsStatus();
+        EXPECT_TRUE(on.mHardcore);
+        // a need at nothing is below the first threshold: clear
+        EXPECT_EQ(on.mTiles[0].mAlpha, 0);
+    }
 }

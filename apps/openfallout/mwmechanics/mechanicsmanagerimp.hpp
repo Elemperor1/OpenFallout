@@ -159,6 +159,8 @@ namespace OFMechanics
 
         void getObjectsInRange(const osg::Vec3f& position, float radius, std::vector<OFWorld::Ptr>& objects) override;
         void getActorsInRange(const osg::Vec3f& position, float radius, std::vector<OFWorld::Ptr>& objects) override;
+        void getFalloutActorsInRange(
+            const osg::Vec3f& position, float radius, std::vector<OFWorld::Ptr>& objects) override;
 
         /// Check if there are actors in selected range
         bool isAnyActorInRange(const osg::Vec3f& position, float radius) override;

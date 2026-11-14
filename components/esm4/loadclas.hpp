@@ -53,6 +53,8 @@ namespace ESM4
         std::string mDesc;
         std::string mIcon;
         Data mData;
+        /// The flags of DATA in Fallout 3 and New Vegas (1 playable, 2 guard); 0 when the record has none
+        std::uint32_t mFo3Flags = 0;
 
         void load(ESM4::Reader& reader);
         // void save(ESM4::Writer& reader) const;

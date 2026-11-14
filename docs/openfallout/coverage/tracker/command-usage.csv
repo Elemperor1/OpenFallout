@@ -362,7 +362,7 @@ code,name,state,fo3_calls,fo3_scripts,fo3_conditions,nv_calls,nv_scripts,nv_cond
 0x1227,FadeSFX,todo,4,2,0,0,0,0,4
 0x1229,SetPCCanUsePowerArmor,todo,2,2,0,2,2,0,4
 0x125B,AddCardToPlayer,todo,0,0,0,4,3,0,4
-0x126B,IsAlwaysHardcore,todo,0,0,0,4,4,0,4
+0x126B,IsAlwaysHardcore,done,0,0,0,4,4,0,4
 0x10AE,WakeUpPC,todo,0,0,0,3,1,0,3
 0x10E0,GetVATSMode,done,0,0,0,2,1,1,3
 0x115B,SetNoAvoidance,todo,0,0,0,3,3,0,3
@@ -382,7 +382,7 @@ code,name,state,fo3_calls,fo3_scripts,fo3_conditions,nv_calls,nv_scripts,nv_cond
 0x107C,StartMisterSandMan,todo,1,1,0,1,1,0,2
 0x1095,GetIsCurrentWeather,todo,0,0,0,2,2,0,2
 0x10B8,StopWaiting,todo,2,2,0,0,0,0,2
-0x10BC,GetPCSleepHours,todo,2,1,0,0,0,0,2
+0x10BC,GetPCSleepHours,done,2,1,0,0,0,0,2
 0x110C,TrapUpdate,todo,1,1,0,1,1,0,2
 0x1159,SetAllReachable,todo,0,0,0,2,2,0,2
 0x115D,SetSceneIsComplex,todo,0,0,0,2,2,0,2
@@ -397,11 +397,11 @@ code,name,state,fo3_calls,fo3_scripts,fo3_conditions,nv_calls,nv_scripts,nv_cond
 0x121F,Sqrt,todo,0,0,0,2,1,0,2
 0x123E,GetReputationPct,todo,0,0,0,0,0,2,2
 0x1243,SetScreenSplatterFade,todo,0,0,0,2,2,0,2
-0x124B,SetHardcore,stand-in,0,0,0,2,1,0,2
+0x124B,SetHardcore,done,0,0,0,2,1,0,2
 0x126D,ResetXP,done,0,0,0,2,2,0,2
 0x1270,EnableLoadingMenu,todo,0,0,0,2,2,0,2
 0x1272,IsActorRefEssential,done,0,0,0,2,1,0,2
-0x1279,ShowSleepWaitMenu,todo,0,0,0,2,2,0,2
+0x1279,ShowSleepWaitMenu,done,0,0,0,2,2,0,2
 0x1019,IsMoving,todo,0,0,1,0,0,0,1
 0x103D,GetAlarmed,todo,0,0,0,1,1,0,1
 0x1051,GetArmorRating,done,0,0,0,1,1,0,1
@@ -610,7 +610,7 @@ code,name,state,fo3_calls,fo3_scripts,fo3_conditions,nv_calls,nv_scripts,nv_cond
 0x1261,SetCasinoCheatLevel,todo,0,0,0,0,0,0,0
 0x1265,ObjectUnderReticle,todo,0,0,0,0,0,0,0
 0x1267,RevokeCode,todo,0,0,0,0,0,0,0
-0x126A,DisableHardcoreTracking,todo,0,0,0,0,0,0,0
+0x126A,DisableHardcoreTracking,done,0,0,0,0,0,0,0
 0x126E,GetDLCCount,todo,0,0,0,0,0,0,0
 0x1271,IsLoadingMenuEnabled,todo,0,0,0,0,0,0,0
 0x1274,IsNoHumanGoreExe,todo,0,0,0,0,0,0,0

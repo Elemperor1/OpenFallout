@@ -29,6 +29,7 @@
 #include <components/esm4/loadnpc.hpp>
 #include <components/esm4/loadproj.hpp>
 #include <components/esm4/loadweap.hpp>
+#include <components/falloutscript/actorstatus.hpp>
 #include <components/falloutscript/footsteps.hpp>
 #include <components/misc/resourcehelpers.hpp>
 #include <components/resource/resourcesystem.hpp>
@@ -298,6 +299,9 @@ namespace OFRender
         setTextKeyListener(nullptr);
         if (mAdvanceCallback != nullptr)
             mInsert->removeUpdateCallback(mAdvanceCallback);
+        // The scripts are not told any more of what an actor that is not in the scene does
+        if (mReported != 0 && OFBase::Environment::get().hasFalloutScripts())
+            OFBase::Environment::get().getFalloutScripts()->forgetBody(mReported);
     }
 
     void FalloutActorAnimation::playTextKeySound(std::string_view text)
@@ -504,11 +508,13 @@ namespace OFRender
         // A dead body does nothing more: only the impact or the flash that was on it when it fell runs out
         if (mFall != nullptr)
         {
+            publishActivity();
             updateEffects(duration);
             return;
         }
         updateGait(duration);
         runAnimation(duration);
+        publishActivity();
         watchPose(duration);
         logPose(duration);
         logWeapon(duration);
@@ -869,6 +875,9 @@ namespace OFRender
                     Log(Debug::Warning) << "Cannot tell whether " << mPtr.getCellRef().getRefId() << " sneaks: " << error.what();
             }
         }
+        // A character that a script forced to sneak (SetForceSneak) sneaks, whether the mechanics know it or not
+        if (!sneak && mPoseKind == 0 && OFBase::Environment::get().hasFalloutScripts())
+            sneak = OFBase::Environment::get().getFalloutScripts()->actorForcesSneak(source);
         const std::string_view prefix = mDrawn ? falloutWeaponPrefix(mWeaponType) : std::string_view();
 
         // In the air, touching the ground again, and swimming: the characters of the world are told whether they are in
@@ -886,6 +895,7 @@ namespace OFRender
             mAirTime = world->isOnGround(source) || swimming ? 0.f : mAirTime + mFrameTime;
             airborne = mAirTime > airborneAfter;
         }
+        mSwimming = swimming;
         if (mPoseKind != 0 || mFirstPerson || isDown())
         {
             airborne = false;
@@ -1158,7 +1168,103 @@ namespace OFRender
             disable(group);
         play(group, OFRender::AnimPriority(priority), OFRender::BlendMask_UpperBody, !loop, 1.f, "start", "stop", 0.f,
             loop ? ~0u : 0u, false);
+        // What GetAnimAction tells while it plays (the aim that holds the weapon ready is no action)
+        switch (move)
+        {
+            case FalloutWeaponMove::Attack:
+                startAction(FalloutScript::AnimAction::attack, group);
+                break;
+            case FalloutWeaponMove::Equip:
+                startAction(FalloutScript::AnimAction::equip, group);
+                break;
+            case FalloutWeaponMove::Unequip:
+                startAction(FalloutScript::AnimAction::unequip, group);
+                break;
+            case FalloutWeaponMove::Recoil:
+                startAction(FalloutScript::AnimAction::recoil, group);
+                break;
+            case FalloutWeaponMove::Aim:
+                break;
+        }
         return group;
+    }
+
+    void FalloutActorAnimation::startAction(int action, const std::string& group)
+    {
+        mActionKind = action;
+        mActionGroup = group;
+    }
+
+    void FalloutActorAnimation::publishActivity()
+    {
+        // The arms that the player sees are no one: it is the body that is the player
+        if (mFirstPerson || !OFBase::Environment::get().hasFalloutScripts())
+            return;
+        namespace Move = FalloutScript::Movement;
+        // How fast it must turn for the games' IsTurning to say it does (the animation of a turn plays from the same
+        // rate)
+        constexpr float turnFrom = 0.5f;
+
+        const bool down = isDown();
+        unsigned movement = 0;
+        if (!down)
+        {
+            if (mGait != FalloutGait::Idle)
+            {
+                switch (mDirection)
+                {
+                    case FalloutDirection::Forward:
+                        movement |= Move::forward;
+                        break;
+                    case FalloutDirection::Backward:
+                        movement |= Move::backward;
+                        break;
+                    case FalloutDirection::Left:
+                        movement |= Move::left;
+                        break;
+                    case FalloutDirection::Right:
+                        movement |= Move::right;
+                        break;
+                }
+                movement |= mGait == FalloutGait::Run ? Move::run : Move::walk;
+            }
+            if (mSneaking)
+                movement |= Move::sneak;
+            if (mTurnRate < -turnFrom)
+                movement |= Move::turnLeft;
+            else if (mTurnRate > turnFrom)
+                movement |= Move::turnRight;
+        }
+
+        // A script's own animation comes before the weapon's moves: it is what the actor is told to do. A seated or lying
+        // pose is a special idle of the games.
+        const bool scripted = !down && !mScriptIdleGroup.empty() && isPlaying(mScriptIdleGroup);
+        if (mScriptIdleWasPlaying && !scripted)
+            mScriptIdleDone = true;
+        mScriptIdleWasPlaying = scripted;
+        int action = FalloutScript::AnimAction::none;
+        if (!down)
+        {
+            if (scripted)
+                action = FalloutScript::AnimAction::forcedByScript;
+            else if (!mActionGroup.empty() && isPlaying(mActionGroup))
+                action = mActionKind;
+            else if (mPoseKind != 0)
+                action = FalloutScript::AnimAction::specialIdle;
+        }
+
+        const bool idleDone = mScriptIdleDone;
+        const bool swimming = mSwimming && !down;
+        const float walkSpeed = mGaits.mHasWalk ? mGaits.mWalkVelocity : 0.f;
+        mReported = OFBase::Environment::get().getFalloutScripts()->noteActivity(
+            mMotionSource.isEmpty() ? mPtr : mMotionSource, [=](FalloutScript::ActorActivity& activity) {
+                activity.mMovement = movement;
+                activity.mSwimming = swimming;
+                activity.mAnimAction = action;
+                activity.mIdlePlaying = scripted;
+                activity.mIdleDoneOnce = idleDone;
+                activity.mWalkSpeed = walkSpeed;
+            });
     }
 
     void FalloutActorAnimation::drawWeapon(std::string_view model, int animationType, std::uint32_t weapon)
@@ -1560,6 +1666,10 @@ namespace OFRender
             disable(group);
         play(group, OFRender::AnimPriority(OFMechanics::Priority_Scripted), OFRender::BlendMask_All, true, 1.f, "start",
             "stop", 0.f, 0u, false);
+        // GetAnimAction, IsIdlePlaying and GetIdleDoneOnce follow it from here
+        mScriptIdleGroup = group;
+        mScriptIdleDone = false;
+        mScriptIdleWasPlaying = false;
         return true;
     }
 

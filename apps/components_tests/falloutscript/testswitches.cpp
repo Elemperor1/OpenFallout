@@ -13,8 +13,7 @@ namespace
     using namespace FalloutScriptTest;
     using FalloutScript::FormId;
 
-    constexpr std::uint16_t OpSetHardcore = 0x124B;
-    constexpr std::uint16_t OpIsHardcore = 0x124A;
+    constexpr std::uint16_t OpSetPCYoung = 0x11E6;
     constexpr std::uint16_t OpIsXBox = 0x1135;
     constexpr std::uint16_t OpAutoDisplayObjectives = 0x1225;
     constexpr std::uint16_t OpResetPipboyManager = 0x1201;
@@ -37,14 +36,14 @@ namespace
         }
     };
 
-    TEST(FalloutScriptSwitchesTest, the_mode_of_play_is_answered_as_it_was_set)
+    TEST(FalloutScriptSwitchesTest, a_switch_that_is_set_is_kept_as_it_was_set)
     {
         Runner run;
-        EXPECT_EQ(run.call(OpIsHardcore), 0.0);
-        run.call(OpSetHardcore, { 1 });
-        EXPECT_EQ(run.call(OpIsHardcore), 1.0);
-        run.call(OpSetHardcore, { 0 });
-        EXPECT_EQ(run.call(OpIsHardcore), 0.0);
+        EXPECT_EQ(run.mSwitches.get("SetPCYoung"), 0);
+        run.call(OpSetPCYoung, { 1 });
+        EXPECT_EQ(run.mSwitches.get("SetPCYoung"), 1);
+        run.call(OpSetPCYoung, { 0 });
+        EXPECT_EQ(run.mSwitches.get("SetPCYoung"), 0);
     }
 
     TEST(FalloutScriptSwitchesTest, a_switch_without_an_argument_is_on_and_one_with_0_is_off)
@@ -83,7 +82,7 @@ namespace
     TEST(FalloutScriptSwitchesTest, a_saved_game_brings_the_switches_back)
     {
         FalloutScript::Switches switches;
-        switches.set("SetHardcore", 1);
+        switches.set("AutoDisplayObjectives", 1);
         switches.set("SetPCYoung", 0);
         switches.set("AutoDisplayObjectives", 1);
         FalloutScript::SaveWriter out;
@@ -94,7 +93,6 @@ namespace
         FalloutScript::SaveReader in(bytes);
         FalloutScript::readSwitches(loaded, in, FalloutScript::switchesSectionVersion);
         EXPECT_TRUE(in.atEnd());
-        EXPECT_EQ(loaded.get("SetHardcore"), 1);
         EXPECT_EQ(loaded.get("AutoDisplayObjectives"), 1);
         // A switch that is off is the same as one never set
         EXPECT_EQ(loaded.all().count("SetPCYoung"), 0u);
