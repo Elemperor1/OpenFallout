@@ -317,8 +317,14 @@ namespace
         data.mStages = { stage(50, 0, DestructionStage::capDamage), stage(0, 1, DestructionStage::disable) };
         EXPECT_FALSE(Rule::disables(data, 50, 100));
         EXPECT_FALSE(Rule::disables(data, 51, 100));
+        EXPECT_FALSE(Rule::disables(data, 20, 100)); // the stage at 0 is not reached yet
         EXPECT_TRUE(Rule::disables(data, 0, 100));
-        EXPECT_TRUE(Rule::disables(data, 20, 100));
+        // A stage that disables under the cap is reached by a blow through the cap, and not while the health is at it
+        DestructionData middle;
+        middle.mHealth = 100;
+        middle.mStages = { stage(50, 0, DestructionStage::capDamage), stage(30, 1, DestructionStage::disable) };
+        EXPECT_FALSE(Rule::disables(middle, 50, 100));
+        EXPECT_TRUE(Rule::disables(middle, 20, 100));
 
         // The same as a thing is hit twice and then loaded again
         const DestructionOutcome first = Rule::damage(data, 100, 100, 100, std::nullopt);
