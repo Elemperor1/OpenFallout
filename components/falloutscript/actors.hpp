@@ -109,6 +109,9 @@ namespace FalloutScript
         /// Everything the holder has (the form of the item and how many, in the order of the forms). False when the
         /// host can not tell yet what the record holds, for a reference in a cell that is not loaded.
         bool items(FormId holder, std::vector<std::pair<FormId, int>>& result);
+        /// Forgets what the holder has and what scripts did to it: the next question asks the record again, so the
+        /// inventory is what a new one is (ResetInventory). Factions, death and the worn state are not touched.
+        void resetItems(FormId holder);
 
         /// A change that a script made to what a holder has: a positive count was added, a negative one taken away
         struct ItemChange

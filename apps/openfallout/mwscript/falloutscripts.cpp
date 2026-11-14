@@ -286,8 +286,10 @@ namespace OFScript
             mInterpreter, mMapMarkers, [this](FalloutScript::FormId marker) { markerShown(marker); });
         FalloutScript::addPresentationCommands(mInterpreter, mPresentation, *this);
         FalloutScript::addSwitchCommands(mInterpreter, mSwitches);
+        installWorldRules();
         FalloutScript::addMagicCommands(mInterpreter, mMagic, *this);
         FalloutScript::addFormListCommands(mInterpreter, mFormLists);
+        setupSpawn();
         FalloutScript::addPlayerProgressCommands(mInterpreter, mProgress);
         // The perks that change what experience is gained apply to what scripts reward as well
         mInterpreter.setHandler("RewardXP", [this](FalloutScript::CallContext& call) {
@@ -782,6 +784,7 @@ namespace OFScript
         mHotKeys.reset();
         mPresentation.clear();
         mSwitches.clear();
+        mWorldState.clear();
         mMagic.clear();
         {
             const std::lock_guard lock(mTextureSwapMutex);
@@ -797,6 +800,7 @@ namespace OFScript
             mLoadAsked.clear();
         }
         mFormLists.clear();
+        clearSpawn();
         mProgress.clear();
         mChallenges.reset();
         {
@@ -951,6 +955,7 @@ namespace OFScript
             reportMissingCommands();
         dropObjectsThatLeft();
         mObjects.setSecondsPassed(frametime);
+        updateWorldRules(frametime);
         updateFurniture();
         updateDoors();
         updateTextureSwaps();
@@ -1066,6 +1071,7 @@ namespace OFScript
         if (mTriggerShapes.size() != volumesBefore)
             Log(Debug::Info) << "Trigger volumes: " << (mTriggerShapes.size() - volumesBefore) << " in a loaded cell, "
                              << mTriggerShapes.size() << " in all";
+        spawnCellLoaded(cell);
     }
 
     void FalloutScripts::registerTrigger(const OFWorld::Ptr& ptr, FalloutScript::FormId reference)
@@ -1312,6 +1318,7 @@ namespace OFScript
             }
             return true;
         });
+        spawnCellUnloaded(cell);
     }
 
     bool FalloutScripts::activated(const OFWorld::Ptr& object, const OFWorld::Ptr& actor)
@@ -2168,30 +2175,39 @@ namespace OFScript
         /// inventory, its AI data): the end of its chain of templates. A levelled list in the place of a template gives
         /// one of its characters, the one that the cell shows for this reference (the chain is followed with the seed
         /// of the reference, as for the level). The record itself when the chain ends without a record that has them.
-        const ESM4::Npc& templateRecordOf(
-            const OFWorld::ESMStore& store, const ESM4::Npc& npc, std::uint16_t flag, std::uint32_t seed)
+        const ESM4::Npc& templateRecordOf(const OFWorld::ESMStore& store, const ESM4::Npc& npc, std::uint16_t flag,
+            std::uint32_t seed, const ESM4::SpawnRoll& roll = ESM4::SpawnRoll{ OFClass::ESM4Impl::sDefaultLevel, 0 })
         {
             const OFClass::StoreWornArmorSource source(store);
-            const ESM4::Npc* owner
-                = ESM4::templateOwner(ESM4::templateChain(source, npc, OFClass::ESM4Impl::sDefaultLevel, seed), flag);
+            const ESM4::Npc* owner = ESM4::templateOwner(
+                ESM4::templateChain(source, npc, roll.mLevel, seed, nullptr, roll.mLevelMod), flag);
             return owner != nullptr ? *owner : npc;
         }
 
         /// As above, for a creature
-        const ESM4::Creature& templateRecordOf(
-            const OFWorld::ESMStore& store, const ESM4::Creature& creature, std::uint16_t flag, std::uint32_t seed)
+        const ESM4::Creature& templateRecordOf(const OFWorld::ESMStore& store, const ESM4::Creature& creature,
+            std::uint16_t flag, std::uint32_t seed,
+            const ESM4::SpawnRoll& roll = ESM4::SpawnRoll{ OFClass::ESM4Impl::sDefaultLevel, 0 })
         {
             const OFClass::StoreCreatureSource source(store);
             const ESM4::Creature* owner = ESM4::creatureTemplateOwner(
-                ESM4::creatureTemplateChain(source, creature, OFClass::ESM4Impl::sDefaultLevel, seed), flag);
+                ESM4::creatureTemplateChain(source, creature, roll.mLevel, seed, roll.mLevelMod), flag);
             return owner != nullptr ? *owner : creature;
+        }
+
+        /// The level and level modifier that the levelled lists of an actor are rolled for: those of its placement
+        /// when scripts placed it (PlaceLeveledActorAtMe), else the level the cells use
+        ESM4::SpawnRoll rollOf(FalloutScript::FormId reference)
+        {
+            return ESM4::spawnRollOf(ESM::FormId::fromUint32(reference), OFClass::ESM4Impl::sDefaultLevel);
         }
 
         /// The record that has the stats of a character
         template <class Record>
-        const Record& statsRecordOf(const OFWorld::ESMStore& store, const Record& record, std::uint32_t seed)
+        const Record& statsRecordOf(
+            const OFWorld::ESMStore& store, const Record& record, std::uint32_t seed, const ESM4::SpawnRoll& roll)
         {
-            return templateRecordOf(store, record, Record::Template_UseStats, seed);
+            return templateRecordOf(store, record, Record::Template_UseStats, seed, roll);
         }
 
         /// The local number, in the first master, of the weapon "Fists" of both games, which the executables take for a
@@ -2316,12 +2332,15 @@ namespace OFScript
         };
         if (base.isZeroOrUnset())
             return true;
+        // A placed actor is rolled for the level it was placed at, and an inventory that was rebuilt is rolled again
+        const ESM4::SpawnRoll roll = rollOf(holder);
         const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(holder), base);
+        const std::uint32_t itemSeed = seed + inventoryGeneration(holder) * 2246822519u;
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
         {
             // The inventory is the one of the record that has it: a template that a levelled list of characters gives
             // is followed with the seed of the reference, as the armor the character is shown wearing is
-            take(templateRecordOf(mStore, *npc, ESM4::Npc::Template_UseInventory, seed).mInventory);
+            take(templateRecordOf(mStore, *npc, ESM4::Npc::Template_UseInventory, seed, roll).mInventory);
             // What the levelled lists of the inventory give is carried as well, as many of each as they gave: armor,
             // whether the character can wear it or not (what is worn is for startingArmor to say), and weapons,
             // ammunition and the rest. The pieces that the inventory lists itself are in it already.
@@ -2329,7 +2348,7 @@ namespace OFScript
             {
                 const OFClass::StoreWornArmorSource source(mStore);
                 const ESM4::CharacterArmor given
-                    = ESM4::characterArmor(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed);
+                    = ESM4::characterArmor(source, *npc, roll.mLevel, itemSeed);
                 for (const ESM4::ListedArmor& piece : given.mFromLists)
                     give(numberOf(piece.mArmor->mId), piece.mCount);
                 for (const ESM4::ListedItem& item : given.mOtherFromLists)
@@ -2340,11 +2359,12 @@ namespace OFScript
         else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
         {
             const std::vector<ESM4::InventoryItem>& inventory
-                = templateRecordOf(mStore, *creature, ESM4::Creature::Template_UseInventory, seed).mInventory;
+                = templateRecordOf(mStore, *creature, ESM4::Creature::Template_UseInventory, seed, roll)
+                      .mInventory;
             take(inventory);
             const OFClass::StoreWornArmorSource source(mStore);
             const ESM4::CharacterArmor given
-                = ESM4::inventoryArmor(source, inventory, OFClass::ESM4Impl::sDefaultLevel, seed);
+                = ESM4::inventoryArmor(source, inventory, roll.mLevel, itemSeed);
             for (const ESM4::ListedArmor& piece : given.mFromLists)
                 give(numberOf(piece.mArmor->mId), piece.mCount);
             for (const ESM4::ListedItem& item : given.mOtherFromLists)
@@ -2357,7 +2377,7 @@ namespace OFScript
             take(container->mInventory);
             const OFClass::StoreWornArmorSource source(mStore);
             const ESM4::CharacterArmor given
-                = ESM4::inventoryArmor(source, container->mInventory, OFClass::ESM4Impl::sDefaultLevel, seed);
+                = ESM4::inventoryArmor(source, container->mInventory, roll.mLevel, itemSeed);
             for (const ESM4::ListedArmor& piece : given.mFromLists)
                 give(numberOf(piece.mArmor->mId), piece.mCount);
             for (const ESM4::ListedItem& item : given.mOtherFromLists)
@@ -2441,15 +2461,17 @@ namespace OFScript
         // What the character is shown wearing: the armor of its inventory and of the lists in it, chosen with the seed
         // of the reference and the level that the cell uses, of which the pieces that show are worn (one that covers
         // no part of the body, or has no model for its sex, is not)
+        const ESM4::SpawnRoll roll = rollOf(actor);
         const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
+        const std::uint32_t itemSeed = seed + inventoryGeneration(actor) * 2246822519u;
         const OFClass::StoreWornArmorSource source(mStore);
-        const auto chain = ESM4::templateChain(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed);
+        const auto chain = ESM4::templateChain(source, *npc, roll.mLevel, seed, nullptr, roll.mLevelMod);
         const ESM4::Npc* traitsOwner = ESM4::templateOwner(chain, ESM4::Npc::Template_UseTraits);
         if (traitsOwner == nullptr)
             traitsOwner = npc;
         const bool female = (traitsOwner->mBaseConfig.fo3.flags & ESM4::Npc::FO3_Female) != 0;
         const ESM4::WornPieces worn
-            = ESM4::wornPieces(ESM4::wornArmor(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed), female);
+            = ESM4::wornPieces(ESM4::wornArmor(source, *npc, roll.mLevel, itemSeed), female);
         for (const ESM4::WornPiece& piece : worn.mPieces)
             armor.push_back(numberOf(piece.mArmor->mId));
         return true;
@@ -2586,11 +2608,11 @@ namespace OFScript
         // the cell shows for this reference)
         const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
-            return (templateRecordOf(mStore, *npc, ESM4::Npc::Template_UseBaseData, seed).mBaseConfig.fo3.flags
+            return (templateRecordOf(mStore, *npc, ESM4::Npc::Template_UseBaseData, seed, rollOf(actor)).mBaseConfig.fo3.flags
                        & ESM4::Npc::FO3_Essential)
                 != 0;
         if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
-            return (templateRecordOf(mStore, *creature, ESM4::Creature::Template_UseBaseData, seed)
+            return (templateRecordOf(mStore, *creature, ESM4::Creature::Template_UseBaseData, seed, rollOf(actor))
                            .mBaseConfig.fo3.flags
                        & ESM4::Creature::FO3_Essential)
                 != 0;
@@ -2658,8 +2680,8 @@ namespace OFScript
             if (attacker != 0 && baseOf(attacker, base) && !base.isZeroOrUnset())
                 if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
                 {
-                    const ESM4::FalloutStats& stats = statsRecordOf(
-                        mStore, *creature, OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(attacker), base))
+                    const ESM4::FalloutStats& stats = statsRecordOf(mStore, *creature,
+                        OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(attacker), base), rollOf(attacker))
                                                           .mFalloutStats;
                     if (stats.mKnown)
                     {
@@ -3466,9 +3488,10 @@ namespace OFScript
             // The AI data are part of the template that a record takes them from
             const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(reference), base);
             if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
-                read(templateRecordOf(mStore, *npc, ESM4::Npc::Template_UseAIData, seed).mFalloutAI);
+                read(templateRecordOf(mStore, *npc, ESM4::Npc::Template_UseAIData, seed, rollOf(reference)).mFalloutAI);
             else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
-                read(templateRecordOf(mStore, *creature, ESM4::Creature::Template_UseAIData, seed).mFalloutAI);
+                read(templateRecordOf(mStore, *creature, ESM4::Creature::Template_UseAIData, seed, rollOf(reference))
+                         .mFalloutAI);
         }
         return mFightTraits.emplace(reference, traits).first->second;
     }
@@ -3932,6 +3955,7 @@ namespace OFScript
         }
         for (const FalloutScript::ActorState::Death& death : deaths)
         {
+            spawnActorDied(death.mActor);
             mObjects.trigger(death.mActor, BlockType::OnDeath, death.mKiller, namesActor(death.mKiller));
             // One that fought nobody and had no package has no mind yet, and its body falls by it
             evaluatePackage(death.mActor);
@@ -3971,9 +3995,9 @@ namespace OFScript
         // the placed Powder Gangers are such records and had no factions at all, so no faction said they were enemies)
         const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
-            take(templateRecordOf(mStore, *npc, ESM4::Npc::Template_UseFactions, seed).mFactions);
+            take(templateRecordOf(mStore, *npc, ESM4::Npc::Template_UseFactions, seed, rollOf(actor)).mFactions);
         else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
-            take(templateRecordOf(mStore, *creature, ESM4::Creature::Template_UseFactions, seed).mFactions);
+            take(templateRecordOf(mStore, *creature, ESM4::Creature::Template_UseFactions, seed, rollOf(actor)).mFactions);
         return true;
     }
 
@@ -4007,7 +4031,7 @@ namespace OFScript
         const std::uint32_t seed = OFClass::ESM4Impl::actorSeed(ESM::FormId::fromUint32(actor), base);
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
         {
-            const ESM4::Npc& stats = statsRecordOf(mStore, *npc, seed);
+            const ESM4::Npc& stats = statsRecordOf(mStore, *npc, seed, rollOf(actor));
             if (!stats.mIsFONV)
                 return true;
             if (stats.mFalloutStats.mKnown)
@@ -4016,7 +4040,7 @@ namespace OFScript
         }
         else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
         {
-            const ESM4::Creature& stats = statsRecordOf(mStore, *creature, seed);
+            const ESM4::Creature& stats = statsRecordOf(mStore, *creature, seed, rollOf(actor));
             if (!stats.mIsFONV)
                 return true;
             if (stats.mFalloutStats.mKnown)
@@ -4246,11 +4270,11 @@ namespace OFScript
         const ESM4::FalloutStats* stats = nullptr;
         bool isCreature = false;
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
-            stats = &statsRecordOf(mStore, *npc, seed).mFalloutStats;
+            stats = &statsRecordOf(mStore, *npc, seed, rollOf(actor)).mFalloutStats;
         else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
         {
             isCreature = true;
-            stats = &statsRecordOf(mStore, *creature, seed).mFalloutStats;
+            stats = &statsRecordOf(mStore, *creature, seed, rollOf(actor)).mFalloutStats;
         }
         if (stats == nullptr || !stats->mKnown)
             return std::nullopt;
@@ -4703,7 +4727,7 @@ namespace OFScript
                     ? std::numeric_limits<float>::max()
                     : (speaker.getRefData().getPosition().asVec3() - player.getRefData().getPosition().asVec3())
                           .length();
-                if (!voiced || line.mForceSubtitles || Settings::gui().mSubtitles)
+                if (!voiced || line.mForceSubtitles || mWorldState.alwaysSubtitles(sayerOf(line)) || Settings::gui().mSubtitles)
                 {
                     // The subtitles of the display (the executable's HUD tile `Subtitles`): the line stays as long as
                     // its text takes at fNoticeTextTimePerCharacter (0.06 in the executable, 0.08 in the files), from
@@ -4962,7 +4986,8 @@ namespace OFScript
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
         {
             const OFClass::StoreWornArmorSource source(mStore);
-            const auto chain = ESM4::templateChain(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed);
+            const ESM4::SpawnRoll roll = rollOf(reference);
+            const auto chain = ESM4::templateChain(source, *npc, roll.mLevel, seed, nullptr, roll.mLevelMod);
             const ESM4::Npc* traitsOwner = ESM4::templateOwner(chain, ESM4::Npc::Template_UseTraits);
             const ESM4::Npc* statsOwner = ESM4::templateOwner(chain, ESM4::Npc::Template_UseStats);
             if (traitsOwner == nullptr)
@@ -4978,8 +5003,9 @@ namespace OFScript
         else if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
         {
             const OFClass::StoreCreatureSource source(mStore);
+            const ESM4::SpawnRoll roll = rollOf(reference);
             const ESM4::Creature* traitsOwner = ESM4::creatureTemplateOwner(
-                ESM4::creatureTemplateChain(source, *creature, OFClass::ESM4Impl::sDefaultLevel, seed),
+                ESM4::creatureTemplateChain(source, *creature, roll.mLevel, seed, roll.mLevelMod),
                 ESM4::Creature::Template_UseTraits);
             if (traitsOwner == nullptr)
                 traitsOwner = creature;
@@ -5021,17 +5047,19 @@ namespace OFScript
         if (const ESM4::Npc* npc = mStore.get<ESM4::Npc>().search(base))
         {
             const OFClass::StoreWornArmorSource source(mStore);
-            const ESM4::Npc* stats
-                = ESM4::templateOwner(ESM4::templateChain(source, *npc, OFClass::ESM4Impl::sDefaultLevel, seed),
-                    ESM4::Npc::Template_UseStats);
+            const ESM4::SpawnRoll roll = rollOf(actor);
+            const ESM4::Npc* stats = ESM4::templateOwner(
+                ESM4::templateChain(source, *npc, roll.mLevel, seed, nullptr, roll.mLevelMod),
+                ESM4::Npc::Template_UseStats);
             level = ESM4::actorLevel(stats != nullptr ? *stats : *npc, playerLevel);
             return true;
         }
         if (const ESM4::Creature* creature = mStore.get<ESM4::Creature>().search(base))
         {
             const OFClass::StoreCreatureSource source(mStore);
+            const ESM4::SpawnRoll roll = rollOf(actor);
             const ESM4::Creature* stats = ESM4::creatureTemplateOwner(
-                ESM4::creatureTemplateChain(source, *creature, OFClass::ESM4Impl::sDefaultLevel, seed),
+                ESM4::creatureTemplateChain(source, *creature, roll.mLevel, seed, roll.mLevelMod),
                 ESM4::Creature::Template_UseStats);
             level = ESM4::creatureLevel(stats != nullptr ? *stats : *creature, playerLevel);
             return true;
@@ -6423,7 +6451,7 @@ namespace OFScript
                 // Asked for at once, so that the rest of the script finds the object it was told the number of (also
                 // when a script that Lua started runs on the thread of Lua); the world makes it at the next frame
                 mPendingMade[id] = MadeObject{ base, reference, direction >= 0 && direction <= 3 ? direction : 0,
-                    static_cast<float>(distance), near };
+                    static_cast<float>(distance), near, 1 };
                 mMadeBases[id] = base;
                 if (first == 0)
                     first = id;
@@ -6449,12 +6477,17 @@ namespace OFScript
         try
         {
             // The same way the Morrowind script command places something next to an actor
-            OFWorld::ManualRef ref(mStore, refId(request.mBase), 1);
+            OFWorld::ManualRef ref(mStore, refId(request.mBase), std::max(request.mCount, 1));
             // A character or creature of Fallout is an actor too: its body is made at once, as in a cell
             ref.getPtr().mRef->mData.mPhysicsPostponed
                 = !ref.getPtr().getClass().isActor() && !isCharacterOrCreature(ref.getPtr());
+            // The equipment of a character is chosen when it is put in the cell: the level it was placed at is known by
+            // the number the world will give it
+            const ESM::FormId guessed = nextGeneratedNumber();
+            spawnRollFor(id, guessed);
             const OFWorld::Ptr placed = OFBase::Environment::get().getWorld()->safePlaceObject(
                 ref.getPtr(), near, near.getCell(), request.mDirection, request.mDistance);
+            spawnPlaced(id, placed, guessed);
             adoptObject(id, placed, true);
         }
         catch (const std::exception& error)
@@ -6555,6 +6588,8 @@ namespace OFScript
                     position.pos[axis] = object.mPosition[axis];
                     position.rot[axis] = object.mAngle[axis];
                 }
+                if (object.mId != 0)
+                    spawnRollFor(object.mId, object.mNumber);
                 const OFWorld::Ptr placed = [&] {
                     // Lua knows the object by the number the world made up for it, which it keeps in its saved data:
                     // the world gives the object the next number it has when the object is put in the cell, so the next

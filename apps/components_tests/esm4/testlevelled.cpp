@@ -123,11 +123,166 @@ namespace
 
         config.flags = 0x80;
         config.levelOrMult = 1500;
-        EXPECT_EQ(ESM4::levelFromConfig(config, 5), 8); // 7.5 rounds up
+        EXPECT_EQ(ESM4::levelFromConfig(config, 5), 7); // 7.5 is cut at the point (0x47DED0)
         config.calcMinlevel = 9;
         EXPECT_EQ(ESM4::levelFromConfig(config, 5), 9);
         config.calcMinlevel = 0;
         config.calcMaxlevel = 4;
         EXPECT_EQ(ESM4::levelFromConfig(config, 5), 4);
+    }
+
+    TEST(ESM4LevelledTest, theMinimumOfAnActorWinsOverItsMaximum)
+    {
+        ESM4::ACBS_FO3 config{};
+        config.flags = 0x80;
+        config.levelOrMult = 2000;
+        config.calcMinlevel = 30;
+        config.calcMaxlevel = 20;
+        EXPECT_EQ(ESM4::levelFromConfig(config, 5), 30); // below the minimum: the maximum is not looked at
+        EXPECT_EQ(ESM4::levelFromConfig(config, 20), 20); // 40 is above the minimum, so the maximum cuts it
+    }
+
+    TEST(ESM4LevelledTest, aMultiplierCutsTheFractionOfTheProduct)
+    {
+        ESM4::ACBS_FO3 config{};
+        config.flags = 0x80;
+        config.levelOrMult = 500;
+        EXPECT_EQ(ESM4::levelFromConfig(config, 5), 2); // 2.5
+        EXPECT_EQ(ESM4::levelFromConfig(config, 1), 1); // 0.5, and nothing is below level 1
+        config.levelOrMult = 1250;
+        EXPECT_EQ(ESM4::levelFromConfig(config, 3), 3); // 3.75
+    }
+
+    TEST(ESM4LevelledTest, theChanceOfNothingFromAGlobalIsItsLowByteWithTheFractionCut)
+    {
+        EXPECT_EQ(ESM4::levelledChanceFromGlobal(25.9f), 25);
+        EXPECT_EQ(ESM4::levelledChanceFromGlobal(0.f), 0);
+        EXPECT_EQ(ESM4::levelledChanceFromGlobal(100.f), 100);
+        EXPECT_EQ(ESM4::levelledChanceFromGlobal(256.f), 0);
+        EXPECT_EQ(ESM4::levelledChanceFromGlobal(300.f), 44);
+        EXPECT_EQ(ESM4::levelledChanceFromGlobal(-4.f), 252);
+        EXPECT_EQ(ESM4::levelledChanceFromGlobal(1e20f), 0); // does not fit a whole number
+    }
+
+    std::set<std::uint32_t> pickedIn(const std::vector<ESM4::LVLO>& entries, const ESM4::LevelledRules& rules, int level)
+    {
+        std::set<std::uint32_t> picked;
+        ESM4::LevelledRandom random(7);
+        for (int i = 0; i < 200; ++i)
+        {
+            std::vector<ESM4::LevelledChoice> chosen;
+            if (ESM4::chooseLevelledEntries(entries, rules, level, random, chosen) == ESM4::LevelledOutcome::Chosen)
+                for (const ESM4::LevelledChoice& entry : chosen)
+                    picked.insert(entry.mItem.toUint32());
+        }
+        return picked;
+    }
+
+    TEST(ESM4LevelledTest, aListThatCalculatesFromAllLevelsMayGiveAnyEntryAtOrBelowTheLevel)
+    {
+        const std::vector<ESM4::LVLO> entries{ entry(1, 0x10), entry(5, 0x11), entry(5, 0x12), entry(9, 0x13) };
+        EXPECT_THAT(pickedIn(entries, {}, 6), ElementsAre(0x11u, 0x12u));
+        ESM4::LevelledRules all;
+        all.mAllLevels = true;
+        EXPECT_THAT(pickedIn(entries, all, 6), ElementsAre(0x10u, 0x11u, 0x12u));
+        EXPECT_THAT(pickedIn(entries, all, 99), ElementsAre(0x10u, 0x11u, 0x12u, 0x13u));
+    }
+
+    TEST(ESM4LevelledTest, aLevelModifierMakesAListChooseFromAllLevels)
+    {
+        const std::vector<ESM4::LVLO> entries{ entry(1, 0x10), entry(5, 0x11), entry(9, 0x13) };
+        ESM4::LevelledRules modified;
+        modified.mLevelMod = 2;
+        EXPECT_THAT(pickedIn(entries, modified, 6), ElementsAre(0x10u, 0x11u));
+    }
+
+    TEST(ESM4LevelledTest, theSettingForTheLevelDifferenceKeepsTheLowestEntriesOut)
+    {
+        // The level does not go above the highest entry (8), so with a difference of 3 the entries below level 5 are
+        // left out: the first entry that is not, and every one after it, count
+        const std::vector<ESM4::LVLO> entries{ entry(1, 0x10), entry(5, 0x11), entry(6, 0x12), entry(8, 0x13) };
+        ESM4::LevelledRules all;
+        all.mAllLevels = true;
+        all.mLevelDifference = 3;
+        EXPECT_THAT(pickedIn(entries, all, 9), ElementsAre(0x11u, 0x12u, 0x13u));
+        all.mLevelDifference = 0;
+        EXPECT_THAT(pickedIn(entries, all, 9), ElementsAre(0x10u, 0x11u, 0x12u, 0x13u));
+    }
+
+    TEST(ESM4LevelledTest, anEntryOfLevelZeroIsNeverTheStartOfTheChoice)
+    {
+        const std::vector<ESM4::LVLO> entries{ entry(0, 0x10) };
+        ESM4::LevelledRandom random(1);
+        std::vector<ESM4::LevelledChoice> chosen;
+        EXPECT_EQ(ESM4::chooseLevelledEntries(entries, {}, 5, random, chosen), ESM4::LevelledOutcome::EmptyByLevel);
+    }
+
+    TEST(ESM4LevelledTest, aListThatUsesAllGivesEveryEntryWhateverItsLevel)
+    {
+        const std::vector<ESM4::LVLO> entries{ entry(1, 0x10), entry(50, 0x11) };
+        ESM4::LevelledRules all;
+        all.mUseAll = true;
+        ESM4::LevelledRandom random(1);
+        std::vector<ESM4::LevelledChoice> chosen;
+        EXPECT_EQ(ESM4::chooseLevelledEntries(entries, all, 2, random, chosen), ESM4::LevelledOutcome::Chosen);
+        EXPECT_EQ(chosen.size(), 2u);
+    }
+
+    TEST(ESM4LevelledTest, anAddedEntryGoesBehindTheEntriesAtItsLevelAndInFrontOfThoseAboveIt)
+    {
+        std::vector<ESM4::LVLO> entries{ entry(1, 0x10), entry(5, 0x11), entry(5, 0x12), entry(9, 0x13) };
+        ESM4::insertLevelledEntry(entries, entry(5, 0x20));
+        ASSERT_EQ(entries.size(), 5u);
+        EXPECT_EQ(entries[3].item, 0x20u);
+        EXPECT_EQ(entries[4].item, 0x13u);
+        ESM4::insertLevelledEntry(entries, entry(1, 0x21));
+        EXPECT_EQ(entries[1].item, 0x21u);
+        ESM4::insertLevelledEntry(entries, entry(40, 0x22));
+        EXPECT_EQ(entries.back().item, 0x22u);
+
+        std::vector<ESM4::LVLO> empty;
+        ESM4::insertLevelledEntry(empty, entry(3, 0x30));
+        EXPECT_EQ(empty.size(), 1u);
+
+        // the walk stops at the first entry above the new one, even when the list is not sorted
+        std::vector<ESM4::LVLO> unsorted{ entry(9, 0x40), entry(2, 0x41) };
+        ESM4::insertLevelledEntry(unsorted, entry(4, 0x42));
+        EXPECT_EQ(unsorted[0].item, 0x42u);
+    }
+
+    TEST(ESM4LevelledTest, theEntriesThatScriptsAddedTakePartInTheChoiceOfALaterRoll)
+    {
+        std::map<ESM::FormId, List> lists;
+        lists[id(0x20)].mLvlObject = { entry(1, 0x21) };
+        std::map<ESM::FormId, Thing> things{ { id(0x21), { 1 } }, { id(0x22), { 2 } } };
+        const auto find = [&](ESM::FormId formId) -> const Thing* {
+            const auto found = things.find(formId);
+            return found == things.end() ? nullptr : &found->second;
+        };
+        const auto findList = [&](ESM::FormId formId) -> const List* {
+            const auto found = lists.find(formId);
+            return found == lists.end() ? nullptr : &found->second;
+        };
+
+        ESM4::LevelledRandom before(1);
+        EXPECT_EQ(ESM4::resolveLevelledRecord<Thing>(find, findList, id(0x20), 9, before)->mValue, 1);
+
+        ESM4::setLevelledAdditions([](ESM::FormId list, const std::vector<ESM4::LVLO>& entries,
+                                       std::vector<ESM4::LVLO>& merged) {
+            if (list != id(0x20))
+                return false;
+            merged = entries;
+            ESM4::insertLevelledEntry(merged, entry(5, 0x22));
+            return true;
+        });
+        ESM4::LevelledRandom after(1);
+        // the added entry is at level 5, which is the highest at or below 9, so it is the one
+        EXPECT_EQ(ESM4::resolveLevelledRecord<Thing>(find, findList, id(0x20), 9, after)->mValue, 2);
+        // below its level the entry of the record is chosen as before
+        ESM4::LevelledRandom low(1);
+        EXPECT_EQ(ESM4::resolveLevelledRecord<Thing>(find, findList, id(0x20), 3, low)->mValue, 1);
+        ESM4::setLevelledAdditions({});
+        ESM4::LevelledRandom gone(1);
+        EXPECT_EQ(ESM4::resolveLevelledRecord<Thing>(find, findList, id(0x20), 9, gone)->mValue, 1);
     }
 }

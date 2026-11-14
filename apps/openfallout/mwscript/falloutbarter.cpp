@@ -254,6 +254,9 @@ namespace OFScript
 
     int FalloutScripts::itemValue(FalloutScript::FormId item)
     {
+        // The value that a script gave the item (SetItemValue) is the one every trade uses
+        if (int given = 0; mItemValues.find(item, given))
+            return given;
         const ESM::RefId record = refId(item);
         if (const ESM4::Weapon* weapon = mStore.get<ESM4::Weapon>().search(record))
             return static_cast<int>(weapon->mData.value);

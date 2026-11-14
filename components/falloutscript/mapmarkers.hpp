@@ -48,6 +48,15 @@ namespace FalloutScript
         /// is when the player is told. False for a reference that is no marker.
         bool show(FormId marker, bool withTravel);
 
+        /// The bit of a marker's flags that the editor calls "show all hidden": ShowAllMapMarkers leaves the markers that
+        /// have it alone when its third argument is not 0 (FalloutNV.exe 0x5B6D40)
+        static constexpr std::uint8_t keepHiddenFlag = 0x04;
+        /// What ShowAllMapMarkers does to one marker: with `keepHidden` a marker that has keepHiddenFlag is skipped;
+        /// otherwise the marker is hidden (visible and travel flags cleared) when `show` is false, and shown when it is
+        /// true (made a place to travel to when `withTravel`, and never made one that it is not by the call's lack of
+        /// it). True when the flags changed.
+        bool showOrHide(FormId marker, bool show, bool withTravel, bool keepHidden);
+
         /// The switches of EnableFastTravel. Fast travel is allowed in a new game.
         void enableFastTravel(bool enable, bool second, bool third);
         /// Whether scripts allow fast travel (the first switch)

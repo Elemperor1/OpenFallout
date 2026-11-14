@@ -17,7 +17,7 @@ namespace
     constexpr std::uint16_t OpIsHardcore = 0x124A;
     constexpr std::uint16_t OpIsXBox = 0x1135;
     constexpr std::uint16_t OpAutoDisplayObjectives = 0x1225;
-    constexpr std::uint16_t OpPlayBink = 0x1114;
+    constexpr std::uint16_t OpResetPipboyManager = 0x1201;
 
     struct Runner
     {
@@ -59,10 +59,10 @@ namespace
     TEST(FalloutScriptSwitchesTest, a_command_that_does_nothing_says_so_once_and_gives_nothing)
     {
         Runner run;
-        EXPECT_EQ(run.call(OpPlayBink, {}), 0.0);
-        EXPECT_EQ(run.call(OpPlayBink, {}), 0.0);
+        EXPECT_EQ(run.call(OpResetPipboyManager, {}), 0.0);
+        EXPECT_EQ(run.call(OpResetPipboyManager, {}), 0.0);
         ASSERT_EQ(run.mHost.mLog.size(), 1u);
-        EXPECT_THAT(run.mHost.mLog[0], HasSubstr("PlayBink"));
+        EXPECT_THAT(run.mHost.mLog[0], HasSubstr("ResetPipboyManager"));
         EXPECT_THAT(run.mHost.mLog[0], HasSubstr("does nothing"));
         EXPECT_EQ(run.call(OpIsXBox), 0.0);
     }

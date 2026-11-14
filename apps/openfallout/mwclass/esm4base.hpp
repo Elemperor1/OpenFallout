@@ -2,6 +2,7 @@
 #define GAME_MWCLASS_ESM4BASE_H
 
 #include <components/esm4/inventory.hpp>
+#include <components/esm4/levelled.hpp>
 #include <components/esm4/loadstat.hpp>
 #include <components/esm4/loadtact.hpp>
 #include <components/esm4/loadtree.hpp>
@@ -43,6 +44,13 @@ namespace OFClass
 
         // We don't handle ESM4 player stats yet, so for resolving levelled object we use an arbitrary number.
         constexpr int sDefaultLevel = 5;
+
+        /// The level and level modifier that the levelled lists of a placed actor are rolled for: those of its
+        /// placement when scripts placed it (PlaceLeveledActorAtMe), else the default level
+        inline ESM4::SpawnRoll actorRoll(const OFWorld::ConstPtr& ptr)
+        {
+            return ESM4::spawnRollOf(ptr.getCellRef().getRefNum(), sDefaultLevel);
+        }
 
         template <class LevelledRecord, class TargetRecord>
         const TargetRecord* resolveLevelled(const ESM::RefId& id, int level = sDefaultLevel)

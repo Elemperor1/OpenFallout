@@ -39,8 +39,9 @@ namespace ESM4
     // The records that a creature gets its model from, the creature itself first and then its template, the template
     // of that, and so on. A levelled list in the place of a template gives one of its creatures, by the level of the
     // player. The seed is what chooses the creature.
+    // `levelMod` is the level modifier of the placement (see LevelledRules).
     std::vector<const Creature*> creatureTemplateChain(
-        const CreatureSource& source, const Creature& creature, int playerLevel, std::uint32_t seed);
+        const CreatureSource& source, const Creature& creature, int playerLevel, std::uint32_t seed, int levelMod = 0);
 
     // What a creature shows: all paths are under meshes, as the records name them.
     struct CreatureModel

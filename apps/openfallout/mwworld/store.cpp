@@ -12,6 +12,7 @@
 #include <components/esm4/loadaloc.hpp>
 #include <components/esm4/loadaspc.hpp>
 #include <components/esm4/loaddehy.hpp>
+#include <components/esm4/loadeczn.hpp>
 #include <components/esm4/loadhung.hpp>
 #include <components/esm4/loadipct.hpp>
 #include <components/esm4/loadipds.hpp>
@@ -1200,6 +1201,7 @@ template class OFWorld::TypedDynamicStore<ESM4::DefaultObj>;
 template class OFWorld::TypedDynamicStore<ESM4::DialogInfo>;
 template class OFWorld::TypedDynamicStore<ESM4::Dialogue>;
 template class OFWorld::TypedDynamicStore<ESM4::Door>;
+template class OFWorld::TypedDynamicStore<ESM4::EncounterZone>;
 template class OFWorld::TypedDynamicStore<ESM4::Explosion>;
 template class OFWorld::TypedDynamicStore<ESM4::ImpactData>;
 template class OFWorld::TypedDynamicStore<ESM4::ImpactDataSet>;

@@ -1022,6 +1022,22 @@ namespace OFScript
                 FalloutScript::readFormLists(mFormLists, in, version);
             });
         section(
+            "spawn", 1,
+            [this](FalloutScript::SaveWriter& out) {
+                mLevelledLists.write(out);
+                mSpawnLevels.write(out);
+                mRespawn.write(out);
+                mItemValues.write(out);
+                mNameOverrides.write(out);
+            },
+            [this](FalloutScript::SaveReader& in, std::uint32_t version) {
+                mLevelledLists.read(in, version);
+                mSpawnLevels.read(in, version);
+                mRespawn.read(in, version);
+                mItemValues.read(in, version);
+                mNameOverrides.read(in, version);
+            });
+        section(
             "dialogue", FalloutScript::dialogueSectionVersion,
             [this](FalloutScript::SaveWriter& out) {
                 const std::lock_guard lock(mDialogueMutex);

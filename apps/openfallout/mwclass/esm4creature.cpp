@@ -61,8 +61,9 @@ namespace OFClass
         const OFWorld::ESMStore* store = OFBase::Environment::get().getESMStore();
         const ESM4::Creature& base = *ptr.get<ESM4::Creature>()->mBase;
         const StoreCreatureSource source(*store);
-        const std::vector<const ESM4::Creature*> chain
-            = ESM4::creatureTemplateChain(source, base, ESM4Impl::sDefaultLevel, ESM4Impl::actorSeed(ptr, base.mId));
+        const ESM4::SpawnRoll roll = ESM4Impl::actorRoll(ptr);
+        const std::vector<const ESM4::Creature*> chain = ESM4::creatureTemplateChain(
+            source, base, roll.mLevel, ESM4Impl::actorSeed(ptr, base.mId), roll.mLevelMod);
 
         data->mModel = ESM4::creatureModel(chain);
         // Fallout names a marker as the model of a creature that is not in the world

@@ -11,10 +11,12 @@ namespace ESM4
         // A chain of templates that is longer is a cycle or a mistake
         constexpr std::size_t maxTemplateDepth = 16;
 
-        const Creature* findInSource(const CreatureSource& source, ESM::FormId start, int level, LevelledRandom& random)
+        const Creature* findInSource(
+            const CreatureSource& source, ESM::FormId start, int level, LevelledRandom& random, int levelMod = 0)
         {
             return resolveLevelledRecord<Creature>([&source](ESM::FormId c) { return source.findCreature(c); },
-                [&source](ESM::FormId c) { return source.findLevelledCreature(c); }, start, level, random);
+                [&source](ESM::FormId c) { return source.findLevelledCreature(c); }, start, level, random, nullptr, 0,
+                levelMod);
         }
 
         bool hasSkeleton(const Creature& creature)
@@ -37,7 +39,7 @@ namespace ESM4
     }
 
     std::vector<const Creature*> creatureTemplateChain(
-        const CreatureSource& source, const Creature& creature, int playerLevel, std::uint32_t seed)
+        const CreatureSource& source, const Creature& creature, int playerLevel, std::uint32_t seed, int levelMod)
     {
         LevelledRandom random(seed ^ 0x5851F42Dull);
         std::vector<const Creature*> chain{ &creature };
@@ -48,7 +50,7 @@ namespace ESM4
                 break;
             // As for characters, a list in the place of a template is resolved for the level of the player: the level
             // of the record that names it is one it takes from its template
-            const Creature* next = findInSource(source, current.mBaseTemplate, playerLevel, random);
+            const Creature* next = findInSource(source, current.mBaseTemplate, playerLevel, random, levelMod);
             if (next == nullptr || std::find(chain.begin(), chain.end(), next) != chain.end())
                 break;
             chain.push_back(next);

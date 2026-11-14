@@ -50,6 +50,22 @@ namespace FalloutScript
         mChanges.clear();
     }
 
+    void ActorState::resetItems(FormId id)
+    {
+        const std::lock_guard lock(mMutex);
+        const auto found = mHolders.find(id);
+        if (found == mHolders.end())
+            return;
+        Holder& entry = found->second;
+        for (const auto& [item, count] : entry.mItems)
+            if (count > 0)
+                noteChange(id, item, -count);
+        entry.mItems.clear();
+        entry.mWorn.clear();
+        entry.mItemEdits.clear();
+        entry.mItemsKnown = false;
+    }
+
     void ActorState::knowItems(FormId id, Holder& entry)
     {
         if (entry.mItemsKnown)

@@ -75,7 +75,7 @@ namespace OFState
         ///
         /// \param bypass Skip new game mechanics.
 
-        void endGame();
+        void endGame() override;
 
         void resumeGame() override;
 

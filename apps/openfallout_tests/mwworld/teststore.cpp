@@ -20,6 +20,7 @@
 #include <components/esm4/common.hpp>
 #include <components/esm4/loadaloc.hpp>
 #include <components/esm4/loadaspc.hpp>
+#include <components/esm4/loadeczn.hpp>
 #include <components/esm4/loadipct.hpp>
 #include <components/esm4/loadipds.hpp>
 #include <components/esm4/loadmset.hpp>

@@ -115,11 +115,11 @@ namespace ESM4
                     = list->calcEachItemInCount() && !list->useAll() ? std::max<std::uint32_t>(count, 1) : 1;
                 const std::uint32_t perRoll = rolls > 1 ? copies : multiply(copies, std::max<std::uint32_t>(count, 1));
                 for (std::uint32_t roll = 0; roll < rolls && mRollsLeft > 0; ++roll)
-                    rollOnce(*list, depth, perRoll);
+                    rollOnce(listId, *list, depth, perRoll);
             }
 
             // The chance in a hundred that the list gives nothing: the value of the global variable that the list
-            // names, if the file has it, and otherwise the chance that the list holds
+            // names with the fraction cut off, if the file has it, and otherwise the chance that the list holds
             int chanceNone(const LevelledItem& list)
             {
                 if (list.mGlobal.isZeroOrUnset())
@@ -129,11 +129,10 @@ namespace ESM4
                     return list.chanceNone();
                 if (mTrace != nullptr)
                     ++mTrace->mListsWithGlobalChance;
-                const float value = global->mValue;
-                return value > 0.f ? static_cast<int>(std::lround(std::min(value, 100.f))) : 0;
+                return levelledChanceFromGlobal(global->mValue);
             }
 
-            void rollOnce(const LevelledItem& list, std::size_t depth, std::uint32_t copies)
+            void rollOnce(ESM::FormId listId, const LevelledItem& list, std::size_t depth, std::uint32_t copies)
             {
                 if (mRollsLeft == 0)
                     return;
@@ -143,7 +142,8 @@ namespace ESM4
                 rules.mAllLevels = list.calcAllLvlLessThanPlayer();
                 rules.mUseAll = list.useAll();
                 std::vector<LevelledChoice> chosen;
-                switch (chooseLevelledEntries(list.mLvlObject, rules, mLevel, mRandom, chosen))
+                std::vector<LVLO> storage;
+                switch (chooseLevelledEntries(levelledEntriesOf(listId, list.mLvlObject, storage), rules, mLevel, mRandom, chosen))
                 {
                     case LevelledOutcome::EmptyByChance:
                         if (mTrace != nullptr)
@@ -195,7 +195,8 @@ namespace ESM4
     }
 
     std::vector<const Npc*> templateChain(
-        const WornArmorSource& source, const Npc& npc, int playerLevel, std::uint32_t seed, WornArmorTrace* trace)
+        const WornArmorSource& source, const Npc& npc, int playerLevel, std::uint32_t seed, WornArmorTrace* trace,
+        int levelMod)
     {
         LevelledRandom random(seed ^ 0x5851F42Dull);
         std::vector<const Npc*> chain{ &npc };
@@ -208,7 +209,7 @@ namespace ESM4
             // names is one it takes from its template anyway, and 1 in nearly all of the records of the real files
             const Npc* next = resolveLevelledRecord<Npc>([&source](ESM::FormId id) { return source.findNpc(id); },
                 [&source](ESM::FormId id) { return source.findLevelledNpc(id); }, current.mBaseTemplate, playerLevel,
-                random, trace != nullptr ? &trace->mTemplateListsEmpty : nullptr);
+                random, trace != nullptr ? &trace->mTemplateListsEmpty : nullptr, 0, levelMod);
             if (next == nullptr || std::find(chain.begin(), chain.end(), next) != chain.end())
                 break;
             chain.push_back(next);

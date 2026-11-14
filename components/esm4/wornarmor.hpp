@@ -60,8 +60,9 @@ namespace ESM4
     // The records that a character gets traits, inventory and the rest from, the character itself first and then its
     // template, the template of that, and so on. A levelled list of characters in the place of a template gives one of
     // its characters, by the level of the player. The seed is what chooses the character.
+    // `levelMod` is the level modifier of the placement (see LevelledRules).
     std::vector<const Npc*> templateChain(const WornArmorSource& source, const Npc& npc, int playerLevel,
-        std::uint32_t seed, WornArmorTrace* trace = nullptr);
+        std::uint32_t seed, WornArmorTrace* trace = nullptr, int levelMod = 0);
 
     // The first record of the chain that does not take the thing the flag names (one of Npc::TemplateFlags) from the
     // next record, so that it is the record that has the thing. Null if every record of the chain takes it.

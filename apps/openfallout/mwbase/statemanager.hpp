@@ -40,6 +40,9 @@ namespace OFBase
 
         virtual void requestQuit() = 0;
 
+        /// Leaves the game that is running for the main menu (ExitGame of a script)
+        virtual void endGame() = 0;
+
         virtual bool hasQuitRequest() const = 0;
 
         virtual void askLoadRecent() = 0;

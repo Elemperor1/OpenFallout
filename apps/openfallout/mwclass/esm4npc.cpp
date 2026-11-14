@@ -226,7 +226,8 @@ namespace OFClass
         const std::uint32_t seed = equipmentSeed(ptr, *base);
         // Fallout chooses among the characters of a levelled template by the level of the character; the games before
         // it keep what they did.
-        auto npcRecs = base->mIsFONV ? ESM4::templateChain(armorSource, *base, ESM4Impl::sDefaultLevel, seed)
+        const ESM4::SpawnRoll roll = ESM4Impl::actorRoll(ptr);
+        auto npcRecs = base->mIsFONV ? ESM4::templateChain(armorSource, *base, roll.mLevel, seed, nullptr, roll.mLevelMod)
                                      : withBaseTemplates<ESM4::LevelledNpc, ESM4::Npc>(base);
 
         data->mTraits = chooseTemplate(npcRecs, ESM4::Npc::Template_UseTraits);
@@ -267,7 +268,7 @@ namespace OFClass
 
         if (base->mIsFONV)
         {
-            data->mEquippedArmor = ESM4::wornArmor(armorSource, *base, ESM4Impl::sDefaultLevel, seed);
+            data->mEquippedArmor = ESM4::wornArmor(armorSource, *base, roll.mLevel, seed);
             for (const ESM::FormId package : ESM4::characterPackages(npcRecs))
                 data->mPackages.push_back(store->get<ESM4::AIPackage>().search(package));
         }

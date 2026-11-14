@@ -430,7 +430,7 @@ namespace
         source.addGlobal(0x3001, 100.f);
         source.addGlobal(0x3002, 0.f);
         source.addGlobal(0x3003, 250.f);
-        source.addGlobal(0x3004, -4.f);
+        source.addGlobal(0x3004, -4.f); // a whole number's low byte is 252
         // The chance stored in the list is the opposite of what the global says, so that it shows which one counts
         source.addList(0x1010, { { 1, 0x1001 } }, 0, 0);
         source.addList(0x1011, { { 1, 0x1001 } }, 0, 100);
@@ -451,7 +451,7 @@ namespace
             EXPECT_TRUE(ESM4::wornArmor(source, alwaysNothing, playerLevel, seed, &trace).empty());
             EXPECT_FALSE(ESM4::wornArmor(source, alwaysSomething, playerLevel, seed, &trace).empty());
             EXPECT_TRUE(ESM4::wornArmor(source, aboveAHundred, playerLevel, seed, &trace).empty());
-            EXPECT_FALSE(ESM4::wornArmor(source, belowZero, playerLevel, seed, &trace).empty());
+            EXPECT_TRUE(ESM4::wornArmor(source, belowZero, playerLevel, seed, &trace).empty());
         }
         EXPECT_EQ(trace.mListsWithGlobalChance, 64u);
     }

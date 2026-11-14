@@ -59,6 +59,7 @@
 #include <components/falloutscript/hotkeys.hpp>
 #include <components/falloutscript/hud.hpp>
 #include <components/falloutscript/interpreter.hpp>
+#include <components/falloutscript/levelledlists.hpp>
 #include <components/falloutscript/itemmods.hpp>
 #include <components/falloutscript/itemuse.hpp>
 #include <components/falloutscript/ambient.hpp>
@@ -81,7 +82,10 @@
 #include <components/falloutscript/queries.hpp>
 #include <components/falloutscript/quests.hpp>
 #include <components/falloutscript/referencestate.hpp>
+#include <components/falloutscript/respawn.hpp>
 #include <components/falloutscript/regionline.hpp>
+#include <components/falloutscript/spawncommands.hpp>
+#include <components/falloutscript/spawnrules.hpp>
 #include <components/falloutscript/repair.hpp>
 #include <components/falloutscript/reputation.hpp>
 #include <components/falloutscript/roulette.hpp>
@@ -93,6 +97,7 @@
 #include <components/falloutscript/vats.hpp>
 #include <components/falloutscript/voicefiles.hpp>
 #include <components/falloutscript/wear.hpp>
+#include <components/falloutscript/worldcommands.hpp>
 
 #include <osg/Node>
 #include <osg/Vec3f>
@@ -147,6 +152,9 @@ namespace OFScript
     /// What a loaded game says that waits for a cell or for the next frame (falloutsavepending.hpp)
     struct PendingSave;
 
+    /// What the commands about the world ask of the host (falloutworld.cpp)
+    class WorldHost;
+
     /// Which commands the compiled scripts of the loaded content use: Fallout 3 when only its master is loaded, New
     /// Vegas otherwise (its table has all the commands of the other and the same names, and Tale of Two Wastelands runs
     /// on the engine of New Vegas).
@@ -191,6 +199,7 @@ namespace OFScript
     {
         template <class T>
         friend struct FalloutScript::SaveAccess;
+        friend class WorldHost;
 
     public:
         /// Whether the game that is played is New Vegas (Tale of Two Wastelands is played with its engine)
@@ -292,6 +301,13 @@ namespace OFScript
         FalloutScript::ActorState& actors() { return mActors; }
         FalloutScript::Equipment& equipment() { return mEquipment; }
         FalloutScript::ActorValues& actorValues() { return mActorValues; }
+        FalloutScript::SpawnLevels& spawnLevels() { return mSpawnLevels; }
+        FalloutScript::RespawnState& respawn() { return mRespawn; }
+        FalloutScript::LevelledLists& levelledLists() { return mLevelledLists; }
+        /// Whether the record of the character or creature has the flag that makes it come back when its cell resets
+        bool respawnsByRecord(FalloutScript::FormId actor);
+        /// Whether the record of the container has the flag that makes it fill again when its cell resets
+        bool respawnsContainerByRecord(FalloutScript::FormId container);
         /// The reference of the player
         FalloutScript::FormId playerReference() const { return mPlayer; }
 
@@ -2144,6 +2160,9 @@ namespace OFScript
         /// once a model is there (a card that is switched on later, a cell that was loaded again), on the thread of
         /// the frame
         void updateTextureSwaps();
+        /// The commands about the world (falloutworld.cpp): the maths, the sky, the cells and the odd corners
+        void installWorldRules();
+        void updateWorldRules(float frametime);
         /// The idle record named by its editor id, or the form when the name is empty; null when there is none
         const ESM4::IdleAnimation* findIdle(std::string_view name, FalloutScript::FormId form);
         /// The animation of the object a reference stands for, when it is in the scene and is no character
@@ -2510,9 +2529,31 @@ namespace OFScript
             int mDirection = 0;
             float mDistance = 0;
             Place mWhere; // where that reference was, which is where scripts see the new object until it is made
+            int mCount = 1; // how many of an item it stands for (a dropped stack)
         };
         /// Makes an object that PlaceAtMe asked for, at the start of the next frame
         void makeObject(FalloutScript::FormId id, const MadeObject& request);
+        /// Sets the spawn commands, the levelled list additions and the respawn rules up (falloutspawn.cpp)
+        void setupSpawn();
+        /// Forgets what the spawn rules kept, for a game that is started or loaded
+        void clearSpawn();
+        /// A cell was loaded: it resets if it has been left for long enough (its dead characters come back, its
+        /// containers are filled again)
+        void spawnCellLoaded(OFWorld::CellStore& cell);
+        /// A cell was unloaded: the game hour it was left at is kept
+        void spawnCellUnloaded(OFWorld::CellStore& cell);
+        /// A character died: the game hour it died at is kept
+        void spawnActorDied(FalloutScript::FormId actor);
+        /// The object of this number that the world is about to make carries the level that the made object `id` was
+        /// placed at, from the first moment (its equipment is chosen when it is put in the cell)
+        void spawnRollFor(FalloutScript::FormId id, const ESM::FormId& number);
+        /// The number the world gives the next object it makes up
+        ESM::FormId nextGeneratedNumber() const;
+        /// What the world made of the made object `id`: the roll it was given for the number that was guessed is the
+        /// one of the number it has
+        void spawnPlaced(FalloutScript::FormId id, const OFWorld::Ptr& placed, const ESM::FormId& guessed);
+        /// The inventory generation the seed of the lists of an actor or container holds (ResetInventory, respawn)
+        std::uint32_t inventoryGeneration(FalloutScript::FormId holder) const;
         /// Takes in an object that was placed while the game runs: scripts name it by `id`, which the world knows by
         /// the number it gave the object. It runs its script unless its cell is not loaded, where the cell starts it.
         void adoptObject(FalloutScript::FormId id, const OFWorld::Ptr& placed, bool run);
@@ -2617,6 +2658,8 @@ namespace OFScript
         FalloutScript::HotKeys mHotKeys;
         FalloutScript::Presentation mPresentation;
         FalloutScript::Switches mSwitches;
+        FalloutScript::WorldState mWorldState{ mSwitches };
+        std::shared_ptr<WorldHost> mWorldHost;
         /// Which script forms have been told that the program was started or that a game was started or loaded
         /// (GetGameRestarted, GetGameLoaded): the first set lasts as long as the program, the second until the next
         /// game is started or loaded
@@ -2624,6 +2667,20 @@ namespace OFScript
         std::set<FalloutScript::FormId> mRestartAsked;
         std::set<FalloutScript::FormId> mLoadAsked;
         FalloutScript::FormLists mFormLists;
+        /// What brings characters, creatures and items into the world and back (falloutspawn.cpp): the entries that
+        /// scripts added to levelled lists, the levels things were placed at, when cells were left and characters died,
+        /// the values and names scripts gave
+        class SpawnAdapter;
+        std::shared_ptr<SpawnAdapter> mSpawnAdapter;
+        FalloutScript::LevelledLists mLevelledLists;
+        FalloutScript::SpawnLevels mSpawnLevels;
+        FalloutScript::RespawnState mRespawn;
+        FalloutScript::ItemValues mItemValues;
+        FalloutScript::NameOverrides mNameOverrides;
+        /// The level and level modifier that the world's own numbers of placed objects roll their lists with, which the
+        /// provider of ESM4::setSpawnRollProvider answers from any thread
+        mutable std::mutex mWorldRollMutex;
+        std::map<ESM::FormId, std::pair<int, int>> mWorldRolls;
         FalloutScript::PlayerProgress mProgress;
         FalloutScript::PerkEngine mPerks;
         FalloutScript::ItemUse mItemUse;
