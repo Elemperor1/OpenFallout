@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <thread>
 
 #include <components/debug/debuglog.hpp>
@@ -27,6 +28,7 @@
 #include <components/esm4/loadweap.hpp>
 #include <components/esm4/loadwrld.hpp>
 #include <components/falloutscript/arguments.hpp>
+#include <components/falloutscript/worldrules.hpp>
 
 #include "../mwbase/environment.hpp"
 #include "../mwbase/statemanager.hpp"
@@ -240,25 +242,14 @@ namespace OFScript
 
         int formTypeOf(FalloutScript::FormId form) override
         {
-            switch (mHost.mStore.find(refIdOf(form)))
-            {
-                case ESM::REC_ARMO4:
-                    return 24;
-                case ESM::REC_BOOK4:
-                    return 25;
-                case ESM::REC_INGR4:
-                    return 29;
-                case ESM::REC_MISC4:
-                    return 31;
-                case ESM::REC_WEAP4:
-                    return 40;
-                case ESM::REC_AMMO4:
-                    return 41;
-                case ESM::REC_ALCH4:
-                    return 47;
-                default:
-                    return 0;
-            }
+            // The number of the record's signature in the executable's table; the same mapping as the form type
+            // conditions, so every inventory record (keys, notes, weapon mods and clothes too) has its number
+            const int type = mHost.mStore.find(refIdOf(form));
+            if (type == 0)
+                return 0;
+            const int number = FalloutScript::World::formTypeNumber(
+                FalloutScript::World::signatureOfRecordType(static_cast<std::uint32_t>(type)));
+            return number > 0 ? number : 0;
         }
 
         FalloutScript::FormId parentOf(FalloutScript::FormId reference) override

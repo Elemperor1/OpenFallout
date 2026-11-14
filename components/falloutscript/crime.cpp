@@ -669,6 +669,16 @@ namespace FalloutScript
         return !mTrespass.empty();
     }
 
+    std::vector<FormId> Law::trespassWatchers()
+    {
+        const std::lock_guard lock(mMutex);
+        std::vector<FormId> result;
+        result.reserve(mTrespass.size());
+        for (const auto& entry : mTrespass)
+            result.push_back(entry.first);
+        return result;
+    }
+
     Law::KarmaChange Law::karma(const LawSettings& settings, int current, int change)
     {
         KarmaChange result;

@@ -83,7 +83,6 @@ namespace OFScript
     {
         mLaw.clear();
         mStanding.clear();
-        mTrespassWatchers.clear();
         const std::lock_guard lock(mAlarmMutex);
         mAlarmed.clear();
         mSinceLook = 0.f;
@@ -715,10 +714,11 @@ namespace OFScript
                 carryOut(mLaw.alarm(alarm), 0);
             }
         }
-        // The ones that no longer have the player in a place that is not its own have their warnings forgotten
-        for (const FormId gone : mTrespassWatchers)
+        // The ones that no longer have the player in a place that is not its own have their warnings forgotten. Every
+        // entry of the law is checked, not only the ones seen earlier, so a warning that a save brought back for a
+        // character that is gone, fighting or out of sight does not stay.
+        for (const FormId gone : mLaw.trespassWatchers())
             if (watching.count(gone) == 0)
                 mLaw.endTrespass(gone);
-        mTrespassWatchers = std::move(watching);
     }
 }
