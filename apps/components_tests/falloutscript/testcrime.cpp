@@ -8,8 +8,10 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <map>
 #include <set>
+#include <vector>
 
 namespace
 {
@@ -568,6 +570,31 @@ namespace
         EXPECT_TRUE(f.mLaw.anyTrespass());
         f.mLaw.endTrespass(trudy);
         EXPECT_FALSE(f.mLaw.anyTrespass());
+    }
+
+    TEST(FalloutScriptCrimeTest, every_watcher_with_a_trespass_package_is_listed_even_after_a_load)
+    {
+        Fixture f;
+        f.mLaw.trespass(doc, 0.0, false);
+        f.mLaw.trespass(trudy, 0.0, false);
+        FalloutScript::SaveWriter out;
+        FalloutScript::writeLaw(f.mLaw, out);
+        const std::string bytes = out.take();
+
+        Fixture g;
+        EXPECT_TRUE(g.mLaw.trespassWatchers().empty());
+        FalloutScript::SaveReader in(bytes);
+        FalloutScript::readLaw(g.mLaw, in, FalloutScript::lawSectionVersion);
+        // the host reconciles these against the ones that mind the player now, and ends the rest
+        std::vector<FalloutScript::FormId> watchers = g.mLaw.trespassWatchers();
+        std::sort(watchers.begin(), watchers.end());
+        std::vector<FalloutScript::FormId> expected{ doc, trudy };
+        std::sort(expected.begin(), expected.end());
+        EXPECT_EQ(watchers, expected);
+        g.mLaw.endTrespass(doc);
+        g.mLaw.endTrespass(trudy);
+        EXPECT_TRUE(g.mLaw.trespassWatchers().empty());
+        EXPECT_FALSE(g.mLaw.anyTrespass());
     }
 
     TEST(FalloutScriptCrimeTest, a_cell_that_is_off_limits_gives_no_warning)

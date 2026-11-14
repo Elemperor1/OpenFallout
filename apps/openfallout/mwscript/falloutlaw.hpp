@@ -109,8 +109,7 @@ namespace OFScript
         FalloutScripts& mHost;
         FalloutScript::Law mLaw;
         FalloutScript::Standing mStanding;
-        /// The characters that warn the player of a trespass now, and the time since the last look
-        std::set<FalloutScript::FormId> mTrespassWatchers;
+        /// The time since the last look at the trespass
         float mSinceLook = 0.f;
         /// The characters that an alarm turned on the player. Asked from any thread.
         std::mutex mAlarmMutex;
