@@ -28,6 +28,7 @@ file(GLOB UNITTEST_SRC_FILES
     misc/compression.cpp
     misc/progressreporter.cpp
     misc/testendianness.cpp
+    misc/testthread.cpp
     misc/testmathutil.cpp
     misc/testresourcehelpers.cpp
     misc/testresourcepaths.cpp
@@ -58,6 +59,8 @@ file(GLOB UNITTEST_SRC_FILES
     settings/shadermanager.cpp
     settings/testmanager.cpp
     settings/testvalues.cpp
+
+    sdlutil/testdesktopconventions.cpp
 
     shader/parsedefines.cpp
     shader/parsefors.cpp
@@ -180,6 +183,7 @@ file(GLOB UNITTEST_SRC_FILES
     esm4/testtree.cpp
     esm4/testvoicetype.cpp
     esm4/testwater.cpp
+    esm4/testweapongamedata.cpp
     esm4/testweather.cpp
     esm4/testwornarmor.cpp
     esm4/testwornarmorcensus.cpp

@@ -285,8 +285,8 @@ de ordinarie fonterna i Morrowind. Bocka i denna ruta om du ändå föredrar ord
         <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;OpenMWs installationsguide har justerat din befintliga Morrowindinstallation.&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
     <message>
-        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The OpenFallout Wizard failed to install Morrowind on your computer.&lt;/p&gt;&lt;p&gt;Please report any bugs you might have encountered to our &lt;a href=&quot;https://github.com/Elemperor1/OpenFallout/issues&quot;&gt;bug tracker&lt;/a&gt;.&lt;br/&gt;Make sure to include the installation log.&lt;/p&gt;&lt;br/&gt;&lt;/body&gt;&lt;/html&gt;</source>
-        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;OpenMWs installationsguide misslyckades med att installera Morrowind på din dator.&lt;/p&gt;&lt;p&gt;Vänligen rapportera eventuella buggar på vår &lt;a href=&quot;https://github.com/Elemperor1/OpenFallout/issues&quot;&gt;bug tracker&lt;/a&gt;.&lt;br/&gt;Se till att du inkluderar installationsloggen.&lt;/p&gt;&lt;br/&gt;&lt;/body&gt;&lt;/html&gt;</translation>
+        <source>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The OpenFallout Wizard failed to install Morrowind on your computer.&lt;/p&gt;&lt;p&gt;Please report any bugs you might have encountered to our &lt;a href=&quot;https://github.com/OpenBethesda/OpenFallout/issues&quot;&gt;bug tracker&lt;/a&gt;.&lt;br/&gt;Make sure to include the installation log.&lt;/p&gt;&lt;br/&gt;&lt;/body&gt;&lt;/html&gt;</source>
+        <translation>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;OpenMWs installationsguide misslyckades med att installera Morrowind på din dator.&lt;/p&gt;&lt;p&gt;Vänligen rapportera eventuella buggar på vår &lt;a href=&quot;https://github.com/OpenBethesda/OpenFallout/issues&quot;&gt;bug tracker&lt;/a&gt;.&lt;br/&gt;Se till att du inkluderar installationsloggen.&lt;/p&gt;&lt;br/&gt;&lt;/body&gt;&lt;/html&gt;</translation>
     </message>
 </context>
 <context>

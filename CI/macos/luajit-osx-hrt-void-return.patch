@@ -1,0 +1,13 @@
+diff --git a/src/lj_mcode.c b/src/lj_mcode.c
+index edcc4bd9..13ad7e0a 100644
+--- a/src/lj_mcode.c
++++ b/src/lj_mcode.c
+@@ -153,7 +153,7 @@ static void mcode_setprot(jit_State *J, void *p, size_t sz, int prot)
+ #if MCMAP_CREATE
+   UNUSED(J); UNUSED(p); UNUSED(sz);
+   pthread_jit_write_protect_np((prot & PROT_EXEC));
+-  return 0;
++  return;
+ #else
+   if (mprotect(p, sz, prot)) mcode_protfail(J);
+ #endif

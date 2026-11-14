@@ -1135,7 +1135,7 @@ namespace OFGui
     void SettingsWindow::onClose()
     {
         // Save user settings
-        Settings::Manager::saveUser(mCfgMgr.getUserConfigPath() / "settings.cfg");
+        OFBase::Environment::get().getWindowManager()->saveUserSettings();
         OFBase::Environment::get().getLuaManager()->savePermanentStorage(mCfgMgr.getUserConfigPath());
         OFBase::Environment::get().getInputManager()->saveBindings();
     }

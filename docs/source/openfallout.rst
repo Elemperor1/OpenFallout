@@ -9,19 +9,19 @@ OpenFallout repository.
 Architecture and code map
 -------------------------
 
-`Developer architecture map <https://github.com/Elemperor1/OpenFallout/blob/master/docs/openfallout/architecture.md>`_
+`Developer architecture map <https://github.com/OpenBethesda/OpenFallout/blob/master/docs/openfallout/architecture.md>`_
 
 Project guides
 --------------
 
-* `Roadmap, implementation scope, and evidence <https://github.com/Elemperor1/OpenFallout/blob/master/docs/openfallout/gap-audit-and-roadmap.md>`_
-* `Build and test baseline <https://github.com/Elemperor1/OpenFallout/blob/master/docs/openfallout/build-baseline.md>`_
-* `Plugin loading and load order <https://github.com/Elemperor1/OpenFallout/blob/master/docs/openfallout/mods-and-load-order.md>`_
-* `Compiled scripts and extender coverage <https://github.com/Elemperor1/OpenFallout/blob/master/docs/openfallout/script-extender-plan.md>`_
-* `Menus and in-game evidence <https://github.com/Elemperor1/OpenFallout/blob/master/docs/openfallout/menus.md>`_
-* `Running OpenFallout <https://github.com/Elemperor1/OpenFallout/blob/master/docs/openfallout/playing.md>`_
-* `CI build cache operation and recovery <https://github.com/Elemperor1/OpenFallout/blob/master/docs/openfallout/ci-cache.md>`_
-* `Test and in-game harness <https://github.com/Elemperor1/OpenFallout/blob/master/docs/openfallout/harness.md>`_
+* `Roadmap, implementation scope, and evidence <https://github.com/OpenBethesda/OpenFallout/blob/master/docs/openfallout/gap-audit-and-roadmap.md>`_
+* `Build and test baseline <https://github.com/OpenBethesda/OpenFallout/blob/master/docs/openfallout/build-baseline.md>`_
+* `Plugin loading and load order <https://github.com/OpenBethesda/OpenFallout/blob/master/docs/openfallout/mods-and-load-order.md>`_
+* `Compiled scripts and extender coverage <https://github.com/OpenBethesda/OpenFallout/blob/master/docs/openfallout/script-extender-plan.md>`_
+* `Menus and in-game evidence <https://github.com/OpenBethesda/OpenFallout/blob/master/docs/openfallout/menus.md>`_
+* `Running OpenFallout <https://github.com/OpenBethesda/OpenFallout/blob/master/docs/openfallout/playing.md>`_
+* `CI build cache operation and recovery <https://github.com/OpenBethesda/OpenFallout/blob/master/docs/openfallout/ci-cache.md>`_
+* `Test and in-game harness <https://github.com/OpenBethesda/OpenFallout/blob/master/docs/openfallout/harness.md>`_
 
 The Sphinx documentation also contains the
 :doc:`Lua scripting reference <reference/lua-scripting/overview>` and

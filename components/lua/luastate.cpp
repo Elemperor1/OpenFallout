@@ -4,8 +4,11 @@
 #include <luajit.h>
 #endif // NO_LUAJIT
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
+#include <string_view>
 
 #include <components/debug/debuglog.hpp>
 #include <components/files/conversion.hpp>
@@ -174,6 +177,55 @@ namespace LuaUtil
         return state;
     }
 
+    bool isLuaJitProbeRequested(const char* value)
+    {
+        return value != nullptr && std::string_view(value) == "1";
+    }
+
+    // With OPENFALLOUT_LUAJIT_PROBE=1, logs once per process whether LuaJIT's compiler is on and whether it really
+    // compiles: a hot loop is run with a trace listener attached. A signed macOS app whose entitlements forbid writable
+    // executable memory cannot place compiled code, so "on" alone does not prove it works; the packaged-app check
+    // (CI/check_mac_package.py) sets the variable and reads this line. Without it nothing is run or logged.
+    static void reportJitStateOnce(sol::state_view& sol)
+    {
+#ifdef NO_LUAJIT
+        (void)sol;
+#else
+        static std::once_flag once;
+        std::call_once(once, [&] {
+            if (!isLuaJitProbeRequested(std::getenv("OPENFALLOUT_LUAJIT_PROBE")))
+                return;
+            sol::protected_function_result result = sol.safe_script(R"(
+                local status = { jit.status() }
+                local traces, aborts, firstAbort = 0, 0, nil
+                local function listener(what, _, _, _, otr)
+                    if what == 'stop' then
+                        traces = traces + 1
+                    elseif what == 'abort' then
+                        aborts = aborts + 1
+                        firstAbort = firstAbort or tostring(otr)
+                    end
+                end
+                local attached = pcall(jit.attach, listener, 'trace')
+                local sum = 0
+                for i = 1, 200000 do sum = sum + i % 7 end
+                if attached then jit.attach(listener) end
+                local flags = {}
+                for i = 2, #status do flags[#flags + 1] = tostring(status[i]) end
+                return string.format('%s (%s); hot loop: %s compiled trace(s), %d aborted%s',
+                    status[1] and 'on' or 'off', table.concat(flags, ' '),
+                    attached and tostring(traces) or 'unknown', aborts,
+                    firstAbort and (', first abort error ' .. firstAbort) or '')
+            )",
+                sol::script_pass_on_error);
+            if (result.valid())
+                Log(Debug::Info) << "LuaJIT compiler: " << result.get<std::string>();
+            else
+                Log(Debug::Warning) << "LuaJIT compiler: state unknown (" << result.get<sol::error>().what() << ")";
+        });
+#endif // NO_LUAJIT
+    }
+
     LuaState::LuaState(const VFS::Manager* vfs, const ScriptsConfiguration* conf, const LuaStateSettings& settings)
         : mSettings(settings)
         , mLuaState([&] {
@@ -196,6 +248,7 @@ namespace LuaUtil
 #ifndef NO_LUAJIT
             sol.open_libraries(sol::lib::jit);
 #endif // NO_LUAJIT
+            reportJitStateOnce(sol);
 
             sol["math"]["randomseed"](static_cast<unsigned>(std::time(nullptr)));
             sol["math"]["randomseed"] = [] {};

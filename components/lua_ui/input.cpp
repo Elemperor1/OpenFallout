@@ -4,13 +4,13 @@
 
 namespace LuaUi
 {
-    void dispatchMouseWheel(MyGUI::Widget* widget, float left, float top, float x, float y)
+    void dispatchMouseWheel(MyGUI::Widget* widget, const MouseWheel& wheel)
     {
         while (widget)
         {
             if (auto* ext = dynamic_cast<WidgetExtension*>(widget))
             {
-                ext->mouseWheel(widget, left, top, x, y);
+                ext->mouseWheel(wheel);
                 break;
             }
             widget = widget->getParent();
