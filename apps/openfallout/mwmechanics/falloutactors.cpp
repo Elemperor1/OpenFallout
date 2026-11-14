@@ -891,6 +891,7 @@ namespace OFMechanics
             // or with none when the duration is 0)
             found->second->mExpired = false;
             found->second->mDone.erase(found->second->mPackage);
+            found->second->mChangeTold = false;
         }
         keepState(*found->second);
     }
