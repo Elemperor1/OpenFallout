@@ -41,9 +41,13 @@ writes (keys `World.<Table>.<hex>`); no new section was added to the save.
     path that asks the actor with a flag of 0 never casts a ray: it reads cached detection bytes (not built here: the
     rays are cast every time).
   - The engine side takes the camera's view and projection matrices for the frustum (the target's feet, middle and
-    top), a ray cast of the physics world for each ray, and shortens the ray's end by the horizontal half extent of the
-    target so that the ray's hit on the target itself is not taken for a wall. That tolerance is mine; the executable
-    ignores the target in its ray cast. Not run on real data except as below.
+    top), a ray cast of the physics world for each ray, and shortens the ray's end by the length the ray travels inside the
+    target's own box (`World::depthInBox`), so that the ray's hit on the target itself is not taken for a wall. That
+    tolerance is mine; the executable ignores the target in its ray cast. The box is built from the half extents the world
+    gives for the target (the physics ones for a character, those of the model for anything else), upright and axis aligned
+    around the reference's position with its feet at it. The offset and the turn of the target's own collision shape are
+    not used (the world interface does not give them), so for a target whose shape is turned or off centre the box, and with
+    it the tolerance, is off by that difference. Not run on real data except as below.
 - `SetAllVisible` is a switch the rule reads.
 - `GetInCellParam` (exec 0x5C7590, eval 0x59EF60; Fallout 3 0x5253A0, 0x5100C0): `_strnicmp` of the name of the cell
   the reference is in against the name of the asked cell, over the length of the asked name: a prefix test, not an

@@ -93,7 +93,8 @@ return { limit = 900, delay = 4, run = function(r)
             end
             r.wait(0.15)
         end
-        r.log('L ' .. label .. ' was not killed in 20 blows')
+        -- (a target that survives every blow fails the round: a note would let it pass)
+        r.error('L ' .. label .. ' was not killed in 20 blows')
         return false
     end
     -- the same two characters are killed again and again (a revived character keeps nothing of the limbs: they are forgotten between
