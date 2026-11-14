@@ -274,6 +274,40 @@ namespace
         EXPECT_EQ(laidOnes.detonate(0x555), 0);
     }
 
+    TEST(FalloutScriptExplosivesTest, aRecordThatDetonatesAndHasTheAltTriggerGoesOffWhenTold)
+    {
+        EX::Kind both = mine();
+        both.mDetonates = true;
+        EX::Laid laidOnes;
+        const std::uint32_t id = laidOnes.plant(laid(both, 0x14));
+        const EX::Rules rules;
+        // nobody comes near: the mine waits
+        EXPECT_TRUE(laidOnes.update(rules, 1.0, nobody()).empty());
+        EXPECT_EQ(laidOnes.detonate(0x14), 1);
+        const std::vector<EX::Event> events = laidOnes.update(rules, 0.1, nobody());
+        ASSERT_EQ(events.size(), 1u);
+        EXPECT_EQ(events[0].mId, id);
+        EXPECT_EQ(events[0].mKind, EX::Event::Kind::Explode);
+    }
+
+    TEST(FalloutScriptExplosivesTest, aBlastThatDoesNoDamageIsKeptInASave)
+    {
+        EX::Laid laidOnes;
+        EX::Placed harmless = laid(mine(), 0x14);
+        harmless.mNoDamage = true;
+        laidOnes.plant(harmless);
+        laidOnes.plant(laid(mine(), 0x14));
+        FalloutScript::SaveWriter out;
+        EX::writeExplosives(laidOnes, out);
+        const std::string bytes = out.take();
+        FalloutScript::SaveReader in(bytes);
+        EX::Laid back;
+        EX::readExplosives(back, in, EX::explosivesSectionVersion);
+        ASSERT_EQ(back.count(), 2u);
+        EXPECT_TRUE(back.all()[0].mNoDamage);
+        EXPECT_FALSE(back.all()[1].mNoDamage);
+    }
+
     TEST(FalloutScriptExplosivesTest, disablingAllMinesSwitchesOffTheMinesThatCanBe)
     {
         EX::Laid laidOnes;

@@ -928,23 +928,27 @@ class StopEngine(unittest.TestCase):
 
     def test_what_is_left_of_the_engines_group_is_ended_with_it(self):
         # a crash handler that outlives the engine (a copy of it, forked when it crashes): the sweep after the run ends it
+        import select
         import signal
         import subprocess
-        leader = subprocess.Popen(["sh", "-c", "sleep 60 & wait"], start_new_session=True)
+        # (the orphan holds the leader's pipe open: the end of the orphan is the end of that pipe, which the kernel closes when
+        # the process exits, reaped or not; a group that is looked at instead exists while a zombie of it does, and in a
+        # container where nothing reaps orphans that is for good)
+        leader = subprocess.Popen(["sh", "-c", "sleep 60 & wait"], start_new_session=True, stdout=subprocess.PIPE)
         time.sleep(0.5)
         os.kill(leader.pid, signal.SIGKILL)
         leader.wait(timeout=10)
         os.killpg(leader.pid, 0)  # a member of the group is still there
         round_runner.sweep_engine_group(leader)
+        ended = False
         deadline = time.monotonic() + 5
         while time.monotonic() < deadline:
-            try:
-                os.killpg(leader.pid, 0)
-            except ProcessLookupError:
+            ready, _, _ = select.select([leader.stdout], [], [], 0.2)
+            if ready and os.read(leader.stdout.fileno(), 1024) == b"":
+                ended = True
                 break
-            time.sleep(0.1)
-        with self.assertRaises(ProcessLookupError):
-            os.killpg(leader.pid, 0)
+        leader.stdout.close()
+        self.assertTrue(ended, "the member of the group that was left is still there")
         with mock.patch.object(round_runner.os, "killpg", side_effect=ProcessLookupError):
             round_runner.sweep_engine_group(leader)  # nothing left: no error
 

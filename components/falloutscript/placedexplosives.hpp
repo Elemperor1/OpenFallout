@@ -114,6 +114,8 @@ namespace FalloutScript
             std::uint32_t mState = 0;
             /// The character that set it off, once someone did (0 until then, and for a charge that counts on its own)
             std::uint32_t mCause = 0;
+            /// Laid by an attack that hits and does no damage (UseWeapon with the flag): its blast does none either
+            bool mNoDamage = false;
         };
 
         /// What the world tells the rules about the characters near a mine (the host answers; the pure rules take the
@@ -190,7 +192,8 @@ namespace FalloutScript
             std::uint32_t mNext = 1;
         };
 
-        constexpr std::uint32_t explosivesSectionVersion = 1;
+        /// (version 2 adds the flag of a blast that does no damage; version 1 loads with it off)
+        constexpr std::uint32_t explosivesSectionVersion = 2;
         void writeExplosives(const Laid& laid, SaveWriter& out);
         void readExplosives(Laid& laid, SaveReader& in, std::uint32_t version);
     }

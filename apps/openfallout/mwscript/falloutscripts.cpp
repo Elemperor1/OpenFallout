@@ -3327,7 +3327,7 @@ namespace OFScript
         if (!keepWeaponLoop(attacker, stats.mWeapon, stats.mInterval))
             playWeaponSound(attacker, stats.mWeapon, false);
         // A mine, and a grenade with no target, is laid where the attacker stands and not struck at anything
-        if (layExplosive(attacker, stats.mWeapon, target))
+        if (layExplosive(attacker, stats.mWeapon, target, noDamage))
             return result;
         const FalloutScript::FormId victim = target.isEmpty() ? 0 : scriptReferenceOf(target);
         if (victim == 0 || victim == attacker)

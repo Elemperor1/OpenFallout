@@ -116,6 +116,13 @@ Rules read in the executable, all in `placedexplosives.cpp` and tested in `testp
 * The player is looked at after the characters. It is rolled against a chance (the perk entry point 4 of 100, "Calculate Mine
   Explode Chance" in the executable's list; no perk of the port uses it yet) with `rand() % 100`; a roll that lets it pass is
   remembered (run-time flag 0x4000) and the mine does not ask again.
+* Review fixes: a laid explosive keeps the place it lies in (the interior cell, or the worldspace outside) and only what is in that
+  place sets it off or takes its blast (a mine outlives the cell it was laid in, and the cells of another place overlap it); a ghost
+  takes no blast; what the player's charge takes off a character is the player's damage (the experience and the statistics of a kill
+  follow it); a charge that is both a mine and a detonator goes off when told, whatever the proximity; a charge laid by an attack
+  with the no-damage flag does no damage (explosives section version 2). PlaceAtReticle still puts the object in front of the
+  player: the hit position of the reticle is known, but the placement path (`placeAtMe`) takes a reference, a distance and a
+  direction, not a position.
 * Delay (0x9C3D1C to 0x9C3D5E): after it is set off a mine counts down fMinesDelayMin (0.2), and for the player, that plus the
   Explosives skill (floor, 0 to 100) times the record's timer over 100.
 * Disarm (0x9C43E0): needs the can-be-disabled flag and not to be disabled yet; sets run-time flag 0x200; the player gets

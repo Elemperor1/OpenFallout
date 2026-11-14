@@ -7,6 +7,7 @@
 #include <vector>
 
 #include <components/debug/debuglog.hpp>
+#include <components/esm4/loadcell.hpp>
 #include <components/esm4/loadcrea.hpp>
 #include <components/esm4/loadexpl.hpp>
 #include <components/esm4/loadnpc.hpp>
@@ -50,6 +51,13 @@ namespace OFScript
             return osg::Vec3f(static_cast<float>(std::sin(position.rot[2])), static_cast<float>(std::cos(position.rot[2])), 0.f);
         }
 
+        /// The number a form has in a saved game, 0 for none
+        FalloutScript::FormId formNumber(const ESM::RefId& id)
+        {
+            const ESM::FormId* form = id.getIf<ESM::FormId>();
+            return form == nullptr || form->isZeroOrUnset() || !form->hasContentFile() ? 0 : form->toUint32();
+        }
+
         bool isCharacterOrCreature(const OFWorld::Ptr& ptr)
         {
             return !ptr.isEmpty()
@@ -57,8 +65,29 @@ namespace OFScript
         }
     }
 
+    bool FalloutScripts::inSpaceOfLaid(const EX::Placed& laid, const OFWorld::Ptr& ptr)
+    {
+        if (ptr.isEmpty() || !ptr.isInCell())
+            return false;
+        const OFWorld::CellStore& cell = *ptr.getCell();
+        if (cell.isExterior() != laid.mExterior)
+            return false;
+        // What the explosive was laid in: its cell for an interior, the worldspace of its cell outside
+        FalloutScript::FormId space = laid.mCell;
+        if (laid.mExterior && laid.mCell != 0)
+        {
+            const ESM4::Cell* record = mStore.get<ESM4::Cell>().search(ESM::FormId::fromUint32(laid.mCell));
+            space = record != nullptr ? formNumber(record->mParent) : 0;
+        }
+        // (a cell that cannot be told stands for the one of its kind, as before the place was kept)
+        if (space == 0)
+            return true;
+        const FalloutScript::FormId here = formNumber(cell.isExterior() ? cell.getCell()->getWorldSpace() : cell.getCell()->getId());
+        return here == 0 || here == space;
+    }
+
     bool FalloutScripts::layExplosive(
-        FalloutScript::FormId attacker, FalloutScript::FormId weapon, const OFWorld::Ptr& target)
+        FalloutScript::FormId attacker, FalloutScript::FormId weapon, const OFWorld::Ptr& target, bool noDamage)
     {
         if (attacker == 0 || weapon == 0)
             return false;
@@ -94,6 +123,7 @@ namespace OFScript
         placed.mPosition[2] = spot.z();
         placed.mCell = cellOf(attacker);
         placed.mExterior = holder.getCell()->isExterior();
+        placed.mNoDamage = noDamage;
         std::uint32_t id = 0;
         {
             const std::lock_guard lock(mExplosivesMutex);
@@ -117,7 +147,8 @@ namespace OFScript
         if (explosion == nullptr)
             return;
         const ESM4::Explosion::GameData data = explosion->gameData();
-        const double damage = std::max<double>(data.mDamage, 0.0);
+        // (a blast of an attack that was to do no damage does none)
+        const double damage = laid.mNoDamage ? 0.0 : std::max<double>(data.mDamage, 0.0);
         const double radius = std::max<double>(data.mRadius, 0.0);
         const osg::Vec3f centre(laid.mPosition[0], laid.mPosition[1], laid.mPosition[2]);
         const double buffer = gameSetting("fExplosionLOSBuffer", 16.0);
@@ -138,12 +169,13 @@ namespace OFScript
                 actors.push_back(actor);
         for (const FalloutScript::FormId victim : actors)
         {
-            if (victim == 0 || mActors.isDead(victim))
+            // A ghost takes no blow, a blast included (as in strike)
+            if (victim == 0 || mActors.isDead(victim) || mObjectState.ghost(victim))
                 continue;
             const OFWorld::Ptr ptr = findReference(victim);
             if (ptr.isEmpty() || !ptr.isInCell() || !ptr.getRefData().isEnabled())
                 continue;
-            if (ptr.getCell()->isExterior() != laid.mExterior)
+            if (!inSpaceOfLaid(laid, ptr))
                 continue;
             const osg::Vec3f where = ptr.getRefData().getPosition().asVec3();
             if ((where - centre).length() > radius || !reaches(where))
@@ -161,7 +193,16 @@ namespace OFScript
                 struck.mAttacker = laid.mOwner;
                 struck.mDamage = damage;
                 mCombat.noteHit(victim, struck, false);
+                const double healthBefore = mActorValues.current(victim, AV::health);
                 mActorValues.damage(victim, AV::health, damage);
+                // What the player's charge took off a character is the player's damage, whoever lands the last of it: the
+                // experience and the statistics of a kill follow it (as for a blow)
+                if (laid.mOwner == mPlayer && mPlayer != 0 && victim != mPlayer)
+                {
+                    const double dealt = std::max(0.0, healthBefore - std::max(mActorValues.current(victim, AV::health), 0.0));
+                    const std::lock_guard damageLock(mPlayerDamageMutex);
+                    mPlayerDamage[victim] += dealt;
+                }
                 mDestruction.damage(victim, damage, mActorValues.current(victim, AV::health));
                 if (mActorValues.current(victim, AV::health) <= 0 && !fallsInsteadOfDying(victim))
                 {
@@ -178,7 +219,7 @@ namespace OFScript
             for (const auto& [reference, ptr] : mReferences)
             {
                 if (ptr.isEmpty() || !ptr.isInCell() || isCharacterOrCreature(ptr) || !ptr.getRefData().isEnabled()
-                    || ptr.mRef->isDeleted() || ptr.getCell()->isExterior() != laid.mExterior)
+                    || ptr.mRef->isDeleted() || !inSpaceOfLaid(laid, ptr))
                     continue;
                 if ((ptr.getRefData().getPosition().asVec3() - centre).length() <= radius)
                     objects.push_back(reference);
@@ -231,10 +272,10 @@ namespace OFScript
                 }
                 return layer;
             };
-            const auto near = [](const EX::Placed& laid, const OFWorld::Ptr& ptr, double radius) {
+            const auto near = [this](const EX::Placed& laid, const OFWorld::Ptr& ptr, double radius) {
                 if (ptr.isEmpty() || !ptr.isInCell() || !ptr.getRefData().isEnabled())
                     return false;
-                if (ptr.getCell()->isExterior() != laid.mExterior)
+                if (!inSpaceOfLaid(laid, ptr))
                     return false;
                 const osg::Vec3f centre(laid.mPosition[0], laid.mPosition[1], laid.mPosition[2]);
                 return (ptr.getRefData().getPosition().asVec3() - centre).length() <= radius;

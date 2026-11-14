@@ -112,6 +112,8 @@ return { limit = 900, delay = 4, run = function(r)
         local result = r.core.vats.attack(g1, aimed.index)
         r.log(string.format('V attack on part %d: refused %s, hit %s, chance %.1f, damage %s, killed %s', aimed.index,
             tostring(result.refused), tostring(result.hit), result.chance or 0, tostring(result.damage), tostring(result.killed)))
+        -- (the four checks below are about an attack that played: one that was refused is a failure of its own)
+        check('V the V.A.T.S. attack was accepted', result.refused == nil, tostring(result.refused))
         if result.refused == nil then
             local seen = nonzero('V playing')
             r.log(string.format('V playing: GetVATSValue 7 (hits) = %s, 11 (fatal) = %s, 5 with the part group = %s, 15 with 0 = %s',
@@ -147,7 +149,9 @@ return { limit = 900, delay = 4, run = function(r)
     local spot = { x = player.position.x, y = player.position.y + 70, z = player.position.z }
     local hq0 = health(g2)
     r.core.combat.fireWeapon(pid, mineForm)
-    r.wait(0.5)
+    -- (the mine lies 70 units from its owner, who can set it off: it is disabled at once, within the least delay a mine has
+    -- between being set off and going off, 0.2 s, so that it is still armed when it is switched off)
+    r.wait(0.05)
     cmd('DisableAllMines', pid)
     r.wait(0.5)
     r.putAt(g2, { pos = { spot.x, spot.y, spot.z }, yaw = math.pi, label = 'g2 on the disabled mine' })

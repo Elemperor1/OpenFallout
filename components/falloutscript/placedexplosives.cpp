@@ -143,7 +143,11 @@ namespace FalloutScript::Explosives
             // Only a projectile with an explosion that has not been disabled can go off
             if (laid.mKind.mHasExplosion && (laid.mState & stateDisabled) == 0)
             {
-                if (laid.mKind.mAltTrigger)
+                // A record that detonates and also has the alt trigger still goes off when it is told to: the word of the script
+                // is looked at before the proximity or the timer
+                if ((laid.mState & stateDetonate) != 0)
+                    explode = true;
+                else if (laid.mKind.mAltTrigger)
                 {
                     bool counting = laid.mTimer != waiting || laid.mKind.mProximity == 0.0;
                     if (!counting)
@@ -192,8 +196,6 @@ namespace FalloutScript::Explosives
                         }
                     }
                 }
-                else if ((laid.mState & stateDetonate) != 0)
-                    explode = true;
             }
             if (explode)
             {
@@ -247,12 +249,14 @@ namespace FalloutScript::Explosives
             out.f64(p.mTimer);
             out.u32(p.mState);
             out.u32(p.mCause);
+            out.boolean(p.mNoDamage);
         }
     }
 
     void readExplosives(Laid& laid, SaveReader& in, std::uint32_t version)
     {
-        if (version != explosivesSectionVersion)
+        // (version 1 has no flag for a blast that does no damage)
+        if (version != 1 && version != explosivesSectionVersion)
             throw SaveError("explosives: unknown version");
         const std::uint32_t next = in.u32();
         // each entry takes at least 64 bytes
@@ -279,6 +283,7 @@ namespace FalloutScript::Explosives
             p.mTimer = in.f64();
             p.mState = in.u32();
             p.mCause = in.u32();
+            p.mNoDamage = version >= 2 && in.boolean();
             // A projectile whose record is no longer loaded is dropped; the cell it lay in is only a guide
             if (!projectile)
                 continue;

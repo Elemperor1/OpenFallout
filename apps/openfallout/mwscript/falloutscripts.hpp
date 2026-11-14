@@ -2522,7 +2522,11 @@ namespace OFScript
         void updateExplosives(float frametime);
         /// A weapon that lays a mine or a charge (a land mine, a thrown mine, a grenade) lays it in front of the attacker
         /// in place of striking; false for any other weapon
-        bool layExplosive(FalloutScript::FormId attacker, FalloutScript::FormId weapon, const OFWorld::Ptr& target);
+        bool layExplosive(FalloutScript::FormId attacker, FalloutScript::FormId weapon, const OFWorld::Ptr& target,
+            bool noDamage = false);
+        /// Whether the thing is in the place that a laid explosive lies in: the same interior, or the same worldspace
+        /// outside (an explosive outlives the cell it was laid in, and a cell elsewhere has places that overlap it)
+        bool inSpaceOfLaid(const FalloutScript::Explosives::Placed& laid, const OFWorld::Ptr& ptr);
         /// The explosion of a laid projectile: what is in its radius loses health (falloutmines.cpp)
         void explodeLaid(const FalloutScript::Explosives::Placed& laid, FalloutScript::FormId cause);
         /// The action of V.A.T.S. for a part of a target (falloutvatscommands.cpp)
